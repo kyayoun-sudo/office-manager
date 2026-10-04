@@ -1,9 +1,13 @@
 {
   "name": "office-manager-ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@openai/agents": "latest",
+    "zod": "^4.0.0"
   }
 }

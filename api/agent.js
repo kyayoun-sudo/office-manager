@@ -1,6 +1,6 @@
-import { chooseAgent, getAgent } from "../agents/index.js";
+import { chooseAgent } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
-import { runAI } from "../lib/ai.js";
+import { runOfficeManager } from "../lib/orchestrator.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -8,6 +8,23 @@ import {
   getPermissions,
   loadAgentContext
 } from "../lib/supabase.js";
+
+const SPECIALISTS = ["grand-controleur", "orpailleur", "sika"];
+
+async function loadAllowedContexts(orgId) {
+  const entries = await Promise.all(
+    SPECIALISTS.map(async agentKey => {
+      const setting = await getAgentSetting(orgId, agentKey);
+      if (!setting || setting.mode === "disabled") {
+        return [agentKey, { unavailable: true, reason: "AGENT_DISABLED" }];
+      }
+      const context = await loadAgentContext(orgId, agentKey);
+      return [agentKey, context];
+    })
+  );
+
+  return Object.fromEntries(entries);
+}
 
 export default async function handler(req, res) {
   let run = null;
@@ -29,65 +46,76 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "message is required" });
     }
 
+    if (requestedAgent !== "auto" && !SPECIALISTS.includes(requestedAgent)) {
+      return res.status(400).json({ error: "UNKNOWN_AGENT" });
+    }
+
     const orgId = process.env.DEFAULT_ORG_ID;
     if (!orgId) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
 
-    const agentKey =
-      requestedAgent === "auto"
-        ? chooseAgent(message)
-        : requestedAgent;
-
-    const agent = getAgent(agentKey);
-
-    const [setting, permissions] = await Promise.all([
-      getAgentSetting(orgId, agentKey),
-      getPermissions(orgId)
-    ]);
-
-    if (!setting) {
-      return res.status(404).json({ error: "AGENT_NOT_CONFIGURED", agent: agentKey });
-    }
-
-    if (setting.mode === "disabled") {
-      return res.status(409).json({ error: "AGENT_DISABLED", agent: agentKey });
-    }
+    const permissions = await getPermissions(orgId);
 
     if (!permissions?.external_ai_approved) {
-      return res.status(409).json({
-        error: "EXTERNAL_AI_APPROVAL_REQUIRED",
-        agent: agentKey
-      });
+      return res.status(409).json({ error: "EXTERNAL_AI_APPROVAL_REQUIRED" });
     }
 
-    const context = await loadAgentContext(orgId, agentKey);
+    if (!permissions?.selected_content_approved) {
+      return res.status(409).json({ error: "CONTENT_PROCESSING_APPROVAL_REQUIRED" });
+    }
+
+    let contexts;
+    let runAgentKey;
+
+    if (requestedAgent === "auto") {
+      contexts = await loadAllowedContexts(orgId);
+      runAgentKey = "grand-controleur";
+    } else {
+      const setting = await getAgentSetting(orgId, requestedAgent);
+      if (!setting) {
+        return res.status(404).json({
+          error: "AGENT_NOT_CONFIGURED",
+          agent: requestedAgent
+        });
+      }
+      if (setting.mode === "disabled") {
+        return res.status(409).json({
+          error: "AGENT_DISABLED",
+          agent: requestedAgent
+        });
+      }
+      contexts = {
+        [requestedAgent]: await loadAgentContext(orgId, requestedAgent)
+      };
+      runAgentKey = requestedAgent;
+    }
+
+    // Kept for compatibility/analytics: the old keyword router still indicates
+    // which specialist would have been chosen before the multi-agent manager.
+    const legacyRoute = chooseAgent(message);
 
     run = await createAgentRun({
       org_id: orgId,
-      agent_key: agentKey,
+      agent_key: runAgentKey,
       status: "running",
-      metrics: {},
+      metrics: {
+        orchestration: requestedAgent === "auto" ? "manager" : "direct-specialist",
+        legacy_route: legacyRoute
+      },
       errors: [],
-      summary: `${agent.name} AI request started`
+      summary:
+        requestedAgent === "auto"
+          ? "Office Manager multi-agent request started"
+          : `${requestedAgent} direct request started`
     });
 
-    const input = JSON.stringify(
-      {
-        user_request: message,
-        agent: agentKey,
-        evidence: context
-      },
-      null,
-      2
-    );
-
-    const result = await runAI({
-      agentKey,
-      instructions: agent.instructions,
-      input,
-      risk,
-      provider
+    const result = await runOfficeManager({
+      message,
+      requestedAgent,
+      contexts,
+      provider,
+      risk
     });
 
     if (run?.id) {
@@ -96,18 +124,26 @@ export default async function handler(req, res) {
         finished_at: new Date().toISOString(),
         summary: result.text.slice(0, 1000),
         metrics: {
-          provider: result.provider
+          provider: result.provider,
+          orchestration: requestedAgent === "auto" ? "manager" : "direct-specialist",
+          last_agent: result.lastAgent || null,
+          reviewed: Boolean(result.review || result.reviewed),
+          legacy_route: legacyRoute
         },
         errors: []
       });
     }
 
     return res.status(200).json({
-      agent: agentKey,
-      agentName: agent.name,
+      agent: requestedAgent === "auto" ? "office-manager" : requestedAgent,
+      agentName:
+        requestedAgent === "auto"
+          ? "Office Manager AI"
+          : result.lastAgent || requestedAgent,
       provider: result.provider,
       answer: result.text,
-      reviewed: Boolean(result.review)
+      reviewed: Boolean(result.review || result.reviewed),
+      lastAgent: result.lastAgent || null
     });
   } catch (error) {
     if (run?.id) {
