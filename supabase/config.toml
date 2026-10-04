@@ -1,0 +1,4 @@
+project_id = "jdshiarbgpddhfhivmie"
+
+[functions.orpailleur-durable-worker]
+verify_jwt = true

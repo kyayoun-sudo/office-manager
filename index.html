@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Office Manager AI</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182033;background:#f4f6fa}
+*{box-sizing:border-box}
+body{margin:0}
+main{max-width:1050px;margin:0 auto;padding:42px 22px 80px}
+.hero{margin-bottom:26px}
+.kicker{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#5b6a82}
+h1{font-size:42px;margin:8px 0 12px}
+.sub{max-width:760px;color:#647087;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:25px 0}
+.card{background:#fff;border:1px solid #dfe5ef;border-radius:15px;padding:18px}
+.card h2{font-size:17px;margin:0 0 8px}
+.card p{margin:0;color:#687389;font-size:14px;line-height:1.5}
+.panel{background:#fff;border:1px solid #dfe5ef;border-radius:18px;padding:22px}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
+input,select,textarea{width:100%;border:1px solid #ccd5e2;border-radius:10px;padding:11px;font:inherit;background:#fff}
+textarea{min-height:150px;resize:vertical}
+button{border:0;border-radius:10px;background:#132a4d;color:#fff;padding:12px 18px;font-weight:750;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}
+.answer{margin-top:18px;padding:16px;border-radius:12px;background:#f7f9fc;white-space:pre-wrap;line-height:1.6;min-height:70px}
+.small{font-size:12px;color:#758198}
+.actions{display:flex;gap:10px;align-items:center;margin-top:12px}
+@media(max-width:760px){.grid,.row{grid-template-columns:1fr}h1{font-size:34px}}
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="kicker">Personal pilot</div>
+    <h1>Office Manager AI</h1>
+    <div class="sub">Un agent principal qui orchestre Grand Contrôleur, Orpailleur et Sika. Supabase garde les données et l’historique; OpenAI et Claude sont appelés uniquement côté serveur.</div>
+  </section>
+
+  <section class="grid">
+    <div class="card"><h2>Grand Contrôleur</h2><p>Missions, planning, PBC, retards, risques qualité et livrables.</p></div>
+    <div class="card"><h2>Orpailleur</h2><p>Drive, documents, versions, inventaire, inspection et classement contrôlé.</p></div>
+    <div class="card"><h2>Sika</h2><p>Facturation, recouvrement et suivi administratif.</p></div>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <div>
+        <label for="token">Access token</label>
+        <input id="token" type="password" autocomplete="off" placeholder="Pilot access token">
+      </div>
+      <div>
+        <label for="agent">Agent</label>
+        <select id="agent">
+          <option value="auto">Auto</option>
+          <option value="grand-controleur">Grand Contrôleur</option>
+          <option value="orpailleur">Orpailleur</option>
+          <option value="sika">Sika</option>
+        </select>
+      </div>
+      <div>
+        <label for="provider">IA</label>
+        <select id="provider">
+          <option value="auto">Auto</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Claude</option>
+          <option value="dual">OpenAI + Claude review</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label for="message">Demande</label>
+      <textarea id="message" placeholder="Exemple : Vérifie les missions en cours et donne-moi les risques qui nécessitent mon attention."></textarea>
+    </div>
+
+    <div class="actions">
+      <button id="send">Envoyer</button>
+      <span id="meta" class="small"></span>
+    </div>
+
+    <div id="answer" class="answer">L’agent est prêt dès que les variables Vercel sont configurées et que les agents sont activés dans Supabase.</div>
+  </section>
+</main>
+
+<script>
+const tokenEl = document.getElementById("token");
+const agentEl = document.getElementById("agent");
+const providerEl = document.getElementById("provider");
+const messageEl = document.getElementById("message");
+const sendEl = document.getElementById("send");
+const answerEl = document.getElementById("answer");
+const metaEl = document.getElementById("meta");
+
+tokenEl.value = sessionStorage.getItem("officeManagerToken") || "";
+
+sendEl.addEventListener("click", async () => {
+  const token = tokenEl.value.trim();
+  const message = messageEl.value.trim();
+
+  if (!token || !message) {
+    answerEl.textContent = "Entre le token pilote et une demande.";
+    return;
+  }
+
+  sessionStorage.setItem("officeManagerToken", token);
+  sendEl.disabled = true;
+  answerEl.textContent = "Analyse en cours…";
+  metaEl.textContent = "";
+
+  try {
+    const response = await fetch("/api/agent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-office-manager-token": token
+      },
+      body: JSON.stringify({
+        message,
+        agent: agentEl.value,
+        provider: providerEl.value,
+        risk: "normal"
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Request failed");
+    }
+
+    answerEl.textContent = data.answer;
+    metaEl.textContent =
+      `${data.agentName} · ${data.provider}` +
+      (data.reviewed ? " · reviewed" : "");
+  } catch (error) {
+    answerEl.textContent = `Erreur : ${error.message}`;
+  } finally {
+    sendEl.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
