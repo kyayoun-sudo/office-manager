@@ -1,3 +1,5 @@
+import { googleConnectionConfigured } from "../lib/google-drive.js";
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -6,6 +8,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     service: "Office Manager AI",
     status: "ok",
+    release: "v2.2-operational-tools",
     providers: {
       supabase: Boolean(
         process.env.SUPABASE_URL &&
@@ -16,7 +19,8 @@ export default async function handler(req, res) {
         process.env.ANTHROPIC_API_KEY &&
         process.env.ANTHROPIC_MODEL
       ),
-      orpailleur: Boolean(process.env.ORPAILLEUR_JOB_SECRET)
+      orpailleur: Boolean(process.env.ORPAILLEUR_JOB_SECRET),
+      googleDriveSheets: googleConnectionConfigured()
     }
   });
 }

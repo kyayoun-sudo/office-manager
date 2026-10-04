@@ -6,6 +6,7 @@ import {
   finishAgentRun,
   getAgentSetting,
   getPermissions,
+  getRunToolEvents,
   loadAgentContext
 } from "../lib/supabase.js";
 
@@ -15,15 +16,38 @@ async function loadAllowedContexts(orgId) {
   const entries = await Promise.all(
     SPECIALISTS.map(async agentKey => {
       const setting = await getAgentSetting(orgId, agentKey);
+
       if (!setting || setting.mode === "disabled") {
-        return [agentKey, { unavailable: true, reason: "AGENT_DISABLED" }];
+        return [
+          agentKey,
+          { unavailable: true, reason: "AGENT_DISABLED" }
+        ];
       }
+
       const context = await loadAgentContext(orgId, agentKey);
       return [agentKey, context];
     })
   );
 
   return Object.fromEntries(entries);
+}
+
+function specialistsFromTools(toolsUsed = [], requestedAgent = "auto") {
+  if (requestedAgent !== "auto") return [requestedAgent];
+
+  const mapping = {
+    consult_grand_controleur: "grand-controleur",
+    consult_orpailleur: "orpailleur",
+    consult_sika: "sika"
+  };
+
+  return [
+    ...new Set(
+      toolsUsed
+        .map(name => mapping[name])
+        .filter(Boolean)
+    )
+  ];
 }
 
 export default async function handler(req, res) {
@@ -46,7 +70,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "message is required" });
     }
 
-    if (requestedAgent !== "auto" && !SPECIALISTS.includes(requestedAgent)) {
+    if (
+      requestedAgent !== "auto" &&
+      !SPECIALISTS.includes(requestedAgent)
+    ) {
       return res.status(400).json({ error: "UNKNOWN_AGENT" });
     }
 
@@ -58,11 +85,15 @@ export default async function handler(req, res) {
     const permissions = await getPermissions(orgId);
 
     if (!permissions?.external_ai_approved) {
-      return res.status(409).json({ error: "EXTERNAL_AI_APPROVAL_REQUIRED" });
+      return res
+        .status(409)
+        .json({ error: "EXTERNAL_AI_APPROVAL_REQUIRED" });
     }
 
     if (!permissions?.selected_content_approved) {
-      return res.status(409).json({ error: "CONTENT_PROCESSING_APPROVAL_REQUIRED" });
+      return res
+        .status(409)
+        .json({ error: "CONTENT_PROCESSING_APPROVAL_REQUIRED" });
     }
 
     let contexts;
@@ -70,29 +101,36 @@ export default async function handler(req, res) {
 
     if (requestedAgent === "auto") {
       contexts = await loadAllowedContexts(orgId);
+      // Existing DB compatibility: multi-agent manager run is stored under
+      // grand-controleur while metrics identify manager orchestration.
       runAgentKey = "grand-controleur";
     } else {
       const setting = await getAgentSetting(orgId, requestedAgent);
+
       if (!setting) {
         return res.status(404).json({
           error: "AGENT_NOT_CONFIGURED",
           agent: requestedAgent
         });
       }
+
       if (setting.mode === "disabled") {
         return res.status(409).json({
           error: "AGENT_DISABLED",
           agent: requestedAgent
         });
       }
+
       contexts = {
-        [requestedAgent]: await loadAgentContext(orgId, requestedAgent)
+        [requestedAgent]: await loadAgentContext(
+          orgId,
+          requestedAgent
+        )
       };
+
       runAgentKey = requestedAgent;
     }
 
-    // Kept for compatibility/analytics: the old keyword router still indicates
-    // which specialist would have been chosen before the multi-agent manager.
     const legacyRoute = chooseAgent(message);
 
     run = await createAgentRun({
@@ -100,14 +138,18 @@ export default async function handler(req, res) {
       agent_key: runAgentKey,
       status: "running",
       metrics: {
-        orchestration: requestedAgent === "auto" ? "manager" : "direct-specialist",
-        legacy_route: legacyRoute
+        orchestration:
+          requestedAgent === "auto"
+            ? "manager"
+            : "direct-specialist",
+        legacy_route: legacyRoute,
+        release: "v2.2-operational-tools"
       },
       errors: [],
       summary:
         requestedAgent === "auto"
-          ? "Office Manager multi-agent request started"
-          : `${requestedAgent} direct request started`
+          ? "Office Manager operational multi-agent request started"
+          : `${requestedAgent} operational direct request started`
     });
 
     const result = await runOfficeManager({
@@ -115,8 +157,28 @@ export default async function handler(req, res) {
       requestedAgent,
       contexts,
       provider,
-      risk
+      risk,
+      orgId,
+      runId: run?.id || null
     });
+
+    const topLevelTools = result.toolsUsed || [];
+    const toolEvents = run?.id
+      ? await getRunToolEvents(orgId, run.id)
+      : [];
+    const eventTools = toolEvents
+      .map(event => event.tool_name)
+      .filter(Boolean);
+    const toolsUsed = [...new Set([...topLevelTools, ...eventTools])];
+    const eventSpecialists = toolEvents
+      .map(event => event.specialist_key)
+      .filter(Boolean);
+    const specialistsUsed = [
+      ...new Set([
+        ...specialistsFromTools(topLevelTools, requestedAgent),
+        ...eventSpecialists
+      ])
+    ];
 
     if (run?.id) {
       await finishAgentRun(run.id, {
@@ -125,17 +187,26 @@ export default async function handler(req, res) {
         summary: result.text.slice(0, 1000),
         metrics: {
           provider: result.provider,
-          orchestration: requestedAgent === "auto" ? "manager" : "direct-specialist",
+          orchestration:
+            requestedAgent === "auto"
+              ? "manager"
+              : "direct-specialist",
           last_agent: result.lastAgent || null,
           reviewed: Boolean(result.review || result.reviewed),
-          legacy_route: legacyRoute
+          legacy_route: legacyRoute,
+          specialists_used: specialistsUsed,
+          tools_used: toolsUsed,
+          release: "v2.2-operational-tools"
         },
         errors: []
       });
     }
 
     return res.status(200).json({
-      agent: requestedAgent === "auto" ? "office-manager" : requestedAgent,
+      agent:
+        requestedAgent === "auto"
+          ? "office-manager"
+          : requestedAgent,
       agentName:
         requestedAgent === "auto"
           ? "Office Manager AI"
@@ -143,7 +214,9 @@ export default async function handler(req, res) {
       provider: result.provider,
       answer: result.text,
       reviewed: Boolean(result.review || result.reviewed),
-      lastAgent: result.lastAgent || null
+      lastAgent: result.lastAgent || null,
+      specialistsUsed,
+      toolsUsed
     });
   } catch (error) {
     if (run?.id) {

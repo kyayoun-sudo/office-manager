@@ -1,6 +1,6 @@
 {
   "name": "office-manager-ai",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@openai/agents": "latest",
+    "exceljs": "latest",
+    "mammoth": "latest",
     "zod": "^4.0.0"
   }
 }
