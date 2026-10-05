@@ -8,19 +8,25 @@ import {
   GOOGLE_DOC_MIME,
   GOOGLE_SHEET_MIME,
   DOCX_MIME,
+  XLSX_MIME,
+  TEMPLATE_READ_CHARS,
   WP_STATUS,
   applyPbcItemPlan,
   buildRequiredWorkingPapers,
+  checkProgrammeState,
   classifyTemplateCandidate,
   contentFingerprint,
   decidePbcEvaluation,
   discoverTemplateLibraries,
+  findPbcColumns,
+  loadPbcItem,
   planHeaderPrefill,
+  planPbcEvaluationWrites,
   planPbcItemApplicability,
   prefillHeader,
   programmeFingerprint,
-  writePbcEvaluation,
-  loadPbcItem
+  verifyLibraryBasis,
+  writePbcEvaluation
 } from "../lib/mission-engine.js";
 import { findOverduePbcItems, buildSpecialistTools } from "../lib/agent-tools.js";
 
@@ -37,7 +43,7 @@ function fakeDrive(seed) {
   let counter = 0;
 
   return {
-    files, texts, copies, writes,
+    files, texts, sheets, copies, writes,
     async getMeta(id) {
       const meta = files.get(id);
       if (!meta) throw new Error(`NOT_FOUND ${id}`);
@@ -71,9 +77,7 @@ function fakeDrive(seed) {
     async getValues(id, range) {
       const sheet = sheets[id];
       if (!sheet) return [];
-      if (range.startsWith("PBC_MASTER")) {
-        return /AB4$/.test(range) ? [sheet.pbcRows[0]] : sheet.pbcRows;
-      }
+      if (range.startsWith("PBC_MASTER")) return sheet.pbcRows;
       return sheet.rows || [];
     },
     async getFormulaMap(id, sheetName) {
@@ -95,7 +99,9 @@ const PROGRAMME_TEXT = [
   "Cycle STK : Procédure STK-01 : assister à l'inventaire physique des stocks."
 ].join("\n");
 
-function seedDrive({ programmeName = "PROGRAMME_TRAVAIL_ABC_VALIDE", extraFiles = [], extraTexts = {} } = {}) {
+const BLANK_TEMPLATE_TEXT = "Client : ............\nExercice : ............\nPréparé par : [à compléter]\nRevu par : [à compléter]\nObjectif : rapprochement bancaire";
+
+function seedDrive({ programmeName = "PROGRAMME_TRAVAIL_ABC_VALIDE", programmeText = PROGRAMME_TEXT, extraFiles = [], extraTexts = {} } = {}) {
   return fakeDrive({
     files: [
       { id: "ROOT", name: "Shared", mimeType: FOLDER_MIME, parents: [] },
@@ -108,12 +114,21 @@ function seedDrive({ programmeName = "PROGRAMME_TRAVAIL_ABC_VALIDE", extraFiles 
       { id: "T6", name: "Modèle WP Trésorerie - Rapprochement bancaire", mimeType: GOOGLE_SHEET_MIME, parents: ["LIB-ARCH"] },
       { id: "T7", name: "Modèle Revue analytique A", mimeType: DOCX_MIME, parents: ["LIB"] },
       { id: "T8", name: "Modèle Revue analytique B", mimeType: DOCX_MIME, parents: ["LIB"] },
+      { id: "T9", name: "Modèle Synthèse (scan)", mimeType: XLSX_MIME, parents: ["LIB"] },
       { id: "M", name: "ABC_2025", mimeType: FOLDER_MIME, parents: ["ROOT"] },
-      { id: "D", name: "05_WORKING_PAPERS", mimeType: FOLDER_MIME, parents: ["M"] },
+      { id: "D", name: "05_DOSSIER_TRAVAUX", mimeType: FOLDER_MIME, parents: ["M"] },
       { id: "P", name: programmeName, mimeType: GOOGLE_DOC_MIME, parents: ["M"], modifiedTime: "2026-10-01T10:00:00Z" },
       ...extraFiles
     ],
-    texts: { P: PROGRAMME_TEXT, ...extraTexts },
+    texts: {
+      P: programmeText,
+      T1: BLANK_TEMPLATE_TEXT,
+      T2: "Client : ....\nTest de cut-off",
+      T4: "Client : SOCIETE CLIENTX SA\nPréparé par : Jean Dupont\nRapprochement bancaire 2023",
+      T7: "Revue analytique - modèle A",
+      T8: "Revue analytique - modèle B",
+      ...extraTexts
+    },
     sheets: {
       T1: {
         sheetName: "WP",
@@ -122,6 +137,34 @@ function seedDrive({ programmeName = "PROGRAMME_TRAVAIL_ABC_VALIDE", extraFiles 
       }
     }
   });
+}
+
+// What inspect_wp_template_candidates returns for a template.
+async function inspected(drive, id) {
+  const meta = await drive.getMeta(id);
+  const read = await drive.readText(id, { maxChars: TEMPLATE_READ_CHARS });
+  return {
+    template_file_id: id,
+    template_modified_at: meta.modifiedTime,
+    template_content_fingerprint: read.supported ? contentFingerprint(meta, read.text) : null
+  };
+}
+
+const TRE_REQ = {
+  cycle: "TRE",
+  workstream: "Trésorerie",
+  procedure: "TRE-01 rapprochements bancaires",
+  required_wp_type: "Rapprochement bancaire",
+  wp_code: null,
+  template_reference: null,
+  template_file_id: null,
+  preparer: "A. Kone",
+  reviewer: "M. Diallo",
+  source_evidence: { excerpt: "Procédure TRE-01 : rapprochements bancaires au 31/12/2025 pour tous les comptes", location: "Cycle TRE" }
+};
+
+async function treReq(drive, id = "T1") {
+  return { ...TRE_REQ, ...(await inspected(drive, id)) };
 }
 
 async function analysedInput(drive, overrides = {}) {
@@ -146,23 +189,10 @@ async function analysedInput(drive, overrides = {}) {
     dry_run: false,
     prefill_headers: false,
     prefill_prepared_date: false,
-    requirements: [TRE_REQ],
+    requirements: [await treReq(drive)],
     ...overrides
   };
 }
-
-const TRE_REQ = {
-  cycle: "TRE",
-  workstream: "Trésorerie",
-  procedure: "TRE-01 rapprochements bancaires",
-  required_wp_type: "Rapprochement bancaire",
-  wp_code: null,
-  template_reference: null,
-  template_file_id: null,
-  preparer: "A. Kone",
-  reviewer: "M. Diallo",
-  source_evidence: { excerpt: "Procédure TRE-01 : rapprochements bancaires au 31/12/2025 pour tous les comptes", location: "Cycle TRE" }
-};
 
 const opts = { configuredLibraryId: "LIB", now: new Date("2026-10-05T12:00:00Z") };
 
@@ -191,7 +221,6 @@ test("programme changed between analysis and execution blocks everything", async
   const r1 = await buildRequiredWorkingPapers(drive, input, opts);
   assert.equal(r1.status, "PROGRAMME_CHANGED");
 
-  // Same modifiedTime but different content -> fingerprint mismatch.
   const drive2 = seedDrive();
   const input2 = await analysedInput(drive2);
   drive2.texts.set("P", PROGRAMME_TEXT + "\nProcédure ajoutée.");
@@ -200,8 +229,25 @@ test("programme changed between analysis and execution blocks everything", async
   assert.equal(drive.copies.length + drive2.copies.length, 0);
 });
 
+test("truncated programme: state PROGRAMME_TRUNCATED_REVIEW_REQUIRED, generation blocked", async () => {
+  const longText = PROGRAMME_TEXT + "\n" + "Procédure détaillée complémentaire. ".repeat(3000);
+  assert.ok(longText.length > 60000);
+  const drive = seedDrive({ programmeText: longText });
+  const meta = await drive.getMeta("P");
+  const read = await drive.readText("P", { maxChars: 60000 });
+  assert.equal(read.truncated, true);
+
+  const state = checkProgrammeState({ meta, read, validatedConfirmed: true });
+  assert.equal(state.ok, false);
+  assert.equal(state.status, "PROGRAMME_TRUNCATED_REVIEW_REQUIRED");
+
+  const built = await buildRequiredWorkingPapers(drive, await analysedInput(drive), opts);
+  assert.equal(built.status, "PROGRAMME_TRUNCATED_REVIEW_REQUIRED");
+  assert.equal(drive.copies.length, 0);
+});
+
 // ---------------------------------------------------------------------------
-// Work products
+// Work products — the AI decides the template, the engine verifies
 // ---------------------------------------------------------------------------
 
 test("only the work products required by the programme are created", async () => {
@@ -211,11 +257,71 @@ test("only the work products required by the programme are created", async () =>
   assert.equal(drive.copies.length, 1, "exactly one copy for one requirement");
   const [item] = result.work_products;
   assert.equal(item.status, WP_STATUS.CREATED);
-  assert.equal(item.template.file_id, "T1", "blank library template, not archive/completed copies");
+  assert.equal(item.template.file_id, "T1");
+  assert.equal(item.template.selection_basis, "AGENT_SELECTED_REVALIDATED");
   assert.equal(drive.copies[0].parentId, "D");
   assert.equal(item.programme_file_id, "P");
   assert.match(item.source_evidence.excerpt, /TRE-01/);
-  assert.ok(item.file.file_id);
+});
+
+test("template_file_id absent: no automatic copy even with a unique scoring candidate", async () => {
+  const drive = seedDrive();
+  const result = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
+    requirements: [{ ...TRE_REQ }] // "Rapprochement bancaire" matches only T1 among eligible files
+  }), opts);
+  const [item] = result.work_products;
+  assert.equal(item.status, WP_STATUS.REVIEW_REQUIRED);
+  assert.equal(item.reason, "TEMPLATE_SELECTION_REQUIRED");
+  assert.equal(item.template_candidates.length, 1, "unique suggestion");
+  assert.equal(item.template_candidates[0].id, "T1");
+  assert.equal(drive.copies.length, 0);
+});
+
+test("explicit template without inspection reference -> REVIEW_REQUIRED", async () => {
+  const drive = seedDrive();
+  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
+    requirements: [{ ...TRE_REQ, template_file_id: "T1" }]
+  }), opts);
+  assert.equal(r.work_products[0].reason, "TEMPLATE_INSPECTION_REFERENCE_REQUIRED");
+  assert.equal(drive.copies.length, 0);
+});
+
+test("explicit template modified after inspection -> REVIEW_REQUIRED", async () => {
+  const drive = seedDrive();
+  const input = await analysedInput(drive);
+  drive.files.get("T1").modifiedTime = "2026-10-05T08:00:00Z";
+  const r1 = await buildRequiredWorkingPapers(drive, input, opts);
+  assert.equal(r1.work_products[0].status, WP_STATUS.REVIEW_REQUIRED);
+  assert.equal(r1.work_products[0].reason, "TEMPLATE_CHANGED_SINCE_INSPECTION");
+
+  const drive2 = seedDrive();
+  const input2 = await analysedInput(drive2);
+  drive2.texts.set("T1", BLANK_TEMPLATE_TEXT + "\nLigne ajoutée");
+  const r2 = await buildRequiredWorkingPapers(drive2, input2, opts);
+  assert.equal(r2.work_products[0].reason, "TEMPLATE_CONTENT_CHANGED_SINCE_INSPECTION");
+  assert.equal(drive.copies.length + drive2.copies.length, 0);
+});
+
+test("explicit template that became client-completed -> REVIEW_REQUIRED", async () => {
+  const drive = seedDrive();
+  const filled = "Client : SOCIETE ABC SA\nExercice : 2024\nPréparé par : Jean Dupont\nRevu par : Awa Sy";
+  drive.texts.set("T1", filled);
+  // The AI inspected the (now filled) content but the engine re-classifies it.
+  const req = await treReq(drive, "T1");
+  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { requirements: [req] }), opts);
+  assert.equal(r.work_products[0].status, WP_STATUS.REVIEW_REQUIRED);
+  assert.equal(r.work_products[0].reason, "TEMPLATE_NOT_ELIGIBLE");
+  assert.equal(drive.copies.length, 0);
+});
+
+test("unreadable explicit template -> REVIEW_REQUIRED", async () => {
+  const drive = seedDrive();
+  const meta = await drive.getMeta("T9");
+  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
+    requirements: [{ ...TRE_REQ, template_file_id: "T9", template_modified_at: meta.modifiedTime, template_content_fingerprint: "x".repeat(64) }]
+  }), opts);
+  assert.equal(r.work_products[0].reason, "TEMPLATE_CONTENT_UNREADABLE");
+  assert.equal(drive.copies.length, 0);
 });
 
 test("no copy-all path: no requirement, untraceable requirement, folder as template, too many", async () => {
@@ -224,7 +330,7 @@ test("no copy-all path: no requirement, untraceable requirement, folder as templ
   assert.equal(none.status, "BLOCKED");
 
   const invented = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
-    requirements: [{ ...TRE_REQ, source_evidence: { excerpt: "Copier tous les modèles de la bibliothèque", location: null } }]
+    requirements: [{ ...(await treReq(drive)), source_evidence: { excerpt: "Copier tous les modèles de la bibliothèque", location: null } }]
   }), opts);
   assert.equal(invented.work_products[0].status, WP_STATUS.REVIEW_REQUIRED);
   assert.match(invented.work_products[0].reason, /SOURCE_EXCERPT_NOT_FOUND/);
@@ -232,7 +338,6 @@ test("no copy-all path: no requirement, untraceable requirement, folder as templ
   const folderAsTemplate = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
     requirements: [{ ...TRE_REQ, template_file_id: "LIB" }]
   }), opts);
-  assert.equal(folderAsTemplate.work_products[0].status, WP_STATUS.REVIEW_REQUIRED);
   assert.equal(folderAsTemplate.work_products[0].reason, "TEMPLATE_IS_A_FOLDER");
 
   const many = Array.from({ length: 61 }, (_, i) => ({ ...TRE_REQ, procedure: `TRE-${i}` }));
@@ -259,7 +364,7 @@ test("dry run plans without copying", async () => {
   assert.equal(drive.copies.length, 0);
 });
 
-test("ambiguous template -> REVIEW_REQUIRED; absent template -> TEMPLATE_NOT_FOUND", async () => {
+test("several equal candidates -> REVIEW_REQUIRED; no candidate -> TEMPLATE_NOT_FOUND", async () => {
   const drive = seedDrive();
   const result = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
     requirements: [
@@ -271,7 +376,6 @@ test("ambiguous template -> REVIEW_REQUIRED; absent template -> TEMPLATE_NOT_FOU
   }), opts);
   const [ana, stk] = result.work_products;
   assert.equal(ana.status, WP_STATUS.REVIEW_REQUIRED);
-  assert.equal(ana.reason, "AMBIGUOUS_TEMPLATE_MATCH");
   assert.ok(ana.template_candidates.length >= 2);
   assert.equal(stk.status, WP_STATUS.TEMPLATE_NOT_FOUND);
   assert.equal(drive.copies.length, 0);
@@ -283,29 +387,57 @@ test("an old completed client WP is never used as a template", async () => {
     "COMPLETED_WP_SUSPECTED"
   );
   assert.equal(
-    classifyTemplateCandidate({ file: { name: "Modèle WP Caisse", mimeType: GOOGLE_SHEET_MIME }, excerpt: "Client : SOCIETE XYZ SARL\nPréparé par : Jean Dupont" }).classification,
+    classifyTemplateCandidate({ file: { name: "PremierFood_SalesAR_Audit_WP_2026.xlsx", mimeType: XLSX_MIME } }).classification,
     "COMPLETED_WP_SUSPECTED"
-  );
-  assert.equal(
-    classifyTemplateCandidate({ file: { name: "WP_TRE_ClientX_2023_FINAL", mimeType: GOOGLE_SHEET_MIME } }).classification,
-    "COMPLETED_WP_SUSPECTED",
-    "underscore-separated names are understood"
   );
   assert.equal(
     classifyTemplateCandidate({ file: { name: "Relevé bancaire janvier.pdf", mimeType: "application/pdf" } }).classification,
     "SUPPORTING_DOCUMENT"
   );
   assert.equal(
-    classifyTemplateCandidate({ file: { name: "Modèle WP Caisse", mimeType: GOOGLE_SHEET_MIME }, excerpt: "Client : ............\nPréparé par : [à compléter]" }).classification,
+    classifyTemplateCandidate({ file: { name: "Modèle WP Caisse", mimeType: GOOGLE_SHEET_MIME }, excerpt: BLANK_TEMPLATE_TEXT }).classification,
     "TEMPLATE_LIKELY"
   );
 
   const drive = seedDrive();
   const forced = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
-    requirements: [{ ...TRE_REQ, template_file_id: "T4" }]
+    requirements: [await treReq(drive, "T4")]
   }), opts);
   assert.equal(forced.work_products[0].status, WP_STATUS.REVIEW_REQUIRED);
   assert.equal(forced.work_products[0].reason, "TEMPLATE_NOT_ELIGIBLE");
+  assert.equal(drive.copies.length, 0);
+});
+
+test("destination must be inside the mission and outside the library", async () => {
+  const drive = seedDrive();
+  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { destination_folder_id: "LIB" }), opts);
+  assert.equal(r.status, "DESTINATION_INVALID");
+  assert.equal(drive.copies.length, 0);
+});
+
+test("works for non-audit mission types", async () => {
+  const drive = seedDrive();
+  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { mission_type: "DUE_DILIGENCE" }), opts);
+  assert.equal(r.work_products[0].status, WP_STATUS.CREATED);
+  assert.equal(r.work_products[0].requirement.mission_type, "DUE_DILIGENCE");
+});
+
+// ---------------------------------------------------------------------------
+// Template library
+// ---------------------------------------------------------------------------
+
+test("USER_CONFIRMED is not executable: OWNER_APPROVAL_MEMORY_REQUIRED, nothing copied", async () => {
+  const drive = seedDrive();
+  const basis = await verifyLibraryBasis(drive, {
+    libraryFolderId: "LIB", basis: "USER_CONFIRMED", confirmationNote: "The owner said this is the right library."
+  });
+  assert.deepEqual(basis, { ok: false, reason: "OWNER_APPROVAL_MEMORY_REQUIRED" });
+
+  const built = await buildRequiredWorkingPapers(drive, await analysedInput(drive, {
+    library_basis: "USER_CONFIRMED",
+    library_confirmation_note: "The owner said this is the right library."
+  }), opts);
+  assert.equal(built.status, "OWNER_APPROVAL_MEMORY_REQUIRED");
   assert.equal(drive.copies.length, 0);
 });
 
@@ -329,23 +461,39 @@ test("template library: discovered, never chosen arbitrarily when ambiguous", as
 
   const blocked = await buildRequiredWorkingPapers(two, await analysedInput(two, { library_basis: "SINGLE_CANDIDATE" }), { now: opts.now });
   assert.equal(blocked.status, "LIBRARY_REVIEW_REQUIRED");
-  const noNote = await buildRequiredWorkingPapers(two, await analysedInput(two, { library_basis: "USER_CONFIRMED" }), { now: opts.now });
-  assert.equal(noNote.status, "LIBRARY_REVIEW_REQUIRED");
   assert.equal(two.copies.length, 0);
 });
 
-test("destination must be inside the mission and outside the library", async () => {
-  const drive = seedDrive();
-  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { destination_folder_id: "LIB" }), opts);
-  assert.equal(r.status, "DESTINATION_INVALID");
-  assert.equal(drive.copies.length, 0);
-});
-
-test("works for non-audit mission types", async () => {
-  const drive = seedDrive();
-  const r = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { mission_type: "DUE_DILIGENCE" }), opts);
-  assert.equal(r.work_products[0].status, WP_STATUS.CREATED);
-  assert.equal(r.work_products[0].requirement.mission_type, "DUE_DILIGENCE");
+test("pilot-like Drive (03 / 05 / 03 tests / 06 working files) -> AMBIGUOUS, 06 never auto-selected", async () => {
+  const drive = fakeDrive({
+    files: [
+      { id: "ROOT", name: "Shared", mimeType: FOLDER_MIME, parents: [] },
+      { id: "F03", name: "03_WORKING_PAPER_TEMPLATES", mimeType: FOLDER_MIME, parents: ["ROOT"] },
+      { id: "F03a", name: "Modèle Lead schedule", mimeType: GOOGLE_SHEET_MIME, parents: ["F03"] },
+      { id: "F03b", name: "Modèle Rapprochement bancaire", mimeType: GOOGLE_SHEET_MIME, parents: ["F03"] },
+      { id: "F03c", name: "Modèle Cut-off ventes", mimeType: GOOGLE_SHEET_MIME, parents: ["F03"] },
+      { id: "F05", name: "05_WORKING_PAPERS_CYCLES_SELECTIONNES", mimeType: FOLDER_MIME, parents: ["ROOT"] },
+      { id: "F05a", name: "VEN", mimeType: FOLDER_MIME, parents: ["F05"] },
+      { id: "F05b", name: "TRE", mimeType: FOLDER_MIME, parents: ["F05"] },
+      { id: "F03T", name: "03_WORKING_PAPERS_TESTS", mimeType: FOLDER_MIME, parents: ["ROOT"] },
+      { id: "F06", name: "06 Working files par cycle", mimeType: FOLDER_MIME, parents: ["ROOT"] },
+      { id: "F06a", name: "Ventes", mimeType: FOLDER_MIME, parents: ["F06"] },
+      { id: "F06b", name: "Trésorerie", mimeType: FOLDER_MIME, parents: ["F06"] },
+      { id: "F06c", name: "Supporting documents", mimeType: FOLDER_MIME, parents: ["F06"] },
+      { id: "F06d", name: "PremierFood_SalesAR_Audit_WP_2026.xlsx", mimeType: XLSX_MIME, parents: ["F06"] }
+    ]
+  });
+  const discovery = await discoverTemplateLibraries(drive, {});
+  assert.equal(discovery.status, "AMBIGUOUS");
+  assert.equal(discovery.selected, null);
+  const f06 = discovery.candidates.find(c => c.folder.id === "F06");
+  assert.ok(f06, "06 is listed as a candidate");
+  assert.ok(f06.stats.completed_suspected >= 1);
+  assert.ok(f06.stats.supporting_subfolders >= 1);
+  for (const id of ["F03", "F05", "F03T"]) {
+    assert.ok(discovery.candidates.some(c => c.folder.id === id), `${id} reported as a rival`);
+  }
+  assert.equal(drive.copies.length + drive.writes.length, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -369,60 +517,184 @@ test("header pre-fill: label-based, never over a formula, never claimed on unsup
   assert.equal(docx.status, "PREFILL_NOT_SUPPORTED_FOR_FORMAT");
   assert.equal(drive.writes.length, 0);
 
-  // Created sheet with a formula on "Préparé par": review required, nothing claimed.
   const built = await buildRequiredWorkingPapers(drive, await analysedInput(drive, { prefill_headers: true }), opts);
   assert.equal(built.work_products[0].prefill.status, "HEADER_PREFILL_REVIEW_REQUIRED");
   assert.equal(drive.writes.length, 0);
 });
 
 // ---------------------------------------------------------------------------
-// PBC refined by the programme
+// Real pilot PBC_MASTER header (row 4) — regression guard
 // ---------------------------------------------------------------------------
 
-const PBC_HEADER = ["Référence", "Dossier", "Document demandé", "", "Cycles", "", "Moment", "", "Critique", "", "Applicable", "", "", "", "Date attendue", "Reçu", "", "Complet", "Statut", "Commentaire"];
-function pbcRow(ref, cycles, extra = {}) {
-  const row = new Array(20).fill("");
-  row[0] = ref; row[2] = `Doc ${ref}`; row[4] = cycles; row[10] = "Oui";
-  for (const [i, v] of Object.entries(extra)) row[i] = v;
+const REAL_PBC_HEADER = [
+  "Référence PBC", "Dossier maître", "Document demandé", "Type de document",
+  "Cycles utilisateurs", "Procédures utilisatrices", "Moment de la demande",
+  "Critère de complétude", "Critique", "Applicabilité (forcer)", "Applicable",
+  "Responsable client", "Responsable audit", "Date de demande", "Échéance",
+  "Reçu ?", "Date réception", "Complet ?", "Statut automatique", "Jours de retard",
+  "Nb relances", "Date dernière relance", "Lien Drive", "Ouvrir", "Commentaire",
+  "Source (Manuel / ISA / SYSCOHADA)", "Contrôle doublon", "Rang critique manquant"
+];
+// Formula / derived columns of the real master: K, S, T, X, AA, AB.
+const DERIVED = ["K", "S", "T", "X", "AA", "AB"];
+const READ_ONLY_COLUMNS = ["K", "S", "T", "X", "AA", "AB"];
+
+function realRow(ref, cycles, overrides = {}) {
+  const row = new Array(28).fill("");
+  row[0] = ref; row[2] = `Doc ${ref}`; row[4] = cycles; row[10] = "Oui"; row[18] = "En attente";
+  row[23] = "Ouvrir"; row[24] = overrides.comment || "";
+  if (overrides.link) row[22] = overrides.link;
   return row;
 }
 
-test("PBC applicability refined by programme procedures, never invented", async () => {
-  const rows = [PBC_HEADER, pbcRow("PBC-001", "TRE"), pbcRow("PBC-002", "TRE"), pbcRow("PBC-010", "STK")];
+function realSheet(rows, extraFormulaCells = []) {
+  const formulaCells = [];
+  for (let r = 5; r <= 4 + rows.length - 1; r += 1) {
+    for (const col of DERIVED) formulaCells.push(`${col}${r}`);
+  }
+  return { sheetName: "PBC_MASTER", pbcRows: rows, formulaCells: [...formulaCells, ...extraFormulaCells] };
+}
+
+function writtenColumns(drive) {
+  return drive.writes.map(w => w.range.replace(/^PBC_MASTER!/, "").replace(/\d+$/, ""));
+}
+
+test("real PBC header: roles mapped exactly; J is the override, K/S/X are read-only outputs", () => {
+  const { columns, ambiguous, missing } = findPbcColumns(REAL_PBC_HEADER);
+  assert.deepEqual(ambiguous, {});
+  assert.deepEqual(missing, []);
+  assert.equal(columns.applicability_override, 9); // J
+  assert.equal(columns.effective_applicable, 10); // K
+  assert.equal(columns.received, 15); // P
+  assert.equal(columns.received_date, 16); // Q
+  assert.equal(columns.complete, 17); // R
+  assert.equal(columns.auto_status, 18); // S
+  assert.equal(columns.drive_link, 22); // W
+  assert.equal(columns.open_link, 23); // X
+  assert.equal(columns.comment, 24); // Y
+});
+
+test("real PBC header: fine applicability writes J only, never K/S/X", async () => {
+  const rows = [REAL_PBC_HEADER, realRow("PBC-001", "TRE"), realRow("PBC-002", "TRE")];
+  const plan = planPbcItemApplicability({
+    rows,
+    retainedCycles: ["TRE"],
+    programmeText: PROGRAMME_TEXT,
+    decisions: [
+      { pbc_reference: "PBC-001", applicable: true, programme_procedure: "TRE-01", source_evidence_excerpt: "rapprochements bancaires au 31/12/2025" },
+      { pbc_reference: "PBC-002", applicable: false, programme_procedure: "Only TRE-01 retained", source_evidence_excerpt: "rapprochements bancaires au 31/12/2025" }
+    ]
+  });
+  const drive = fakeDrive({ files: [], sheets: { S: realSheet(rows) } });
+  const applied = await applyPbcItemPlan(drive, "S", plan);
+  assert.deepEqual(applied.map(a => a.status), ["APPLIED", "APPLIED"]);
+  assert.ok(drive.writes.some(w => w.range === "PBC_MASTER!J5" && w.rows[0][0] === "Oui"));
+  assert.ok(drive.writes.some(w => w.range === "PBC_MASTER!J6" && w.rows[0][0] === "Non"));
+  for (const col of writtenColumns(drive)) {
+    assert.ok(!READ_ONLY_COLUMNS.includes(col), `never writes ${col}`);
+  }
+
+  // If J itself holds a formula -> review, nothing written.
+  const drive2 = fakeDrive({ files: [], sheets: { S: realSheet(rows, ["J5"]) } });
+  const applied2 = await applyPbcItemPlan(drive2, "S", plan.slice(0, 1));
+  assert.equal(applied2[0].status, "ITEM_OVERRIDE_REVIEW_REQUIRED");
+  assert.ok(!drive2.writes.some(w => w.range === "PBC_MASTER!J5"));
+});
+
+test("PBC applicability refined by programme procedures, never invented", () => {
+  const rows = [REAL_PBC_HEADER, realRow("PBC-001", "TRE"), realRow("PBC-010", "STK")];
   const plan = planPbcItemApplicability({
     rows,
     retainedCycles: ["TRE", "VEN"],
     programmeText: PROGRAMME_TEXT,
     decisions: [
       { pbc_reference: "PBC-001", applicable: true, programme_procedure: "TRE-01", source_evidence_excerpt: "rapprochements bancaires au 31/12/2025" },
-      { pbc_reference: "PBC-002", applicable: false, programme_procedure: "TRE: only bank reconciliations retained", source_evidence_excerpt: "rapprochements bancaires au 31/12/2025" },
       { pbc_reference: "PBC-010", applicable: true, programme_procedure: "STK", source_evidence_excerpt: "inventaire physique des stocks" },
       { pbc_reference: "PBC-999", applicable: true, programme_procedure: "?", source_evidence_excerpt: "rapprochements bancaires au 31/12/2025" },
       { pbc_reference: "PBC-001", applicable: true, programme_procedure: "x", source_evidence_excerpt: "texte qui n'existe pas dans le programme" }
     ]
   });
   assert.deepEqual(plan.map(p => p.status), [
-    "PLANNED", "PLANNED", "REJECTED_CYCLE_NOT_RETAINED", "REJECTED_UNKNOWN_REFERENCE", "REJECTED_SOURCE_NOT_IN_PROGRAMME"
+    "PLANNED", "REJECTED_CYCLE_NOT_RETAINED", "REJECTED_UNKNOWN_REFERENCE", "REJECTED_SOURCE_NOT_IN_PROGRAMME"
   ]);
   assert.equal(plan[0].row_number, 5);
-
-  // Writes only into a non-formula "Applicable" cell; formula -> review.
-  const drive = fakeDrive({ files: [], sheets: { S: { sheetName: "PBC_MASTER", pbcRows: rows, formulaCells: ["K6"] } } });
-  const applied = await applyPbcItemPlan(drive, "S", plan);
-  assert.equal(applied[0].status, "APPLIED");
-  assert.equal(applied[1].status, "ITEM_OVERRIDE_REVIEW_REQUIRED");
-  assert.ok(drive.writes.some(w => w.range === "PBC_MASTER!K5" && w.rows[0][0] === "Oui"));
-  assert.ok(!drive.writes.some(w => w.range === "PBC_MASTER!K6"));
 });
 
 // ---------------------------------------------------------------------------
-// PBC evidence control
+// PBC evidence evaluation
 // ---------------------------------------------------------------------------
 
-const EVIDENCE_META = { id: "E1", name: "Bank Statements 2025", modifiedTime: "2026-03-01T00:00:00Z", mimeType: GOOGLE_DOC_MIME };
+const EVIDENCE_META = { id: "E1", name: "Bank Statements 2025", modifiedTime: "2026-03-01T00:00:00Z", mimeType: GOOGLE_DOC_MIME, webViewLink: "https://drive/E1" };
 const EVIDENCE_TEXT = "Relevés BANQUE ATLANTIQUE compte 0123 — ABC SA — janvier à juin 2025";
 const ALL_MATCH = { client: "MATCH", mission: "MATCH", scope_account: "MATCH", period: "MATCH", completeness: "MATCH", document_nature: "MATCH" };
 const readOk = { supported: true, text: EVIDENCE_TEXT, truncated: false, file: EVIDENCE_META };
+const FP = contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT);
+const RATIONALE = "Statements of account 0123 for ABC SA read and compared with the request.";
+
+test("RECEIVED without content_fingerprint / real read -> REVIEW", () => {
+  const base = {
+    proposed: "RECEIVED",
+    checks: { ...ALL_MATCH, completeness: "NOT_CHECKED" },
+    rationale: RATIONALE,
+    evidenceMeta: EVIDENCE_META,
+    analysedModifiedTime: EVIDENCE_META.modifiedTime
+  };
+  assert.deepEqual(decidePbcEvaluation({ ...base, analysedFingerprint: null, read: readOk }).reasons, ["NO_PROOF_OF_CONTENT_READ"]);
+  assert.deepEqual(decidePbcEvaluation({ ...base, analysedFingerprint: FP, read: { supported: false } }).reasons, ["EXTRACTOR_REQUIRED"]);
+  assert.deepEqual(decidePbcEvaluation({ ...base, analysedFingerprint: FP, read: null }).reasons, ["EXTRACTOR_REQUIRED"]);
+  assert.deepEqual(decidePbcEvaluation({ ...base, analysedFingerprint: "forged", read: readOk }).reasons, ["CONTENT_FINGERPRINT_MISMATCH"]);
+  assert.deepEqual(decidePbcEvaluation({ ...base, analysedFingerprint: FP, analysedModifiedTime: null, read: readOk }).reasons, ["EVIDENCE_CHANGED_SINCE_ANALYSIS"]);
+  assert.deepEqual(decidePbcEvaluation({ ...base, evidenceMeta: null, analysedFingerprint: FP, read: readOk }).reasons, ["EVIDENCE_FILE_NOT_FOUND"]);
+  for (const outcome of [
+    decidePbcEvaluation({ ...base, analysedFingerprint: null, read: readOk }),
+    decidePbcEvaluation({ ...base, analysedFingerprint: FP, read: { supported: false } })
+  ]) assert.equal(outcome.final_state, "REVIEW");
+});
+
+test("RECEIVED with a real read and correct nature is allowed, never auto-VERIFIED", () => {
+  const ok = decidePbcEvaluation({
+    proposed: "RECEIVED",
+    checks: { ...ALL_MATCH, completeness: "NOT_CHECKED" },
+    rationale: RATIONALE,
+    evidenceMeta: EVIDENCE_META,
+    analysedModifiedTime: EVIDENCE_META.modifiedTime,
+    analysedFingerprint: FP,
+    read: readOk
+  });
+  assert.equal(ok.final_state, "RECEIVED");
+
+  const wrongNature = decidePbcEvaluation({
+    proposed: "RECEIVED",
+    checks: { ...ALL_MATCH, document_nature: "MISMATCH" },
+    rationale: RATIONALE,
+    evidenceMeta: EVIDENCE_META,
+    analysedModifiedTime: EVIDENCE_META.modifiedTime,
+    analysedFingerprint: FP,
+    read: readOk
+  });
+  assert.equal(wrongNature.final_state, "REVIEW");
+
+  const wrongClient = decidePbcEvaluation({
+    proposed: "RECEIVED",
+    checks: { ...ALL_MATCH, client: "MISMATCH" },
+    rationale: RATIONALE,
+    evidenceMeta: EVIDENCE_META,
+    analysedModifiedTime: EVIDENCE_META.modifiedTime,
+    analysedFingerprint: FP,
+    read: readOk
+  });
+  assert.equal(wrongClient.final_state, "REVIEW");
+
+  const plan = planPbcEvaluationWrites(findPbcColumns(REAL_PBC_HEADER).columns, realRow("PBC-001", "TRE"), {
+    final_state: "RECEIVED", evidence_url: EVIDENCE_META.webViewLink, evidence_file_id: "E1",
+    evidence_name: EVIDENCE_META.name, content_fingerprint: FP, rationale: RATIONALE,
+    evaluated_at: "2026-10-05T12:00:00Z", received_date: "2026-10-03"
+  });
+  const roles = plan.writes.map(w => w.key);
+  assert.ok(roles.includes("received"));
+  assert.ok(!roles.includes("complete"), "completeness not validated: R untouched");
+  assert.equal(plan.writes.find(w => w.key === "received").value, "Oui");
+});
 
 test("right file name but incomplete period is never VERIFIED", () => {
   const d = decidePbcEvaluation({
@@ -431,7 +703,7 @@ test("right file name but incomplete period is never VERIFIED", () => {
     rationale: "Only January to June 2025 statements, July-December missing.",
     evidenceMeta: EVIDENCE_META,
     analysedModifiedTime: EVIDENCE_META.modifiedTime,
-    analysedFingerprint: contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT),
+    analysedFingerprint: FP,
     read: readOk
   });
   assert.equal(d.final_state, "REVIEW");
@@ -442,7 +714,7 @@ test("right file name but incomplete period is never VERIFIED", () => {
     rationale: "Only January to June 2025 statements, July-December missing.",
     evidenceMeta: EVIDENCE_META,
     analysedModifiedTime: EVIDENCE_META.modifiedTime,
-    analysedFingerprint: contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT),
+    analysedFingerprint: FP,
     read: readOk
   });
   assert.equal(partial.final_state, "PARTIAL");
@@ -474,31 +746,70 @@ test("VERIFIED requires proof of a real, complete, unchanged read", () => {
   assert.equal(decidePbcEvaluation({ ...base, analysedFingerprint: null }).reasons.at(-1), "NO_PROOF_OF_CONTENT_READ");
   assert.equal(decidePbcEvaluation({ ...base, analysedFingerprint: "forged" }).reasons.at(-1), "CONTENT_FINGERPRINT_MISMATCH");
   assert.equal(
-    decidePbcEvaluation({ ...base, analysedFingerprint: contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT), read: { ...readOk, truncated: true } }).reasons.at(-1),
+    decidePbcEvaluation({ ...base, analysedFingerprint: FP, read: { ...readOk, truncated: true } }).reasons.at(-1),
     "CONTENT_TRUNCATED_NOT_FULLY_READ"
   );
   assert.equal(
-    decidePbcEvaluation({ ...base, analysedFingerprint: contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT), analysedModifiedTime: "2025-01-01T00:00:00Z" }).reasons.at(-1),
+    decidePbcEvaluation({ ...base, analysedFingerprint: FP, analysedModifiedTime: "2025-01-01T00:00:00Z" }).reasons.at(-1),
     "EVIDENCE_CHANGED_SINCE_ANALYSIS"
   );
-  const ok = decidePbcEvaluation({ ...base, analysedFingerprint: contentFingerprint(EVIDENCE_META, EVIDENCE_TEXT) });
-  assert.equal(ok.final_state, "VERIFIED");
+  assert.equal(decidePbcEvaluation({ ...base, analysedFingerprint: FP }).final_state, "VERIFIED");
 });
 
-test("evaluation is written only to identified, non-formula checklist columns", async () => {
-  const header = [...PBC_HEADER, "Statut contrôle IA", "Lien preuve", "Date vérification"];
-  const rows = [header, pbcRow("PBC-001", "TRE")];
-  const drive = fakeDrive({ files: [], sheets: { S: { sheetName: "PBC_MASTER", pbcRows: rows, formulaCells: ["T5"] } } });
+async function writeEval(state, rowOverrides = {}) {
+  const rows = [REAL_PBC_HEADER, realRow("PBC-001", "TRE", rowOverrides)];
+  const drive = fakeDrive({ files: [], sheets: { S: realSheet(rows) } });
   const item = await loadPbcItem(drive, "S", "PBC-001");
-  assert.equal(item.found, true);
   const out = await writePbcEvaluation(drive, "S", item, {
-    final_state: "PARTIAL", evidence_url: "https://drive/E1", evidence_file_id: "E1",
-    evaluated_at: "2026-10-05T12:00:00Z", rationale: "Only H1 2025."
+    final_state: state, evidence_url: EVIDENCE_META.webViewLink, evidence_file_id: "E1",
+    evidence_name: EVIDENCE_META.name, content_fingerprint: FP, rationale: RATIONALE,
+    evaluated_at: "2026-10-05T12:00:00Z", received_date: "2026-10-03"
   });
-  assert.equal(out.status, "PARTIALLY_WRITTEN"); // comment column T5 is a formula
-  assert.ok(drive.writes.some(w => w.range === "PBC_MASTER!U5" && w.rows[0][0] === "PARTIAL"));
-  assert.ok(!drive.writes.some(w => w.range === "PBC_MASTER!S5"), "automatic status column untouched");
-  assert.ok(!drive.writes.some(w => w.range === "PBC_MASTER!T5"));
+  const byCol = Object.fromEntries(drive.writes.map(w => [w.range.replace(/^PBC_MASTER!/, "").replace(/\d+$/, ""), w.rows[0][0]]));
+  return { out, drive, byCol };
+}
+
+test("real header: evaluation writes manual P/Q/R/W/Y only, never S (or K/X/T/AA/AB)", async () => {
+  const verified = await writeEval("VERIFIED");
+  assert.equal(verified.out.status, "WRITTEN");
+  assert.equal(verified.byCol.P, "Oui");
+  assert.equal(verified.byCol.R, "Oui");
+  assert.equal(verified.byCol.Q, "2026-10-03");
+  assert.equal(verified.byCol.W, "https://drive/E1");
+  assert.match(verified.byCol.Y, /VERIFIED/);
+
+  const partial = await writeEval("PARTIAL");
+  assert.equal(partial.byCol.P, "Partiel");
+  assert.equal(partial.byCol.R, "Non");
+
+  const received = await writeEval("RECEIVED");
+  assert.equal(received.byCol.P, "Oui");
+  assert.equal(received.byCol.R, undefined);
+
+  const nonConforme = await writeEval("NON_CONFORME");
+  assert.equal(nonConforme.out.checklist_status_limitation, "CHECKLIST_STATUS_LIMITATION");
+  assert.equal(nonConforme.out.status, "CHECKLIST_STATUS_LIMITATION");
+  assert.deepEqual(Object.keys(nonConforme.byCol), ["Y"]);
+  assert.match(nonConforme.byCol.Y, /NON_CONFORME/);
+
+  const review = await writeEval("REVIEW");
+  assert.deepEqual(Object.keys(review.byCol), ["Y"]);
+
+  for (const run of [verified, partial, received, nonConforme, review]) {
+    for (const col of writtenColumns(run.drive)) {
+      assert.ok(!READ_ONLY_COLUMNS.includes(col), `never writes ${col}`);
+    }
+  }
+});
+
+test("evaluation keeps human data: existing link kept, comment appended, idempotent", async () => {
+  const { byCol, out } = await writeEval("VERIFIED", { link: "https://drive/OTHER", comment: "Note de l'auditeur" });
+  assert.equal(byCol.W, undefined, "existing different link is not overwritten");
+  assert.deepEqual(out.kept.map(k => k.role), ["drive_link"]);
+  assert.match(byCol.Y, /^Note de l'auditeur\n\[OM-AI VERIFIED/);
+
+  const again = await writeEval("VERIFIED", { comment: byCol.Y });
+  assert.equal(again.byCol.Y, undefined, "same marker already present: comment not duplicated");
 });
 
 // ---------------------------------------------------------------------------
@@ -512,7 +823,12 @@ test("PBC reminder still works and keeps PARTIAL / NON_CONFORME remindable", () 
     return r;
   };
   const { overdue } = findOverduePbcItems(
-    [row("PBC-1", "Non", "Non", ""), row("PBC-2", "Oui", "Non", "Partiel"), row("PBC-3", "Oui", "Oui", "Non conforme"), row("PBC-4", "Oui", "Oui", "Vérifié")],
+    [
+      row("PBC-1", "Non", "Non", ""),
+      row("PBC-2", "Partiel", "Non", ""), // manual "Reçu ? = Partiel"
+      row("PBC-3", "Oui", "Oui", "Non conforme"),
+      row("PBC-4", "Oui", "Oui", "Vérifié")
+    ],
     new Date("2026-10-05T00:00:00Z")
   );
   assert.deepEqual(overdue.map(i => [i.reference, i.lifecycle_state]), [

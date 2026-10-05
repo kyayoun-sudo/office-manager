@@ -44,19 +44,19 @@ The canonical library can be configured with the generic env var `WP_TEMPLATE_LI
 
 **Programme gating**
 - Programme gating: the work programme must be validated (drafts are blocked by name). The tool blocks when the version or content changed since the analysis (`programme_fingerprint` + `modifiedTime`).
+- Truncated programme (>60,000 extracted characters) → `PROGRAMME_TRUNCATED_REVIEW_REQUIRED`: work-product generation and fine PBC applicability are blocked. Nobody claims the whole programme was read.
 - Traceability: a requirement whose quote is not found in the programme → REVIEW_REQUIRED. No requirements → BLOCKED. More than 60 → BLOCKED.
 - No "copy all" path: no tool or parameter copies a library. A folder as template → REVIEW_REQUIRED. The mission skeleton copies folders only.
 
 **Templates and library**
-- Template selection:
-  - The agent's choice is validated: inside the library, an eligible blank template.
-  - Otherwise the match must be unique.
-  - Ambiguous → REVIEW_REQUIRED; nothing found → TEMPLATE_NOT_FOUND.
-  - Completed WPs (year, FINAL, client/archive path, filled fields) and supporting documents are excluded.
+- Template selection — **the AI decides, the engine verifies**:
+  - Without `template_file_id` → REVIEW_REQUIRED with suggestions. Word scoring only ranks suggestions; it never triggers a copy. No candidate at all → TEMPLATE_NOT_FOUND.
+  - An explicit template also requires `template_modified_at` and `template_content_fingerprint` from `inspect_wp_template_candidates`.
+  - Before copying, the engine re-fetches and re-reads the template and refuses it (REVIEW_REQUIRED) if it changed, cannot be read, is outside the library, or now looks like a completed client file. Completed WPs (year, FINAL, client/archive path, filled fields) and supporting documents are excluded.
 - Library certainty:
-  - AMBIGUOUS / NONE → nothing is copied, and a validation action is created.
-  - SINGLE_CANDIDATE is re-checked by a fresh discovery.
-  - USER_CONFIRMED requires a confirmation note.
+  - Executable only with CONFIGURED or SINGLE_CANDIDATE (re-checked by a fresh discovery).
+  - Several library-like folders → AMBIGUOUS: nothing is copied and a validation action can be created. Example from the pilot: `03_WORKING_PAPER_TEMPLATES`, `05_WORKING_PAPERS_CYCLES_SELECTIONNES`, `03_WORKING_PAPERS_TESTS`, `06 Working files par cycle`.
+  - **USER_CONFIRMED is disabled** → `OWNER_APPROVAL_MEMORY_REQUIRED`, nothing copied. Persistent owner approval will come with MAP/RULES.
 
 **Work product creation**
 - Destination: must be inside the mission folder and outside the library.
@@ -64,16 +64,18 @@ The canonical library can be configured with the generic env var `WP_TEMPLATE_LI
 - After each copy, the metadata is re-read (id, name, parent) → CREATED or FAILED.
 
 **PBC**
-- Item-level PBC applicability:
-  - only existing references are toggled, never invented;
-  - an item outside the retained cycles is refused;
-  - the programme quote is checked;
-  - nothing is written over a formula.
-- PBC evidence evaluation:
-  - VERIFIED requires a real read (fingerprint re-checked by a fresh read), a complete (non-truncated) read, an unchanged file and the required checks MATCH;
-  - unreadable format → REVIEW (EXTRACTOR_REQUIRED);
-  - PARTIAL / NON_CONFORME require a read and a failed check;
-  - the final state is never higher than the AI's proposal.
+- Real pilot PBC_MASTER header (row 4, A..AB), matched on exact labels:
+  - **Writable (manual) columns only**: J `Applicabilité (forcer)`, P `Reçu ?`, Q `Date réception`, R `Complet ?`, W `Lien Drive`, Y `Commentaire`.
+  - **Never written (formula/derived)**: K `Applicable`, S `Statut automatique`, T `Jours de retard`, X `Ouvrir`, AA `Contrôle doublon`, AB `Rang critique manquant`. Every write is also checked against the formula map.
+- Item-level PBC applicability: written into J only. Only existing references are toggled, never invented; an item outside the retained cycles is refused; the programme quote is checked.
+- PBC evidence evaluation — every evidence-based state (RECEIVED, PARTIAL, NON_CONFORME, VERIFIED) requires a real read: the file exists and is unchanged, the content can be read, and a fresh read matches the fingerprint. A file name is never enough.
+  - RECEIVED: document nature MATCH and no MISMATCH on client/mission/scope/period → P=Oui, Q (when known), W, Y; R untouched.
+  - PARTIAL → P=Partiel, R=Non, Q/W/Y.
+  - VERIFIED: complete read, required checks MATCH → P=Oui, R=Oui, Q/W/Y. Formula S then computes the status.
+  - NON_CONFORME: there is no manual column for it, so business cells stay unchanged; Y + journal; `CHECKLIST_STATUS_LIMITATION`.
+  - REVIEW: no business status is simulated; Y + journal.
+  - An existing link/date is kept; the comment is appended (never erased) and deduplicated.
+  - Unreadable format → REVIEW / EXTRACTOR_REQUIRED. The final state is never higher than the AI's proposal.
 - Reminders: PARTIAL / NON_CONFORME stay remindable. One action per item, deadline and state, kept PENDING for the email dispatcher.
 
 **Generic**
@@ -84,9 +86,7 @@ The canonical library can be configured with the generic env var `WP_TEMPLATE_LI
 - **Header pre-fill**: native Google Sheets only (first sheet, A1:Z60).
   - It matches exact labels, writes only when the target is unique, empty and not a formula; otherwise it returns HEADER_PREFILL_REVIEW_REQUIRED.
   - xlsx/docx/Google Docs → PREFILL_NOT_SUPPORTED_FOR_FORMAT: the Drive layer has no safe write for these formats. Nothing is ever claimed as pre-filled.
-- **Recording evaluations and item applicability in the checklist**:
-  - Only columns identified unambiguously by their header (row 4) and not formulas (detected via xlsx export, works in bridge mode) are written. Otherwise SHEET_WRITE_REVIEW_REQUIRED / ITEM_OVERRIDE_REVIEW_REQUIRED.
-  - The real labels of the pilot PBC master have not been checked: actual writes depend on them.
+- **Recording in the checklist**: aligned with the real header described in the review, but not yet run against a real copy of the master. The accepted values (`Oui` / `Partiel` / `Non` in P, `Oui` / `Non` in J/R) are assumed to be the ones the sheet formulas expect.
 - **Durable memory of WP creations and evaluations**: journaled in `office_agent_tool_events.metadata.journal` (non-destructive, no new table).
   - Not yet queryable as a register: there is no read tool for it.
   - Follow-ups go through `office_action_queue`.
