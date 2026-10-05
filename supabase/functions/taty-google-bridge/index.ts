@@ -1,4 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  BridgeError,
+  createBinaryFileAction,
+  googleBinaryDeps,
+  updateBinaryFileAction
+} from "./binary-files.ts";
 
 const DRIVE_ID = Deno.env.get("TATY_SHARED_DRIVE_ID") || "0AOuBC85x_FJSUk9PVA";
 const JOB_SECRET = Deno.env.get("ORPAILLEUR_JOB_SECRET") || "";
@@ -354,8 +360,23 @@ Deno.serve(async req => {
       ));
     }
 
+    // Office Manager memory files (OFFICE_MANAGER_MAP.xlsx /
+    // OFFICE_MANAGER_REGISTER.xlsx): allow-listed names and MIME type, 10 MB,
+    // configured Shared Drive only, create-once / update-in-place with an
+    // optimistic concurrency check. No move, no delete. See binary-files.ts.
+    if (action === "create_binary_file") {
+      return json(await createBinaryFileAction(googleBinaryDeps(gfetch, DRIVE_ID), body));
+    }
+
+    if (action === "update_binary_file") {
+      return json(await updateBinaryFileAction(googleBinaryDeps(gfetch, DRIVE_ID), body));
+    }
+
     return json({ error: "UNKNOWN_ACTION" }, 400);
   } catch (error) {
+    if (error instanceof BridgeError) {
+      return json({ error: error.message, code: error.code }, error.status);
+    }
     console.error(error);
     return json({ error: String(error?.message || error) }, 500);
   }

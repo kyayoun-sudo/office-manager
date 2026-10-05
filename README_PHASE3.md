@@ -108,9 +108,7 @@ This is the only path that writes a signed rule. No agent tool reaches it.
 - Reuse of `orpailleur_inventory` / `orpailleur_scan_runs` (latest COMPLETE/PARTIAL run) as the listing source.
 
 ### PARTIAL
-- **Writing MAP/REGISTER requires direct Google credentials** (`GOOGLE_SERVICE_ACCOUNT_JSON` or OAuth). The deployed Supabase bridge can READ these files but has no upload action. In bridge mode, `run_mapping_pass` returns `MEMORY_WRITE_UNAVAILABLE` without scanning anything.
-  - Consequence: in production via the bridge, the mapping gate stays closed unless `OFFICE_MANAGER_REQUIRE_MAPPING=false` (legacy).
-  - Alternatives for phase 4: add an `upload` action to the bridge, or use two native Google Sheets.
+- **MAP/REGISTER writing through the bridge (Phase 3.1)**: implemented in the repository (`create_binary_file` / `update_binary_file` actions of `taty-google-bridge`). **The new Edge Function version is not deployed**: as long as it is not deployed, the live bridge will answer `UNKNOWN_ACTION` and the pass will fail without writing anything.
 - Owner interface: API endpoint only. There is no screen yet in `index.html`.
 - Whole Drive walk in one tool call (BFS, `max_items` limit). No resumption across invocations: for a large Drive, use `ORPAILLEUR_INVENTORY` (the durable scanner is paged and resumable).
 - Reading is bounded per pass (`max_reads`); the rest stays PENDING_READ for the next passes.
@@ -133,3 +131,27 @@ This is the only path that writes a signed rule. No agent tool reaches it.
 | `OWNER_APPROVAL_SECRET` | Signing of owner rules |
 | `OFFICE_MANAGER_OWNER_TOKEN` | Owner credential |
 | `OFFICE_MANAGER_REQUIRE_MAPPING=false` | Legacy mode |
+
+## Phase 3.1 — MAP / REGISTER writable through the existing bridge
+
+Two actions are added to `supabase/functions/taty-google-bridge` (source versioned in the repository; logic in `binary-files.ts`, shared with the offline tests):
+
+- `create_binary_file { parent_id, name, mime_type, base64, expected_name? }`:
+  - Drive `files.create` multipart in the parent folder.
+  - Refuses if a file with the same name already exists there (`FILE_ALREADY_EXISTS`).
+  - Re-reads the metadata and returns `id, name, mimeType, parents, modifiedTime, createdTime, webViewLink, size`.
+- `update_binary_file { file_id, mime_type, base64, expected_modified_time }`:
+  - Reads the current metadata. If `modifiedTime` ≠ `expected_modified_time` → `MEMORY_CONFLICT` (409) and **nothing is written**.
+  - Otherwise `files.update` media on the **same file_id**, then re-reads and returns the final file.
+
+Safeguards:
+- `x-orpailleur-secret` kept.
+- MIME allow-list (xlsx only).
+- **Name allow-list** (`OFFICE_MANAGER_MAP.xlsx`, `OFFICE_MANAGER_REGISTER.xlsx` only): the bridge can never overwrite a business file.
+- 10 MB maximum, checked before decoding.
+- Strict, mandatory base64.
+- `parent_id` mandatory.
+- Parent / target must belong to the configured Shared Drive (`driveId`) and not be in the trash.
+- No folder target, no MIME change, no move, no delete, no caller-supplied URL.
+
+`lib/google-drive.js`: `createBinaryFile` / `updateBinaryFile` use the bridge when it is the active connection; the memory engine does not see the difference. `expectedModifiedTime` is now mandatory and re-checked by the writer (bridge or direct API). `run_mapping_pass` no longer returns `MEMORY_WRITE_UNAVAILABLE`.
