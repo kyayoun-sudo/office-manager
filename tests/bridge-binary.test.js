@@ -7,8 +7,10 @@ import assert from "node:assert/strict";
 import {
   BINARY_MAX_BYTES,
   BridgeError,
+  MEMORY_BINARY_MAX_BYTES as BRIDGE_MEMORY_MAX,
   XLSX_MIME,
   createBinaryFileAction,
+  findExactFileAction,
   googleBinaryDeps,
   updateBinaryFileAction
 } from "../supabase/functions/taty-google-bridge/binary-files.ts";
@@ -40,6 +42,10 @@ function fakeGoogle() {
     },
     async listChildren(parentId) {
       return [...files.values()].filter(f => !f.trashed && f.parents.includes(parentId)).map(f => ({ ...f }));
+    },
+    // Google semantics of an exact-name query (server-side filter).
+    async findExact(parentId, name) {
+      return [...files.values()].filter(f => !f.trashed && f.parents.includes(parentId) && f.name === name).map(f => ({ ...f }));
     },
     async uploadCreate({ name, parentId, mimeType, bytes: data }) {
       const meta = { id: `bin-${++counter}`, name, mimeType, parents: [parentId], driveId: DRIVE_ID, trashed: false, modifiedTime: tick(), createdTime: "2026-10-05T12:00:00Z", size: String(data.length), webViewLink: "https://drive/x" };
@@ -206,6 +212,51 @@ test("Google requests built by the bridge: multipart create, media PATCH on the 
   assert.ok(requests.every(r => !/addParents|removeParents/.test(r.url)), "no move");
 });
 
+test("exact lookup follows nextPageToken: MAP after the first page is found, never duplicated", async () => {
+  const requests = [];
+  const map = { id: "MAP-1", name: "OFFICE_MANAGER_MAP.xlsx", mimeType: XLSX_MIME, parents: ["ROOT"], driveId: DRIVE_ID, trashed: false, modifiedTime: "t1" };
+  const gfetch = async url => {
+    requests.push(url);
+    const reply = body => new Response(JSON.stringify(body), { status: 200 });
+    if (url.startsWith("https://www.googleapis.com/drive/v3/files?")) {
+      const token = new URL(url).searchParams.get("pageToken");
+      // Page 1: no match yet (e.g. 1000 results consumed), page 2: the MAP.
+      return token === "PAGE-2" ? reply({ files: [map] }) : reply({ files: [], nextPageToken: "PAGE-2" });
+    }
+    if (url.includes("/files/ROOT?")) return reply({ id: "ROOT", name: "Shared", mimeType: FOLDER, driveId: DRIVE_ID, trashed: false });
+    throw new Error(`unexpected ${url}`);
+  };
+  const deps = googleBinaryDeps(gfetch, DRIVE_ID);
+
+  const found = await findExactFileAction(deps, { parent_id: "ROOT", name: "OFFICE_MANAGER_MAP.xlsx" });
+  assert.deepEqual(found.files.map(f => f.id), ["MAP-1"]);
+  const queries = requests.filter(u => u.startsWith("https://www.googleapis.com/drive/v3/files?")).map(u => new URL(u).searchParams);
+  assert.equal(queries.length, 2, "followed nextPageToken");
+  assert.equal(queries[0].get("q"), "'ROOT' in parents and name = 'OFFICE_MANAGER_MAP.xlsx' and trashed = false");
+  for (const q of queries) {
+    assert.equal(q.get("corpora"), "drive");
+    assert.equal(q.get("driveId"), DRIVE_ID);
+    assert.equal(q.get("supportsAllDrives"), "true");
+    assert.equal(q.get("includeItemsFromAllDrives"), "true");
+  }
+
+  requests.length = 0;
+  await expectBridgeError(createBinaryFileAction(deps, {
+    parent_id: "ROOT", name: "OFFICE_MANAGER_MAP.xlsx", mime_type: XLSX_MIME, base64: b64("x")
+  }), "FILE_ALREADY_EXISTS");
+  assert.ok(!requests.some(u => u.includes("/upload/")), "nothing uploaded");
+
+  // find_exact_file is limited to the two memory names.
+  await expectBridgeError(findExactFileAction(deps, { parent_id: "ROOT", name: "Client WP.xlsx" }), "FILE_NAME_NOT_ALLOWED");
+});
+
+test("memory files: one size limit shared by write (bridge) and read (google-drive.js)", async () => {
+  const { MEMORY_BINARY_MAX_BYTES } = await import("../lib/google-drive.js");
+  assert.equal(MEMORY_BINARY_MAX_BYTES, 10 * 1024 * 1024);
+  assert.equal(BRIDGE_MEMORY_MAX, MEMORY_BINARY_MAX_BYTES);
+  assert.equal(BINARY_MAX_BYTES, MEMORY_BINARY_MAX_BYTES);
+});
+
 // ---------------------------------------------------------------------------
 // B. End to end in bridge mode: memory engine -> lib/google-drive.js ->
 //    (mocked HTTP) -> bridge dispatcher with the real binary actions -> fake Google
@@ -234,7 +285,10 @@ async function bridge(body, headers) {
   try {
     switch (body.action) {
       case "list_children":
-        return bridgeResponse({ files: await g.deps.listChildren(body.parent_id) });
+        // A single non-paginated page: never more than 1000 children.
+        return bridgeResponse({ files: (await g.deps.listChildren(body.parent_id)).slice(0, 1000) });
+      case "find_exact_file":
+        return bridgeResponse(await findExactFileAction(g.deps, body));
       case "file_metadata": {
         const meta = await g.deps.getMetadata(body.file_id);
         return meta ? bridgeResponse(meta) : bridgeResponse({ error: "GOOGLE_API_404" }, 500);
@@ -242,7 +296,10 @@ async function bridge(body, headers) {
       case "read_file": {
         const meta = await g.deps.getMetadata(body.file_id);
         if (g.texts.has(body.file_id)) return bridgeResponse({ mode: "text", file: meta, text: g.texts.get(body.file_id) });
-        return bridgeResponse({ mode: "base64", file: meta, mime_type: meta.mimeType, base64: (g.bytes.get(body.file_id) || Buffer.alloc(0)).toString("base64") });
+        const data = g.bytes.get(body.file_id) || Buffer.alloc(0);
+        // Same rule as the deployed read_file: max_bytes from the caller, default 8,000,000.
+        if (data.length > (Number(body.max_bytes) || 8_000_000)) return bridgeResponse({ error: "FILE_TOO_LARGE_FOR_BRIDGE" }, 500);
+        return bridgeResponse({ mode: "base64", file: meta, mime_type: meta.mimeType, base64: data.toString("base64") });
       }
       case "search_files":
         return bridgeResponse({ files: [] });
@@ -355,6 +412,46 @@ test("no business document is moved or modified during FIRST_MAPPING", async () 
     assert.equal(JSON.stringify(world.g.files.get(id)), before, `business object ${id} unchanged`);
   }
   assert.deepEqual(world.g.bytes.get("WP1"), wpBytes);
-  const writes = world.actions.filter(a => !["list_children", "file_metadata", "read_file", "search_files"].includes(a));
+  const writes = world.actions.filter(a => !["list_children", "file_metadata", "read_file", "search_files", "find_exact_file"].includes(a));
   assert.deepEqual(writes.sort(), ["create_binary_file", "create_binary_file"]);
+});
+
+test(">1000 siblings with MAP after the first page: no new MAP is created", async () => {
+  world.g = orgGoogle();
+  const first = await memory.runMappingPass(driveAdapter, { memoryFolderId: "ROOT", rootFolderId: "ROOT", now: new Date("2026-10-05T12:00:00Z") });
+
+  // 1500 siblings inserted BEFORE the memory files: a 1000-item listing of
+  // ROOT no longer contains OFFICE_MANAGER_MAP.xlsx / _REGISTER.xlsx.
+  const memoryMetas = memoryFiles(world.g).map(f => ({ ...f }));
+  for (const f of memoryMetas) world.g.files.delete(f.id);
+  for (let i = 0; i < 1500; i += 1) {
+    world.g.add({ id: `SIB-${i}`, name: `Sibling ${i}.txt`, mimeType: "text/plain", parents: ["ROOT"] });
+  }
+  for (const f of memoryMetas) world.g.files.set(f.id, f);
+  const listed = (await driveAdapter.listChildren("ROOT")).map(f => f.name);
+  assert.ok(!listed.includes("OFFICE_MANAGER_MAP.xlsx"), "MAP is beyond the first 1000 children");
+
+  world.actions = [];
+  const found = await driveAdapter.findFilesByExactName("OFFICE_MANAGER_MAP.xlsx", "ROOT");
+  assert.deepEqual(found.map(f => f.id), [first.summary.map_file_id]);
+
+  const reopened = await memory.openMemory(driveAdapter, { memoryFolderId: "ROOT" });
+  assert.equal(reopened.map.fileId, first.summary.map_file_id);
+  await memory.saveMemory(driveAdapter, reopened);
+  assert.ok(!world.actions.includes("create_binary_file"), "no new MAP / REGISTER");
+  assert.equal(memoryFiles(world.g).length, 2);
+  assert.ok(world.actions.includes("find_exact_file"));
+});
+
+test("a memory file just over 8,000,000 bytes (< 10 MiB) can be written AND read back", async () => {
+  world.g = orgGoogle();
+  const size = 8_100_000;
+  const buffer = Buffer.alloc(size, 7);
+  const created = await driveAdapter.createBinary({ name: "OFFICE_MANAGER_REGISTER.xlsx", parentId: "ROOT", buffer, mimeType: XLSX_MIME });
+  const readBack = await driveAdapter.downloadBuffer(created.id);
+  assert.equal(readBack.length, size);
+
+  const updated = await driveAdapter.updateBinary(created.id, { buffer: Buffer.alloc(size + 1000, 8), mimeType: XLSX_MIME, expectedModifiedTime: created.modifiedTime });
+  assert.equal(updated.id, created.id);
+  assert.equal((await driveAdapter.downloadBuffer(created.id)).length, size + 1000);
 });

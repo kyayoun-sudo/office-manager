@@ -21,7 +21,10 @@ export const BINARY_ALLOWED_NAMES: ReadonlySet<string> = new Set([
   "OFFICE_MANAGER_MAP.xlsx",
   "OFFICE_MANAGER_REGISTER.xlsx"
 ]);
-export const BINARY_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+// Single limit for memory files, used for write (here) AND read
+// (lib/google-drive.js MEMORY_BINARY_MAX_BYTES, passed as read_file max_bytes).
+export const MEMORY_BINARY_MAX_BYTES = 10 * 1024 * 1024; // 10 MiB
+export const BINARY_MAX_BYTES = MEMORY_BINARY_MAX_BYTES;
 
 export const FILE_FIELDS =
   "id,name,mimeType,parents,modifiedTime,createdTime,webViewLink,size,driveId,trashed";
@@ -43,7 +46,8 @@ export type DriveMeta = {
 export type BinaryDeps = {
   driveId: string;
   getMetadata: (fileId: string) => Promise<DriveMeta | null>; // null = not found
-  listChildren: (parentId: string) => Promise<DriveMeta[]>;
+  // Exact, paginated lookup: '<parent>' in parents and name = '<name>' and trashed = false
+  findExact: (parentId: string, name: string) => Promise<DriveMeta[]>;
   uploadCreate: (args: { name: string; parentId: string; mimeType: string; bytes: Uint8Array }) => Promise<DriveMeta>;
   uploadUpdate: (args: { fileId: string; mimeType: string; bytes: Uint8Array }) => Promise<DriveMeta>;
 };
@@ -133,14 +137,27 @@ export async function createBinaryFileAction(deps: BinaryDeps, body: Record<stri
   if (parent.mimeType !== FOLDER_MIME) throw new BridgeError("PARENT_NOT_A_FOLDER", 400);
 
   // Never create a second file with the same name: the caller must update.
-  const siblings = await deps.listChildren(parentId);
-  if (siblings.some(item => item.name === name && item.mimeType !== FOLDER_MIME && !item.trashed)) {
+  // Exact paginated search, independent of how many siblings the folder has.
+  const existing = await deps.findExact(parentId, name);
+  if (existing.some(item => item.name === name && item.mimeType !== FOLDER_MIME && !item.trashed)) {
     throw new BridgeError("FILE_ALREADY_EXISTS", 409, name);
   }
 
   const created = await deps.uploadCreate({ name, parentId, mimeType, bytes });
   const confirmed = assertInDrive(await deps.getMetadata(created.id), deps.driveId, "CREATED_FILE_NOT_FOUND");
   return publicMeta(confirmed);
+}
+
+// find_exact_file { parent_id, name } — read-only, memory file names only.
+export async function findExactFileAction(deps: BinaryDeps, body: Record<string, unknown>) {
+  const parentId = requireString(body.parent_id, "PARENT_ID_REQUIRED");
+  const name = requireAllowedName(body.name);
+  const parent = assertInDrive(await deps.getMetadata(parentId), deps.driveId, "PARENT_NOT_FOUND");
+  if (parent.mimeType !== FOLDER_MIME) throw new BridgeError("PARENT_NOT_A_FOLDER", 400);
+  const files = (await deps.findExact(parentId, name))
+    .filter(item => item.name === name && item.mimeType !== FOLDER_MIME && !item.trashed)
+    .map(publicMeta);
+  return { files };
 }
 
 // update_binary_file { file_id, mime_type, base64, expected_modified_time }
@@ -213,17 +230,26 @@ export function googleBinaryDeps(gfetch: GoogleFetch, driveId: string): BinaryDe
       if (response.status === 404) return null;
       return okJson(response);
     },
-    async listChildren(parentId) {
-      const params = new URLSearchParams({
-        q: `'${parentId.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' in parents and trashed = false`,
-        supportsAllDrives: "true",
-        includeItemsFromAllDrives: "true",
-        corpora: "drive",
-        driveId,
-        pageSize: "1000",
-        fields: `files(${FILE_FIELDS})`
-      });
-      return (await okJson(await gfetch(`${base}?${params.toString()}`))).files || [];
+    async findExact(parentId, name) {
+      const esc = (value: string) => value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      const files: DriveMeta[] = [];
+      let pageToken: string | null = null;
+      do {
+        const params = new URLSearchParams({
+          q: `'${esc(parentId)}' in parents and name = '${esc(name)}' and trashed = false`,
+          supportsAllDrives: "true",
+          includeItemsFromAllDrives: "true",
+          corpora: "drive",
+          driveId,
+          pageSize: "1000",
+          fields: `nextPageToken,files(${FILE_FIELDS})`
+        });
+        if (pageToken) params.set("pageToken", pageToken);
+        const page = await okJson(await gfetch(`${base}?${params.toString()}`));
+        files.push(...(page.files || []));
+        pageToken = page.nextPageToken || null;
+      } while (pageToken);
+      return files;
     },
     async uploadCreate({ name, parentId, mimeType, bytes }) {
       const boundary = `om-bridge-${crypto.randomUUID()}`;

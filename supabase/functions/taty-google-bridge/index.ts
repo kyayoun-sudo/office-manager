@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   BridgeError,
   createBinaryFileAction,
+  findExactFileAction,
   googleBinaryDeps,
   updateBinaryFileAction
 } from "./binary-files.ts";
@@ -364,6 +365,10 @@ Deno.serve(async req => {
     // OFFICE_MANAGER_REGISTER.xlsx): allow-listed names and MIME type, 10 MB,
     // configured Shared Drive only, create-once / update-in-place with an
     // optimistic concurrency check. No move, no delete. See binary-files.ts.
+    if (action === "find_exact_file") {
+      return json(await findExactFileAction(googleBinaryDeps(gfetch, DRIVE_ID), body));
+    }
+
     if (action === "create_binary_file") {
       return json(await createBinaryFileAction(googleBinaryDeps(gfetch, DRIVE_ID), body));
     }
