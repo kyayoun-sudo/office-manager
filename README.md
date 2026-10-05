@@ -12,9 +12,13 @@ Office Manager AI is a multi-agent operating layer for audit, accounting and adv
 
 ## Agents
 
-- **Grand Contrôleur** — missions, planning, PBC, deadlines, workload, review and delivery risk
+**Grand Contrôleur / Office Manager AI** is the root orchestrator (not a specialist). It owns the global view: all missions, global planning, staff capacity and availability, overlaps/overload, staff and firm KPI, global alerts, prioritisation and arbitration. Its specialists are:
+
+- **Mission Controller** — lifecycle of one mission: TDR/contract/engagement letter, validated work programme, cycles/workstreams, required Working Papers, PBC List and received-document control, review, deadlines, delay risks
 - **Orpailleur** — Drive inventory, document inspection, versions and controlled filing
 - **Sika** — billing/collection workflow and administrative follow-up
+
+See `README_ARCHITECTURE_PHASE1.md` for the phase-1 refactor and Supabase compatibility notes.
 
 ## Important
 

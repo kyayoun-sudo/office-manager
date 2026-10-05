@@ -1,53 +1,115 @@
-import { chooseAgent } from "../agents/index.js";
+import {
+  LEGACY_SETTING_FALLBACK,
+  ROOT_AGENT_KEY,
+  ROOT_AGENT_NAME,
+  ROOT_ROUTE,
+  SPECIALIST_KEYS,
+  chooseAgent,
+  normalizeRequestedAgent
+} from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
-import { runOfficeManager } from "../lib/orchestrator.js";
+import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import {
   createAgentRun,
   finishAgentRun,
   getAgentSetting,
   getPermissions,
   getRunToolEvents,
-  loadAgentContext
+  loadAgentContext,
+  loadRootContext
 } from "../lib/supabase.js";
 
-const SPECIALISTS = ["grand-controleur", "orpailleur", "sika"];
+// Specialists of the Grand Contrôleur / Office Manager AI root agent.
+// The Grand Contrôleur itself is NOT a specialist: it is the "auto" route.
+const SPECIALISTS = SPECIALIST_KEYS; // mission-controller, orpailleur, sika
+
+const RELEASE = "v2.3-architecture-phase1";
+
+// Resolves the Supabase configuration of an agent.
+// If mission-controller has no office_agent_settings row yet, the legacy
+// "grand-controleur" row is used (mode / enabled state) and its records are
+// written under that legacy agent_key. Non-destructive: nothing is migrated.
+async function resolveAgentSetting(orgId, agentKey) {
+  const own = await getAgentSetting(orgId, agentKey);
+  if (own) {
+    return { setting: own, storageKey: agentKey, legacyFallback: false };
+  }
+
+  const legacyKey = LEGACY_SETTING_FALLBACK[agentKey];
+  if (legacyKey) {
+    const legacy = await getAgentSetting(orgId, legacyKey);
+    if (legacy) {
+      return { setting: legacy, storageKey: legacyKey, legacyFallback: true };
+    }
+  }
+
+  return { setting: null, storageKey: agentKey, legacyFallback: false };
+}
 
 async function loadAllowedContexts(orgId) {
   const entries = await Promise.all(
     SPECIALISTS.map(async agentKey => {
-      const setting = await getAgentSetting(orgId, agentKey);
+      const resolved = await resolveAgentSetting(orgId, agentKey);
 
-      if (!setting || setting.mode === "disabled") {
+      if (!resolved.setting || resolved.setting.mode === "disabled") {
         return [
           agentKey,
-          { unavailable: true, reason: "AGENT_DISABLED" }
+          {
+            context: { unavailable: true, reason: "AGENT_DISABLED" },
+            resolved
+          }
         ];
       }
 
-      const context = await loadAgentContext(orgId, agentKey);
-      return [agentKey, context];
+      const context = await loadAgentContext(orgId, agentKey, {
+        storageKey: resolved.storageKey
+      });
+      return [agentKey, { context, resolved }];
     })
   );
 
-  return Object.fromEntries(entries);
+  const contexts = {};
+  const storageKeys = {};
+  const legacyFallbacks = [];
+  for (const [agentKey, { context, resolved }] of entries) {
+    contexts[agentKey] = context;
+    storageKeys[agentKey] = resolved.storageKey;
+    if (resolved.legacyFallback) legacyFallbacks.push(agentKey);
+  }
+
+  return { contexts, storageKeys, legacyFallbacks };
 }
 
-function specialistsFromTools(toolsUsed = [], requestedAgent = "auto") {
-  if (requestedAgent !== "auto") return [requestedAgent];
+const CONSULT_TOOL_TO_SPECIALIST = Object.fromEntries(
+  Object.entries(CONSULT_TOOLS).map(([agentKey, toolName]) => [
+    toolName,
+    agentKey
+  ])
+);
 
-  const mapping = {
-    consult_grand_controleur: "grand-controleur",
-    consult_orpailleur: "orpailleur",
-    consult_sika: "sika"
-  };
+function specialistsFromTools(toolsUsed = [], requestedAgent = ROOT_ROUTE) {
+  if (requestedAgent !== ROOT_ROUTE) return [requestedAgent];
 
+  // consult_mission_controller / consult_orpailleur / consult_sika
   return [
     ...new Set(
       toolsUsed
-        .map(name => mapping[name])
+        .map(name => CONSULT_TOOL_TO_SPECIALIST[name])
         .filter(Boolean)
     )
   ];
+}
+
+// Tool events store the Supabase agent_key in specialist_key (possibly the
+// legacy "grand-controleur" for mission-controller) and the logical agent key
+// in metadata.logical_agent_key. Only real specialists are reported; tools run
+// by the root Grand Contrôleur itself are not a "specialist used".
+function specialistsFromEvents(toolEvents = []) {
+  return toolEvents
+    .map(event =>
+      event?.metadata?.logical_agent_key || event?.specialist_key
+    )
+    .filter(key => SPECIALISTS.includes(key));
 }
 
 export default async function handler(req, res) {
@@ -62,7 +124,9 @@ export default async function handler(req, res) {
 
     const body = req.body || {};
     const message = String(body.message || "").trim();
-    const requestedAgent = String(body.agent || "auto").trim();
+    const rawRequestedAgent = String(body.agent || ROOT_ROUTE).trim();
+    // "grand-controleur" (legacy specialist key) now means the root agent.
+    const requestedAgent = normalizeRequestedAgent(rawRequestedAgent);
     const provider = String(body.provider || "auto").trim();
     const risk = String(body.risk || "normal").trim();
 
@@ -70,10 +134,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "message is required" });
     }
 
-    if (
-      requestedAgent !== "auto" &&
-      !SPECIALISTS.includes(requestedAgent)
-    ) {
+    if (!requestedAgent) {
       return res.status(400).json({ error: "UNKNOWN_AGENT" });
     }
 
@@ -97,15 +158,26 @@ export default async function handler(req, res) {
     }
 
     let contexts;
+    let rootContext = {};
+    let storageKeys = {};
+    let legacyFallbacks = [];
     let runAgentKey;
 
-    if (requestedAgent === "auto") {
-      contexts = await loadAllowedContexts(orgId);
-      // Existing DB compatibility: multi-agent manager run is stored under
-      // grand-controleur while metrics identify manager orchestration.
-      runAgentKey = "grand-controleur";
+    if (requestedAgent === ROOT_ROUTE) {
+      const loaded = await loadAllowedContexts(orgId);
+      contexts = loaded.contexts;
+      storageKeys = { ...loaded.storageKeys, [ROOT_AGENT_KEY]: ROOT_AGENT_KEY };
+      legacyFallbacks = loaded.legacyFallbacks;
+      rootContext = await loadRootContext(orgId, {
+        storageKey: ROOT_AGENT_KEY
+      });
+      // The root agent IS the Grand Contrôleur: its runs are stored under
+      // agent_key "grand-controleur", which is also the historical key used
+      // for manager runs in office_agent_runs (no data migration needed).
+      runAgentKey = ROOT_AGENT_KEY;
     } else {
-      const setting = await getAgentSetting(orgId, requestedAgent);
+      const resolved = await resolveAgentSetting(orgId, requestedAgent);
+      const setting = resolved.setting;
 
       if (!setting) {
         return res.status(404).json({
@@ -124,13 +196,24 @@ export default async function handler(req, res) {
       contexts = {
         [requestedAgent]: await loadAgentContext(
           orgId,
-          requestedAgent
+          requestedAgent,
+          { storageKey: resolved.storageKey }
         )
       };
 
-      runAgentKey = requestedAgent;
+      storageKeys = { [requestedAgent]: resolved.storageKey };
+      if (resolved.legacyFallback) legacyFallbacks = [requestedAgent];
+
+      // mission-controller without its own settings row is stored under the
+      // legacy "grand-controleur" agent_key (see resolveAgentSetting).
+      runAgentKey = resolved.storageKey;
     }
 
+    const orchestration =
+      requestedAgent === ROOT_ROUTE ? "manager" : "direct-specialist";
+    const logicalAgentKey =
+      requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent;
+    // Routing hint only; the root agent decides the actual delegation.
     const legacyRoute = chooseAgent(message);
 
     run = await createAgentRun({
@@ -138,17 +221,17 @@ export default async function handler(req, res) {
       agent_key: runAgentKey,
       status: "running",
       metrics: {
-        orchestration:
-          requestedAgent === "auto"
-            ? "manager"
-            : "direct-specialist",
+        orchestration,
+        logical_agent_key: logicalAgentKey,
+        storage_agent_key: runAgentKey,
+        legacy_setting_fallback: legacyFallbacks,
         legacy_route: legacyRoute,
-        release: "v2.2-operational-tools"
+        release: RELEASE
       },
       errors: [],
       summary:
-        requestedAgent === "auto"
-          ? "Office Manager operational multi-agent request started"
+        requestedAgent === ROOT_ROUTE
+          ? "Grand Contrôleur / Office Manager AI multi-agent request started"
           : `${requestedAgent} operational direct request started`
     });
 
@@ -156,10 +239,12 @@ export default async function handler(req, res) {
       message,
       requestedAgent,
       contexts,
+      rootContext,
       provider,
       risk,
       orgId,
-      runId: run?.id || null
+      runId: run?.id || null,
+      storageKeys
     });
 
     const topLevelTools = result.toolsUsed || [];
@@ -170,9 +255,7 @@ export default async function handler(req, res) {
       .map(event => event.tool_name)
       .filter(Boolean);
     const toolsUsed = [...new Set([...topLevelTools, ...eventTools])];
-    const eventSpecialists = toolEvents
-      .map(event => event.specialist_key)
-      .filter(Boolean);
+    const eventSpecialists = specialistsFromEvents(toolEvents);
     const specialistsUsed = [
       ...new Set([
         ...specialistsFromTools(topLevelTools, requestedAgent),
@@ -187,29 +270,32 @@ export default async function handler(req, res) {
         summary: result.text.slice(0, 1000),
         metrics: {
           provider: result.provider,
-          orchestration:
-            requestedAgent === "auto"
-              ? "manager"
-              : "direct-specialist",
+          orchestration,
+          logical_agent_key: logicalAgentKey,
+          storage_agent_key: runAgentKey,
+          legacy_setting_fallback: legacyFallbacks,
           last_agent: result.lastAgent || null,
           reviewed: Boolean(result.review || result.reviewed),
           legacy_route: legacyRoute,
           specialists_used: specialistsUsed,
           tools_used: toolsUsed,
-          release: "v2.2-operational-tools"
+          release: RELEASE
         },
         errors: []
       });
     }
 
     return res.status(200).json({
+      // "office-manager" kept as the response value of the root route for
+      // existing clients; rootAgentKey identifies it as the Grand Contrôleur.
       agent:
-        requestedAgent === "auto"
+        requestedAgent === ROOT_ROUTE
           ? "office-manager"
           : requestedAgent,
+      rootAgentKey: ROOT_AGENT_KEY,
       agentName:
-        requestedAgent === "auto"
-          ? "Office Manager AI"
+        requestedAgent === ROOT_ROUTE
+          ? ROOT_AGENT_NAME
           : result.lastAgent || requestedAgent,
       provider: result.provider,
       answer: result.text,
