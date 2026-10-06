@@ -169,7 +169,7 @@
 
   $('save').addEventListener('click', function () {
     $('save').disabled = true; show('Enregistrement…');
-    OM.api('/api/branding', {
+    OM.api('/api/app?route=branding', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firm_name: state.firm_name, primary_color: state.primary_color, logo_data_url: state.logo_data_url, updated_by: OM.getUserName() || null })
     }).then(function (b) { OM.applyBranding(b); show('Enregistré pour tout le cabinet.'); })

@@ -56,7 +56,7 @@
   function decide(action, decision, note, card) {
     var buttons = card.querySelectorAll('button');
     Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
-    OM.api('/api/actions', {
+    OM.api('/api/app?route=actions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_id: action.id, decision: decision, note: note || null, decided_by: OM.getUserName() || null })
     }).then(function () {
@@ -150,7 +150,7 @@
   function start() {
     OM.loadBranding().catch(function () {});
     show('Chargement…');
-    OM.api('/api/actions').then(function (data) {
+    OM.api('/api/app?route=actions').then(function (data) {
       all = (data && data.actions) || [];
       show(data && data.truncated ? 'Seules les 100 propositions les plus récentes sont affichées.' : '');
       renderFilters(); render();

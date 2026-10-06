@@ -112,7 +112,7 @@
     var q = $('q').value.trim();
     if (q.length < 2) { $('status').textContent = 'Tapez au moins 2 caractères.'; return; }
     $('status').textContent = 'Recherche…'; $('status').className = 'status';
-    OM.api('/api/search?q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(scope))
+    OM.api('/api/app?route=search&q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(scope))
       .then(render)
       .catch(function (err) { $('results').textContent = ''; $('status').textContent = 'Recherche impossible : ' + err.message; $('status').className = 'status error'; });
   }

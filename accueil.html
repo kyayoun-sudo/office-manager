@@ -113,7 +113,7 @@
   }
 
   function loadPending() {
-    OM.api('/api/actions').then(function (data) {
+    OM.api('/api/app?route=actions').then(function (data) {
       var n = ((data && data.actions) || []).filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
       $('pending').textContent = String(n);
       if (n) { $('nav-count').hidden = false; $('nav-count').textContent = String(n); }
@@ -125,7 +125,7 @@
     var q = $('q').value.trim();
     if (q.length < 2) { $('search-status').textContent = 'Tapez au moins 2 caractères.'; return; }
     $('search-status').textContent = 'Recherche…';
-    OM.api('/api/search?q=' + encodeURIComponent(q) + '&scope=all').then(function (data) {
+    OM.api('/api/app?route=search&q=' + encodeURIComponent(q) + '&scope=all').then(function (data) {
       UI.renderSearch($('search-results'), data);
       $('search-status').textContent = data.total + ' résultat(s) pour « ' + data.query + ' ».';
     }).catch(function (err) { $('search-status').textContent = 'Recherche impossible : ' + err.message; });

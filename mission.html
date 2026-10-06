@@ -218,7 +218,7 @@
   function start() {
     OM.loadBranding().catch(function () {});
     if (!missionId) { showList(); return; }
-    OM.api('/api/mission-view?mission_id=' + encodeURIComponent(missionId))
+    OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId))
       .then(showDossier)
       .catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });
   }
