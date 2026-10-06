@@ -165,6 +165,9 @@ export default async function handler(req, res) {
     let runAgentKey;
 
     if (requestedAgent === ROOT_ROUTE) {
+      const rootSetting = await getAgentSetting(orgId, ROOT_AGENT_KEY);
+      if (!rootSetting) return res.status(404).json({ error: "AGENT_NOT_CONFIGURED" });
+      if (rootSetting.mode === "disabled") return res.status(409).json({ error: "AGENT_DISABLED" });
       const [loaded, loadedRoot] = await Promise.all([
         loadAllowedContexts(orgId),
         loadRootContext(orgId, { storageKey: ROOT_AGENT_KEY })
@@ -301,6 +304,7 @@ export default async function handler(req, res) {
           : result.lastAgent || requestedAgent,
       provider: result.provider,
       answer: result.text,
+      runId: run?.id || null,
       reviewed: Boolean(result.review || result.reviewed),
       lastAgent: result.lastAgent || null,
       specialistsUsed,
@@ -321,6 +325,7 @@ export default async function handler(req, res) {
 
     return res
       .status(error.statusCode || 500)
-      .json({ error: String(error.message || error) });
+      .json({ error: error.statusCode === 401 ? "UNAUTHORIZED" : "AGENT_REQUEST_FAILED",
+        runId: run?.id || null });
   }
 }

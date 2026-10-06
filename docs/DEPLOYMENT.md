@@ -1,5 +1,26 @@
 # Recette et déploiement préparé
 
+## Étape 1 — suivi des demandes
+
+La preview 296b1d52 est READY : health 200, accès agent/status sans token 401.
+Le contrôle utilisateur complet du Grand Contrôleur après correction reste
+à confirmer. Le nouvel endpoint GET /api/runs utilise le token pilote et
+l'organisation serveur ; il affiche les vingt demandes de l'interface les
+plus récentes, sans métriques ni erreurs techniques brutes.
+Une demande running vieille de plus de six minutes est affichée comme fin
+inconnue : cela ne signifie ni annulation ni absence d'effets.
+Le suivi expose un résumé limité aux 1000 caractères déjà enregistrés.
+La route racine vérifie maintenant son activation avant tout appel IA.
+113 tests locaux passent. Aucun SQL, cron, scan Drive ou appel IA réel
+n'est nécessaire pour publier le correctif.
+
+Recette : charger les fichiers sur fix/map-register-bridge-write, ouvrir
+la nouvelle preview, entrer le token habituel, cliquer Actualiser le suivi.
+Pour valider une réponse réelle, envoyer une seule demande de lecture sur
+Nova Services, puis vérifier la réponse et son résumé dans le suivi.
+Cette dernière action utilise les fournisseurs IA configurés et reste une
+recette utilisateur ; elle n'a pas été exécutée par l'agent.
+
 ## Correction du délai du Grand Contrôleur
 
 Le test utilisateur du 6 octobre sur BLE TRANSIT a validé la consultation
