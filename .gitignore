@@ -1,1 +1,12 @@
 node_modules/
+.env.local
+work-*.mjs
+.env
+.env.*
+!.env.example
+.vercel/
+*.dump
+*.backup
+*questionnaire*.csv
+*questionnaire*.xlsx
+
