@@ -83,6 +83,12 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="answer" class="answer">L’agent est prêt dès que les variables Vercel sont configurées et que les agents sont activés dans Supabase.</div>
   </section>
   <section class="panel" style="margin-top:18px">
+    <h2>Suivi des demandes</h2>
+    <p class="small">Consulte les résultats avant de relancer une demande interrompue. Un résumé terminé ne prouve pas que toutes les actions proposées ont été exécutées.</p>
+    <div class="actions"><button id="runs-read">Actualiser le suivi</button></div>
+    <div id="runs-answer" class="answer">Les demandes récentes apparaîtront ici.</div>
+  </section>
+  <section class="panel" style="margin-top:18px">
     <h2>TATY People Intelligence</h2>
     <p class="small">Préparer l’équipe et le briefing d’une mission. Les compétences et la disponibilité restent à valider par le manager.</p>
     <label for="people-mission">Identifiant de la mission</label>
@@ -116,6 +122,21 @@ async function readApiResponse(response) {
   if (!response.ok) throw new Error(data.error || "La demande a échoué.");
   return data;
 }
+
+document.getElementById('runs-read').addEventListener('click', async () => {
+  const button = document.getElementById('runs-read');
+  const output = document.getElementById('runs-answer');
+  button.disabled = true;
+  try {
+    const data = await readApiResponse(await fetch('/api/runs', {
+      headers: { 'x-office-manager-token': tokenEl.value.trim() }
+    }));
+    output.textContent = data.runs.length ? data.runs.map(run =>
+      `${run.label} — ${run.agent}\n${new Date(run.started_at).toLocaleString('fr-FR')}\nRéférence : ${run.id}\nRésumé : ${run.summary}\n${run.warning || ''}`
+    ).join('\n\n') : 'Aucune demande récente enregistrée.';
+  } catch (error) { output.textContent = `Erreur : ${error.message}`; }
+  finally { button.disabled = false; }
+});
 
 document.getElementById('people-read').addEventListener('click', async () => {
   const button = document.getElementById('people-read');

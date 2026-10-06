@@ -92,6 +92,14 @@ connected and deployed. Do not claim completion from mocked tests alone.
 
 ### Latest verified state (supersedes earlier publication notes below)
 
+- Roadmap step 1 active. Timeout correction 296b1d52 deployed READY.
+  Health 200; unauthenticated agent and status 401.
+- Prepared internal run-history endpoint and UI, scoped to server org and
+  interface release; stale running rows shown as completion unknown without
+  changing database status or retrying actions. Root enablement enforced.
+- 113 local tests pass. Run-history publication and authenticated live root
+  response remain required before declaring step 1 complete.
+
 - Safe staffing correction uploaded as 0f02eaff; all eight files verified.
 - Preview dpl_GvaZRfQAvh7TDtwrEfa9RZi7HU9Y READY; health/homepage 200,
   unauthenticated status/people 401. User BLE TRANSIT matching succeeded.
