@@ -10,7 +10,7 @@
     "windows": [
       {
         "title": "Office Manager",
-        "url": "/recherche.html",
+        "url": "/accueil.html",
         "width": 1280,
         "height": 840,
         "minWidth": 900,

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>À valider</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/validations.html" aria-current="page">À valider <span class="badge" id="nav-count" hidden></span></a>
+    <a href="/">Assistant (pilote)</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>À valider</h1>
+      <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Elle ne déclenche aucun envoi, classement ou affectation automatique.</p>
+    </header>
+
+    <div class="chips" id="filters" aria-label="Filtrer par agent"></div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <div id="list" class="stack" style="gap:16px"></div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var AGENTS = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
+  var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
+  var all = [], filter = 'all';
+
+  function agentName(key) { return AGENTS[key] || key || 'Agent'; }
+
+  function show(msg, isError) { $('status').textContent = msg; $('status').className = 'status' + (isError ? ' error' : ''); }
+
+  function decide(action, decision, note, card) {
+    var buttons = card.querySelectorAll('button');
+    Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
+    OM.api('/api/actions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action_id: action.id, decision: decision, note: note || null, decided_by: OM.getUserName() || null })
+    }).then(function () {
+      action.last_decision = { decision: decision, note: note || null, decided_by: OM.getUserName() || null, created_at: new Date().toISOString() };
+      show('Décision enregistrée : ' + LABELS[decision] + '.');
+      render();
+    }).catch(function (err) {
+      show('Échec : ' + err.message, true);
+      Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
+    });
+  }
+
+  function card(action) {
+    var c = el('article', null, 'card');
+    var head = el('div', null, 'btn-row');
+    head.style.alignItems = 'center';
+    head.appendChild(el('span', agentName(action.agent_key), 'tag'));
+    head.appendChild(el('span', action.action_type || 'ACTION', 'meta'));
+    if (action.due_at) head.appendChild(el('span', 'Échéance ' + UI.date(action.due_at), 'tag warn'));
+    c.appendChild(head);
+    c.appendChild(el('h2', action.summary || 'Proposition sans résumé'));
+    var meta = [];
+    if (action.created_at) meta.push('Proposé le ' + UI.dateTime(action.created_at));
+    if (action.office_mission_id) {
+      var link = el('a', 'Voir la mission');
+      link.href = '/mission.html?id=' + encodeURIComponent(action.office_mission_id);
+      var line = el('p', meta.join(' · ') + (meta.length ? ' · ' : ''), 'meta');
+      line.style.margin = '0';
+      line.appendChild(link);
+      c.appendChild(line);
+    } else if (meta.length) {
+      var p = el('p', meta.join(' · '), 'meta'); p.style.margin = '0'; c.appendChild(p);
+    }
+
+    var last = action.last_decision;
+    if (last && last.decision !== 'defer') {
+      var done = el('p', LABELS[last.decision] + ' le ' + UI.dateTime(last.created_at) + (last.decided_by ? ' par ' + last.decided_by : '') + (last.note ? ' — ' + last.note : ''), 'tag ' + (last.decision === 'reject' ? 'warn' : ''));
+      done.style.margin = '0'; done.style.alignSelf = 'flex-start';
+      c.appendChild(done);
+      return c;
+    }
+    if (last && last.decision === 'defer') {
+      var d = el('p', 'Reporté le ' + UI.dateTime(last.created_at), 'tag neutral'); d.style.margin = '0'; d.style.alignSelf = 'flex-start';
+      c.appendChild(d);
+    }
+
+    var box = el('div', null, 'decision');
+    var id = 'note-' + action.id;
+    var label = el('label', 'Commentaire (obligatoire pour refuser)'); label.htmlFor = id;
+    var note = el('textarea'); note.id = id; note.maxLength = 1000;
+    box.appendChild(label); box.appendChild(note);
+    var row = el('div', null, 'btn-row');
+    var ok = el('button', 'Valider', 'btn'); ok.type = 'button';
+    var later = el('button', 'Reporter', 'btn ghost'); later.type = 'button';
+    var no = el('button', 'Refuser', 'btn danger'); no.type = 'button';
+    ok.addEventListener('click', function () { decide(action, 'approve', note.value.trim(), c); });
+    later.addEventListener('click', function () { decide(action, 'defer', note.value.trim(), c); });
+    no.addEventListener('click', function () {
+      if (!note.value.trim()) { show('Indiquez la raison du refus dans le commentaire.', true); note.focus(); return; }
+      decide(action, 'reject', note.value.trim(), c);
+    });
+    row.appendChild(ok); row.appendChild(later); row.appendChild(no);
+    box.appendChild(row);
+    c.appendChild(box);
+    return c;
+  }
+
+  function renderFilters() {
+    var counts = {};
+    all.forEach(function (a) { var k = a.agent_key || 'autre'; counts[k] = (counts[k] || 0) + 1; });
+    var box = $('filters'); box.textContent = '';
+    var keys = ['all'].concat(Object.keys(counts));
+    keys.forEach(function (k) {
+      var b = el('button', (k === 'all' ? 'Tout' : agentName(k)) + ' · ' + (k === 'all' ? all.length : counts[k]), 'chip');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(k === filter));
+      b.addEventListener('click', function () { filter = k; renderFilters(); render(); });
+      box.appendChild(b);
+    });
+  }
+
+  function render() {
+    var list = $('list'); list.textContent = '';
+    var rows = all.filter(function (a) { return filter === 'all' || (a.agent_key || 'autre') === filter; });
+    var open = all.filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+    $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
+    if (!rows.length) { list.appendChild(el('p', 'Rien à valider pour le moment.', 'empty')); return; }
+    rows.forEach(function (a) { list.appendChild(card(a)); });
+  }
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    show('Chargement…');
+    OM.api('/api/actions').then(function (data) {
+      all = (data && data.actions) || [];
+      show(data && data.truncated ? 'Seules les 100 propositions les plus récentes sont affichées.' : '');
+      renderFilters(); render();
+    }).catch(function (err) { show('Indisponible : ' + err.message, true); });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

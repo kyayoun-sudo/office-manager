@@ -57,3 +57,36 @@ inchangés.
      (Rust et les prérequis Tauri de la plateforme sont nécessaires).
   Pour vendre à un autre cabinet : changer `productName`, `identifier`, le logo,
   puis reconstruire.
+
+## Ajout 2 — écrans Accueil, Missions et À valider (2026-10-07)
+
+Toujours en ajout seulement : aucun fichier d'origine du projet n'est modifié.
+Seuls trois fichiers de l'ajout 1 sont mis à jour (menu commun, page d'ouverture
+de l'application de bureau) : `parametres.html`, `recherche.html`,
+`desktop/src-tauri/tauri.conf.json`.
+
+| Fichier | Rôle |
+|---|---|
+| `accueil.html` | Tableau de bord : recherche, missions, nombre de propositions à valider, dernières demandes aux agents. |
+| `mission.html` | Liste des missions et dossier d'une mission (`?id=`) : chiffres clés, points à régler, équipe, actions, documents, plan proposé, question au Mission Controller. |
+| `validations.html` | « À valider » : propositions des agents, filtre par agent, Valider / Reporter / Refuser (commentaire obligatoire pour refuser). |
+| `lib/mission-view.js`, `api/mission-view.js` | Dossier de mission + noms de l'équipe (nom et fonction uniquement, jamais e-mail, compétences, CV ou profil RH). Lecture seule. |
+| `lib/action-decisions.js`, `api/actions.js` | Liste des propositions en attente et journal des décisions. |
+| `db/action-decisions.sql` | Nouvelle table `office_action_decisions`, journal **en ajout seul** (ni modification ni suppression), avec l'empreinte exacte du contenu décidé. |
+| `assets/screens.css`, `assets/screens.js` | Styles et outils communs des écrans. |
+| `tests/action-decisions.test.js`, `tests/verify-action-decisions-sql.mjs` | 7 tests + vérification SQL. |
+
+**Important — ce qu'une décision fait et ne fait pas :** elle est enregistrée et
+horodatée dans `office_action_decisions`. Elle **ne modifie pas**
+`office_action_queue` et **ne déclenche rien** (aucun envoi, classement ou
+affectation). Brancher l'exécution d'une décision validée est une étape
+ultérieure, à faire explicitement, action par action.
+
+**La question au Mission Controller** (écran mission) appelle l'endpoint
+existant `/api/agent` : elle part chez OpenAI et l'agent peut utiliser ses
+outils habituels, avec leurs garde-fous existants.
+
+Vérifications : nouveaux tests 7/7 ; SQL OK ; suite complète 130/131 (seul
+échec : `tests/browser-response.test.js`, déjà présent avant ces ajouts).
+À appliquer dans Supabase : `db/action-decisions.sql` (en plus de
+`db/org-branding.sql`).
