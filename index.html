@@ -94,6 +94,17 @@ button:disabled{opacity:.55;cursor:not-allowed}
       <button id="mission-plan" disabled>Préparer la demande au Grand Contrôleur</button>
     </div>
     <div id="mission-dossier" class="answer">Le dossier regroupe le cadrage, les affectations, les actions et les documents référencés.</div>
+    <h3>Plan proposé — versions</h3>
+    <p class="small">L’enregistrement crée une proposition. Il ne valide aucun programme et n’affecte personne. Relis le contenu et les phases avant de sauvegarder.</p>
+    <label for="plan-content">Texte du plan</label>
+    <textarea id="plan-content" placeholder="Saisis un plan ou copie la réponse du Grand Contrôleur."></textarea>
+    <label for="plan-phases" style="margin-top:12px">Phases proposées — une par ligne</label>
+    <textarea id="plan-phases" placeholder="Cadrage&#10;Cartographie&#10;Diagnostic"></textarea>
+    <div class="actions">
+      <button id="plan-copy" disabled>Copier la dernière réponse de cette mission</button>
+      <button id="plan-save" disabled>Enregistrer une version proposée</button>
+    </div>
+    <div id="plan-result" class="small" style="margin-top:12px"></div>
   </section>
   <section class="panel" style="margin-top:18px">
     <h2>Suivi des demandes</h2>
@@ -141,6 +152,22 @@ const missionOpen = document.getElementById('mission-open');
 const missionPlan = document.getElementById('mission-plan');
 const missionOutput = document.getElementById('mission-dossier');
 let openedMission = null;
+let preparedPlan = null;
+let lastPlanReply = null;
+const planContent = document.getElementById('plan-content');
+const planPhases = document.getElementById('plan-phases');
+const planCopy = document.getElementById('plan-copy');
+const planSave = document.getElementById('plan-save');
+const planResult = document.getElementById('plan-result');
+function resetPlanEditor() {
+  preparedPlan = null;
+  lastPlanReply = null;
+  planContent.value = '';
+  planPhases.value = '';
+  planCopy.disabled = true;
+  planSave.disabled = true;
+  planResult.textContent = '';
+}
 document.getElementById('missions-read').addEventListener('click', async () => {
   const button = document.getElementById('missions-read');
   button.disabled = true;
@@ -158,6 +185,7 @@ document.getElementById('missions-read').addEventListener('click', async () => {
       data.missions.length + ' missions affichées · ' + drafts + ' brouillons · ' + undated +
       ' avec dates incomplètes' + (data.truncated ? ' · Liste limitée aux 100 missions les plus récentes.' : '');
     openedMission = null;
+    resetPlanEditor();
     missionOpen.disabled = true;
     missionPlan.disabled = true;
     missionOutput.textContent = 'Choisis une mission puis ouvre son dossier.';
@@ -166,6 +194,7 @@ document.getElementById('missions-read').addEventListener('click', async () => {
 });
 missionSelect.addEventListener('change', () => {
   openedMission = null;
+  resetPlanEditor();
   missionOpen.disabled = !missionSelect.value;
   missionPlan.disabled = true;
   missionOutput.textContent = 'Ouvre le dossier sélectionné.';
@@ -181,6 +210,7 @@ missionOpen.addEventListener('click', async () => {
     }));
     if (missionSelect.value !== id) return;
     openedMission = data;
+    planSave.disabled = false;
     const req = data.requirements || {};
     const lines = [
       data.mission.name, 'Source : ' + data.source, 'Statut : ' + data.mission.status,
@@ -196,6 +226,11 @@ missionOpen.addEventListener('click', async () => {
       ...(data.actions.length ? data.actions.map(a => a.summary + ' · ' + a.status + ' · ' + a.work_state) : ['Aucune action opérationnelle enregistrée.']),
       '\nDOCUMENTS RÉFÉRENCÉS',
       ...(data.documents.length ? data.documents.map(d => d.name + (d.content_verified_at ? ' · contenu vérifié dans l’inventaire' : ' · contenu à vérifier')) : ['Aucun document relié dans l’inventaire.']),
+      '\nVERSIONS DU PLAN — NON APPROUVÉES',
+      ...(data.plans.length ? data.plans.flatMap(p => [
+        'Version ' + p.version + ' · ' + new Date(p.created_at).toLocaleString('fr-FR'),
+        'Phases : ' + p.phases.join(' → '), p.content
+      ]) : ['Aucune version enregistrée.']),
       '\nPARCOURS PROPOSÉ', ...data.next_steps, '\n' + data.guardrail
     ];
     if (Object.values(data.truncated).some(Boolean)) lines.push('Certaines listes sont limitées aux 100 premières lignes.');
@@ -214,8 +249,33 @@ missionPlan.addEventListener('click', () => {
     'Propose les phases, les livrables, les informations manquantes et les spécialistes à consulter. ' +
     'Ne lance aucun scan Drive, aucune affectation, aucun envoi et aucune modification. ' +
     'Distingue les faits du dossier et le plan proposé à faire valider.';
+  preparedPlan = { missionId: openedMission.mission.id, message: messageEl.value };
   metaEl.textContent = 'Demande préparée : relis-la puis clique sur Envoyer si tu souhaites lancer l’analyse.';
   messageEl.focus();
+});
+
+planCopy.addEventListener('click', () => {
+  if (!lastPlanReply || !openedMission || lastPlanReply.missionId !== openedMission.mission.id) return;
+  planContent.value = lastPlanReply.text;
+  planResult.textContent = 'Réponse copiée. Renseigne les phases proposées et relis le texte avant enregistrement.';
+});
+planSave.addEventListener('click', async () => {
+  if (!openedMission || openedMission.mission.id !== missionSelect.value) return;
+  const id = openedMission.mission.id;
+  const content = planContent.value;
+  const phases = planPhases.value.split('\n').map(p => p.trim()).filter(Boolean);
+  if (!content.trim()) { planResult.textContent = 'Renseigne le texte du plan.'; return; }
+  planSave.disabled = true;
+  try {
+    const data = await readApiResponse(await fetch('/api/mission-plans', {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'x-office-manager-token':tokenEl.value.trim() },
+      body: JSON.stringify({mission_id:id,content,phases})
+    }));
+    if (missionSelect.value !== id) return;
+    planResult.textContent = 'Version ' + data.plan.version + ' enregistrée comme proposition, sans approbation. Clique sur Ouvrir le dossier pour la consulter.';
+  } catch (error) {
+    if (missionSelect.value === id) planResult.textContent = 'Erreur : ' + error.message + ' Vérifie le dossier avant de réessayer.';
+  } finally { planSave.disabled = !openedMission || openedMission.mission.id !== missionSelect.value; }
 });
 
 document.getElementById('runs-read').addEventListener('click', async () => {
@@ -262,6 +322,8 @@ sendEl.addEventListener("click", async () => {
   }
 
   sessionStorage.setItem("officeManagerToken", token);
+  const replyMission = preparedPlan && preparedPlan.message === message && agentEl.value === 'auto'
+    ? preparedPlan.missionId : null;
   sendEl.disabled = true;
   answerEl.textContent = "Analyse en cours… La consultation des spécialistes peut prendre quelques minutes.";
   metaEl.textContent = "";
@@ -288,6 +350,10 @@ sendEl.addEventListener("click", async () => {
     }
 
     answerEl.textContent = data.answer;
+    if (replyMission && openedMission?.mission.id === replyMission) {
+      lastPlanReply = { missionId:replyMission, text:data.answer };
+      planCopy.disabled = false;
+    }
     metaEl.textContent =
       `${data.agentName} · ${data.provider}` +
       (data.reviewed ? " · reviewed" : "");

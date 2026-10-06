@@ -92,6 +92,22 @@ connected and deployed. Do not claim completion from mocked tests alone.
 
 ### Latest verified state (supersedes earlier publication notes below)
 
+- 2026-10-07: user verified restored Nova dossier and root plan proposal.
+  Step 2 versioned plan storage prepared: exact text and reviewed phase lines,
+  immutable to backend direct writes, idempotent saves and proposal-only status.
+- Applied add_internal_mission_plan_versions to Supabase. RLS enabled, no
+  anon/authenticated read or RPC execution, backend SELECT/RPC only.
+  Live rollback test verified duplicate and version increment; no plans seeded.
+- 120 application tests and PostgreSQL plan tests pass. Publication/recipe
+  pending. No approval UI implemented and no model request launched by agent.
+
+- 2026-10-07: user authorized fixing live requirement overwrite. Applied
+  preserve_manual_mission_requirements_and_validated_people_actions migration
+  replacing only private.enqueue_people_intelligence_for_mission. Local SQL
+  verification passed before application. Restored Nova Services demo scope,
+  Conseil skill and team size 3. Trigger refresh verified preservation and
+  matching queue payload. No assignments created, no Edge Function redeployed.
+
 - User live root request returned and its summary appeared in history:
   55a22e5b-0bd1-4f02-9d1e-1428b6f31697. Step 1 response/history verified.
 - Google Sheets register read failed because Sheets API is disabled on the
