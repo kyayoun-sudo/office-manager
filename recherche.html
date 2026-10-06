@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recherche</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+.searchbox{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid var(--brand);border-radius:12px;padding:0 16px;min-height:56px}
+.searchbox input{flex:1;min-width:0;border:0;outline:none;font:inherit;font-size:17px;padding:14px 0;background:transparent}
+.kbd{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+.group h2{margin:0 0 8px;font-size:14px;color:var(--muted)}
+.item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:8px}
+.item .t{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.item .t span:first-child{font-weight:500}
+.item .meta{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted)}
+.tag{font-size:12px;background:var(--soft);color:#0E5A52;border-radius:6px;padding:4px 8px;font-weight:500}
+.empty{color:var(--muted);font-size:14px;margin:0}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/">Accueil (pilote)</a>
+    <a href="/recherche.html" aria-current="page">Recherche</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <form id="form" role="search" style="display:flex;flex-direction:column;gap:12px">
+      <label for="q">Rechercher dans tout le cabinet — documents, missions, personnes</label>
+      <div class="searchbox">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--brand)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        <input id="q" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="Ex. balance âgée Nova">
+        <span class="kbd" aria-hidden="true">Ctrl K</span>
+      </div>
+      <div class="chips" id="scopes">
+        <button type="button" class="chip" data-scope="all" aria-pressed="true">Tout</button>
+        <button type="button" class="chip" data-scope="documents" aria-pressed="false">Documents</button>
+        <button type="button" class="chip" data-scope="missions" aria-pressed="false">Missions</button>
+        <button type="button" class="chip" data-scope="people" aria-pressed="false">Personnes</button>
+      </div>
+    </form>
+
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <div id="results" style="display:flex;flex-direction:column;gap:20px"></div>
+    <p class="lead" style="font-size:13px">Recherche en lecture seule dans l'inventaire du Drive, les missions et l'annuaire. Elle ne modifie rien et n'appelle aucune IA.</p>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager;
+  var $ = function (id) { return document.getElementById(id); };
+  var scope = 'all';
+  var LABELS = { documents: 'Documents', missions: 'Missions', people: 'Personnes' };
+
+  function el(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+
+  function renderItem(group, row) {
+    var item = el('div', null, 'item');
+    var t = el('div', null, 't');
+    if (group === 'documents') {
+      t.appendChild(el('span', row.name || 'Sans nom'));
+      t.appendChild(el('span', row.folder_path || row.client_name || '', 'meta'));
+      item.appendChild(t);
+      if (row.decision_status) item.appendChild(el('span', row.decision_status, 'tag'));
+      if (row.web_url && /^https:\/\//.test(row.web_url)) {
+        var a = el('a', 'Ouvrir'); a.href = row.web_url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        item.appendChild(a);
+      }
+    } else if (group === 'missions') {
+      t.appendChild(el('span', row.name || row.mission_code || 'Mission'));
+      t.appendChild(el('span', [row.mission_code, row.status].filter(Boolean).join(' · '), 'meta'));
+      item.appendChild(t);
+    } else {
+      t.appendChild(el('span', row.full_name || 'Personne'));
+      t.appendChild(el('span', [row.role_title, row.department].filter(Boolean).join(' · '), 'meta'));
+      item.appendChild(t);
+    }
+    return item;
+  }
+
+  function render(data) {
+    var box = $('results'); box.textContent = '';
+    Object.keys(data.results).forEach(function (group) {
+      var rows = data.results[group];
+      var section = el('section', null, 'group');
+      section.appendChild(el('h2', (LABELS[group] || group) + ' · ' + rows.length));
+      if (!rows.length) section.appendChild(el('p', data.unavailable.indexOf(group) >= 0 ? 'Source indisponible pour le moment.' : 'Aucun résultat.', 'empty'));
+      rows.forEach(function (row) { section.appendChild(renderItem(group, row)); });
+      box.appendChild(section);
+    });
+    $('status').textContent = data.total + ' résultat(s) pour « ' + data.query + ' ».';
+    $('status').className = 'status';
+  }
+
+  function run() {
+    var q = $('q').value.trim();
+    if (q.length < 2) { $('status').textContent = 'Tapez au moins 2 caractères.'; return; }
+    $('status').textContent = 'Recherche…'; $('status').className = 'status';
+    OM.api('/api/search?q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(scope))
+      .then(render)
+      .catch(function (err) { $('results').textContent = ''; $('status').textContent = 'Recherche impossible : ' + err.message; $('status').className = 'status error'; });
+  }
+
+  $('form').addEventListener('submit', function (e) { e.preventDefault(); run(); });
+  Array.prototype.forEach.call($('scopes').children, function (b) {
+    b.addEventListener('click', function () {
+      scope = b.dataset.scope;
+      Array.prototype.forEach.call($('scopes').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      if ($('q').value.trim().length >= 2) run();
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); $('q').focus(); }
+  });
+
+  function start() { OM.loadBranding().catch(function () { /* default look kept */ }); $('q').focus(); }
+  $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
+  if (!OM.getToken()) { $('login').hidden = false; } else { start(); }
+})();
+</script>
+</body>
+</html>
