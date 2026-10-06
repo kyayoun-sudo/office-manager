@@ -28,7 +28,7 @@ test('people route denies unauthorised requests before fetching data', async () 
   assert.deepEqual(result.value, { error: 'UNAUTHORIZED' });
 });
 
-test('tenant scope is server-controlled and excluded candidates never appear', async () => {
+test('staffing uses operational eligibility and includes workers without questionnaire', async () => {
   process.env.SUPABASE_URL = 'https://example.invalid';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-only';
   const original = globalThis.fetch;
@@ -36,7 +36,12 @@ test('tenant scope is server-controlled and excluded candidates never appear', a
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
     let rows;
-    if (url.includes('/rpc/')) rows = [{ staff_profile_id: 'staff', fit_score: 100 }, { staff_profile_id: 'other-tenant', fit_score: 100 }];
+    if (url.includes('/rpc/')) rows = [
+      { staff_profile_id: 'staff', technical_eligible: true, available_for_window: true, current_load_pct: 30, profile_available: false, management_support: { instruction: 'Normal management' }, data_quality_flags: ['MISSION_DATES_MISSING'] },
+      { staff_profile_id: 'unskilled', technical_eligible: false, available_for_window: true, current_load_pct: 0 },
+      { staff_profile_id: 'absent', technical_eligible: true, available_for_window: false, current_load_pct: 0 },
+      { staff_profile_id: 'overloaded', technical_eligible: true, available_for_window: true, current_load_pct: 100 }
+    ];
     else if (url.includes('/office_missions?')) rows = [mission];
     else if (url.includes('/office_mission_people_requirements?')) rows = [{ required_skills: ['Tax'] }];
     else if (url.includes('/office_staff_profiles?')) rows = [staff];
@@ -45,7 +50,12 @@ test('tenant scope is server-controlled and excluded candidates never appear', a
   };
   try {
     const result = await getPeopleIntelligence('tenant-a', 'mission');
-    assert.deepEqual(result.candidates, []);
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].profile_available, false);
+    assert.equal(result.candidates[0].eligibility.availability, null);
+    assert.equal(result.candidates[0].people_fit_score, undefined);
+    assert.ok(calls.some(call => call.url.includes('rpc/office_mission_staffing_advice')));
+    assert.ok(!calls.some(call => call.url.includes('rpc/office_people_match')));
     assert.ok(calls.every(call => call.url.includes('org_id=eq.tenant-a') || JSON.parse(call.options.body).p_org_id === 'tenant-a'));
     assert.ok(calls.every(call => !call.options.method || call.options.method === 'POST' && call.url.includes('/rpc/')));
   } finally { globalThis.fetch = original; }

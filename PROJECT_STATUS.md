@@ -90,6 +90,21 @@ connected and deployed. Do not claim completion from mocked tests alone.
 
 ## Publication Record - 2026-10-06
 
+### Latest verified state (supersedes earlier publication notes below)
+
+- Manual upload verified on fix/map-register-bridge-write: ea79766a,
+  followed by .gitignore correction 8a5cd0e.
+- Git-connected Vercel preview dpl_5EXs6RxaTwc4gvajFzrrhXMy1JKW is READY.
+  Health and homepage return 200. Authenticated functional recipe is pending.
+- OFFICE_MANAGER_ACCESS_TOKEN target extended to preview without reading or
+  changing its value. A new deployment is needed to consume this setting.
+- Latest local correction connects office_mission_staffing_advice, preserves
+  questionnaire-free candidates, and removes questionnaire score ordering.
+- 107 application tests and PostgreSQL fixture validation pass. Corrected SQL
+  and application delta prepared locally; not yet uploaded or applied live.
+- No production promotion, live SQL mutation, scheduler run, or Edge Function
+  redeployment performed. No new subscription or paid AI request made.
+
 - Local implementation commit: 5e4ce5230c29d951a10bbb1c20c7fb7e772a1c52.
 - GitHub publication blocked: connector create-tree returned HTTP 403,
   Resource not accessible by integration; direct Git push also failed.

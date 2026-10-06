@@ -115,7 +115,7 @@ document.getElementById('people-read').addEventListener('click', async () => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Consultation indisponible');
     output.textContent = [data.limitation || 'Exigences humaines à renseigner.', ...data.candidates.map(person =>
-      `${person.full_name} — people fit ${person.people_fit_score}/100 (à valider)\nCompétences : ${person.eligibility.technical === true ? 'correspondance trouvée' : 'à confirmer'} ; disponibilité : à confirmer.\nBriefing : ${(person.management_brief?.briefing_requirements || []).join(' ; ')}\nManagement : ${person.management_brief?.management_style || 'à préciser'}\nCommunication : ${person.management_brief?.communication || 'à préciser'}\nFeedback : ${person.management_brief?.feedback || 'à préciser'}`
+      `${person.full_name} — ${person.role_title || 'rôle à confirmer'}\nCharge déjà planifiée : ${person.current_load_pct}% ; disponibilité : ${person.eligibility.availability === true ? 'aucune indisponibilité enregistrée' : 'à confirmer'}.\nPoints à vérifier : ${(person.data_quality_flags || []).join(', ') || 'validation du responsable'}\nBriefing : ${(person.management_brief?.briefing_requirements || []).join(' ; ')}\nManagement : ${person.management_brief?.management_style || person.management_brief?.instruction || 'à préciser'}\nCommunication : ${person.management_brief?.communication || 'à préciser'}\nFeedback : ${person.management_brief?.feedback || 'à préciser'}`
     )].join('\n\n');
     if (!data.candidates.length) output.textContent += '\nAucun profil à proposer avec les preuves disponibles.';
   } catch (error) { output.textContent = `Erreur : ${error.message}`; }

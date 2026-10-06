@@ -279,26 +279,187 @@ order by greatest(0,least(100,s.fit_score)) desc, s.full_name
 limit greatest(1,least(coalesce(p_limit,10),50));
 $function$;
 
+alter table public.office_mission_people_requirements add column if not exists required_skills text[] not null default '{}';
+alter table public.office_mission_people_requirements add column if not exists preferred_team_size smallint not null default 4;
+
+CREATE OR REPLACE FUNCTION public.office_mission_staffing_advice(p_org_id uuid, p_office_mission_id uuid)
+ RETURNS TABLE(staff_profile_id uuid, full_name text, role_title text, role_family text, skills text[], technical_eligible boolean, available_for_window boolean, current_load_pct numeric, profile_available boolean, management_support jsonb, data_quality_flags text[])
+ LANGUAGE sql
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+with mission as (
+  select m.id,m.org_id,m.name,m.mission_code,m.planned_start,m.planned_end,
+         r.required_skills,r.autonomy_required,r.structure_level,r.ambiguity_level,
+         r.innovation_level,r.collaboration_level,r.decision_speed_required,
+         r.compliance_level,r.stability_level,r.client_contact_level,r.urgency_level
+  from public.office_missions m
+  left join public.office_mission_people_requirements r
+    on r.org_id=m.org_id and r.office_mission_id=m.id
+  where m.org_id=p_org_id and m.id=p_office_mission_id
+), normalized as (
+  select *,
+    case
+      when coalesce(cardinality(required_skills),0)>0 then required_skills
+      when lower(coalesce(mission_code,'')||' '||coalesce(name,'')) ~ '(due[ _-]?diligence|diligence[ _-]?financi)' then array['Audit','Conseil']::text[]
+      when lower(coalesce(mission_code,'')||' '||coalesce(name,'')) ~ '(audit|commissariat|cac)' then array['Audit']::text[]
+      else '{}'::text[]
+    end as effective_required_skills
+  from mission
+), assignment_load as (
+  select a.staff_profile_id,
+         sum(a.allocation_pct)::numeric as load_pct
+  from public.office_mission_assignments a
+  cross join normalized n
+  where a.org_id=p_org_id
+    and lower(coalesce(a.status,'')) not in ('cancelled','canceled','rejected')
+    and (
+      n.planned_start is null or n.planned_end is null
+      or daterange(a.planned_start,a.planned_end,'[]') && daterange(n.planned_start,n.planned_end,'[]')
+    )
+    and a.office_mission_id <> p_office_mission_id
+  group by a.staff_profile_id
+), workforce_load as (
+  select a.staff_profile_id,
+         sum(a.planned_load_pct)::numeric as load_pct
+  from public.office_workforce_allocations a
+  cross join normalized n
+  where a.org_id=p_org_id
+    and lower(coalesce(a.status,'')) not in ('cancelled','canceled','rejected')
+    and (
+      n.planned_start is null or n.planned_end is null
+      or daterange(a.start_date,a.end_date,'[]') && daterange(n.planned_start,n.planned_end,'[]')
+    )
+    and a.office_mission_id <> p_office_mission_id
+  group by a.staff_profile_id
+), unavailable as (
+  select distinct a.staff_profile_id
+  from public.office_staff_availability a
+  cross join normalized n
+  where a.org_id=p_org_id and a.approved=true
+    and (
+      n.planned_start is null or n.planned_end is null
+      or tstzrange(a.starts_at,a.ends_at,'[]') && tstzrange(n.planned_start::timestamptz,(n.planned_end+1)::timestamptz,'[)')
+    )
+), dq as (
+  select array_remove(array[
+    case when planned_start is null or planned_end is null then 'MISSION_DATES_MISSING' end,
+    case when not exists(select 1 from public.office_mission_assignments x where x.org_id=p_org_id)
+          and not exists(select 1 from public.office_workforce_allocations y where y.org_id=p_org_id)
+         then 'WORKLOAD_DATA_MISSING' end,
+    case when not exists(select 1 from public.office_staff_availability z where z.org_id=p_org_id)
+         then 'AVAILABILITY_EXCEPTIONS_NOT_RECORDED' end
+  ],null)::text[] flags
+  from normalized
+)
+select
+  sp.id,
+  sp.full_name,
+  sp.role_title,
+  case
+    when lower(coalesce(sp.role_title,'')) like '%partner%' then 'OVERSIGHT'
+    when lower(coalesce(sp.role_title,'')) like '%manager%' or lower(coalesce(sp.role_title,'')) like '%superviseur%' then 'MANAGEMENT'
+    when lower(coalesce(sp.role_title,'')) like '%senior%' then 'SENIOR'
+    when lower(coalesce(sp.role_title,'')) like '%stagiaire%' then 'JUNIOR'
+    when lower(coalesce(sp.role_title,'')) like '%audit%' then 'FIELD'
+    else 'OTHER'
+  end as role_family,
+  sp.skills,
+  (
+    (coalesce(cardinality(n.effective_required_skills),0)=0 or sp.skills && n.effective_required_skills)
+    and not (lower(coalesce(sp.role_title,'')) ~ '(assistante|secr|chauffeur|coursier)')
+  ) as technical_eligible,
+  (u.staff_profile_id is null) as available_for_window,
+  greatest(coalesce(al.load_pct,0),coalesce(wl.load_pct,0))::numeric as current_load_pct,
+  (mp.staff_profile_id is not null) as profile_available,
+  case when mp.staff_profile_id is null then
+    jsonb_build_object(
+      'profile_available',false,
+      'instruction','Aucun questionnaire de préférences de travail disponible. Ne pas pénaliser le collaborateur; utiliser les règles normales de management et recueillir des préférences directement.'
+    )
+  else
+    jsonb_build_object(
+      'profile_available',true,
+      'profile_label',mp.profile_label,
+      'management_style',mp.management_style,
+      'communication',mp.communication_guidance,
+      'feedback',mp.feedback_guidance,
+      'briefing_requirements',to_jsonb(mp.briefing_requirements),
+      'motivators',to_jsonb(mp.primary_motivators),
+      'watchouts',to_jsonb(mp.risk_flags),
+      'mission_support',jsonb_build_object(
+        'extra_structure', case when coalesce(n.ambiguity_level,3)>=4 and mp.structure_need_score>=4 then true else false end,
+        'more_frequent_checkpoints', case when coalesce(n.ambiguity_level,3)>=4 and mp.uncertainty_tolerance_score<=2 then true else false end,
+        'explicit_recognition_helpful', case when mp.recognition_need_score>=4 then true else false end,
+        'autonomy_can_be_high', case when mp.autonomy_score>=4 and mp.decision_confidence_score>=4 then true else false end
+      ),
+      'guardrail','Préférences de travail déclarées: aide au briefing et au management uniquement. Ne pas utiliser pour exclure, sanctionner, promouvoir, rémunérer ou affecter seul.'
+    )
+  end as management_support,
+  dq.flags
+from public.office_staff_profiles sp
+cross join normalized n
+cross join dq
+left join assignment_load al on al.staff_profile_id=sp.id
+left join workforce_load wl on wl.staff_profile_id=sp.id
+left join unavailable u on u.staff_profile_id=sp.id
+left join public.office_staff_management_profiles mp
+  on mp.org_id=sp.org_id and mp.staff_profile_id=sp.id and mp.active=true
+where sp.org_id=p_org_id and sp.active=true
+order by technical_eligible desc, available_for_window desc,
+         greatest(coalesce(al.load_pct,0),coalesce(wl.load_pct,0)) asc,
+         case
+           when lower(coalesce(sp.role_title,'')) like '%partner%' then 1
+           when lower(coalesce(sp.role_title,'')) like '%manager%' then 2
+           when lower(coalesce(sp.role_title,'')) like '%superviseur%' then 3
+           when lower(coalesce(sp.role_title,'')) like '%senior%' then 4
+           when lower(coalesce(sp.role_title,'')) like '%audit%' and lower(coalesce(sp.role_title,'')) not like '%stagiaire%' then 5
+           when lower(coalesce(sp.role_title,'')) like '%stagiaire%' then 6
+           else 9
+         end,
+         sp.full_name;
+$function$;
+
+
+CREATE OR REPLACE FUNCTION private.enrich_people_intelligence_action()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'private', 'pg_catalog'
+AS $function$
+begin
+  if new.action_type='PEOPLE_INTELLIGENCE_RECOMMENDATION' then
+    new.evidence := coalesce(new.evidence,'{}'::jsonb) || jsonb_build_object(
+      'staffing_digest',coalesce(new.payload->'candidate_pool','[]'::jsonb),
+      'data_quality_flags',coalesce(new.payload->'data_quality_flags','[]'::jsonb),
+      'selection_order',coalesce(new.payload->'selection_order','[]'::jsonb),
+      'management_instruction',coalesce(new.payload->>'instruction',''),
+      'required_skills',coalesce(new.payload->'required_skills','[]'::jsonb),
+      'preferred_team_size',coalesce(new.payload->'preferred_team_size','4'::jsonb),
+      'context_visibility','Copied into evidence because Office Manager root context reads action evidence.'
+    );
+  end if;
+  return new;
+end;
+$function$;
+
+
 CREATE OR REPLACE FUNCTION private.enqueue_people_intelligence_for_mission()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'pg_catalog'
+ SET search_path TO 'public', 'private', 'pg_catalog'
 AS $function$
 declare
   v_text text := lower(coalesce(new.mission_code,'') || ' ' || coalesce(new.name,''));
   v_req jsonb;
   v_kind text;
+  v_required_skills text[];
+  v_team_size integer := 4;
   v_candidates jsonb;
+  v_data_quality text[] := '{}'::text[];
 begin
-  if tg_op = 'UPDATE' and new.org_id is distinct from old.org_id then
-    raise exception 'Mission tenant cannot change';
-  end if;
-  if tg_op = 'UPDATE' and new.name is not distinct from old.name and new.mission_code is not distinct from old.mission_code then
-    return new;
-  end if;
   if v_text ~ '(due[ _-]?diligence|diligence[ _-]?financi)' then
     v_kind := 'DUE_DILIGENCE';
+    v_required_skills := array['Audit','Conseil']::text[];
     v_req := jsonb_build_object(
       'autonomy_required',4,'structure_level',3,'ambiguity_level',4,'innovation_level',4,
       'collaboration_level',4,'decision_speed_required',4,'compliance_level',4,'stability_level',2,
@@ -306,6 +467,7 @@ begin
     );
   elsif v_text ~ '(audit|commissariat|cac)' then
     v_kind := 'AUDIT';
+    v_required_skills := array['Audit']::text[];
     v_req := jsonb_build_object(
       'autonomy_required',3,'structure_level',4,'ambiguity_level',2,'innovation_level',2,
       'collaboration_level',4,'decision_speed_required',3,'compliance_level',5,'stability_level',4,
@@ -313,6 +475,7 @@ begin
     );
   else
     v_kind := 'GENERAL';
+    v_required_skills := '{}'::text[];
     v_req := jsonb_build_object(
       'autonomy_required',3,'structure_level',3,'ambiguity_level',3,'innovation_level',3,
       'collaboration_level',3,'decision_speed_required',3,'compliance_level',4,'stability_level',3,
@@ -323,15 +486,16 @@ begin
   insert into public.office_mission_people_requirements(
     org_id,office_mission_id,autonomy_required,structure_level,ambiguity_level,innovation_level,
     collaboration_level,decision_speed_required,compliance_level,stability_level,client_contact_level,
-    urgency_level,mission_context,source,confidence,updated_at
+    urgency_level,required_skills,preferred_team_size,mission_context,source,confidence,updated_at
   ) values (
     new.org_id,new.id,
     (v_req->>'autonomy_required')::int,(v_req->>'structure_level')::int,(v_req->>'ambiguity_level')::int,
     (v_req->>'innovation_level')::int,(v_req->>'collaboration_level')::int,(v_req->>'decision_speed_required')::int,
     (v_req->>'compliance_level')::int,(v_req->>'stability_level')::int,(v_req->>'client_contact_level')::int,
     (v_req->>'urgency_level')::int,
-    'Profil initial dérivé du type de mission '||v_kind||'. À affiner par le manager si le contexte réel diffère.',
-    'mission_trigger_v2',0.65,now()
+    v_required_skills,v_team_size,
+    'Profil opérationnel initial dérivé du type de mission '||v_kind||'. À affiner par le manager selon les TDR, le programme de travail et les exigences client.',
+    'mission_trigger_v2_safe_staffing',0.65,now()
   )
   on conflict (org_id,office_mission_id) do update set
     autonomy_required=excluded.autonomy_required,
@@ -344,62 +508,82 @@ begin
     stability_level=excluded.stability_level,
     client_contact_level=excluded.client_contact_level,
     urgency_level=excluded.urgency_level,
+    required_skills=excluded.required_skills,
+    preferred_team_size=excluded.preferred_team_size,
     mission_context=excluded.mission_context,
     source=excluded.source,
     confidence=excluded.confidence,
     updated_at=now()
-  where office_mission_people_requirements.source in ('mission_trigger_v1','mission_trigger_v2');
+  where office_mission_people_requirements.source in ('mission_trigger_v1','mission_trigger_v2','mission_trigger_v2_safe_staffing');
 
-  select to_jsonb(r) - 'mission_context' - 'org_id' - 'id' - 'office_mission_id' - 'created_at' - 'updated_at'
-  into v_req from public.office_mission_people_requirements r
+  select to_jsonb(r) into v_req from public.office_mission_people_requirements r
   where r.org_id=new.org_id and r.office_mission_id=new.id;
+  v_required_skills := array(select jsonb_array_elements_text(v_req->'required_skills'));
+  v_team_size := coalesce((v_req->>'preferred_team_size')::integer,4);
 
   select coalesce(jsonb_agg(jsonb_build_object(
-    'staff_profile_id',m.staff_profile_id,
-
-    'role_title',m.role_title,
-
-    'people_fit_score',m.fit_score,
-    'fit_band',m.fit_band,
-    'recognition_need',m.recognition_need,
-    'management_brief',m.management_brief
-  ) order by m.fit_score desc),'[]'::jsonb)
+    'staff_profile_id',s.staff_profile_id,
+    'full_name',s.full_name,
+    'role_title',s.role_title,
+    'role_family',s.role_family,
+    'skills',to_jsonb(s.skills),
+    'technical_eligible',s.technical_eligible,
+    'available_for_window',s.available_for_window,
+    'current_load_pct',s.current_load_pct,
+    'profile_available',s.profile_available,
+    'management_support',s.management_support
+  ) order by
+    case s.role_family when 'OVERSIGHT' then 1 when 'MANAGEMENT' then 2 when 'SENIOR' then 3 when 'FIELD' then 4 when 'JUNIOR' then 5 else 9 end,
+    s.current_load_pct,
+    s.full_name),'[]'::jsonb)
   into v_candidates
-  from public.office_people_match(new.org_id,v_req,5) m;
+  from public.office_mission_staffing_advice(new.org_id,new.id) s
+  where s.technical_eligible=true and s.available_for_window=true and s.current_load_pct < 100;
+
+  select coalesce(s.data_quality_flags,'{}'::text[])
+  into v_data_quality
+  from public.office_mission_staffing_advice(new.org_id,new.id) s
+  limit 1;
 
   insert into public.office_action_queue(
     org_id,agent_key,office_mission_id,action_type,idempotency_key,summary,payload,evidence,status,requested_at,work_state
   ) values (
-    new.org_id,
-    'grand-controleur',
-    new.id,
-    'PEOPLE_INTELLIGENCE_RECOMMENDATION',
+    new.org_id,'grand-controleur',new.id,'PEOPLE_INTELLIGENCE_RECOMMENDATION',
     'people-intelligence:'||new.id::text,
-    'Recommandation de composition d équipe et de briefing managérial — '||new.name,
+    'Préparation équipe et briefing managérial — '||new.name,
     jsonb_build_object(
       'mission_type',v_kind,
+      'required_skills',to_jsonb(v_required_skills),
+      'preferred_team_size',v_team_size,
       'mission_requirements',v_req,
-      'people_fit_review_pool',v_candidates,
-      'eligibility_status','manager_review_required',
-      'technical_skills_verified',false,
-      'availability_verified',false,
-      'selection_order',jsonb_build_array('compétence technique','disponibilité et absence de chevauchement','people fit','niveau hiérarchique adapté'),
-      'instruction','Le people fit est un critère complémentaire. Ne jamais affecter quelqu un uniquement sur la base du questionnaire.'
+      'candidate_pool',v_candidates,
+      'data_quality_flags',to_jsonb(coalesce(v_data_quality,'{}'::text[])),
+      'team_shape',jsonb_build_object(
+        'oversight','1 partner/associé selon exigences de mission',
+        'management','1 manager ou superviseur',
+        'senior','au moins 1 senior si complexité significative',
+        'field_team','auditeurs et stagiaires selon charge et cycles'
+      ),
+      'selection_order',jsonb_build_array(
+        'compétences techniques et expérience requise',
+        'disponibilité réelle et absence de chevauchement',
+        'charge de travail et niveau hiérarchique adapté',
+        'équilibre de l équipe',
+        'préférences de travail uniquement pour adapter le management après présélection'
+      ),
+      'instruction','Le questionnaire de préférences de travail ne détermine jamais l éligibilité ni l affectation. Il sert à préparer le briefing, la communication, les checkpoints et le feedback.'
     ),
     jsonb_build_object(
-      'algorithm_version','taty_people_intelligence_v2',
-      'profile_source','private_management_profiles',
-      'guardrail','Aucun diagnostic clinique. Aucune décision RH sensible fondée uniquement sur ces profils.'
+      'algorithm_version','taty_safe_staffing_v2',
+      'profile_source','Questionnaire TATY préférences de travail 2026-10 + données opérationnelles Supabase',
+      'guardrail','Aucune décision RH sensible ou affectation automatique fondée sur un profil psychologique. Validation humaine obligatoire.',
+      'generated_at',now()
     ),
     'proposed',now(),'requested'
   )
   on conflict (org_id,idempotency_key) do update set
-    summary=excluded.summary,
-    payload=excluded.payload,
-    evidence=excluded.evidence,
-    status='proposed',
-    requested_at=now(),
-    work_state='requested'
+    summary=excluded.summary,payload=excluded.payload,evidence=excluded.evidence,
+    status='proposed',requested_at=now(),work_state='requested'
   where office_action_queue.status in ('proposed','awaiting_approval')
     and office_action_queue.approved_at is null
     and office_action_queue.executed_at is null
@@ -439,7 +623,14 @@ revoke all on function private.enqueue_people_intelligence_for_mission() from pu
 create index if not exists office_staff_management_profiles_staff_idx on public.office_staff_management_profiles(staff_profile_id);
 create index if not exists office_mission_people_requirements_mission_idx on public.office_mission_people_requirements(office_mission_id);
 drop trigger if exists trg_office_missions_people_intelligence on public.office_missions;
-create trigger trg_office_missions_people_intelligence after insert or update of mission_code,name,org_id on public.office_missions
+create trigger trg_office_missions_people_intelligence after insert or update of mission_code,name,planned_start,planned_end,org_id on public.office_missions
 for each row execute function private.enqueue_people_intelligence_for_mission();
+
+revoke all on function public.office_mission_staffing_advice(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.office_mission_staffing_advice(uuid,uuid) to service_role;
+revoke all on function private.enrich_people_intelligence_action() from public,anon,authenticated;
+drop trigger if exists trg_enrich_people_intelligence_action on public.office_action_queue;
+create trigger trg_enrich_people_intelligence_action before insert or update of payload,evidence on public.office_action_queue
+for each row execute function private.enrich_people_intelligence_action();
 
 commit;
