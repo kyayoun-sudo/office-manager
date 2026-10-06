@@ -53,7 +53,7 @@
 
     loadBranding: function () {
       if (!OM.getToken()) return Promise.resolve(null);
-      return OM.api('/api/branding').then(function (b) { OM.applyBranding(b); return b; });
+      return OM.api('/api/app?route=branding').then(function (b) { OM.applyBranding(b); return b; });
     }
   };
   window.OfficeManager = OM;

@@ -14,9 +14,9 @@ inchangés.
 |---|---|
 | `db/org-branding.sql` | Nouvelle table `office_org_branding` : nom du cabinet, couleur principale, couleur secondaire, logo. RLS activé, aucun accès public, pas de suppression. |
 | `lib/branding.js` | Validation (couleurs `#RRGGBB`, logo PNG/JPG/WebP ≤ 400 000 caractères, SVG refusé), contraste WCAG, lecture et enregistrement. |
-| `api/branding.js` | `GET /api/branding` (lire) · `POST /api/branding` (enregistrer). Protégé par le token pilote. |
+| `api/app.js` (route `branding`) | `GET`/`POST /api/app?route=branding` : lire et enregistrer. Protégé par le token pilote. |
 | `lib/global-search.js` | Recherche en lecture seule : inventaire Drive (Orpailleur), missions, annuaire. Aucun profil RH ni questionnaire. |
-| `api/search.js` | `GET /api/search?q=…&scope=all|documents|missions|people`. Aucune écriture, aucun appel IA. |
+| `api/app.js` (route `search`) | `GET /api/app?route=search&q=…&scope=…`. Aucune écriture, aucun appel IA. |
 | `parametres.html` | Écran « Paramètres du cabinet » : nom, nom d'utilisateur, logo, couleur, aperçu en direct. |
 | `recherche.html` | Écran « Recherche » : barre de recherche, filtres, Ctrl+K. |
 | `assets/brand-theme.js`, `assets/app.css` | Thème partagé : applique nom, logo et couleur du cabinet sur les nouvelles pages. Même clé de session que `index.html` (`officeManagerToken`). |
@@ -37,12 +37,12 @@ inchangés.
 
 - **Rien n'est déployé.** Ni Vercel, ni Supabase, ni Edge Function.
 - **Appliquer `db/org-branding.sql`** dans Supabase après relecture, sinon
-  `/api/branding` répond `BRANDING_UNAVAILABLE`.
+  `/api/app?route=branding` répond `BRANDING_UNAVAILABLE`.
 - **Nom d'utilisateur** : enregistré sur l'ordinateur (localStorage), car
   l'application n'a pas encore de comptes utilisateurs. À brancher sur de vrais
   comptes plus tard.
 - **Écrire les réglages** demande le token pilote, comme le reste de l'application.
-  Avec de vrais comptes, réserver `POST /api/branding` à l'administrateur.
+  Avec de vrais comptes, réserver `POST /api/app?route=branding` à l'administrateur.
 - **Réponse rédigée par l'assistant** en tête de la recherche : non branchée
   (la recherche reste déterministe). Peut appeler `/api/agent` ensuite.
 - **Écran « À valider »** de la maquette : non construit ici.
@@ -90,3 +90,19 @@ Vérifications : nouveaux tests 7/7 ; SQL OK ; suite complète 130/131 (seul
 échec : `tests/browser-response.test.js`, déjà présent avant ces ajouts).
 À appliquer dans Supabase : `db/action-decisions.sql` (en plus de
 `db/org-branding.sql`).
+
+## Correctif — limite de 12 fonctions Vercel (2026-10-07)
+
+L'aperçu Vercel échouait à l'étape « Deploying outputs » : le dossier `api/`
+comptait 13 fichiers, alors que l'offre Hobby de Vercel accepte au plus
+12 fonctions. Les 4 endpoints ajoutés (`api/branding.js`, `api/search.js`,
+`api/actions.js`, `api/mission-view.js`) sont regroupés dans **un seul
+fichier, `api/app.js`**, avec un paramètre `route` :
+
+- `/api/app?route=branding` (GET, POST)
+- `/api/app?route=search&q=…&scope=…` (GET)
+- `/api/app?route=actions` (GET, POST)
+- `/api/app?route=mission-view&mission_id=…` (GET)
+
+Total `api/` : 10 fonctions. Les endpoints d'origine du projet sont inchangés.
+Le test `tests/app-router.test.js` vérifie aussi que `api/` reste à 12 fichiers au plus.
