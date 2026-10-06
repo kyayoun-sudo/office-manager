@@ -165,13 +165,14 @@ export default async function handler(req, res) {
     let runAgentKey;
 
     if (requestedAgent === ROOT_ROUTE) {
-      const loaded = await loadAllowedContexts(orgId);
+      const [loaded, loadedRoot] = await Promise.all([
+        loadAllowedContexts(orgId),
+        loadRootContext(orgId, { storageKey: ROOT_AGENT_KEY })
+      ]);
       contexts = loaded.contexts;
       storageKeys = { ...loaded.storageKeys, [ROOT_AGENT_KEY]: ROOT_AGENT_KEY };
       legacyFallbacks = loaded.legacyFallbacks;
-      rootContext = await loadRootContext(orgId, {
-        storageKey: ROOT_AGENT_KEY
-      });
+      rootContext = loadedRoot;
       // The root agent IS the Grand Contrôleur: its runs are stored under
       // agent_key "grand-controleur", which is also the historical key used
       // for manager runs in office_agent_runs (no data migration needed).

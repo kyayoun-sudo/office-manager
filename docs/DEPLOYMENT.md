@@ -1,5 +1,22 @@
 # Recette et déploiement préparé
 
+## Correction du délai du Grand Contrôleur
+
+Le test utilisateur du 6 octobre sur BLE TRANSIT a validé la consultation
+People Intelligence. La demande au Grand Contrôleur a été interrompue après
+60 secondes (journal Vercel confirmé), avant une réponse JSON.
+Fluid Compute est déjà activé sur le projet Hobby. Le correctif porte uniquement
+la limite de api/agent.js à 300 secondes, garde 60 secondes pour les autres
+routes et charge le contexte racine en parallèle des contextes spécialistes.
+L'interface traduit les réponses non JSON et délais dépassés en message lisible,
+sans relance automatique ni affirmation qu'une action a été effectuée.
+
+110 tests passent, dont les erreurs HTTP de la page. Le correctif doit être
+publié sur la branche de preview puis testé. Aucun appel IA ou scan Drive
+n'a été lancé pour le valider localement ; aucun abonnement n'a été changé.
+La durée plus longue ne garantit pas la fin de toutes les demandes.
+Documentation : https://vercel.com/docs/functions/limitations.
+
 Le commit uploadé 8a5cd0e a créé une preview Vercel READY sur le projet existant office-manager-personal-pilot. La page et /api/health répondent. Le contrôle initial de /api/status échouait : OFFICE_MANAGER_ACCESS_TOKEN était limité à production. Sa portée a été étendue à preview sans lire ni changer sa valeur. Un nouveau déploiement est nécessaire pour prendre cette configuration en compte.
 
 1. Charger le contenu du dossier correctif sur la branche fix/map-register-bridge-write en conservant les chemins. Aucun merge sur main.

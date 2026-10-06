@@ -92,6 +92,14 @@ connected and deployed. Do not claim completion from mocked tests alone.
 
 ### Latest verified state (supersedes earlier publication notes below)
 
+- Safe staffing correction uploaded as 0f02eaff; all eight files verified.
+- Preview dpl_GvaZRfQAvh7TDtwrEfa9RZi7HU9Y READY; health/homepage 200,
+  unauthenticated status/people 401. User BLE TRANSIT matching succeeded.
+- Root agent user request hit the configured 60-second Vercel timeout.
+  Fluid Compute confirmed enabled on Hobby. Local correction allows 300
+  seconds on api/agent.js only, parallelizes snapshot loading and handles
+  non-JSON failures clearly. 110 tests pass. New runtime test remains pending.
+
 - Manual upload verified on fix/map-register-bridge-write: ea79766a,
   followed by .gitignore correction 8a5cd0e.
 - Git-connected Vercel preview dpl_5EXs6RxaTwc4gvajFzrrhXMy1JKW is READY.

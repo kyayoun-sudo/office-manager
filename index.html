@@ -103,6 +103,20 @@ const metaEl = document.getElementById("meta");
 
 tokenEl.value = sessionStorage.getItem("officeManagerToken") || "";
 
+async function readApiResponse(response) {
+  const raw = await response.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch {
+    if ([502, 504].includes(response.status) || /FUNCTION_INVOCATION_TIMEOUT/i.test(raw)) {
+      throw new Error("Le serveur a interrompu la demande après un délai trop long. Vérifie son état avant de relancer une action.");
+    }
+    throw new Error("Le serveur a renvoyé une réponse illisible. La demande n’est pas confirmée ; vérifie son état avant de la relancer.");
+  }
+  if (!response.ok) throw new Error(data.error || "La demande a échoué.");
+  return data;
+}
+
 document.getElementById('people-read').addEventListener('click', async () => {
   const button = document.getElementById('people-read');
   const output = document.getElementById('people-answer');
@@ -112,7 +126,7 @@ document.getElementById('people-read').addEventListener('click', async () => {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-office-manager-token': tokenEl.value.trim() },
       body: JSON.stringify({ mission_id: document.getElementById('people-mission').value.trim() })
     });
-    const data = await response.json();
+    const data = await readApiResponse(response);
     if (!response.ok) throw new Error(data.error || 'Consultation indisponible');
     output.textContent = [data.limitation || 'Exigences humaines à renseigner.', ...data.candidates.map(person =>
       `${person.full_name} — ${person.role_title || 'rôle à confirmer'}\nCharge déjà planifiée : ${person.current_load_pct}% ; disponibilité : ${person.eligibility.availability === true ? 'aucune indisponibilité enregistrée' : 'à confirmer'}.\nPoints à vérifier : ${(person.data_quality_flags || []).join(', ') || 'validation du responsable'}\nBriefing : ${(person.management_brief?.briefing_requirements || []).join(' ; ')}\nManagement : ${person.management_brief?.management_style || person.management_brief?.instruction || 'à préciser'}\nCommunication : ${person.management_brief?.communication || 'à préciser'}\nFeedback : ${person.management_brief?.feedback || 'à préciser'}`
@@ -133,7 +147,7 @@ sendEl.addEventListener("click", async () => {
 
   sessionStorage.setItem("officeManagerToken", token);
   sendEl.disabled = true;
-  answerEl.textContent = "Analyse en cours…";
+  answerEl.textContent = "Analyse en cours… La consultation des spécialistes peut prendre quelques minutes.";
   metaEl.textContent = "";
 
   try {
@@ -151,7 +165,7 @@ sendEl.addEventListener("click", async () => {
       })
     });
 
-    const data = await response.json();
+    const data = await readApiResponse(response);
 
     if (!response.ok) {
       throw new Error(data.error || "Request failed");
