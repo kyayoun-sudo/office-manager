@@ -83,6 +83,19 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div id="answer" class="answer">L’agent est prêt dès que les variables Vercel sont configurées et que les agents sont activés dans Supabase.</div>
   </section>
   <section class="panel" style="margin-top:18px">
+    <h2>Pilotage des missions</h2>
+    <p class="small">Le Grand Contrôleur coordonne les spécialistes. Choisis une mission pour consulter son dossier et préparer sa prochaine demande.</p>
+    <button id="missions-read">Charger les missions</button>
+    <div id="mission-counts" class="small" style="margin-top:12px"></div>
+    <label for="mission-select" style="margin-top:16px">Mission</label>
+    <select id="mission-select"><option value="">Choisir une mission</option></select>
+    <div class="actions">
+      <button id="mission-open" disabled>Ouvrir le dossier</button>
+      <button id="mission-plan" disabled>Préparer la demande au Grand Contrôleur</button>
+    </div>
+    <div id="mission-dossier" class="answer">Le dossier regroupe le cadrage, les affectations, les actions et les documents référencés.</div>
+  </section>
+  <section class="panel" style="margin-top:18px">
     <h2>Suivi des demandes</h2>
     <p class="small">Consulte les résultats avant de relancer une demande interrompue. Un résumé terminé ne prouve pas que toutes les actions proposées ont été exécutées.</p>
     <div class="actions"><button id="runs-read">Actualiser le suivi</button></div>
@@ -122,6 +135,88 @@ async function readApiResponse(response) {
   if (!response.ok) throw new Error(data.error || "La demande a échoué.");
   return data;
 }
+
+const missionSelect = document.getElementById('mission-select');
+const missionOpen = document.getElementById('mission-open');
+const missionPlan = document.getElementById('mission-plan');
+const missionOutput = document.getElementById('mission-dossier');
+let openedMission = null;
+document.getElementById('missions-read').addEventListener('click', async () => {
+  const button = document.getElementById('missions-read');
+  button.disabled = true;
+  try {
+    const data = await readApiResponse(await fetch('/api/missions', {
+      headers: { 'x-office-manager-token': tokenEl.value.trim() }
+    }));
+    missionSelect.replaceChildren(new Option('Choisir une mission', ''));
+    for (const mission of data.missions) {
+      missionSelect.add(new Option(mission.name + ' — ' + mission.status, mission.id));
+    }
+    const drafts = data.missions.filter(m => m.status === 'draft').length;
+    const undated = data.missions.filter(m => !m.planned_start || !m.planned_end).length;
+    document.getElementById('mission-counts').textContent =
+      data.missions.length + ' missions affichées · ' + drafts + ' brouillons · ' + undated +
+      ' avec dates incomplètes' + (data.truncated ? ' · Liste limitée aux 100 missions les plus récentes.' : '');
+    openedMission = null;
+    missionOpen.disabled = true;
+    missionPlan.disabled = true;
+    missionOutput.textContent = 'Choisis une mission puis ouvre son dossier.';
+  } catch (error) { missionOutput.textContent = 'Erreur : ' + error.message; }
+  finally { button.disabled = false; }
+});
+missionSelect.addEventListener('change', () => {
+  openedMission = null;
+  missionOpen.disabled = !missionSelect.value;
+  missionPlan.disabled = true;
+  missionOutput.textContent = 'Ouvre le dossier sélectionné.';
+});
+missionOpen.addEventListener('click', async () => {
+  const id = missionSelect.value;
+  missionOpen.disabled = true;
+  missionPlan.disabled = true;
+  openedMission = null;
+  try {
+    const data = await readApiResponse(await fetch('/api/missions?mission_id=' + encodeURIComponent(id), {
+      headers: { 'x-office-manager-token': tokenEl.value.trim() }
+    }));
+    if (missionSelect.value !== id) return;
+    openedMission = data;
+    const req = data.requirements || {};
+    const lines = [
+      data.mission.name, 'Source : ' + data.source, 'Statut : ' + data.mission.status,
+      'Dates : ' + (data.mission.planned_start || 'à préciser') + ' → ' + (data.mission.planned_end || 'à préciser'),
+      '\nCADRAGE', req.mission_context || 'À renseigner.',
+      'Compétences : ' + (req.required_skills || []).join(', '),
+      'Équipe cible : ' + (req.preferred_team_size || 'à préciser'),
+      '\nPOINTS À TRAITER', ...data.blockers,
+      '\nAFFECTATIONS ENREGISTRÉES',
+      ...(data.assignments.length ? data.assignments.map(a =>
+        (a.mission_role || 'Rôle à préciser') + ' · ' + a.status + ' · allocation ' + a.allocation_pct + '%') : ['Aucune.']),
+      '\nACTIONS INTERNES',
+      ...(data.actions.length ? data.actions.map(a => a.summary + ' · ' + a.status + ' · ' + a.work_state) : ['Aucune action opérationnelle enregistrée.']),
+      '\nDOCUMENTS RÉFÉRENCÉS',
+      ...(data.documents.length ? data.documents.map(d => d.name + (d.content_verified_at ? ' · contenu vérifié dans l’inventaire' : ' · contenu à vérifier')) : ['Aucun document relié dans l’inventaire.']),
+      '\nPARCOURS PROPOSÉ', ...data.next_steps, '\n' + data.guardrail
+    ];
+    if (Object.values(data.truncated).some(Boolean)) lines.push('Certaines listes sont limitées aux 100 premières lignes.');
+    missionOutput.textContent = lines.join('\n');
+    document.getElementById('people-mission').value = id;
+    missionPlan.disabled = false;
+  } catch (error) {
+    if (missionSelect.value === id) missionOutput.textContent = 'Erreur : ' + error.message;
+  } finally { missionOpen.disabled = !missionSelect.value; }
+});
+missionPlan.addEventListener('click', () => {
+  if (!openedMission) return;
+  agentEl.value = 'auto';
+  messageEl.value = 'Consulte le dossier Office Manager de la mission ' + openedMission.mission.name +
+    ' (identifiant ' + openedMission.mission.id + ') avec read_office_mission_dossier. ' +
+    'Propose les phases, les livrables, les informations manquantes et les spécialistes à consulter. ' +
+    'Ne lance aucun scan Drive, aucune affectation, aucun envoi et aucune modification. ' +
+    'Distingue les faits du dossier et le plan proposé à faire valider.';
+  metaEl.textContent = 'Demande préparée : relis-la puis clique sur Envoyer si tu souhaites lancer l’analyse.';
+  messageEl.focus();
+});
 
 document.getElementById('runs-read').addEventListener('click', async () => {
   const button = document.getElementById('runs-read');

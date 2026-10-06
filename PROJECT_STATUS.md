@@ -92,6 +92,17 @@ connected and deployed. Do not claim completion from mocked tests alone.
 
 ### Latest verified state (supersedes earlier publication notes below)
 
+- User live root request returned and its summary appeared in history:
+  55a22e5b-0bd1-4f02-9d1e-1428b6f31697. Step 1 response/history verified.
+- Google Sheets register read failed because Sheets API is disabled on the
+  Google project used by the bridge. Drive integration remains unresolved.
+- Step 2 first increment prepared: protected missions list/dossier endpoint,
+  mission selector and detailed dossier UI, current Supabase dossier tools
+  for root and Mission Controller. Human review precedes plan-request send.
+- 117 local tests pass; live schema field compatibility checked read-only.
+  Publication and live dossier recipe pending. Detailed persistent plan and
+  exact-content approvals not yet implemented. See docs/ROADMAP.md.
+
 - Roadmap step 1 active. Timeout correction 296b1d52 deployed READY.
   Health 200; unauthenticated agent and status 401.
 - Prepared internal run-history endpoint and UI, scoped to server org and
