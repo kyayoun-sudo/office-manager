@@ -1,5 +1,7 @@
 # Office Manager AI
 
+TATY People Intelligence : consultation interne `POST /api/people` avec `mission_id`, sans appel IA externe. Règles R009–R012, matching complémentaire et briefing sont raccordés à l'architecture existante. Lire `PROJECT_STATUS.md`, `docs/PEOPLE_INTELLIGENCE.md` et `docs/DEPLOYMENT.md` avant déploiement. Tests : `pnpm test` et `pnpm test:sql`.
+
 Office Manager AI is a multi-agent operating layer for audit, accounting and advisory firms.
 
 ## Architecture

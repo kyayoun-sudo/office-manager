@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { planMailEvidence, prepareMailEvidenceFiles } from '../lib/pbc-mail-evidence.js';
+const message={messageId:'m1',from:'client@example.test',sentAt:'2026-10-05T10:00:00Z',bodyText:'Nous confirmons le solde de ce compte.',rawEml:Buffer.from('original mail'),attachments:[{id:'a1',name:'balance.xlsx'}]};
+const input={message,missionId:'mission',knownReferences:['PBC-01'],matches:[{attachmentId:'a1',reference:'PBC-01',contentChecked:true,missionId:'mission',rationale:'Client and period checked'}],evidence:{kind:'CONFIRMATION',excerpt:message.bodyText,rationale:'Client confirmation'}};
+test('extract original attachment, PDF and EML without remote writes',async()=>{const p=planMailEvidence(input),r=await prepareMailEvidenceFiles(message,p,async()=>Buffer.from('original bytes'));assert.equal(r.files.length,3);assert.equal(r.files[0].buffer.toString(),'original bytes');assert.equal(r.files[2].buffer.subarray(0,5).toString(),'%PDF-');assert.equal(r.remoteWrites,0);assert.equal(p.extractions[0].status,'RECEIVED_REVIEW_REQUIRED');});
+test('filename alone, wrong mission and unknown PBC require review',()=>{for(const patch of [{contentChecked:false},{missionId:'wrong'},{reference:'unknown'}])assert.equal(planMailEvidence({...input,matches:[{...input.matches[0],...patch}]}).extractions.length,0);});
+test('invented evidence cannot become a PDF',()=>assert.equal(planMailEvidence({...input,evidence:{...input.evidence,excerpt:'Invented client confirmation'}}).archivePdf,false));
+test('duplicate matches and repeat processing have stable identity',()=>{const p=planMailEvidence({...input,matches:[...input.matches,...input.matches]});assert.equal(p.extractions.length,1);assert.equal(p.idempotencyKey,planMailEvidence(input).idempotencyKey);});
+test('archive requires original EML',async()=>assert.rejects(prepareMailEvidenceFiles({...message,rawEml:null},planMailEvidence(input),async()=>Buffer.from('bytes')),/ORIGINAL_MAIL_REQUIRED/));

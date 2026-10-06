@@ -1,0 +1,104 @@
+# Office Manager AI - Work Continuity
+
+Updated: 2026-10-06. Branch: fix/map-register-bridge-write.
+
+## People Intelligence continuation - 2026-10-06
+
+Resumed from local c57c940, preserving yesterday's unpublished work and 103 tests.
+Remote branch inspected at 5fc31ecd: publication must include yesterday's files.
+Added protected internal matching/briefing, rules R009-R012 in root and Mission
+Controller, schema-only SQL delivery and approval-preserving recommendation trigger.
+No named HR profile or questionnaire response exported. No paid model call,
+production deployment, Edge Function deployment, cron execution or database
+schema change performed. SQL must be reviewed/applied before application deploy.
+R012 remains a documented manager-validated observation loop, not autonomous learning.
+See docs/PEOPLE_INTELLIGENCE.md and docs/DEPLOYMENT.md. GitHub write access remains
+blocked (403). Agreed publication path: changed files uploaded manually through
+GitHub Add file -> Upload files, preserving folders, on this existing branch.
+Verification: 107 Node tests pass (103 previous + 4 People tests); local SQL
+delivery executed twice and checked for scoring, tenant scope, protected RPC,
+automatic proposals and preservation of manager requirements/approvals.
+No deployed-runtime verification or database production write is implied.
+Reference before this work: 5fc31ecd1b8b29bff8a2ade0bc19e58b1be21df1.
+
+## Full Scope
+
+Grand Controleur is the root Office Manager: coordinates Mission Controller,
+Orpailleur and Sika; owns all-mission planning, confirmed staffing, capacity,
+overlaps, KPI, priorities and alerts.
+
+Mission Controller: TDR, contract, scope, validated programme, cycles/controls,
+matching cycle SOPs (objectives, risks, assertions, execution and evidence),
+working papers, PBC, assignments, execution, review, deadlines and deliverables.
+The programme selects controls; SOPs explain execution and document needs.
+Requests go to the manager for approval before external sending to a confirmed
+client contact, with impacted cycle owners. Do not duplicate shared documents.
+
+Orpailleur: detect -> read -> understand -> attach to client/mission/period ->
+decide -> act when authorised -> verify -> remember. MAP/REGISTER, versions,
+archives, retrieval and eventual authorised filing. Incoming attachments must
+be content-checked. Audit evidence mail: PDF plus original EML and provenance.
+Received does not mean complete or verified.
+
+Sika: billing, collection, payment evidence and administrative finance.
+Reported payments are not verified payments; no bank operations.
+
+## Verified State
+
+- Bridge OAuth correction deployed to Supabase v3 in an earlier approved step;
+  credentials can be resolved through an organisation-scoped RPC.
+- Limited initial mapping created MAP/REGISTER once. Full mapping and signed
+  owner approval of MAPPING_REVIEWED remain incomplete.
+- BLE TRANSIT is a TEST mission; no production mission approval is implied.
+- Programme extraction supports 200000 characters, with truncation gates kept.
+  Excel formula caches render safely, without recalculation or invented results.
+- Mission Controller has prepare_sop_pbc_plan: programme/SOP traceability checks,
+  deduplicated PBC proposals and manager email drafts, no writes or sends.
+- Local mail-evidence module extracts supplied attachment bytes and prepares
+  PDF/EML packages; no live inbox/filing connection.
+- Offline pilot uses the existing WP engine and simulates approvals, sending,
+  replies, storage, evidence evaluation and repeat execution. Interpretations
+  are supplied test inputs, not model outputs. It covers a synthetic scenario,
+  not all controls of the Drive programme.
+- 103 automated tests passed before publication, including Windows path fix.
+
+## Remaining Work
+
+1. Complete programme/SOP/PBC coverage; local proposal covers five sales/client
+   controls only, not the whole mission.
+2. Finish mapping and signed owner validation through the existing flow.
+3. Connect workflow to agent runtime with persistent exact-content approvals.
+4. Connect authorised mailbox sending, replies and attachment retrieval. Gmail
+   tools in this conversation are not an application mailbox integration.
+5. Verified Drive storage, durable idempotency and failure recovery.
+6. Sika operational tools/data and integrated global reporting.
+7. Visual PDF review and authorised test-data execution with real model calls.
+
+## Restrictions
+
+No merge, Vercel production deployment, deletion or business-file movement.
+FIRST_MAPPING is read-only on business files; only MAP/REGISTER writes allowed.
+Never bypass programme, mapping or manager approvals. GitHub publication is
+not deployment of a running service. Never commit secrets or client documents.
+
+## Resume Protocol
+
+Read this file and repository instructions; inspect branch, HEAD, status and
+changes. Verify live dependencies when needed. Preserve unrelated edits.
+Update this file after milestones, distinguishing implemented, simulated,
+connected and deployed. Do not claim completion from mocked tests alone.
+
+## Publication Record - 2026-10-06
+
+- Local implementation commit: 5e4ce5230c29d951a10bbb1c20c7fb7e772a1c52.
+- GitHub publication blocked: connector create-tree returned HTTP 403,
+  Resource not accessible by integration; direct Git push also failed.
+  Remote branch still points to the original reference commit. Do not claim
+  the local implementation is published on GitHub until verified remotely.
+- Vercel Preview created from local source files, not fetched from GitHub:
+  dpl_9Dv2MvahQ3VqxZTbEQvemgY4cEDK.
+- Preview URL: https://office-manager-personal-pilot-2ukg4tabu-paul-bc10.vercel.app
+- Production deployment was not promoted or changed by this operation.
+- Build verified READY. GET /api/health returned HTTP 200, status ok.
+  Provider flags were present for Supabase, OpenAI, Anthropic, Orpailleur and
+  Google Drive/Sheets; these are configuration flags, not full live tests.

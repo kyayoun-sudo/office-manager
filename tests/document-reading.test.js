@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { documentReadLimit, spreadsheetCellText } from '../lib/document-reading.js';
+import { checkProgrammeState } from '../lib/mission-engine.js';
+test('long programme fits mission reading limit; larger inputs remain bounded',()=>{assert.equal(documentReadLimit(200000),200000);assert.equal(documentReadLimit(999999),200000);assert.ok(documentReadLimit(200000)>114852);assert.equal(documentReadLimit(),30000);});
+test('formula caches preserve zero, false and errors without object text',()=>{for(const result of [0,false,'COMPLETE'])assert.equal(spreadsheetCellText({value:{formula:'A1',result}}),String(result));assert.equal(spreadsheetCellText({value:{sharedFormula:'A1',result:{error:'#REF!'}}}),'#REF!');assert.equal(spreadsheetCellText({value:{formula:'A1'}}),'[FORMULA_RESULT_UNAVAILABLE]');});
+test('rich text and hyperlinks are readable',()=>{assert.equal(spreadsheetCellText({value:{richText:[{text:'A'},{text:'B'}]}}),'AB');assert.equal(spreadsheetCellText({value:{text:'Link',hyperlink:'https://example.test'}}),'Link');});
+test('a longer extraction never bypasses validation or truncation gates',()=>{const meta={id:'p',name:'Programme approuve.docx',mimeType:'application/docx'};const read={supported:true,text:'x'.repeat(114852),truncated:false};assert.equal(checkProgrammeState({meta,read,validatedConfirmed:false}).status,'VALIDATION_REQUIRED');assert.equal(checkProgrammeState({meta,read,validatedConfirmed:true}).status,'VALIDATED');assert.equal(checkProgrammeState({meta,read:{...read,truncated:true},validatedConfirmed:true}).status,'PROGRAMME_TRUNCATED_REVIEW_REQUIRED');});

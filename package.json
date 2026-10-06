@@ -8,12 +8,15 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:sql": "node tests/verify-sql.mjs",
     "check": "node --check agents/index.js && node --check lib/orchestrator.js && node --check lib/agent-tools.js && node --check lib/mission-engine.js && node --check lib/orpailleur-memory.js && node --check lib/memory-runtime.js && node --check lib/drive-adapter.js && node --check lib/google-drive.js && node --check lib/supabase.js && node --check api/agent.js && node --check api/status.js && node --check api/owner.js && node --check supabase/functions/taty-google-bridge/binary-files.ts"
   },
   "dependencies": {
-    "@openai/agents": "latest",
-    "exceljs": "latest",
-    "mammoth": "latest",
-    "zod": "^4.0.0"
-  }
+    "@openai/agents": "0.18.0",
+    "exceljs": "4.4.0",
+    "mammoth": "1.13.0",
+    "pdfkit": "0.17.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": { "@electric-sql/pglite": "0.3.14" }
 }

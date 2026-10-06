@@ -169,7 +169,7 @@ async function treReq(drive, id = "T1") {
 
 async function analysedInput(drive, overrides = {}) {
   const meta = await drive.getMeta("P");
-  const read = await drive.readText("P", { maxChars: 60000 });
+  const read = await drive.readText("P", { maxChars: 200000 });
   return {
     mission_id: "MIS-ABC",
     mission_type: "AUDIT",
@@ -230,11 +230,11 @@ test("programme changed between analysis and execution blocks everything", async
 });
 
 test("truncated programme: state PROGRAMME_TRUNCATED_REVIEW_REQUIRED, generation blocked", async () => {
-  const longText = PROGRAMME_TEXT + "\n" + "Procédure détaillée complémentaire. ".repeat(3000);
-  assert.ok(longText.length > 60000);
+  const longText = PROGRAMME_TEXT + "\n" + "Procédure détaillée complémentaire. ".repeat(9000);
+  assert.ok(longText.length > 200000);
   const drive = seedDrive({ programmeText: longText });
   const meta = await drive.getMeta("P");
-  const read = await drive.readText("P", { maxChars: 60000 });
+  const read = await drive.readText("P", { maxChars: 200000 });
   assert.equal(read.truncated, true);
 
   const state = checkProgrammeState({ meta, read, validatedConfirmed: true });

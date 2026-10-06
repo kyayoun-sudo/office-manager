@@ -82,6 +82,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
     <div id="answer" class="answer">L’agent est prêt dès que les variables Vercel sont configurées et que les agents sont activés dans Supabase.</div>
   </section>
+  <section class="panel" style="margin-top:18px">
+    <h2>TATY People Intelligence</h2>
+    <p class="small">Préparer l’équipe et le briefing d’une mission. Les compétences et la disponibilité restent à valider par le manager.</p>
+    <label for="people-mission">Identifiant de la mission</label>
+    <input id="people-mission" placeholder="Identifiant de la mission dans Office Manager">
+    <div class="actions"><button id="people-read">Consulter le matching et le briefing</button></div>
+    <div id="people-answer" class="answer">Les profils sont consultés dans l’espace interne autorisé.</div>
+  </section>
 </main>
 
 <script>
@@ -94,6 +102,25 @@ const answerEl = document.getElementById("answer");
 const metaEl = document.getElementById("meta");
 
 tokenEl.value = sessionStorage.getItem("officeManagerToken") || "";
+
+document.getElementById('people-read').addEventListener('click', async () => {
+  const button = document.getElementById('people-read');
+  const output = document.getElementById('people-answer');
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/people', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-office-manager-token': tokenEl.value.trim() },
+      body: JSON.stringify({ mission_id: document.getElementById('people-mission').value.trim() })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Consultation indisponible');
+    output.textContent = [data.limitation || 'Exigences humaines à renseigner.', ...data.candidates.map(person =>
+      `${person.full_name} — people fit ${person.people_fit_score}/100 (à valider)\nCompétences : ${person.eligibility.technical === true ? 'correspondance trouvée' : 'à confirmer'} ; disponibilité : à confirmer.\nBriefing : ${(person.management_brief?.briefing_requirements || []).join(' ; ')}\nManagement : ${person.management_brief?.management_style || 'à préciser'}\nCommunication : ${person.management_brief?.communication || 'à préciser'}\nFeedback : ${person.management_brief?.feedback || 'à préciser'}`
+    )].join('\n\n');
+    if (!data.candidates.length) output.textContent += '\nAucun profil à proposer avec les preuves disponibles.';
+  } catch (error) { output.textContent = `Erreur : ${error.message}`; }
+  finally { button.disabled = false; }
+});
 
 sendEl.addEventListener("click", async () => {
   const token = tokenEl.value.trim();

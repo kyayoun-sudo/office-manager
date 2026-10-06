@@ -1,0 +1,17 @@
+# Intégration TATY People Intelligence
+
+Cette livraison reprend le dossier local d'hier, HEAD `c57c940`, sur `fix/map-register-bridge-write`. La branche distante vérifiée reste au commit `5fc31ecd`; les modifications locales d'hier doivent donc être publiées avec cette livraison.
+
+Le Grand Contrôleur est l'orchestrateur racine; Mission Controller, Orpailleur et Sika restent ses trois spécialistes. `api/agent.js`, `lib/orchestrator.js`, `lib/agent-tools.js` et `agents/index.js` sont les chemins réellement utilisés. Le matching ne remplace pas le programme de travail validé, les gates de mapping ou les affectations confirmées.
+
+`api/people.js` consulte une mission Supabase dans l'organisation imposée par le serveur et active côté Grand Contrôleur. Les compétences et conflits sont examinés avant le scoring; un filtre d'identifiants éligibles est transmis au RPC `office_people_match`. Cinq profils à examiner, avec briefing et management, sont consultables dans l'interface interne. Une absence de conflit ne certifie pas la disponibilité : celle-ci et le niveau hiérarchique restent à valider. Une compétence requise non renseignée vaut UNKNOWN. Une absence approuvée ou affectation active chevauchante exclut le candidat par précaution.
+
+R009 : compétences et disponibilité avant people fit. R010 : briefing adapté. R011 : aucune décision RH sensible ni diagnostic clinique issus du questionnaire seul. R012 : évolution des profils avec observations documentées et validées après mission. Aucun apprentissage autonome de profil n'est ajouté. Le score n'est pas une mesure de performance.
+
+Le script SQL versionne les deux tables, les contraintes, le scoring historique, les quatre règles et le déclencheur. La formule historique conserve ses huit dimensions pondérées; urgence et contact client restent des exigences de contexte. Les exigences renseignées par le manager sont conservées. Le déclencheur génère une action `PEOPLE_INTELLIGENCE_RECOMMENDATION` à examiner; il ne valide ni n'affecte personne. Une mise à jour ne rouvre pas les actions approuvées, exécutées, vérifiées ou annulées. Aucun rétrotraitement de mission ou de recommandation ancienne n'est exécuté.
+
+Les neuf profils actifs restent dans Supabase. Aucun profil nominatif ni réponse individuelle n'a été exporté. Les tables et le RPC de profils restent réservés au backend; le token pilote donne accès à la vue interne et doit rester réservé aux managers. Il ne remplace pas un système d'autorisation RH individuel. Les recommandations sensibles sont exclues des contextes préchargés et de l'outil générique de lecture des actions envoyés à l'IA; la consultation People Intelligence ne contacte aucun fournisseur externe.
+
+Les workers Supabase actifs ont été inspectés : Orpailleur durable v9, reconciler v3, mission lifecycle v2, Google bridge v3 et fonctions OAuth existantes. Le worker lifecycle crée des `office_missions`, ce qui déclenche les recommandations. Ses cron et celui d'Orpailleur sont actifs toutes les cinq minutes. Aucun nouveau scheduler n'est créé, aucune fonction n'est redéployée. Le fichier Orpailleur durable du dépôt diffère de la version déployée; il n'est pas remplacé. La couche historique Mission Controller reste reliée par `legacy_mission_id` et conserve ses fonctions privées.
+
+Les modules et tests programme/SOP/PBC/mail/pilote simulé d'hier sont conservés. Les restrictions de production et le statut incomplet des connecteurs restent décrits dans `PROJECT_STATUS.md`.

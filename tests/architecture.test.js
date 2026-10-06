@@ -226,8 +226,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-test("no source still references the removed consult_grand_controleur tool", () => {
-  const root = new URL("..", import.meta.url).pathname;
+test("no source still references the removed consult_grand_controleur tool", async () => {
+  const root = (await import("node:url")).fileURLToPath(new URL("..", import.meta.url));
   const offenders = walk(root).filter(file =>
     readFileSync(file, "utf8").includes("consult_grand_controleur")
   );

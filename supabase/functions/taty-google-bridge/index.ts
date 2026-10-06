@@ -1,4 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { oauthCredentials } from "./oauth-credentials.ts";
+import { DEFAULT_ORG_ID } from "./deployment-config.ts";
 import {
   BridgeError,
   createBinaryFileAction,
@@ -108,18 +110,18 @@ async function googleToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const refresh = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN");
-  const client = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
-  const secret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
-  if (refresh && client && secret) {
+  const credentials = await oauthCredentials(name =>
+    Deno.env.get(name) || (name === "DEFAULT_ORG_ID" ? DEFAULT_ORG_ID : undefined)
+  );
+  if (credentials) {
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: refresh,
-        client_id: client,
-        client_secret: secret
+        refresh_token: credentials.refresh_token,
+        client_id: credentials.client_id,
+        client_secret: credentials.client_secret
       })
     });
     const data = await response.json();
