@@ -29,14 +29,17 @@ body{background:var(--bg,#F4F5F3)}
   <section class="step" id="st1">
     <h2><span class="num">1</span> Votre compte</h2>
     <div id="s1-form" style="display:flex;flex-direction:column;gap:12px">
-      <button class="btn gbtn" type="button" id="s1-google" hidden>
+      <button class="btn gbtn" type="button" id="s1-google">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
         Continuer avec Google</button>
-      <p class="small" id="s1-or" style="text-align:center" hidden>ou</p>
+      <p class="small" id="s1-or" hidden></p>
+      <p class="small">Un clic : Google vous identifie, crée votre compte et donne au cabinet l’accès à son Drive. Aucun mot de passe à créer.</p>
+      <details id="s1-pw"><summary class="small" style="cursor:pointer">Sans Google : nom, e-mail et mot de passe</summary><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <div class="field"><label for="name">Votre nom</label><input id="name" type="text" maxlength="120" autocomplete="name"></div>
       <div class="field"><label for="email">Votre e-mail</label><input id="email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
       <div class="field"><label for="pw">Choisissez un mot de passe (10 caractères, lettres et chiffres)</label><input id="pw" type="password" maxlength="128" autocomplete="new-password"></div>
       <button class="btn" type="button" id="s1-create">Créer mon compte</button>
+      </div></details>
     </div>
     <p class="small" id="s1-msg" role="status" aria-live="polite"></p>
   </section>
@@ -124,7 +127,7 @@ body{background:var(--bg,#F4F5F3)}
   var q = new URLSearchParams(location.search);
   if (q.get('google') === 'error') $('s2-msg').textContent = 'Connexion Google non aboutie : ' + (q.get('code') || '');
   if (q.get('google')) history.replaceState(null, '', location.pathname);
-  fetch('/api/app?route=setup-state').then(function (r) { return r.json(); }).then(function (d) { if (d && d.google_login) { $('s1-google').hidden = false; $('s1-or').hidden = false; } }).catch(function () {});
+  fetch('/api/app?route=setup-state').then(function (r) { return r.json(); }).then(function (d) { if (d && !d.google_login) { $('s1-google').hidden = true; $('s1-pw').open = true; } }).catch(function () {});
   refresh();
 })();
 </script>

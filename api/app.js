@@ -18,6 +18,8 @@ import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase,
 import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
 import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogleConnection, setFirmDrive } from '../lib/google-connection.js';
 import { assertIsolatedOrg } from '../lib/test-mode.js';
+import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
+import { googleClientConfigured } from '../lib/google-connection.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -99,10 +101,15 @@ export const ROUTES = Object.freeze({
   'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
   // Sign-up for everyone (account inactive until the owner gives a role) and owner claim (owner code).
   signup: { POST: open((orgId, req) => signUp(orgId, req.body || {})), unavailable: 'SIGNUP_UNAVAILABLE' },
-  'setup-state': { GET: open((orgId) => setupState(orgId)), unavailable: 'SIGNUP_UNAVAILABLE' },
+  'setup-state': { GET: open(async (orgId) => {
+    const st = await setupState(orgId);
+    // The app's own Google sign-in (no Supabase provider needed) once its Google client is set.
+    return { ...st, google_login: Boolean(st.google_login || googleClientConfigured()) };
+  }), unavailable: 'SIGNUP_UNAVAILABLE' },
   'claim-owner': { POST: open((orgId, req) => claimOwner(orgId, req)), unavailable: 'CLAIM_UNAVAILABLE' },
   // "Continuer avec Google": start address (public) and session check after Google (public).
   'oauth-start': { GET: open((orgId, req) => {
+    if (String(req.query?.provider || 'google') === 'google' && googleClientConfigured()) return signinUrl(orgId, req);
     const host = req.headers?.['x-forwarded-host'] || req.headers?.host;
     const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0];
     return { url: authStartUrl(String(req.query?.provider || 'google'), proto + '://' + host + '/login.html') };
@@ -200,11 +207,14 @@ export const ROUTES = Object.freeze({
   'google-callback': {
     GET: open(async (orgId, req) => {
       try {
-        const r = await finishConnect(orgId, req);
-        console.log('[google-callback] connected:', r.email, (r.scopes || []).length + ' scopes');
-        return { __redirect: r.return_to + '?google=ok&email=' + encodeURIComponent(r.email) + '#google' };
+        const out = await completeGoogleReturn(orgId, req);
+        console.log('[google-callback] ok');
+        return out;
       } catch (e) {
         console.error('[google-callback] failed:', String(e.message || e).slice(0, 120));
+        let signin = false;
+        try { signin = JSON.parse(Buffer.from(String(req.query?.state || '').split('.')[0], 'base64url').toString('utf8')).m === 'signin'; } catch { signin = false; }
+        if (signin) return { __redirect: '/login.html#error=' + encodeURIComponent(String(e.message || e).slice(0, 80)) };
         return { __redirect: '/parametres.html?google=error&code=' + encodeURIComponent(String(e.message || e).slice(0, 80)) + '#google' };
       }
     }),
