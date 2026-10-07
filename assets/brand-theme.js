@@ -19,7 +19,8 @@
     try { var s = JSON.parse(safeGet(window.localStorage, SESSION_KEY) || 'null'); return s && s.pilot_token ? s : null; }
     catch (e) { return null; }
   }
-  function onLoginPage() { return location.pathname === LOGIN_PAGE; }
+  // The setup page (Démarrer) is open without a session, like the login page.
+  function onLoginPage() { return location.pathname === LOGIN_PAGE || location.pathname === '/demarrer.html'; }
 
   var OM = {
     getSession: readSession,
