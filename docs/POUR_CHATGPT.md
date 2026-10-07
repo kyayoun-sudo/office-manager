@@ -215,7 +215,16 @@ validation avant. »
   **Alias** : si l'adresse de l'agent est un alias de la boîte d'une personne (sans licence en plus), mettre
   `AGENT_MAIL_MAILBOX` = la vraie boîte (ex. paulkomenan@taty.info) : l'app se connecte comme elle et écrit
   « De : alias ». La boîte doit être dans les domaines du cabinet.
-  Limite : 100 envois par jour. Pas de Cc / Cci ; en-têtes protégés contre l'injection.
+  Limite : 100 envois par jour.
+- **Pré-tests (décision de Paul, 7/10)** : adresse d'envoi = `paulkomenan@taty.info` (sa vraie boîte),
+  domaine `taty.info`, pas de `AGENT_MAIL_MAILBOX`. Délégation `gmail.send` pour cette adresse.
+- ⏳ **Au lancement** : adresse dédiée à l'agent. **L'agent créera lui-même ses alias en demandant
+  les droits d'administrateur** : à construire — action « Créer l'adresse de l'agent » dans la Mise en
+  service, Admin SDK Directory (`users.aliases.insert`, scope
+  `https://www.googleapis.com/auth/admin.directory.user.alias`), via le compte de service agissant
+  au nom d'un administrateur qui l'a autorisé (délégation par le super administrateur) ; création
+  seulement après validation explicite du propriétaire, alias limité aux domaines du cabinet,
+  journalisé ; jamais de création d'utilisateur ni de changement de droits. Pas de Cc / Cci ; en-têtes protégés contre l'injection.
 - Mise en service : 2 nouvelles lignes (adresse d'envoi + domaines ; envoi Gmail).
 
 ### 4. Recherche, missions, décisions
