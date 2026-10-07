@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;background:var(--nav)}
+.login-card{width:100%;max-width:420px;background:#fff;border-radius:16px;padding:32px 28px;display:flex;flex-direction:column;gap:16px}
+.login-brand{display:flex;align-items:center;gap:12px}
+.login-brand .logo{width:44px;height:44px;border-radius:10px;font-size:20px}
+.login-brand strong{font-size:20px;display:block}
+.login-brand small{font-size:13px;color:var(--muted)}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:400}
+.link-btn{font:inherit;font-size:13px;background:none;border:0;color:var(--brand);text-decoration:underline;cursor:pointer;padding:8px 0;align-self:flex-start;min-height:36px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="logo" data-firm-logo>C</div>
+      <div><strong data-firm-name>Office Manager</strong><small>Espace du cabinet</small></div>
+    </div>
+
+    <form id="login-form" style="display:flex;flex-direction:column;gap:14px" novalidate>
+      <h1 style="font-size:22px">Connexion</h1>
+      <div class="field"><label for="email">Adresse e-mail</label><input id="email" type="text" inputmode="email" autocomplete="username" maxlength="254" required></div>
+      <div class="field"><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" maxlength="128" required></div>
+      <label class="check"><input type="checkbox" id="show-pw"> Afficher le mot de passe</label>
+      <button class="btn" type="submit" id="login-btn">Se connecter</button>
+      <p class="status" id="login-status" role="status" aria-live="polite"></p>
+      <p class="hint" style="margin:0;font-size:12px;color:var(--muted)">Vous restez connecté sur cet ordinateur jusqu'à ce que vous cliquiez sur « Se déconnecter ». Mot de passe oublié : demandez au propriétaire du cabinet de le réinitialiser.</p>
+    </form>
+
+    <button type="button" class="link-btn" id="first-link">Première configuration du cabinet</button>
+    <form id="first-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <h2 style="font-size:17px;margin:0">Créer le compte du propriétaire</h2>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Une seule fois, quand aucun compte n'existe encore. Il faut le code propriétaire du cabinet.</p>
+      <div class="field"><label for="f-owner">Code propriétaire</label><input id="f-owner" type="password" autocomplete="off"></div>
+      <div class="field"><label for="f-name">Votre nom</label><input id="f-name" type="text" maxlength="120" autocomplete="name"></div>
+      <div class="field"><label for="f-email">Votre adresse e-mail</label><input id="f-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="f-pw">Mot de passe (10 caractères minimum, avec lettres et chiffres)</label><input id="f-pw" type="password" maxlength="128" autocomplete="new-password"></div>
+      <button class="btn" type="submit">Créer et se connecter</button>
+      <p class="status" id="first-status" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager;
+  var $ = function (id) { return document.getElementById(id); };
+  var MESSAGES = {
+    INVALID_EMAIL: 'Adresse e-mail invalide.',
+    INVALID_CREDENTIALS: 'E-mail ou mot de passe incorrect.',
+    ACCOUNT_NOT_ALLOWED: 'Ce compte n’a pas accès à l’espace du cabinet, ou il a été désactivé.',
+    TOO_MANY_ATTEMPTS: 'Trop de tentatives. Réessayez dans quelques minutes.',
+    WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
+    OWNER_ONLY: 'Code propriétaire incorrect.',
+    OWNER_SETTINGS_NOT_CONFIGURED: 'Le code propriétaire n’est pas encore défini sur le serveur.',
+    ACCOUNTS_ALREADY_EXIST: 'Des comptes existent déjà : connectez-vous, ou demandez un compte au propriétaire.',
+    EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.',
+    INVALID_NAME: 'Indiquez votre nom.'
+  };
+  function say(id, text, isError) { $(id).textContent = text; $(id).className = 'status' + (isError ? ' error' : ''); }
+  function next() {
+    var n = new URLSearchParams(location.search).get('next') || '/accueil.html';
+    return /^\/[A-Za-z0-9\-_.\/?=&%]*$/.test(n) && n.indexOf('//') !== 0 ? n : '/accueil.html';
+  }
+  function post(route, body, extraHeaders) {
+    return fetch('/api/app?route=' + route, {
+      method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, extraHeaders || {}), body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error((d && d.error) || 'HTTP_' + r.status);
+        return d;
+      });
+    });
+  }
+  function enter(session) { OM.saveSession(session); location.replace(next()); }
+
+  if (OM.getSession()) { location.replace(next()); return; }
+
+  $('show-pw').addEventListener('change', function () { $('password').type = this.checked ? 'text' : 'password'; });
+
+  $('login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = $('email').value.trim(), password = $('password').value;
+    if (!email || !password) { say('login-status', 'Renseignez votre e-mail et votre mot de passe.', true); return; }
+    $('login-btn').disabled = true; say('login-status', 'Connexion…');
+    post('login', { email: email, password: password }).then(enter)
+      .catch(function (err) { say('login-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); $('password').value = ''; $('password').focus(); })
+      .then(function () { $('login-btn').disabled = false; });
+  });
+
+  $('first-link').addEventListener('click', function () { $('first-form').hidden = !$('first-form').hidden; });
+  $('first-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    say('first-status', 'Création…');
+    post('bootstrap-owner', { display_name: $('f-name').value.trim(), email: $('f-email').value.trim(), password: $('f-pw').value },
+      { 'x-office-manager-owner-token': $('f-owner').value.trim() })
+      .then(enter)
+      .catch(function (err) { say('first-status', MESSAGES[err.message] || 'Création impossible pour le moment.', true); });
+  });
+
+  $('email').focus();
+})();
+</script>
+</body>
+</html>

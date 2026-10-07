@@ -5,6 +5,7 @@ import { globalSearch } from '../lib/global-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount } from '../lib/accounts.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -16,11 +17,18 @@ import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-pers
 //   GET  /api/app?route=agent-persona              agent mail identity and tone — OWNER ONLY
 //   POST /api/app?route=agent-persona              save them — OWNER ONLY
 //   POST /api/app?route=agent-message              draft an internal message (never sent)
-// Every route needs the pilot token. Owner routes also need the owner token
-// (x-office-manager-owner-token), the same credential as api/owner.js.
+//   POST /api/app?route=login                      e-mail + password -> session (public)
+//   POST /api/app?route=session                    re-check a session with its refresh token (public)
+//   POST /api/app?route=logout                     end the session (public)
+//   POST /api/app?route=bootstrap-owner            first owner account (owner code, only if no account)
+//   GET  /api/app?route=users                      firm accounts — OWNER ONLY
+//   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
+// Every route needs the pilot token, except the public login routes. Owner routes
+// also need the owner token (x-office-manager-owner-token), as in api/owner.js.
 
 const fail = (code, statusCode) => Object.assign(new Error(code), { statusCode });
 const owner = run => Object.assign(run, { ownerOnly: true });
+const open = run => Object.assign(run, { public: true });
 
 export const ROUTES = Object.freeze({
   branding: {
@@ -49,15 +57,24 @@ export const ROUTES = Object.freeze({
   'agent-message': {
     POST: (orgId, req) => draftInternalMessage(orgId, req.body || {}),
     unavailable: 'AGENT_MESSAGE_UNAVAILABLE'
+  },
+  login: { POST: open((orgId, req) => login(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
+  session: { POST: open((orgId, req) => refreshSession(orgId, req.body || {})), unavailable: 'SESSION_UNAVAILABLE' },
+  logout: { POST: open((orgId, req) => logout(req.body || {})), unavailable: 'LOGOUT_UNAVAILABLE' },
+  'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
+  users: {
+    GET: owner((orgId) => listAccounts(orgId)),
+    POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
+    unavailable: 'USERS_UNAVAILABLE'
   }
 });
 
 export async function handleApp(req) {
-  requirePilotAccess(req);
   const route = ROUTES[String(req.query?.route || '')];
-  if (!route) throw fail('UNKNOWN_ROUTE', 404);
+  if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
   const run = route[req.method];
-  if (typeof run !== 'function') throw fail('METHOD_NOT_ALLOWED', 405);
+  if (typeof run !== 'function') { requirePilotAccess(req); throw fail('METHOD_NOT_ALLOWED', 405); }
+  if (!run.public) requirePilotAccess(req);
   if (run.ownerOnly) requireFirmOwner(req);
   const orgId = process.env.DEFAULT_ORG_ID;
   if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
@@ -71,7 +88,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = error.statusCode || 500;
     const route = ROUTES[String(req.query?.route || '')];
-    const shown = [400, 401, 403, 404, 405, 409, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
+    const shown = [400, 401, 403, 404, 405, 409, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
     if (Array.isArray(error.outside)) body.outside = error.outside;
     return res.status(status).json(body);

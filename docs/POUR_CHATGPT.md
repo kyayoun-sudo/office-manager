@@ -54,6 +54,27 @@ Règles codées dans `lib/agent-persona.js` (et testées) :
   pas de blague sur les sujets sérieux (santé, RH, deuil, retard grave) ;
   informations de travail exactes ; pas de données client inutiles.
 
+### 3 bis. Connexion par e-mail et mot de passe
+- `login.html` : e-mail + mot de passe, vérifiés par **Supabase Auth**
+  (aucun mot de passe stocké par l'application). Rôles dans la table
+  `office_app_users` : `owner` (propriétaire), `partner` (associé-gérant),
+  `collaborator`. Un compte se désactive, jamais supprimé ; il reste toujours au
+  moins un propriétaire actif.
+- **On reste connecté jusqu'à « Se déconnecter »** : session dans `localStorage`,
+  revérifiée à chaque page via `route=session` (refresh token Supabase) ; compte
+  désactivé ⇒ déconnexion. Bouton « Se déconnecter » ajouté au menu par
+  `assets/brand-theme.js` ; sans session, toute page renvoie vers `login.html`.
+- Après connexion, le navigateur reçoit le code pilote (et le code propriétaire
+  pour `owner`/`partner`) : **tous les endpoints existants fonctionnent sans
+  modification**. Le lien « Paramètres » est masqué aux collaborateurs.
+- Premier accès : « Première configuration du cabinet » sur `login.html` crée le
+  compte propriétaire avec le code propriétaire, uniquement si aucun compte n'existe.
+- Gestion des comptes dans `parametres.html` (propriétaire / associés-gérants).
+- **Limite connue** : le code pilote reste un secret partagé entre les comptes
+  connectés. Étape suivante recommandée : faire accepter par `lib/auth.js` le jeton
+  de session Supabase par utilisateur, puis ne plus transmettre le code pilote au
+  navigateur (cela modifie un fichier d'origine : à valider avec Paul).
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -77,15 +98,21 @@ sans permission locale. Non compilée (voir `docs/WHITE_LABEL_DESKTOP.md`).
 | `mission-view` | GET | code pilote |
 | `agent-persona` | GET / POST | **propriétaire** |
 | `agent-message` | POST (brouillon interne, jamais envoyé) | code pilote |
+| `login` | POST e-mail + mot de passe | public |
+| `session` | POST refresh_token (revérifie le compte) | public |
+| `logout` | POST | public |
+| `bootstrap-owner` | POST (premier propriétaire, si aucun compte) | code propriétaire |
+| `users` | GET / POST (créer, désactiver, rôle, mot de passe) | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
-`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`.
+`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`.
 Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
 Vérifications PGlite : `tests/verify-branding-sql.mjs`,
-`tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`.
+`tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
+`tests/verify-app-users-sql.mjs`.
 
 ## État des tests
-139 tests : 138 OK. Le seul échec, `tests/browser-response.test.js`, **existait
+147 tests : 146 OK. Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes
@@ -97,6 +124,7 @@ avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
    Supabase) qui lit `internal_frequency`, rédige avec `draftInternalMessage` et
    envoie aux adresses internes uniquement. Prévoir une désinscription par personne.
 3. Exécuter les décisions validées (« À valider ») action par action.
-4. Vrais comptes utilisateurs et rôles (aujourd'hui : code pilote + code propriétaire).
+4. Sessions par utilisateur côté serveur (voir « Limite connue » ci-dessus) et
+   réinitialisation du mot de passe par e-mail (aujourd'hui : par le propriétaire).
 5. Appliquer les 3 fichiers SQL, activer l'API Google Sheets, corriger
    `browser-response.test.js`, compiler l'app de bureau, brancher `taty.info`.

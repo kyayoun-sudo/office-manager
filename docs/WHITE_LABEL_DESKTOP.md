@@ -118,3 +118,10 @@ Le test `tests/app-router.test.js` vérifie aussi que `api/` reste à 12 fichier
   dans `api/app.js`. `POST branding` est désormais réservé au propriétaire.
 - Tests : `tests/agent-persona.test.js`, `tests/verify-agent-persona-sql.mjs`.
 - Résumé complet pour reprendre le travail : **`docs/POUR_CHATGPT.md`**.
+
+## Ajout 4 — Connexion par e-mail et mot de passe (2026-10-07)
+
+`login.html`, `lib/accounts.js`, `db/app-users.sql`, routes `login`, `session`,
+`logout`, `bootstrap-owner`, `users` dans `api/app.js`, session persistante et
+bouton « Se déconnecter » dans `assets/brand-theme.js`, gestion des comptes dans
+`parametres.html`. Détails et limites : `docs/POUR_CHATGPT.md`.

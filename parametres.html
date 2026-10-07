@@ -61,7 +61,7 @@
         <section class="card" aria-labelledby="h-id">
           <h2 id="h-id">Identité</h2>
           <div class="field"><label for="firm">Nom du cabinet</label><input id="firm" type="text" maxlength="120"></div>
-          <div class="field"><label for="user">Votre nom (affiché sur cet ordinateur)</label><input id="user" type="text" maxlength="80"></div>
+          <div class="field"><label for="user">Votre nom (celui de votre compte)</label><input id="user" type="text" maxlength="80" readonly></div>
         </section>
 
         <section class="card" aria-labelledby="h-logo">
@@ -109,6 +109,23 @@
             </select></div>
           <div class="field"><label for="signature">Signature (facultatif)</label><input id="signature" type="text" maxlength="500" placeholder="Ex. Ton collègue Office Manager 😉"></div>
           <p class="hint" style="margin:0"><strong>Avec les clients</strong> et toute personne hors du cabinet, l'agent écrit toujours sur un ton formel, quel que soit ce réglage. Pas de blague sur les sujets sérieux (santé, RH, retards graves).</p>
+        </section>
+
+        <section class="card" aria-labelledby="h-users">
+          <h2 id="h-users">Comptes du cabinet</h2>
+          <p class="hint" style="margin:0">Chaque personne se connecte avec son e-mail et son mot de passe. Le propriétaire et les associés-gérants ont accès à ces paramètres ; les collaborateurs, non. Un compte se désactive, il ne se supprime pas.</p>
+          <div id="users" class="stack" style="display:flex;flex-direction:column;gap:8px"></div>
+          <h3 style="margin:8px 0 0;font-size:15px">Ajouter une personne</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+            <div class="field"><label for="u-name">Nom</label><input id="u-name" type="text" maxlength="120"></div>
+            <div class="field"><label for="u-email">E-mail</label><input id="u-email" type="text" inputmode="email" maxlength="254"></div>
+            <div class="field"><label for="u-role">Rôle</label>
+              <select id="u-role" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+                <option value="collaborator">Collaborateur</option><option value="partner">Associé-gérant</option><option value="owner">Propriétaire</option>
+              </select></div>
+            <div class="field"><label for="u-pw">Mot de passe provisoire</label><input id="u-pw" type="text" maxlength="128" autocomplete="off" placeholder="10 caractères, lettres et chiffres"></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="u-add" type="button">Créer le compte</button><span class="status" id="u-status" role="status" aria-live="polite"></span></div>
         </section>
 
         <section class="card" aria-labelledby="h-try">
@@ -214,7 +231,11 @@
 
   // ---- Owner / managing partner access ----
   var OWNER_KEY = 'officeManagerOwnerToken';
-  function ownerToken() { try { return sessionStorage.getItem(OWNER_KEY) || ''; } catch (e) { return ''; } }
+  function ownerToken() {
+    var fromSession = OM.getOwnerToken && OM.getOwnerToken();
+    if (fromSession) return fromSession;
+    try { return sessionStorage.getItem(OWNER_KEY) || ''; } catch (e) { return ''; }
+  }
   function setOwnerToken(t) { try { sessionStorage.setItem(OWNER_KEY, String(t || '').trim()); } catch (e) { /* storage unavailable */ } }
   function ownerApi(route, options) {
     options = options || {};
@@ -265,6 +286,7 @@
     ownerApi('agent-persona').then(function (p) {
       fillPersona(p);
       $('owner-gate').hidden = true; $('owner-area').hidden = false;
+      loadUsers();
     }).catch(function (err) {
       $('owner-area').hidden = true; $('owner-gate').hidden = false;
       $('owner-status').textContent = explain(err); $('owner-status').className = 'status error';
@@ -294,6 +316,69 @@
       $('try-out').textContent = 'Objet : ' + d.subject + '\n\n' + d.body + '\n\n— ' + d.note;
     }).catch(function (err) { $('try-out').textContent = 'Échec : ' + explain(err); })
       .then(function () { $('try-btn').disabled = false; });
+  });
+
+  // ---- Accounts (owner / partner) ----
+  var ROLE_LABEL = { owner: 'Propriétaire', partner: 'Associé-gérant', collaborator: 'Collaborateur' };
+  Object.assign(ERRORS, {
+    WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
+    EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.', INVALID_EMAIL: 'Adresse e-mail invalide.',
+    INVALID_NAME: 'Indiquez le nom.', LAST_OWNER: 'Impossible : il doit rester au moins un propriétaire actif.'
+  });
+  function uSay(t, e) { $('u-status').textContent = t; $('u-status').className = 'status' + (e ? ' error' : ''); }
+  function manage(body) {
+    return ownerApi('users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+  function userRow(u) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 14px';
+    var t = document.createElement('div'); t.style.cssText = 'flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px';
+    var n = document.createElement('span'); n.textContent = u.display_name; n.style.fontWeight = '500';
+    var m = document.createElement('span'); m.textContent = u.email + ' · ' + (ROLE_LABEL[u.role] || u.role) + (u.active ? '' : ' · désactivé');
+    m.style.cssText = 'font-size:12px;color:var(--muted)';
+    t.appendChild(n); t.appendChild(m); row.appendChild(t);
+    var role = document.createElement('select');
+    role.setAttribute('aria-label', 'Rôle de ' + u.display_name);
+    role.style.cssText = 'font:inherit;font-size:13px;border:1px solid #C9D0CC;border-radius:8px;padding:6px 8px;min-height:36px;background:#fff';
+    ['collaborator', 'partner', 'owner'].forEach(function (r) { var o = new Option(ROLE_LABEL[r], r); role.appendChild(o); });
+    role.value = u.role;
+    role.addEventListener('change', function () {
+      manage({ action: 'set_role', auth_user_id: u.auth_user_id, role: role.value }).then(loadUsers)
+        .catch(function (err) { uSay(explain(err), true); role.value = u.role; });
+    });
+    row.appendChild(role);
+    var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'btn ghost';
+    tog.textContent = u.active ? 'Désactiver' : 'Réactiver'; tog.style.cssText = 'padding:6px 12px;min-height:36px;font-size:13px';
+    tog.addEventListener('click', function () {
+      manage({ action: u.active ? 'deactivate' : 'reactivate', auth_user_id: u.auth_user_id }).then(loadUsers)
+        .catch(function (err) { uSay(explain(err), true); });
+    });
+    row.appendChild(tog);
+    var pw = document.createElement('button'); pw.type = 'button'; pw.className = 'btn ghost';
+    pw.textContent = 'Nouveau mot de passe'; pw.style.cssText = 'padding:6px 12px;min-height:36px;font-size:13px';
+    pw.addEventListener('click', function () {
+      var v = window.prompt('Nouveau mot de passe provisoire pour ' + u.display_name + ' (10 caractères minimum, lettres et chiffres) :');
+      if (!v) return;
+      manage({ action: 'reset_password', auth_user_id: u.auth_user_id, password: v })
+        .then(function () { uSay('Mot de passe changé. Transmettez-le à la personne de vive voix.'); })
+        .catch(function (err) { uSay(explain(err), true); });
+    });
+    row.appendChild(pw);
+    return row;
+  }
+  function loadUsers() {
+    ownerApi('users').then(function (d) {
+      var box = $('users'); box.textContent = '';
+      (d.users || []).forEach(function (u) { box.appendChild(userRow(u)); });
+      if (!(d.users || []).length) { var p = document.createElement('p'); p.textContent = 'Aucun compte.'; p.style.cssText = 'margin:0;color:var(--muted);font-size:14px'; box.appendChild(p); }
+    }).catch(function (err) { uSay(explain(err), true); });
+  }
+  $('u-add').addEventListener('click', function () {
+    $('u-add').disabled = true; uSay('Création…');
+    manage({ action: 'create', display_name: $('u-name').value.trim(), email: $('u-email').value.trim(), role: $('u-role').value, password: $('u-pw').value })
+      .then(function () { uSay('Compte créé. Transmettez le mot de passe provisoire à la personne.'); $('u-name').value = ''; $('u-email').value = ''; $('u-pw').value = ''; loadUsers(); })
+      .catch(function (err) { uSay(explain(err), true); })
+      .then(function () { $('u-add').disabled = false; });
   });
 
   function start() {
