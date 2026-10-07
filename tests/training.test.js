@@ -225,6 +225,28 @@ test('local mode without Drive, failures retried then marked failed, report', as
   assert.equal(r.overall, null);
 });
 
+test('without the firm’s direct Google access, missions wait (no attempt burnt) and the failed ones restart once the access is set', async () => {
+  const w = world();
+  let writable = false;
+  const deps = { fetchRows: w.fetchRows, ai: w.ai, drive: w.d, now: () => new Date('2026-10-07T09:00:00Z'), driveReady: () => true, driveWritable: () => writable, fire: async () => true };
+  const s = await startCampaign('org', { body: {}, headers: {} }, deps);
+  assert.equal(s.campaign.mode, 'drive');
+  // A mission that already failed on the bridge refusal (as on the real Drive on 2026-10-07).
+  Object.assign(w.tables.office_training_cases[0], { status: 'failed', attempts: 3, error: 'GOOGLE_BRIDGE_403: {"error":"FILE_NAME_NOT_ALLOWED: 01_Lettre_de_mission.txt"}' });
+  for (let i = 0; i < 6; i++) await step('org', null, deps);
+  const waiting = w.tables.office_training_cases.filter(c => c.status === 'to_create');
+  assert.equal(waiting.length, 3);
+  assert.ok(waiting.every(c => c.attempts === 0 && /EN ATTENTE : accès Google du cabinet/.test(c.error)), 'waits, says why');
+  assert.equal(w.drive.nodes.filter(x => x.mimeType !== FOLDER).length, 0, 'nothing written');
+  assert.equal((await tickTraining('org', null, deps)).training, 'active');
+
+  writable = true;
+  await tickTraining('org', null, deps);
+  assert.ok(w.tables.office_training_cases.every(c => c.status === 'to_create' && c.attempts === 0 && !c.error), 'all four start again');
+  for (let i = 0; i < 40; i++) { if ((await step('org', null, deps)).done) break; }
+  assert.ok(w.tables.office_training_cases.every(c => c.status === 'graded'), JSON.stringify(w.tables.office_training_cases.map(c => [c.status, c.error])));
+});
+
 test('routes and page: owner starts / stops / cleans up; everyone with a session sees and confirms', () => {
   assert.ok(ROUTES.training.POST.ownerOnly);
   assert.deepEqual(ROUTES.training.GET.userRoles, ['owner', 'partner', 'manager', 'collaborator']);
