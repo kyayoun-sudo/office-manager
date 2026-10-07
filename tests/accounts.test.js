@@ -136,3 +136,28 @@ test('sign-up: anyone creates an account, it has NO access until the owner gives
   assert.equal(rows[0].active, true);
   assert.ok(ROUTES.signup.POST.public && ROUTES['claim-owner'].POST.public);
 });
+
+import { oauthLogin, authStartUrl } from '../lib/accounts.js';
+
+test('Continuer avec Google: session re-checked with Supabase; first person of a new firm = owner; others wait for a role', async () => {
+  const rows = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; }
+    const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1];
+    return id ? rows.filter(r => r.auth_user_id === id) : rows;
+  };
+  const people = { 'rt-paul': { id: UID, email: 'kyayoun@gmail.com', user_metadata: { full_name: 'Paul Komenan' } }, 'rt-yvan': { id: UID2, email: 'yvan@taty.info', user_metadata: {} } };
+  const authCall = async (path, o) => people[o.body.refresh_token] ? { status: 200, data: { refresh_token: 'new', access_token: 'a', user: people[o.body.refresh_token] } } : { status: 400, data: {} };
+  await assert.rejects(oauthLogin('org-1', { refresh_token: 'forged' }, { authCall, fetchRows, env: {} }), /SESSION_EXPIRED/);
+  const s = await oauthLogin('org-1', { refresh_token: 'rt-paul' }, { authCall, fetchRows, env: {} });
+  assert.equal(s.user.role, 'owner', 'first person of the firm');
+  assert.equal(s.user.display_name, 'Paul Komenan');
+  await assert.rejects(oauthLogin('org-1', { refresh_token: 'rt-yvan' }, { authCall, fetchRows, env: {} }), /ACCOUNT_PENDING/);
+  assert.deepEqual(rows.map(r => [r.email, r.role, r.active]), [['kyayoun@gmail.com', 'owner', true], ['yvan@taty.info', 'collaborator', false]]);
+  // FIRST_OWNER_EMAILS limits who may become the first owner.
+  const rows2 = [];
+  const f2 = async (path, o = {}) => { if (o.method === 'POST') { rows2.push(...JSON.parse(o.body)); return []; } const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1]; return id ? rows2.filter(r => r.auth_user_id === id) : rows2; };
+  await assert.rejects(oauthLogin('org-2', { refresh_token: 'rt-yvan' }, { authCall, fetchRows: f2, env: { FIRST_OWNER_EMAILS: 'kyayoun@gmail.com' } }), /ACCOUNT_PENDING/);
+  assert.match(authStartUrl('google', 'https://app.example/login.html', { SUPABASE_URL: 'https://x.supabase.co' }), /^https:\/\/x\.supabase\.co\/auth\/v1\/authorize\?provider=google&redirect_to=https%3A%2F%2Fapp\.example%2Flogin\.html$/);
+  assert.throws(() => authStartUrl('evil', 'x', { SUPABASE_URL: 'https://x' }), /PROVIDER_NOT_SUPPORTED/);
+});

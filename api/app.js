@@ -5,7 +5,7 @@ import { globalSearch } from '../lib/global-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner } from '../lib/accounts.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl } from '../lib/accounts.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -100,6 +100,13 @@ export const ROUTES = Object.freeze({
   // Sign-up for everyone (account inactive until the owner gives a role) and owner claim (owner code).
   signup: { POST: open((orgId, req) => signUp(orgId, req.body || {})), unavailable: 'SIGNUP_UNAVAILABLE' },
   'claim-owner': { POST: open((orgId, req) => claimOwner(orgId, req)), unavailable: 'CLAIM_UNAVAILABLE' },
+  // "Continuer avec Google": start address (public) and session check after Google (public).
+  'oauth-start': { GET: open((orgId, req) => {
+    const host = req.headers?.['x-forwarded-host'] || req.headers?.host;
+    const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0];
+    return { url: authStartUrl(String(req.query?.provider || 'google'), proto + '://' + host + '/login.html') };
+  }), unavailable: 'LOGIN_UNAVAILABLE' },
+  'oauth-login': { POST: open((orgId, req) => oauthLogin(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
   tidy: {
     GET: (orgId, req) => req.query?.id ? getRequest(orgId, req.query.id) : listRequests(orgId),
     POST: (orgId, req) => tidyAction(orgId, req),
