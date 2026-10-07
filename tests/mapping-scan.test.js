@@ -9,7 +9,8 @@ function fakeDrive() {
     findFilesByExactName: async (name) => [...files.entries()].filter(([, f]) => f.name === name).map(([id]) => ({ id })),
     downloadBuffer: async id => files.get(id).buffer,
     createBinary: async ({ name, buffer }) => { const id = 'f' + (++n); files.set(id, { name, buffer }); return { id }; },
-    updateBinary: async (id, { buffer }) => { files.get(id).buffer = buffer; }
+    getMeta: async id => ({ id, modifiedTime: files.get(id).mt || 't0' }),
+    updateBinary: async (id, { buffer, expectedModifiedTime }) => { if (!expectedModifiedTime) throw new Error('EXPECTED_MODIFIED_TIME_REQUIRED'); files.get(id).buffer = buffer; files.get(id).mt = 't' + Math.random(); }
   };
 }
 const tree = { R: [{ id: 'A', name: 'Clients', mimeType: 'application/vnd.google-apps.folder' }, { id: 'x', name: 'note.pdf', mimeType: 'application/pdf' }],
