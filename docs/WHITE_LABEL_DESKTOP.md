@@ -106,3 +106,15 @@ fichier, `api/app.js`**, avec un paramètre `route` :
 
 Total `api/` : 10 fonctions. Les endpoints d'origine du projet sont inchangés.
 Le test `tests/app-router.test.js` vérifie aussi que `api/` reste à 12 fichiers au plus.
+
+## Ajout 3 — Assistant intégré et paramètres propriétaire (2026-10-07)
+
+- `assistant.html` : la console pilote dans la même application (voir `docs/POUR_CHATGPT.md`).
+- `parametres.html` réservé au propriétaire / associés-gérants (code propriétaire).
+  Nouvelles sections : e-mail de l'agent (nom, adresse d'envoi, réponse, alias,
+  domaines du cabinet) et ton avec les collègues (nouchi et blagueur par défaut).
+- `lib/owner-auth.js`, `lib/agent-persona.js`, `db/agent-persona.sql`, routes
+  `agent-persona` (propriétaire) et `agent-message` (brouillon, jamais envoyé)
+  dans `api/app.js`. `POST branding` est désormais réservé au propriétaire.
+- Tests : `tests/agent-persona.test.js`, `tests/verify-agent-persona-sql.mjs`.
+- Résumé complet pour reprendre le travail : **`docs/POUR_CHATGPT.md`**.

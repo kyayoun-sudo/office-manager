@@ -37,7 +37,7 @@
   <main class="main">
     <header style="display:flex;flex-direction:column;gap:6px">
       <h1>Paramètres du cabinet</h1>
-      <p class="lead">Le cabinet installe l'application à son image : son nom, son logo, ses couleurs. Les réglages du cabinet s'appliquent à tous ses utilisateurs.</p>
+      <p class="lead">Réservé au propriétaire et aux associés-gérants : nom, logo et couleurs du cabinet, e-mail de l'agent et sa façon de parler à l'équipe. Les réglages s'appliquent à tous les utilisateurs.</p>
     </header>
 
     <section class="card" id="login" aria-labelledby="h-login" hidden>
@@ -46,7 +46,17 @@
       <div><button class="btn" id="connect" type="button">Se connecter</button></div>
     </section>
 
-    <div class="row">
+    <section class="card" id="owner-gate" aria-labelledby="h-owner" hidden>
+      <h2 id="h-owner">Accès propriétaire / associé-gérant</h2>
+      <p class="lead" style="font-size:14px">Ces paramètres ne sont modifiables qu'avec le code propriétaire du cabinet. Les collaborateurs n'y ont pas accès.</p>
+      <div class="field" style="max-width:420px"><label for="owner-token">Code propriétaire</label><input id="owner-token" type="password" autocomplete="off"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <button class="btn" id="owner-unlock" type="button">Déverrouiller</button>
+        <span class="status" id="owner-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <div class="row" id="owner-area" hidden>
       <div class="grow">
         <section class="card" aria-labelledby="h-id">
           <h2 id="h-id">Identité</h2>
@@ -72,6 +82,41 @@
           <div class="swatches" id="swatches" role="radiogroup" aria-label="Couleur principale"></div>
           <div class="field" style="max-width:260px"><label for="hex">Ou code couleur exact de la charte</label><input id="hex" class="mono" type="text" maxlength="7" placeholder="#0E5A52"></div>
           <p class="status" id="contrast" aria-live="polite"></p>
+        </section>
+
+        <section class="card" aria-labelledby="h-mail">
+          <h2 id="h-mail">E-mail de l'agent</h2>
+          <div class="field"><label for="agent-name">Nom de l'agent (affiché dans les e-mails)</label><input id="agent-name" type="text" maxlength="80" placeholder="Ex. Office Manager TATY"></div>
+          <div class="field"><label for="sender">Adresse d'envoi de l'agent</label><input id="sender" type="text" maxlength="254" placeholder="Ex. assistant@taty.info"></div>
+          <div class="field"><label for="reply-to">Adresse de réponse (facultatif)</label><input id="reply-to" type="text" maxlength="254" placeholder="Ex. hit@taty.info"></div>
+          <div class="field"><label for="aliases">Alias de l'agent — un par ligne (10 maximum)</label><textarea id="aliases" class="mono" rows="3" style="font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px" placeholder="office@taty.info&#10;pbc@taty.info"></textarea></div>
+          <div class="field"><label for="domains">Domaines du cabinet — un par ligne</label><textarea id="domains" class="mono" rows="2" style="font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px" placeholder="taty.info"></textarea>
+            <span class="hint">Seules les adresses de ces domaines sont traitées comme des collègues. Par défaut : le domaine de l'adresse d'envoi.</span></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-tone">
+          <h2 id="h-tone">Ton avec les collègues</h2>
+          <div role="radiogroup" aria-label="Ton avec les collègues" style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="radio" name="tone" value="nouchi_fun" style="margin-top:3px"> <span><strong>Nouchi et blagueur</strong> — comme un collègue d'Abidjan : « On dit quoi la team ? Ya fohi… »</span></label>
+            <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="radio" name="tone" value="relaxed_fun" style="margin-top:3px"> <span><strong>Détendu et souriant</strong> — français courant, sans argot</span></label>
+            <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="radio" name="tone" value="professional" style="margin-top:3px"> <span><strong>Professionnel</strong> — cordial, humour très discret</span></label>
+          </div>
+          <div class="field" style="max-width:360px"><label for="humor">Dose d'humour : <span id="humor-label"></span></label><input id="humor" type="range" min="0" max="3" step="1"></div>
+          <div class="field" style="max-width:360px"><label for="frequency">Messages spontanés à l'équipe</label>
+            <select id="frequency" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+              <option value="off">Jamais</option><option value="weekly">Une fois par semaine</option>
+              <option value="few_per_week">Plusieurs fois par semaine</option><option value="daily">Tous les jours</option>
+            </select></div>
+          <div class="field"><label for="signature">Signature (facultatif)</label><input id="signature" type="text" maxlength="500" placeholder="Ex. Ton collègue Office Manager 😉"></div>
+          <p class="hint" style="margin:0"><strong>Avec les clients</strong> et toute personne hors du cabinet, l'agent écrit toujours sur un ton formel, quel que soit ce réglage. Pas de blague sur les sujets sérieux (santé, RH, retards graves).</p>
+        </section>
+
+        <section class="card" aria-labelledby="h-try">
+          <h2 id="h-try">Essayer</h2>
+          <div class="field"><label for="try-topic">Sujet du message à l'équipe</label><input id="try-topic" type="text" maxlength="300" placeholder="Ex. Rappeler que les pièces Nova Services sont attendues vendredi"></div>
+          <div class="field"><label for="try-to">Destinataires (facultatif, adresses du cabinet uniquement)</label><input id="try-to" type="text" maxlength="500" placeholder="samira@taty.info, yannick@taty.info"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="try-btn" type="button">Rédiger un message test</button><span class="hint">Enregistrez d'abord. Rien n'est envoyé.</span></div>
+          <div id="try-out" style="white-space:pre-wrap;background:#F7F8F6;border:1px solid #EEF0EE;border-radius:10px;padding:14px;font-size:14px;line-height:1.55" hidden></div>
         </section>
 
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -167,14 +212,88 @@
 
   function show(msg, isError) { $('status').textContent = msg; $('status').className = 'status' + (isError ? ' error' : ''); }
 
+  // ---- Owner / managing partner access ----
+  var OWNER_KEY = 'officeManagerOwnerToken';
+  function ownerToken() { try { return sessionStorage.getItem(OWNER_KEY) || ''; } catch (e) { return ''; } }
+  function setOwnerToken(t) { try { sessionStorage.setItem(OWNER_KEY, String(t || '').trim()); } catch (e) { /* storage unavailable */ } }
+  function ownerApi(route, options) {
+    options = options || {};
+    var headers = Object.assign({ 'x-office-manager-owner-token': ownerToken() }, options.headers || {});
+    return OM.api('/api/app?route=' + route, Object.assign({}, options, { headers: headers }));
+  }
+  var ERRORS = {
+    OWNER_ONLY: 'Code propriétaire incorrect : ces paramètres sont réservés au propriétaire et aux associés-gérants.',
+    OWNER_SETTINGS_NOT_CONFIGURED: 'Le code propriétaire n’est pas encore défini sur le serveur (variable OFFICE_MANAGER_OWNER_TOKEN).',
+    INVALID_SENDER_EMAIL: 'Adresse d’envoi invalide.', INVALID_REPLY_TO: 'Adresse de réponse invalide.',
+    INVALID_ALIASES: 'Un alias est invalide (10 maximum).', ALIAS_OUTSIDE_FIRM_DOMAINS: 'Un alias n’appartient pas aux domaines du cabinet.',
+    SENDER_OUTSIDE_FIRM_DOMAINS: 'L’adresse d’envoi n’appartient pas aux domaines du cabinet.',
+    INVALID_INTERNAL_DOMAINS: 'Un domaine du cabinet est invalide (ex. taty.info).',
+    RECIPIENT_OUTSIDE_FIRM: 'Un destinataire n’est pas une adresse du cabinet : l’agent ne parle en nouchi qu’aux collègues.',
+    INTERNAL_DOMAINS_NOT_CONFIGURED: 'Renseignez et enregistrez d’abord l’adresse d’envoi ou les domaines du cabinet.',
+    TOPIC_REQUIRED: 'Indiquez le sujet du message.'
+  };
+  function explain(err) { return ERRORS[err.message] || err.message; }
+
+  var HUMOR = ['aucune blague', 'une petite touche', 'régulier', 'collègue très blagueur'];
+  function lines(id) { return $(id).value.split(/[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function fillPersona(p) {
+    $('agent-name').value = p.agent_display_name || '';
+    $('sender').value = p.sender_email || '';
+    $('reply-to').value = p.reply_to || '';
+    $('aliases').value = (p.aliases || []).join('\n');
+    $('domains').value = (p.internal_domains || []).join('\n');
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="tone"]'), function (r) { r.checked = r.value === p.internal_tone; });
+    $('humor').value = String(p.humor_level == null ? 2 : p.humor_level); $('humor-label').textContent = HUMOR[Number($('humor').value)];
+    $('frequency').value = p.internal_frequency || 'few_per_week';
+    $('signature').value = p.signature || '';
+  }
+  function readPersona() {
+    var tone = document.querySelector('input[name="tone"]:checked');
+    return {
+      agent_display_name: $('agent-name').value.trim() || 'Office Manager',
+      sender_email: $('sender').value.trim() || null, reply_to: $('reply-to').value.trim() || null,
+      aliases: lines('aliases'), internal_domains: lines('domains'),
+      internal_tone: tone ? tone.value : 'nouchi_fun', humor_level: Number($('humor').value),
+      internal_frequency: $('frequency').value, signature: $('signature').value.trim() || null,
+      updated_by: OM.getUserName() || null
+    };
+  }
+  $('humor').addEventListener('input', function () { $('humor-label').textContent = HUMOR[Number($('humor').value)]; });
+
+  function unlock() {
+    $('owner-status').textContent = 'Vérification…'; $('owner-status').className = 'status';
+    ownerApi('agent-persona').then(function (p) {
+      fillPersona(p);
+      $('owner-gate').hidden = true; $('owner-area').hidden = false;
+    }).catch(function (err) {
+      $('owner-area').hidden = true; $('owner-gate').hidden = false;
+      $('owner-status').textContent = explain(err); $('owner-status').className = 'status error';
+    });
+  }
+  $('owner-unlock').addEventListener('click', function () { setOwnerToken($('owner-token').value); unlock(); });
+
   $('save').addEventListener('click', function () {
     $('save').disabled = true; show('Enregistrement…');
-    OM.api('/api/app?route=branding', {
+    ownerApi('branding', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firm_name: state.firm_name, primary_color: state.primary_color, logo_data_url: state.logo_data_url, updated_by: OM.getUserName() || null })
-    }).then(function (b) { OM.applyBranding(b); show('Enregistré pour tout le cabinet.'); })
-      .catch(function (err) { show('Échec : ' + err.message, true); })
+    }).then(function (b) {
+      OM.applyBranding(b);
+      return ownerApi('agent-persona', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(readPersona()) });
+    }).then(function (p) { fillPersona(p); show('Enregistré pour tout le cabinet.'); })
+      .catch(function (err) { show('Échec : ' + explain(err), true); })
       .then(function () { $('save').disabled = false; });
+  });
+
+  $('try-btn').addEventListener('click', function () {
+    $('try-btn').disabled = true; $('try-out').hidden = false; $('try-out').textContent = 'Rédaction en cours…';
+    OM.api('/api/app?route=agent-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: $('try-topic').value.trim(), recipients: $('try-to').value })
+    }).then(function (d) {
+      $('try-out').textContent = 'Objet : ' + d.subject + '\n\n' + d.body + '\n\n— ' + d.note;
+    }).catch(function (err) { $('try-out').textContent = 'Échec : ' + explain(err); })
+      .then(function () { $('try-btn').disabled = false; });
   });
 
   function start() {
@@ -183,6 +302,7 @@
       if (b) { state.firm_name = b.firm_name; state.primary_color = b.primary_color; state.logo_data_url = b.logo_data_url; }
       $('firm').value = state.firm_name; $('hex').value = state.primary_color; render();
     }).catch(function (err) { show('Lecture impossible : ' + err.message, true); render(); });
+    if (ownerToken()) unlock(); else $('owner-gate').hidden = false;
   }
 
   $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
