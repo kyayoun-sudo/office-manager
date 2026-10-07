@@ -83,6 +83,7 @@
           <button class="btn ghost" id="map-pass" type="button">Lancer un passage de cartographie complet</button>
           <button class="btn" id="map-review" type="button" hidden>Valider la cartographie</button>
         </div>
+        <p id="map-live" role="status" aria-live="polite" style="margin:0;font-size:15px;font-weight:600;color:#0B4A43"></p>
         <h3 style="margin:8px 0 0;font-size:15px">Questions de l'Orpailleur</h3>
         <div id="questions" class="stack" style="gap:8px"></div>
       </section>
@@ -183,10 +184,11 @@
     });
   }
 
+  function live(t) { $('map-live').textContent = t || ''; say(t); }
   function mappingPass() {
-    say('Lancement du passage de cartographie…');
+    live('Lancement de la cartographie…'); $('map-pass').disabled = true;
     OM.api('/api/app?route=readiness', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'mapping-pass' }) })
-      .then(function (r) { say(r.message); watchScan(); }).catch(function (e) { say(msg(e)); });
+      .then(function (r) { live(r.message); watchScan(); }).catch(function (e) { live('La cartographie n’a pas démarré : ' + msg(e)); }).then(function () { $('map-pass').disabled = false; });
   }
   // Live progress of the Drive walk, then of the Orpailleur's mapping pass.
   var scanTimer = null;
@@ -199,7 +201,7 @@
         : s.status === 'done' ? 'Cartographie terminée : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers. Ses questions apparaissent ci-dessous.'
         : s.status === 'failed' ? 'La cartographie a échoué : ' + ((s.errors || []).map(function (e) { return e.path + ' — ' + e.error; }).pop() || 'cause inconnue') + '.' : '';
       if (s.errors && s.errors.length && s.status !== 'failed') t += ' ' + s.errors.length + ' dossier(s) illisible(s).';
-      say(t);
+      live(t);
       if (s.status === 'walking' || s.status === 'mapping') scanTimer = setTimeout(watchScan, 5000); else load();
     }).catch(function () {});
   }
