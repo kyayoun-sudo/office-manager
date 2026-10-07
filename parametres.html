@@ -9,15 +9,15 @@
 <style>
 .swatches{display:flex;flex-wrap:wrap;gap:10px}
 .swatch{width:44px;height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #C9D0CC;cursor:pointer}
-.swatch[aria-checked="true"]{border-color:#17201D}
+.swatch[aria-checked="true"]{border-color:var(--ink)}
 .logo-big{width:88px;height:88px;border-radius:14px;background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:700;overflow:hidden}
 .drop{flex:1 1 240px;border:2px dashed #C9D0CC;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px}
 .hint{font-size:12px;color:var(--muted)}
-.preview{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.preview{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .preview-top{background:var(--nav);padding:14px 16px;display:flex;align-items:center;gap:10px;color:#fff;font-weight:600}
 .preview-body{padding:16px;display:flex;flex-direction:column;gap:12px}
 .pv-search{border:2px solid var(--brand);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted)}
-.pv-bar{height:6px;background:#EEF0EE;border-radius:3px}.pv-bar span{display:block;width:64%;height:6px;background:var(--brand);border-radius:3px}
+.pv-bar{height:6px;background:var(--surface-2);border-radius:3px}.pv-bar span{display:block;width:64%;height:6px;background:var(--brand);border-radius:3px}
 .mono{font-family:var(--mono)}
 </style>
 </head>
@@ -79,7 +79,7 @@
             <button class="btn" type="button" id="g-drive-save-all">Tout mon Google Drive</button></div>
             <span class="hint" id="g-drive-now"></span></div>
           <div class="field" style="max-width:640px"><label for="g-home">Mémoire des agents (avec « Tout mon Google Drive ») : dans quel Drive partagé du cabinet ?</label>
-            <select id="g-home" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff"></select>
+            <select id="g-home" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)"></select>
             <span class="hint">Sa mémoire principale : le dossier existant dont le nom dit « AI … office manager » (ex. TATY_AI_office manager) est repris tel quel ; sinon un dossier « 00_OFFICE_MANAGER » est créé. Carte du Drive, registre, ce que les agents ont compris du cabinet, politique des personnes : tout y est, mis à jour sans doublon.</span>
             <label for="g-memory" style="margin-top:6px">Ou collez le lien du dossier mémoire (facultatif)</label>
             <input id="g-memory" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/… (TATY_AI_office manager)"></div>
@@ -123,8 +123,8 @@
           <div class="field"><label for="agent-name">Nom de l'agent (affiché dans les e-mails)</label><input id="agent-name" type="text" maxlength="80" placeholder="Ex. Office Manager TATY"></div>
           <div class="field"><label for="sender">Adresse d'envoi de l'agent</label><input id="sender" type="text" maxlength="254" placeholder="Ex. assistant@taty.info"></div>
           <div class="field"><label for="reply-to">Adresse de réponse (facultatif)</label><input id="reply-to" type="text" maxlength="254" placeholder="Ex. hit@taty.info"></div>
-          <div class="field"><label for="aliases">Alias de l'agent — un par ligne (10 maximum)</label><textarea id="aliases" class="mono" rows="3" style="font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px" placeholder="office@taty.info&#10;pbc@taty.info"></textarea></div>
-          <div class="field"><label for="domains">Domaines du cabinet — un par ligne</label><textarea id="domains" class="mono" rows="2" style="font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px" placeholder="taty.info"></textarea>
+          <div class="field"><label for="aliases">Alias de l'agent — un par ligne (10 maximum)</label><textarea id="aliases" class="mono" rows="3" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="office@taty.info&#10;pbc@taty.info"></textarea></div>
+          <div class="field"><label for="domains">Domaines du cabinet — un par ligne</label><textarea id="domains" class="mono" rows="2" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="taty.info"></textarea>
             <span class="hint">Seules les adresses de ces domaines sont traitées comme des collègues. Par défaut : le domaine de l'adresse d'envoi.</span></div>
         </section>
 
@@ -137,7 +137,7 @@
           </div>
           <div class="field" style="max-width:360px"><label for="humor">Dose d'humour : <span id="humor-label"></span></label><input id="humor" type="range" min="0" max="3" step="1"></div>
           <div class="field" style="max-width:360px"><label for="frequency">Messages spontanés à l'équipe</label>
-            <select id="frequency" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+            <select id="frequency" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
               <option value="off">Jamais</option><option value="weekly">Une fois par semaine</option>
               <option value="few_per_week">Plusieurs fois par semaine</option><option value="daily">Tous les jours</option>
             </select></div>
@@ -159,7 +159,7 @@
           <label style="display:flex;gap:10px;align-items:center;font-weight:500;font-size:14px"><input type="checkbox" id="s-enabled"> Activer les passages automatiques</label>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
             <div class="field"><label for="s-tz">Fuseau horaire du cabinet</label>
-              <select id="s-tz" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+              <select id="s-tz" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
                 <option value="Africa/Abidjan">Abidjan (GMT)</option><option value="Africa/Lagos">Lagos, Douala, Kinshasa (UTC+1)</option>
                 <option value="Africa/Lubumbashi">Lubumbashi (UTC+2)</option><option value="Europe/Paris">Paris</option>
                 <option value="Europe/Budapest">Budapest</option><option value="UTC">UTC</option>
@@ -167,7 +167,7 @@
             <div class="field"><label for="s-ctrl">Grand Contrôleur — heures de passage</label>
               <input id="s-ctrl" type="text" class="mono" maxlength="60" placeholder="09:00, 16:00"></div>
             <div class="field"><label for="s-sika-day">Sika — jour (une fois par semaine)</label>
-              <select id="s-sika-day" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+              <select id="s-sika-day" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
                 <option value="1">Lundi</option><option value="2">Mardi</option><option value="3">Mercredi</option><option value="4">Jeudi</option>
                 <option value="5">Vendredi</option><option value="6">Samedi</option><option value="7">Dimanche</option>
               </select></div>
@@ -198,7 +198,7 @@
             <div class="field"><label for="u-name">Nom</label><input id="u-name" type="text" maxlength="120"></div>
             <div class="field"><label for="u-email">E-mail</label><input id="u-email" type="text" inputmode="email" maxlength="254"></div>
             <div class="field"><label for="u-role">Rôle</label>
-              <select id="u-role" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+              <select id="u-role" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
                 <option value="collaborator">Collaborateur</option><option value="manager">Manager</option><option value="partner">Associé-gérant</option><option value="owner">Propriétaire</option>
               </select></div>
             <div class="field"><label for="u-pw">Mot de passe provisoire</label><input id="u-pw" type="text" maxlength="128" autocomplete="off" placeholder="10 caractères, lettres et chiffres"></div>
@@ -211,7 +211,7 @@
           <div class="field"><label for="try-topic">Sujet du message à l'équipe</label><input id="try-topic" type="text" maxlength="300" placeholder="Ex. Rappeler que les pièces Nova Services sont attendues vendredi"></div>
           <div class="field"><label for="try-to">Destinataires (facultatif, adresses du cabinet uniquement)</label><input id="try-to" type="text" list="try-people" maxlength="500" placeholder="samira@taty.info, yannick@taty.info"><datalist id="try-people"></datalist></div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="try-btn" type="button">Rédiger un message test</button><button class="btn" id="try-send" type="button" hidden>Envoyer pour validation</button><span class="hint" id="try-hint">Enregistrez d'abord. Rien n'est envoyé sans validation dans « À valider ».</span></div>
-          <div id="try-out" style="white-space:pre-wrap;background:#F7F8F6;border:1px solid #EEF0EE;border-radius:10px;padding:14px;font-size:14px;line-height:1.55" hidden></div>
+          <div id="try-out" style="white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px;line-height:1.55" hidden></div>
         </section>
 
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -609,7 +609,7 @@
     t.appendChild(n); t.appendChild(m); row.appendChild(t);
     var role = document.createElement('select');
     role.setAttribute('aria-label', 'Rôle de ' + u.display_name);
-    role.style.cssText = 'font:inherit;font-size:13px;border:1px solid #C9D0CC;border-radius:8px;padding:6px 8px;min-height:36px;background:#fff';
+    role.style.cssText = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px;background:var(--surface)';
     ['collaborator', 'manager', 'partner', 'owner'].forEach(function (r) { var o = new Option(ROLE_LABEL[r], r); role.appendChild(o); });
     role.value = u.role;
     role.addEventListener('change', function () {

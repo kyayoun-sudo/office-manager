@@ -7,20 +7,20 @@
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
 <style>
-.progress{height:10px;background:#E3E7E5;border-radius:5px;overflow:hidden}
+.progress{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
 .progress span{display:block;height:10px;background:var(--brand)}
 .step{display:flex;flex-direction:column;gap:8px}
 .step h3{margin:6px 0 0;font-size:15px}
-.chk{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.chk{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .chk .ico{font-family:var(--mono);font-size:15px;line-height:22px;text-align:center;border-radius:6px}
-.chk.ok .ico{color:#0B4A43;background:#E3F1EE}
-.chk.todo .ico{color:#8A2E0B;background:#FBE4D8}
-.chk.warn .ico{color:#8A5A0B;background:#FBF0D8}
+.chk.ok .ico{color:var(--brand-ink);background:var(--soft)}
+.chk.todo .ico{color:var(--danger-ink);background:var(--danger-soft)}
+.chk.warn .ico{color:var(--warn-ink);background:#FBF0D8}
 .chk .lbl{font-weight:500;font-size:14px;overflow-wrap:anywhere}
 .chk .fix{grid-column:2;font-size:13px;color:var(--muted);margin:0;line-height:1.5;overflow-wrap:anywhere}
 .chk .act{grid-column:2}
 .next{border-left:4px solid var(--brand)}
-.q{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.q{display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .cand{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
 .cand code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
 .small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
@@ -79,12 +79,12 @@
         <h2 id="h-map">Cartographie du Drive <span class="meta" id="map-state"></span></h2>
         <p class="small">L'Orpailleur parcourt le Drive et apprend où se trouve chaque chose (missions, modèles, procédures…). Tant que la cartographie n'est pas complète <strong>et</strong> validée par vous, aucun agent ne range, ne renomme ni ne crée de fichier dans le Drive.</p>
         <div class="kpis" id="map-kpis"></div>
-        <p class="small" id="map-warning" style="color:#8A2E0B" hidden></p>
+        <p class="small" id="map-warning" style="color:var(--danger-ink)" hidden></p>
         <div class="btn-row">
           <button class="btn ghost" id="map-pass" type="button">Lancer le premier scan</button>
           <button class="btn" id="map-review" type="button" hidden>Valider la cartographie</button>
         </div>
-        <p id="map-live" role="status" aria-live="polite" style="margin:0;font-size:15px;font-weight:600;color:#0B4A43"></p>
+        <p id="map-live" role="status" aria-live="polite" style="margin:0;font-size:15px;font-weight:600;color:var(--brand-ink)"></p>
         <h3 style="margin:8px 0 0;font-size:15px">Questions de l'Orpailleur</h3>
         <div id="questions" class="stack" style="gap:8px"></div>
       </section>
@@ -92,7 +92,7 @@
       <section class="card" aria-labelledby="h-know" id="know-card">
         <h2 id="h-know">Ce que l'Orpailleur a compris du cabinet</h2>
         <p class="small" style="margin:0">Pendant le premier scan, l'Orpailleur lit avec l'IA les documents qui décrivent le cabinet (tableur de l'équipe, CV, organigramme, clients, lettres de mission, budgets, programmes de travail). Ce qu'il comprend entre directement dans Équipe, les missions et les indicateurs, et reste écrit dans sa mémoire du Drive (00_OFFICE_MANAGER). Corrigez ensuite dans Équipe si besoin.</p>
-        <p id="know-live" role="status" aria-live="polite" style="margin:0;font-weight:600;color:#0B4A43"></p>
+        <p id="know-live" role="status" aria-live="polite" style="margin:0;font-weight:600;color:var(--brand-ink)"></p>
         <div id="know-body" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="btn-row">
           <button class="btn ghost" id="know-learn" type="button">Relire le Drive pour apprendre le cabinet</button>
@@ -225,9 +225,9 @@
   function knowList(title, rows, fmt) {
     var box = el('div', null, 'display:flex;flex-direction:column;gap:4px');
     box.appendChild(el('h3', title + ' (' + rows.length + ')', 'margin:4px 0 0;font-size:15px'));
-    if (!rows.length) box.appendChild(el('p', 'Rien trouvé dans les documents lus.', 'margin:0;font-size:13px;color:#5B6660'));
+    if (!rows.length) box.appendChild(el('p', 'Rien trouvé dans les documents lus.', 'margin:0;font-size:13px;color:var(--muted)'));
     rows.forEach(function (r) {
-      var t = el('div', fmt(r), 'font-size:14px'); if (r.source) t.appendChild(el('small', '  — ' + r.source, 'color:#5B6660')); box.appendChild(t);
+      var t = el('div', fmt(r), 'font-size:14px'); if (r.source) t.appendChild(el('small', '  — ' + r.source, 'color:var(--muted)')); box.appendChild(t);
     });
     return box;
   }
@@ -240,7 +240,7 @@
     $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s)' + (a.missions_merged ? ' (' + a.missions_merged + ' doublon(s) fusionné(s))' : '') + ', ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s)' + ((a.firm_domains || []).length ? ' ; domaines du cabinet ajoutés dans Paramètres : ' + a.firm_domains.join(', ') : '') + '.';
     if ((k.files_read || []).length) {
       var dl = el('details', null, 'font-size:13px'); dl.appendChild(el('summary', 'Documents lus (' + k.files_read.length + ')', 'cursor:pointer'));
-      k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:#5B6660;padding:2px 0')); }); b.appendChild(dl);
+      k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:var(--muted);padding:2px 0')); }); b.appendChild(dl);
     }
     var f = k.firm || {};
     b.appendChild(el('p', (f.name || 'Cabinet') + (f.activity ? ' — ' + f.activity : '') + (f.summary ? ' : ' + f.summary : ''), 'margin:0;font-size:15px'));
@@ -254,7 +254,7 @@
       b.appendChild(el('h3', 'Questions de l’Orpailleur — répondez ici', 'margin:4px 0 0;font-size:15px'));
       var answered = {}; (k.answers || []).forEach(function (a) { answered[a.question] = a.answer; });
       k.questions.forEach(function (qq) {
-        var row = el('div', null, 'display:flex;flex-direction:column;gap:4px;border:1px solid #E3E7E5;border-radius:10px;padding:10px');
+        var row = el('div', null, 'display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:10px;padding:10px');
         row.appendChild(el('div', qq, 'font-size:14px;font-weight:600'));
         var line = el('div', null, 'display:flex;gap:8px;flex-wrap:wrap');
         var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 2000; inp.value = answered[qq] || ''; inp.placeholder = 'Votre réponse'; inp.style.cssText = 'flex:1;min-width:220px';

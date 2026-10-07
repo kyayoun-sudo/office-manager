@@ -10,7 +10,7 @@
 .bars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end;height:170px;padding-top:8px}
 .bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
 .bar .fill{width:100%;max-width:64px;background:var(--brand);border-radius:6px 6px 0 0;min-height:2px}
-.bar .fill.empty{background:#E3E7E5}
+.bar .fill.empty{background:var(--surface-2)}
 .bar b{font-family:var(--mono);font-weight:500;font-size:14px}
 .bar small{font-size:12px;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -18,11 +18,11 @@
 .case summary{cursor:pointer;font-size:13px;color:var(--muted);margin-top:4px}
 .answer{white-space:pre-wrap;font-size:13px;line-height:1.5;background:#F6F7F6;border:1px solid var(--line);border-radius:8px;padding:12px;max-height:380px;overflow:auto;margin:8px 0}
 .trap{font-size:13px;margin:2px 0}
-.trap.ok{color:#0B4A43}.trap.ko{color:#8A2E0B}
+.trap.ok{color:var(--brand-ink)}.trap.ko{color:var(--danger-ink)}
 .score{font-family:var(--mono);font-size:20px;font-weight:500;min-width:56px;text-align:right}
 .mono{font-family:var(--mono)}
 .confirm{display:flex;flex-direction:column;gap:8px;width:100%}
-.confirm textarea{font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;min-height:60px}
+.confirm textarea{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:60px}
 .small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 table.by-day td,table.by-day th{text-align:center}
 table.by-day td:first-child,table.by-day th:first-child{text-align:left}
@@ -69,9 +69,9 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         <div class="kpis" id="state-kpis"></div>
         <p class="small" id="state-text"></p>
         <div id="drive-link"></div>
-        <p class="small" id="state-error" style="color:#8A2E0B" hidden></p>
+        <p class="small" id="state-error" style="color:var(--danger-ink)" hidden></p>
         <div class="field" id="pick-wrap" hidden style="max-width:360px"><label for="pick">Autre campagne</label>
-          <select id="pick" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px;min-height:44px;background:#fff"></select></div>
+          <select id="pick" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px;background:var(--surface)"></select></div>
       </section>
 
       <section class="card" aria-labelledby="h-owner" id="owner-card" hidden>
@@ -83,7 +83,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
               <span class="hint">Choisissez l'espace Audit. Vide : à la racine du Drive partagé du cabinet.</span></div>
             <div class="field"><label for="run-time">Heure des nouvelles missions (jours 2 à 5)</label><input id="run-time" type="time" class="mono" value="07:00"></div>
             <div class="field"><label for="provider">Moteur de l'agent entraîné</label>
-              <select id="provider" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+              <select id="provider" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
                 <option value="auto">Comme en production (automatique)</option><option value="anthropic">Claude</option><option value="openai">ChatGPT (OpenAI)</option>
               </select></div>
           </div>

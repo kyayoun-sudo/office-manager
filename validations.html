@@ -195,15 +195,15 @@
     var st = MSTATUS[m.status] || [m.status, 'tag neutral']; var tag = el('span', st[0], st[1]); tag.style.alignSelf = 'flex-start'; c.appendChild(tag);
     if (client) {
       var warn = el('p', 'Brouillon de l’agent destiné au client (ton formel). Relisez et corrigez si besoin : il ne part qu’après votre validation, et seulement au contact enregistré sur la mission.', 'hint');
-      warn.style.cssText = 'margin:0;color:#8A4B08;font-weight:500'; c.appendChild(warn);
+      warn.style.cssText = 'margin:0;color:var(--warn-ink);font-weight:500'; c.appendChild(warn);
     }
     if (m.status === 'pending_approval' || m.status === 'failed') {
       var subj = el('input'); subj.type = 'text'; subj.value = m.subject; subj.maxLength = 200; subj.setAttribute('aria-label', 'Objet');
-      subj.style.cssText = 'font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;font-weight:500';
+      subj.style.cssText = 'font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-weight:500';
       var body = el('textarea'); body.value = m.body; body.rows = 7; body.maxLength = 10000; body.setAttribute('aria-label', 'Texte du message');
-      body.style.cssText = 'font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;line-height:1.5';
+      body.style.cssText = 'font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5';
       var why = el('input'); why.type = 'text'; why.maxLength = 1000; why.placeholder = 'Pourquoi refuser (obligatoire pour refuser)'; why.setAttribute('aria-label', 'Motif du refus');
-      why.style.cssText = 'font:inherit;font-size:13px;border:1px solid #C9D0CC;border-radius:8px;padding:6px 10px';
+      why.style.cssText = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px';
       if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || m.error), 'hint'));
       c.appendChild(subj); c.appendChild(body); c.appendChild(why);
       var row = el('div', null, 'btn-row');

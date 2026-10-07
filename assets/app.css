@@ -9,6 +9,7 @@
   --ground:#EDF1EF; --surface:#FFFFFF; --surface-2:#F6F8F7; --ink:#142019; --muted:#56635D; --line:#DCE3E0;
   --brass:#C8922E; --brass-soft:#F7ECD6; --brass-ink:#6B4A0E;
   --warn-bg:#F7ECD6; --warn-ink:#6B4A0E; --soft:#DDEDE8; --danger:#B5482B;
+  --brand-ink:#0B4A43; --danger-soft:#FBE4D8; --danger-ink:#8A2E0B;
   --radius:14px; --radius-s:9px;
   --shadow:0 1px 0 rgba(20,32,25,.04),0 8px 24px -16px rgba(20,32,25,.18);
   --mono:"Schibsted Grotesk",system-ui,sans-serif;
@@ -22,6 +23,7 @@
     --nav:#08110F; --nav-text:#9FB2AB; --nav-active:#132823; --nav-line:#18302A;
     --ground:#0F1715; --surface:#16211E; --surface-2:#1B2824; --ink:#E6EEEA; --muted:#97A8A1; --line:#26362F;
     --brass-soft:#3A2E16; --brass-ink:#F0C877; --warn-bg:#3A2E16; --warn-ink:#F0C877; --soft:#173A33;
+    --brand-ink:#86D4C5; --danger-soft:#3B1E15; --danger-ink:#F2A68C; --danger:#E07A5B;
     --shadow:0 1px 0 rgba(0,0,0,.2),0 10px 28px -18px rgba(0,0,0,.6);
     color-scheme:dark;
   }
@@ -31,7 +33,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html,body{margin:0;background:var(--ground)}
-a{color:var(--brand)}
+a{color:var(--brand-ink)}
 ::selection{background:var(--soft)}
 
 /* ---- Shell: fixed rail + content ---- */

@@ -8,17 +8,17 @@
 <link rel="stylesheet" href="/assets/screens.css">
 <style>
 .people{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.person{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.person{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
 .person h3{margin:0;font-size:16px}
-.load{height:8px;background:#EEF0EE;border-radius:4px;overflow:hidden}
+.load{height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden}
 .load span{display:block;height:8px;background:var(--brand)}
 .load.over span{background:#B45309}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font-size:13px}
 .stats b{font-family:var(--mono);font-weight:500;font-size:14px}
 .sig{font-size:13px;margin:0;line-height:1.4}
-.sig.warn{color:#8A3B0B}
+.sig.warn{color:var(--danger-ink)}
 .cov{font-size:12px;color:var(--muted);margin:0;line-height:1.4}
-.risk-high{background:#FBE4D8;color:#8A2E0B}
+.risk-high{background:var(--danger-soft);color:var(--danger-ink)}
 .method{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
 </style>
 </head>
