@@ -22,6 +22,8 @@ import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
 import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
+import { learnFirm, firmKnowledge, applyKnowledge } from '../lib/firm-learning.js';
+import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -213,6 +215,20 @@ export const ROUTES = Object.freeze({
   // Drive mapping progress (owner) and its background step (pilot token, chained by itself).
   'mapping-scan': { GET: owner(() => scanStatus()), unavailable: 'MAPPING_UNAVAILABLE' },
   'mapping-step': { POST: (orgId, req) => scanStep(orgId, req), unavailable: 'MAPPING_UNAVAILABLE' },
+  // « Ce que l'Orpailleur a compris du cabinet »: team, clients, missions read in the Drive.
+  //   GET  firm-knowledge                       the proposal (owner)
+  //   POST firm-knowledge {action:learn|apply}   relearn (background) | save the ticked lines (owner)
+  //   POST firm-learn                           background work (pilot token)
+  'firm-knowledge': {
+    GET: owner(() => firmKnowledge()),
+    POST: owner(async (orgId, req) => {
+      if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
+      if (req.body?.action === 'apply') return applyKnowledge(orgId, req.body);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'KNOWLEDGE_UNAVAILABLE'
+  },
+  'firm-learn': { POST: (orgId) => learnFirm(orgId), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
