@@ -1,0 +1,234 @@
+# Passation pour ChatGPT — ajouts de Claude intégrés à notre branche
+
+## Correction de Paul — branche de travail
+
+Paul a précisé le 7 octobre : Codex reste responsable de l'intégration dans
+**fix/map-register-bridge-write**. Les ajouts de Claude sont importés depuis
+feature/white-label-desktop ; cette dernière reste une branche de contribution.
+Cette consigne directe de Paul remplace la règle de branche ci-dessous, conservée
+comme historique. Continuer notre feuille de route dans docs/ROADMAP.md. Préserver
+les fichiers d'origine, les garde-fous et la limite de 12 fonctions API.
+
+État courant de notre programme de mission : lire docs/PROGRAMME_MISSIONS.md.
+L'étape 4 prépare des propositions ; les validations d'équipe et de programme
+de l'étape 3 restent à compléter et à recetter. Ne pas déclarer leur exécution prête.
+
+Rédigé par Claude (Anthropic) le 2026-10-07, à la demande de Paul KOMENAN (TATY).
+À lire avant toute modification de cette branche, avec `PROJECT_STATUS.md` et
+`docs/WHITE_LABEL_DESKTOP.md`.
+
+## Règles de travail convenues avec Paul
+
+1. **Travailler uniquement sur `feature/white-label-desktop`.** Ne jamais toucher
+   `main` ni `fix/map-register-bridge-write` sans accord explicite.
+2. **Ajouter sans casser.** Aucun fichier d'origine du projet n'est modifié, sauf
+   `vercel.json` (redirection `/` → `/accueil.html`, voir plus bas). La console
+   pilote `index.html` est intacte et reste accessible à `/index.html`.
+3. **Limite Vercel Hobby : 12 fonctions dans `api/`.** Toutes les nouvelles routes
+   passent par **un seul fichier, `api/app.js`** (paramètre `route`). Le test
+   `tests/app-router.test.js` échoue si `api/` dépasse 12 fichiers.
+4. Montrer son plan à Paul avant d'écrire du code.
+
+## Ce que Claude a construit (dans l'ordre)
+
+### 1. Application « marque blanche » (même menu, même style partout)
+Écrans : `accueil.html` (tableau de bord), `recherche.html`, `mission.html`
+(liste + dossier `?id=`), `validations.html` (« À valider »), `assistant.html`,
+`parametres.html`. Styles et outils communs : `assets/app.css`,
+`assets/screens.css`, `assets/screens.js`, `assets/brand-theme.js` (nom, logo et
+couleur du cabinet appliqués à toutes les pages). Les pages construisent le DOM
+sans `innerHTML` (vérifié par test).
+
+### 2. `assistant.html` — la console pilote intégrée
+Reprend toutes les fonctions de `index.html` dans la même application : demande
+aux agents (Grand Contrôleur, Mission Controller, Orpailleur, Sika ; IA Auto /
+OpenAI / Claude / OpenAI + relecture Claude) via l'endpoint existant `/api/agent`,
+préparation et enregistrement d'un plan de mission (`/api/missions`,
+`/api/mission-plans`), People Intelligence (`/api/people`), suivi des demandes
+(`/api/runs`). Paramètres d'URL : `?mission=<uuid>`, `?agent=<clé>`.
+
+### 3. Paramètres réservés au propriétaire / associés-gérants
+`parametres.html` ne s'ouvre qu'avec le **code propriétaire** (en-tête
+`x-office-manager-owner-token` = variable `OFFICE_MANAGER_OWNER_TOKEN`, le même
+que `api/owner.js`). Le code pilote seul est refusé (`OWNER_ONLY`, 403).
+- Marque : nom, logo (PNG/JPG/WebP, SVG refusé), couleur, contraste vérifié.
+- **E-mail de l'agent** : nom affiché, adresse d'envoi, adresse de réponse,
+  **alias** (10 max, obligatoirement dans les domaines du cabinet), domaines du cabinet.
+- **Ton avec les collègues** : « Nouchi et blagueur » (par défaut), « Détendu »,
+  « Professionnel » ; dose d'humour 0–3 ; fréquence des messages spontanés ; signature.
+- Bouton « Essayer » : rédige un message test, **jamais envoyé**.
+
+Règles codées dans `lib/agent-persona.js` (et testées) :
+- Un destinataire n'est un collègue que si son domaine est dans les domaines du
+  cabinet. **Clients et inconnus : toujours ton formel** (`toneFor`), quel que soit
+  le réglage. Un brouillon en nouchi vers une adresse externe est refusé
+  (`RECIPIENT_OUTSIDE_FIRM`).
+- Humour bienveillant seulement ; jamais de moquerie visant une personne ;
+  pas de blague sur les sujets sérieux (santé, RH, deuil, retard grave) ;
+  informations de travail exactes ; pas de données client inutiles.
+
+### 3 bis. Connexion par e-mail et mot de passe
+- `login.html` : e-mail + mot de passe, vérifiés par **Supabase Auth**
+  (aucun mot de passe stocké par l'application). Rôles dans la table
+  `office_app_users` : `owner` (propriétaire), `partner` (associé-gérant),
+  `collaborator`. Un compte se désactive, jamais supprimé ; il reste toujours au
+  moins un propriétaire actif.
+- **On reste connecté jusqu'à « Se déconnecter »** : session dans `localStorage`,
+  revérifiée à chaque page via `route=session` (refresh token Supabase) ; compte
+  désactivé ⇒ déconnexion. Bouton « Se déconnecter » ajouté au menu par
+  `assets/brand-theme.js` ; sans session, toute page renvoie vers `login.html`.
+- Après connexion, le navigateur reçoit le code pilote (et le code propriétaire
+  pour `owner`/`partner`) : **tous les endpoints existants fonctionnent sans
+  modification**. Le lien « Paramètres » est masqué aux collaborateurs.
+- Premier accès : « Première configuration du cabinet » sur `login.html` crée le
+  compte propriétaire avec le code propriétaire, uniquement si aucun compte n'existe.
+- Gestion des comptes dans `parametres.html` (propriétaire / associés-gérants).
+- **Limite connue** : le code pilote reste un secret partagé entre les comptes
+  connectés. Étape suivante recommandée : faire accepter par `lib/auth.js` le jeton
+  de session Supabase par utilisateur, puis ne plus transmettre le code pilote au
+  navigateur (cela modifie un fichier d'origine : à valider avec Paul).
+
+### 3 ter. Orpailleur — « Rangement » du Drive en arrière-plan
+Écran `rangement.html`. L'utilisateur décrit le rangement (et peut limiter à un
+dossier), clique « Lancer », puis fait autre chose.
+- `lib/tidy.js` : demandes, étapes en arrière-plan (lot de 24 fichiers à planifier
+  ou 15 à déplacer par étape, enchaînées par `continueInBackground` dans
+  `api/app.js` ; la page relance la chaîne si elle s'arrête), décisions,
+  annulation, arrêt.
+- `lib/tidy-planner.js` (pur, testé) : pour chaque fichier, 1) préférences
+  apprises, 2) règle « dossier existant du client (et de l'année) », 3) IA sur
+  l'**extrait de contenu** (`orpailleur_inspection_queue`) — **jamais sur le nom
+  seul** ; un identifiant de dossier inventé par l'IA est ignoré.
+- Modes : `auto` (dossier existant, confiance ≥ 0,85 **et** carte du Drive validée
+  par le propriétaire via `mappingGate()` existant), `proposal` (sinon, ou nouveau
+  dossier à créer), `in_place`, `needs_reading` (contenu pas encore lu), `unsure`.
+- **Apprentissage** : chaque validation (+1), correction (+2), refus (−1),
+  annulation (−2) ajuste `office_tidy_preferences` (client, type, client+extension
+  → dossier). Apprentissage au niveau du cabinet (le Drive est partagé).
+- `lib/tidy-drive.js` : déplacer (vérifie que le fichier est encore dans son
+  dossier d'origine et dans le Drive du cabinet), créer un dossier. **Jamais de
+  suppression.** Le dossier précédent est conservé ⇒ annulation.
+  ⚠️ **Correction :** le rôle de l'Orpailleur, défini par Paul, comprend aussi le
+  **renommage** (sur la base du contenu, jamais du nom seul). L'implémentation de
+  Claude ne renomme pas encore : voir « Demandes de Paul » ci-dessous.
+- **Prérequis pour déplacer** : accès Google direct en écriture dans Vercel
+  (`GOOGLE_SERVICE_ACCOUNT_JSON` ou OAuth). Le pont Supabase n'a pas d'action
+  « move » : en mode pont seul, le plan est prêt mais l'exécution affiche
+  `DRIVE_WRITE_REQUIRES_DIRECT_ACCESS`. Pour l'aperçu protégé par Vercel, la
+  chaîne en arrière-plan utilise `VERCEL_AUTOMATION_BYPASS_SECRET` si présent.
+- **Ordinateur (PC) : pas encore fait.** Demande de Paul : l'Orpailleur lit les
+  fichiers du PC, range dans un dossier existant s'il convient, sinon propose ; il
+  apprend et s'adapte à chaque utilisateur (préférences par utilisateur).
+  Prévu via l'application de bureau (`desktop/`) avec accès explicite à des dossiers.
+
+### 4. Recherche, missions, décisions
+- `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
+  missions, annuaire ; jamais les profils RH).
+- `lib/mission-view.js` — dossier de mission + nom/fonction de l'équipe uniquement.
+- `lib/action-decisions.js` — « À valider » : la décision (valider / reporter /
+  refuser, commentaire obligatoire pour refuser) est **journalisée** avec
+  l'empreinte du contenu exact. **Elle ne modifie pas `office_action_queue` et
+  ne déclenche rien.**
+
+### 5. Application de bureau
+`desktop/` : coquille Tauri v2 qui ouvre `/accueil.html` dans une fenêtre native,
+sans permission locale. Non compilée (voir `docs/WHITE_LABEL_DESKTOP.md`).
+
+## Routes de `api/app.js`
+
+| Route | Méthodes | Accès |
+|---|---|---|
+| `branding` | GET (tous) / POST | POST : **propriétaire** |
+| `search` | GET | code pilote |
+| `actions` | GET / POST | code pilote |
+| `mission-view` | GET | code pilote |
+| `agent-persona` | GET / POST | **propriétaire** |
+| `agent-message` | POST (brouillon interne, jamais envoyé) | code pilote |
+| `login` | POST e-mail + mot de passe | public |
+| `session` | POST refresh_token (revérifie le compte) | public |
+| `logout` | POST | public |
+| `bootstrap-owner` | POST (premier propriétaire, si aucun compte) | code propriétaire |
+| `diagnostic` | POST (quel code a été tapé, ce qui manque ; aucun secret renvoyé) | public |
+| `tidy` | GET (liste / `&id=`) · POST `action` create, step, decide, undo, stop | code pilote |
+| `users` | GET / POST (créer, désactiver, rôle, mot de passe) | **propriétaire** |
+
+## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
+`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`.
+Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
+Vérifications PGlite : `tests/verify-branding-sql.mjs`,
+`tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
+`tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`.
+
+## État des tests
+158 tests : 157 OK. Le seul échec, `tests/browser-response.test.js`, **existait
+avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
+
+## Ce qui n'est PAS fait — prochaines étapes
+1. **Envoi réel des e-mails de l'agent.** Il faut une boîte d'envoi (par ex. Gmail
+   API avec délégation sur l'adresse de l'agent, ou un fournisseur SMTP/transactionnel)
+   et ses secrets dans Vercel. À brancher sur `agent-persona` + `toneFor`, avec
+   validation humaine pour tout message externe.
+2. **Messages spontanés à l'équipe** (« souvent ») : planificateur (Vercel Cron ou
+   Supabase) qui lit `internal_frequency`, rédige avec `draftInternalMessage` et
+   envoie aux adresses internes uniquement. Prévoir une désinscription par personne.
+3. Exécuter les décisions validées (« À valider ») action par action.
+4. Sessions par utilisateur côté serveur (voir « Limite connue » ci-dessus) et
+   réinitialisation du mot de passe par e-mail (aujourd'hui : par le propriétaire).
+5. Appliquer les 3 fichiers SQL, activer l'API Google Sheets, corriger
+   `browser-response.test.js`, compiler l'app de bureau, brancher `taty.info`.
+
+---
+
+## ▶ Demandes de Paul du 7 octobre 2026 — À METTRE EN ŒUVRE
+
+> Message de Paul, transmis par Claude. Statut : ✅ fait · ⏳ à faire.
+
+### 1. Style futuriste — ✅ typographie / ⏳ textes
+- ✅ Typographie de toute l'application passée en **Space Grotesk** (texte, titres)
+  et **JetBrains Mono** (libellés et détails techniques) — `assets/app.css`
+  (`@import` + variable `--mono`), titres resserrés, libellés en capitales mono.
+- ⏳ Garder ce style partout (nouvelles pages comprises) et moderniser le ton des
+  textes de l'interface : phrases courtes, directes, dynamiques.
+
+### 2. Configuration de départ de l'ordinateur — ⏳
+Un assistant de premier lancement de l'**application de bureau** (`desktop/`) :
+1. connexion de l'utilisateur (e-mail + mot de passe, comptes déjà en place) ;
+2. choix des **dossiers de l'ordinateur** que l'Orpailleur peut lire et ranger
+   (accès explicite, révocable) ;
+3. rappel des horaires des agents (section 3) ;
+4. création du **profil d'apprentissage propre à cet utilisateur** (ses habitudes
+   de rangement sur son PC). Sur le PC, l'Orpailleur lit les fichiers, comprend,
+   **range dans un dossier existant s'il convient, sinon propose**, et apprend.
+
+### 3. Horaires de passage des agents — ⏳
+| Agent | Passages | Qui décide |
+|---|---|---|
+| **Grand Contrôleur** | heures définies **par le propriétaire du cabinet** lors de la configuration | propriétaire (écran Paramètres) |
+| **Sika** | **une fois par semaine** | jour/heure à proposer au propriétaire |
+| **Orpailleur** | **3 passages par jour : 8 h, 12 h, 20 h** | fixé par Paul |
+- Fuseau horaire du cabinet à saisir à la configuration.
+- Contrainte technique : l'offre Vercel Hobby limite les tâches planifiées
+  (cron) ; prévoir un « tic » horaire déclenché par **Supabase pg_cron + pg_net**
+  (ou GitHub Actions) vers une route de `api/app.js` (rester ≤ 12 fonctions), qui
+  lance les agents dont l'heure est venue et journalise chaque passage.
+
+### 4. Orpailleur et Grand Contrôleur : travail complémentaire — ⏳
+- Chaque **passage de l'Orpailleur** (8 h / 12 h / 20 h) : inventaire des
+  nouveautés, lecture, **rangement et renommage**, pièces reçues rattachées aux
+  missions → résumé du passage.
+- Chaque **passage du Grand Contrôleur** part du dernier résumé de l'Orpailleur :
+  pièces PBC reçues / manquantes, échéances, affectations, alertes. Il renvoie à
+  l'Orpailleur ses besoins (pièces attendues, dossiers à surveiller), traités au
+  passage suivant. Aucun des deux ne refait le travail de l'autre.
+- **Sika**, une fois par semaine, s'appuie sur les deux pour la facturation et
+  les relances administratives.
+
+### 5. Rôle de l'Orpailleur — rappel de Paul
+- Le rôle était **déjà défini** : il range **et renomme** (sur le contenu).
+- ✅ Claude a construit le rangement en arrière-plan (`rangement.html`,
+  `lib/tidy*.js`) et **ajouté l'apprentissage** par-dessus cette logique.
+- ⏳ **Renommage à ajouter** au rangement : nouveau nom proposé d'après le
+  contenu (et la convention du cabinet), ancien nom conservé pour l'annulation,
+  validation selon les mêmes règles que les déplacements, appris comme eux.
+- ⏳ Brancher les passages automatiques (section 3) sur ce rangement : chaque
+  passage ne traite que les fichiers nouveaux ou modifiés depuis le précédent.

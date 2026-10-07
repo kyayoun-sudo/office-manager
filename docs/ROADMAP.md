@@ -34,3 +34,13 @@ l'interface et sa recette restent à faire. Les approbations restent étape 3.
 RPC réservé au backend ont été appliqués dans Supabase. Les tests locaux et
 un test en ligne annulé vérifient versions, doublons et droits d'accès.
 Aucun scan, appel IA réel ou export de profil RH effectué pour cette livraison.
+
+## Point de reprise vérifié — 7 octobre, après le budget
+
+Notre branche reste `fix/map-register-bridge-write`. Voir `docs/COMPARAISON_CLAUDE_2026-10-07.md` pour les nouvelles contributions et les écarts de publication.
+
+Le budget de mission est construit et testé localement (201 tests). Le paquet budget a bien été chargé sur GitHub à `6b369e6d`, mais la branche distante manque encore de dépendances des écrans et du programme issus de notre intégration précédente. Restaurer la base complète avant déploiement.
+
+Le prochain jalon produit est de **compléter l'étape 3**, puis recetter l'étape 4 : valider séparément le programme et l'équipe avant le parcours budget → classement. Les étapes 3, 5 et 6 ne sont pas déclarées terminées. Les nouveautés de Claude restent des contributions à intégrer sélectivement, sans changer de branche.
+
+Horaires convenus : Grand Contrôleur 07:00 GMT ; Orpailleur 08:00 / 12:00 / 20:00 GMT ; Sika lundi, heure à préciser. Conserver le scheduler désactivé tant que ses passages ne sont pas recettés.

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accueil</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html" aria-current="page">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/validations.html">À valider <span class="badge" id="nav-count" hidden></span></a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1 id="hello">Bonjour</h1>
+      <p class="lead">Vue d'ensemble du cabinet : ce qui attend votre décision, les missions et les dernières demandes aux agents.</p>
+    </header>
+
+    <form id="search" role="search" class="searchbox" action="/recherche.html">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--brand)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+      <label for="q" class="sr">Rechercher dans tout le cabinet</label>
+      <input id="q" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="Rechercher un document, une mission, une personne…">
+      <button class="btn" type="submit">Rechercher</button>
+    </form>
+    <p class="status" id="search-status" role="status" aria-live="polite"></p>
+    <div id="search-results" class="stack"></div>
+
+    <div class="row">
+      <div class="grow">
+        <section class="card" aria-labelledby="h-missions">
+          <div class="card-head"><h2 id="h-missions">Missions</h2><a href="/mission.html">Tout voir</a></div>
+          <div id="missions" class="stack"><p class="empty">Chargement…</p></div>
+        </section>
+        <section class="card" aria-labelledby="h-runs">
+          <h2 id="h-runs">Dernières demandes aux agents</h2>
+          <div id="runs" class="stack"><p class="empty">Chargement…</p></div>
+        </section>
+      </div>
+      <aside class="side">
+        <a class="callout" href="/validations.html">
+          <span class="callout-label">À valider par vous</span>
+          <span class="callout-num" id="pending">–</span>
+          <span class="callout-text">L'agent propose, vous décidez. Rien ne part sans votre accord.</span>
+        </a>
+        <section class="card" aria-labelledby="h-next">
+          <h2 id="h-next">Raccourcis</h2>
+          <a href="/recherche.html">Recherche avancée</a>
+          <a href="/assistant.html">Poser une question aux agents</a>
+          <a href="/rangement.html">Ranger le Drive</a>
+          <a href="/parametres.html">Nom, logo et couleurs du cabinet</a>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function loadMissions() {
+    OM.api('/api/missions').then(function (data) {
+      var box = $('missions'); box.textContent = '';
+      var list = (data && data.missions) || [];
+      if (!list.length) { box.appendChild(UI.el('p', 'Aucune mission enregistrée.', 'empty')); return; }
+      list.slice(0, 8).forEach(function (m) {
+        var a = UI.el('a', null, 'item link-item');
+        a.href = '/mission.html?id=' + encodeURIComponent(m.id);
+        var t = UI.el('div', null, 't');
+        t.appendChild(UI.el('span', m.name || m.mission_code || 'Mission'));
+        t.appendChild(UI.el('span', [m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta'));
+        a.appendChild(t);
+        if (m.status) a.appendChild(UI.el('span', m.status, 'tag'));
+        box.appendChild(a);
+      });
+    }).catch(function (e) { UI.fail($('missions'), e); });
+  }
+
+  function loadRuns() {
+    OM.api('/api/runs').then(function (data) {
+      var box = $('runs'); box.textContent = '';
+      var runs = (data && data.runs) || [];
+      if (!runs.length) { box.appendChild(UI.el('p', 'Aucune demande récente.', 'empty')); return; }
+      runs.slice(0, 5).forEach(function (r) {
+        var item = UI.el('div', null, 'item');
+        var t = UI.el('div', null, 't');
+        t.appendChild(UI.el('span', (r.summary || 'Demande').slice(0, 140)));
+        t.appendChild(UI.el('span', [r.agent, UI.dateTime(r.started_at)].filter(Boolean).join(' · '), 'meta'));
+        item.appendChild(t);
+        item.appendChild(UI.el('span', r.label, r.status === 'verified' ? 'tag' : 'tag warn'));
+        box.appendChild(item);
+      });
+    }).catch(function (e) { UI.fail($('runs'), e); });
+  }
+
+  function loadPending() {
+    OM.api('/api/app?route=actions').then(function (data) {
+      var n = ((data && data.actions) || []).filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+      $('pending').textContent = String(n);
+      if (n) { $('nav-count').hidden = false; $('nav-count').textContent = String(n); }
+    }).catch(function () { $('pending').textContent = '?'; });
+  }
+
+  $('search').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var q = $('q').value.trim();
+    if (q.length < 2) { $('search-status').textContent = 'Tapez au moins 2 caractères.'; return; }
+    $('search-status').textContent = 'Recherche…';
+    OM.api('/api/app?route=search&q=' + encodeURIComponent(q) + '&scope=all').then(function (data) {
+      UI.renderSearch($('search-results'), data);
+      $('search-status').textContent = data.total + ' résultat(s) pour « ' + data.query + ' ».';
+    }).catch(function (err) { $('search-status').textContent = 'Recherche impossible : ' + err.message; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); $('q').focus(); }
+  });
+
+  function start() {
+    var name = OM.getUserName();
+    $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
+    OM.loadBranding().catch(function () {});
+    loadMissions(); loadRuns(); loadPending();
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

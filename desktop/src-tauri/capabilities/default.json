@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "No native permission is granted to the hosted page.",
+  "windows": ["main"],
+  "permissions": []
+}

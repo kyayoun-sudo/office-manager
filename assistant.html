@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assistant</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.agent-card{font:inherit;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;cursor:pointer;color:var(--ink);min-height:44px}
+.agent-card strong{font-size:15px}
+.agent-card span{font-size:13px;color:var(--muted);line-height:1.45}
+.agent-card[aria-pressed="true"]{border:2px solid var(--brand);background:var(--soft)}
+.field select,.field textarea{font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff;width:100%}
+.field textarea{min-height:120px;resize:vertical;line-height:1.5}
+.reply{background:#F7F8F6;border:1px solid #EEF0EE;border-radius:10px;padding:16px;white-space:pre-wrap;line-height:1.6;font-size:15px;min-height:60px;overflow-wrap:anywhere}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+details.card summary{cursor:pointer;font-weight:600;font-size:16px;list-style-position:outside}
+details.card[open] summary{margin-bottom:6px}
+.hint{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html" aria-current="page">Assistant</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Assistant</h1>
+      <p class="lead">Posez votre demande. Le Grand Contrôleur répartit le travail entre ses spécialistes, ou vous choisissez directement l'agent.</p>
+    </header>
+
+    <!-- 1. Demande aux agents -->
+    <section class="card" aria-labelledby="h-ask">
+      <h2 id="h-ask">Votre demande</h2>
+      <div class="agents" id="agents" role="group" aria-label="Agent">
+        <button type="button" class="agent-card" data-agent="auto" aria-pressed="true"><strong>Grand Contrôleur</strong><span>Choisit lui-même les spécialistes à consulter.</span></button>
+        <button type="button" class="agent-card" data-agent="mission-controller" aria-pressed="false"><strong>Mission Controller</strong><span>Programme, cycles, Working Papers, PBC, revue, échéances.</span></button>
+        <button type="button" class="agent-card" data-agent="orpailleur" aria-pressed="false"><strong>Orpailleur</strong><span>Drive, documents, versions, inventaire, classement contrôlé.</span></button>
+        <button type="button" class="agent-card" data-agent="sika" aria-pressed="false"><strong>Sika</strong><span>Facturation, recouvrement, suivi administratif.</span></button>
+      </div>
+      <div class="field"><label for="message">Demande</label>
+        <textarea id="message" maxlength="8000" placeholder="Exemple : Vérifie les missions en cours et donne-moi les risques qui nécessitent mon attention."></textarea></div>
+      <div class="two">
+        <div class="field"><label for="provider">Intelligence artificielle</label>
+          <select id="provider">
+            <option value="auto">Auto</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Claude (avis, sans outils)</option>
+            <option value="dual">OpenAI + relecture Claude</option>
+          </select></div>
+      </div>
+      <div class="btn-row" style="align-items:center">
+        <button class="btn" id="send" type="button">Envoyer</button>
+        <span class="meta" id="meta" aria-live="polite"></span>
+      </div>
+      <div class="reply" id="answer" role="status" aria-live="polite">La réponse apparaîtra ici. La consultation des spécialistes peut prendre quelques minutes.</div>
+    </section>
+
+    <!-- 2. Pilotage des missions -->
+    <details class="card" id="pilot" open>
+      <summary>Préparer une mission avec le Grand Contrôleur</summary>
+      <p class="hint">Choisissez une mission : son dossier s'affiche, puis l'assistant peut préparer une demande de plan. Enregistrer un plan crée une proposition : cela ne valide aucun programme et n'affecte personne.</p>
+      <div class="two">
+        <div class="field"><label for="mission-select">Mission</label>
+          <select id="mission-select"><option value="">Chargement…</option></select></div>
+      </div>
+      <p class="meta" id="mission-counts"></p>
+      <div class="btn-row">
+        <button class="btn ghost" id="mission-plan" type="button" disabled>Préparer la demande de plan</button>
+        <a class="btn ghost" id="mission-link" href="/mission.html" hidden style="text-decoration:none;display:inline-flex;align-items:center">Voir le dossier complet</a>
+      </div>
+      <div class="reply" id="mission-dossier">Le dossier regroupe le cadrage, les affectations, les actions et les documents référencés.</div>
+      <h3 style="margin:8px 0 0;font-size:15px">Plan proposé — nouvelle version</h3>
+      <div class="field"><label for="plan-content">Texte du plan</label>
+        <textarea id="plan-content" placeholder="Saisissez un plan ou copiez la réponse du Grand Contrôleur."></textarea></div>
+      <div class="field"><label for="plan-phases">Phases proposées — une par ligne</label>
+        <textarea id="plan-phases" style="min-height:90px" placeholder="Cadrage&#10;Cartographie&#10;Diagnostic"></textarea></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="plan-copy" type="button" disabled>Copier la dernière réponse</button>
+        <button class="btn" id="plan-save" type="button" disabled>Enregistrer une version proposée</button>
+      </div>
+      <p class="status" id="plan-result" aria-live="polite"></p>
+    </details>
+
+    <!-- 3. Équipe -->
+    <details class="card" id="people">
+      <summary>Équipe et briefing (People Intelligence)</summary>
+      <p class="hint">Personnes disponibles pour la mission choisie ci-dessus, avec les points à vérifier. Les compétences et la disponibilité restent à valider par le manager. Aucun appel à l'IA.</p>
+      <div class="btn-row"><button class="btn ghost" id="people-read" type="button" disabled>Consulter l'équipe possible</button></div>
+      <div class="reply" id="people-answer">Choisissez d'abord une mission.</div>
+    </details>
+
+    <!-- 4. Suivi -->
+    <details class="card" id="runs-box">
+      <summary>Suivi des demandes</summary>
+      <p class="hint">Consultez les résultats avant de relancer une demande interrompue. Un résumé terminé ne prouve pas que toutes les actions proposées ont été exécutées.</p>
+      <div class="btn-row"><button class="btn ghost" id="runs-read" type="button">Actualiser</button></div>
+      <div id="runs" class="stack"></div>
+    </details>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var agent = 'auto';
+  var opened = null, prepared = null, lastReply = null;
+
+  function readable(err) {
+    if (err && (err.status === 502 || err.status === 504)) return 'Le serveur a interrompu la demande après un délai trop long. Vérifiez le suivi des demandes avant de relancer.';
+    if (err && err.message === 'INVALID_RESPONSE') return 'Réponse illisible du serveur : la demande n’est pas confirmée. Vérifiez le suivi avant de relancer.';
+    return (err && err.message) || 'La demande a échoué.';
+  }
+
+  // Agent choice
+  Array.prototype.forEach.call($('agents').children, function (b) {
+    b.addEventListener('click', function () {
+      agent = b.getAttribute('data-agent');
+      Array.prototype.forEach.call($('agents').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    });
+  });
+  function selectAgent(key) {
+    agent = key;
+    Array.prototype.forEach.call($('agents').children, function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-agent') === key)); });
+  }
+
+  // 1. Send a request
+  $('send').addEventListener('click', function () {
+    var message = $('message').value.trim();
+    if (!message) { $('answer').textContent = 'Écrivez votre demande.'; return; }
+    var replyMission = prepared && prepared.message === message && agent === 'auto' ? prepared.missionId : null;
+    $('send').disabled = true; $('meta').textContent = '';
+    $('answer').textContent = 'Analyse en cours… La consultation des spécialistes peut prendre quelques minutes.';
+    OM.api('/api/agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message, agent: agent, provider: $('provider').value, risk: 'normal' })
+    }).then(function (data) {
+      $('answer').textContent = data.answer || 'Réponse vide.';
+      $('meta').textContent = [data.agentName, data.provider, data.reviewed ? 'relu' : ''].filter(Boolean).join(' · ');
+      if (replyMission && opened && opened.mission.id === replyMission) {
+        lastReply = { missionId: replyMission, text: data.answer };
+        $('plan-copy').disabled = false;
+      }
+    }).catch(function (err) { $('answer').textContent = 'Erreur : ' + readable(err); })
+      .then(function () { $('send').disabled = false; });
+  });
+
+  // 2. Missions
+  function resetPlan() {
+    prepared = null; lastReply = null;
+    $('plan-content').value = ''; $('plan-phases').value = '';
+    $('plan-copy').disabled = true; $('plan-save').disabled = true; $('plan-result').textContent = '';
+  }
+
+  function loadMissions(preselect) {
+    OM.api('/api/missions').then(function (data) {
+      var list = (data && data.missions) || [];
+      var sel = $('mission-select'); sel.textContent = '';
+      sel.appendChild(new Option(list.length ? 'Choisir une mission' : 'Aucune mission', ''));
+      list.forEach(function (m) { sel.appendChild(new Option((m.name || m.mission_code || 'Mission') + ' — ' + (m.status || ''), m.id)); });
+      var drafts = list.filter(function (m) { return m.status === 'draft'; }).length;
+      var undated = list.filter(function (m) { return !m.planned_start || !m.planned_end; }).length;
+      $('mission-counts').textContent = list.length + ' missions · ' + drafts + ' brouillons · ' + undated + ' avec dates incomplètes' + (data.truncated ? ' · limitée aux 100 plus récentes' : '');
+      if (preselect && list.some(function (m) { return m.id === preselect; })) { sel.value = preselect; openMission(preselect); }
+    }).catch(function (err) { $('mission-select').textContent = ''; $('mission-select').appendChild(new Option('Indisponible', '')); $('mission-counts').textContent = readable(err); });
+  }
+
+  function openMission(id) {
+    opened = null; resetPlan();
+    $('mission-plan').disabled = true; $('people-read').disabled = !id; $('mission-link').hidden = !id;
+    if (!id) { $('mission-dossier').textContent = 'Choisissez une mission.'; return; }
+    $('mission-link').href = '/mission.html?id=' + encodeURIComponent(id);
+    $('people-answer').textContent = 'Cliquez sur « Consulter l’équipe possible ».';
+    $('mission-dossier').textContent = 'Chargement du dossier…';
+    OM.api('/api/missions?mission_id=' + encodeURIComponent(id)).then(function (d) {
+      if ($('mission-select').value !== id) return;
+      opened = d;
+      var req = d.requirements || {}, m = d.mission || {};
+      var lines = [
+        m.name, 'Statut : ' + (m.status || '?'), 'Dates : ' + (m.planned_start || 'à préciser') + ' → ' + (m.planned_end || 'à préciser'),
+        '', 'CADRAGE', req.mission_context || 'À renseigner.',
+        'Compétences : ' + ((req.required_skills || []).join(', ') || 'à préciser'),
+        'Équipe cible : ' + (req.preferred_team_size || 'à préciser'),
+        '', 'POINTS À TRAITER'
+      ].concat(d.blockers && d.blockers.length ? d.blockers : ['Aucun.'])
+       .concat(['', 'VERSIONS DU PLAN — NON APPROUVÉES'])
+       .concat((d.plans || []).length ? d.plans.map(function (p) { return 'Version ' + p.version + ' · ' + UI.dateTime(p.created_at) + ' · ' + (p.phases || []).join(' → '); }) : ['Aucune version enregistrée.'])
+       .concat(['', d.guardrail || '']);
+      $('mission-dossier').textContent = lines.join('\n');
+      $('mission-plan').disabled = false; $('plan-save').disabled = false;
+    }).catch(function (err) { if ($('mission-select').value === id) $('mission-dossier').textContent = 'Erreur : ' + readable(err); });
+  }
+
+  $('mission-select').addEventListener('change', function () { openMission($('mission-select').value); });
+
+  $('mission-plan').addEventListener('click', function () {
+    if (!opened) return;
+    selectAgent('auto');
+    $('message').value = 'Consulte le dossier Office Manager de la mission ' + opened.mission.name +
+      ' (identifiant ' + opened.mission.id + ') avec read_office_mission_dossier. ' +
+      'Propose les phases, les livrables, les informations manquantes et les spécialistes à consulter. ' +
+      'Ne lance aucun scan Drive, aucune affectation, aucun envoi et aucune modification. ' +
+      'Distingue les faits du dossier et le plan proposé à faire valider.';
+    prepared = { missionId: opened.mission.id, message: $('message').value };
+    $('meta').textContent = 'Demande préparée : relisez-la, puis cliquez sur Envoyer.';
+    $('message').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  $('plan-copy').addEventListener('click', function () {
+    if (!lastReply || !opened || lastReply.missionId !== opened.mission.id) return;
+    $('plan-content').value = lastReply.text;
+    $('plan-result').textContent = 'Réponse copiée. Renseignez les phases et relisez le texte avant d’enregistrer.';
+  });
+
+  $('plan-save').addEventListener('click', function () {
+    if (!opened) return;
+    var id = opened.mission.id, content = $('plan-content').value;
+    var phases = $('plan-phases').value.split('\n').map(function (p) { return p.trim(); }).filter(Boolean);
+    if (!content.trim()) { $('plan-result').textContent = 'Renseignez le texte du plan.'; return; }
+    $('plan-save').disabled = true;
+    OM.api('/api/mission-plans', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mission_id: id, content: content, phases: phases })
+    }).then(function (data) {
+      $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée comme proposition, sans approbation.';
+      openMission(id);
+    }).catch(function (err) { $('plan-result').textContent = 'Erreur : ' + readable(err) + ' Vérifiez le dossier avant de réessayer.'; })
+      .then(function () { $('plan-save').disabled = !opened; });
+  });
+
+  // 3. People Intelligence
+  $('people-read').addEventListener('click', function () {
+    var id = $('mission-select').value; if (!id) return;
+    $('people-read').disabled = true; $('people-answer').textContent = 'Consultation…';
+    OM.api('/api/people', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mission_id: id })
+    }).then(function (data) {
+      var c = data.candidates || [];
+      var parts = [data.limitation || 'Exigences humaines à renseigner.'].concat(c.map(function (p) {
+        var b = p.management_brief || {};
+        return p.full_name + ' — ' + (p.role_title || 'rôle à confirmer') +
+          '\nCharge déjà planifiée : ' + p.current_load_pct + ' % ; disponibilité : ' + (p.eligibility && p.eligibility.availability === true ? 'aucune indisponibilité enregistrée' : 'à confirmer') +
+          '\nPoints à vérifier : ' + ((p.data_quality_flags || []).join(', ') || 'validation du responsable') +
+          '\nBriefing : ' + ((b.briefing_requirements || []).join(' ; ') || 'à préciser') +
+          '\nManagement : ' + (b.management_style || b.instruction || 'à préciser') +
+          '\nCommunication : ' + (b.communication || 'à préciser') +
+          '\nFeedback : ' + (b.feedback || 'à préciser');
+      }));
+      if (!c.length) parts.push('Aucun profil à proposer avec les informations disponibles.');
+      $('people-answer').textContent = parts.join('\n\n');
+    }).catch(function (err) { $('people-answer').textContent = 'Erreur : ' + readable(err); })
+      .then(function () { $('people-read').disabled = !$('mission-select').value; });
+  });
+
+  // 4. Runs
+  function loadRuns() {
+    $('runs-read').disabled = true;
+    OM.api('/api/runs').then(function (data) {
+      var box = $('runs'); box.textContent = '';
+      var runs = (data && data.runs) || [];
+      if (!runs.length) { box.appendChild(el('p', 'Aucune demande récente enregistrée.', 'empty')); return; }
+      runs.forEach(function (r) {
+        var item = el('div', null, 'item');
+        var t = el('div', null, 't');
+        t.appendChild(el('span', r.summary || 'Sans résumé'));
+        t.appendChild(el('span', [r.agent, UI.dateTime(r.started_at), 'réf. ' + r.id].filter(Boolean).join(' · '), 'meta'));
+        if (r.warning) t.appendChild(el('span', r.warning, 'meta'));
+        item.appendChild(t);
+        item.appendChild(el('span', r.label, r.status === 'verified' ? 'tag' : 'tag warn'));
+        box.appendChild(item);
+      });
+    }).catch(function (err) { UI.fail($('runs'), { message: readable(err) }); })
+      .then(function () { $('runs-read').disabled = false; });
+  }
+  $('runs-read').addEventListener('click', loadRuns);
+  $('runs-box').addEventListener('toggle', function () { if ($('runs-box').open && !$('runs').childNodes.length) loadRuns(); });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    var params = new URLSearchParams(location.search);
+    var a = params.get('agent');
+    if (a && ['auto', 'mission-controller', 'orpailleur', 'sika'].indexOf(a) >= 0) selectAgent(a);
+    loadMissions(params.get('mission'));
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>
