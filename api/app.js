@@ -27,6 +27,7 @@ import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/
 import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
 import { dropFile } from '../lib/drop-box.js';
 import { peopleBrief } from '../lib/people-brief.js';
+import { dedupeMissions } from '../lib/mission-dedupe.js';
 import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -229,6 +230,7 @@ export const ROUTES = Object.freeze({
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
+      if (req.body?.action === 'dedupe') return dedupeMissions(orgId);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'KNOWLEDGE_UNAVAILABLE'

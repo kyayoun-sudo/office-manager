@@ -95,6 +95,7 @@
         <div id="know-body" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="btn-row">
           <button class="btn ghost" id="know-learn" type="button">Relire le Drive pour apprendre le cabinet</button>
+          <button class="btn ghost" id="know-dedupe" type="button">Fusionner les missions en double</button>
         </div>
       </section>
     </div>
@@ -235,7 +236,7 @@
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
     if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet (équipe, CV, missions)…'; knowTimer = setTimeout(loadKnow, 6000); return; }
     var a = k.applied || {};
-    $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s), ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s)' + ((a.firm_domains || []).length ? ' ; domaines du cabinet ajoutés dans Paramètres : ' + a.firm_domains.join(', ') : '') + '.';
+    $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s)' + (a.missions_merged ? ' (' + a.missions_merged + ' doublon(s) fusionné(s))' : '') + ', ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s)' + ((a.firm_domains || []).length ? ' ; domaines du cabinet ajoutés dans Paramètres : ' + a.firm_domains.join(', ') : '') + '.';
     if ((k.files_read || []).length) {
       var dl = el('details', null, 'font-size:13px'); dl.appendChild(el('summary', 'Documents lus (' + k.files_read.length + ')', 'cursor:pointer'));
       k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:#5B6660;padding:2px 0')); }); b.appendChild(dl);
@@ -288,6 +289,12 @@
     $('know-live').textContent = 'L’Orpailleur relit le Drive…';
     OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'learn' }) })
       .then(function () { knowTimer = setTimeout(loadKnow, 4000); }).catch(function (e) { $('know-live').textContent = msg(e); });
+  });
+  $('know-dedupe').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('know-live').textContent = 'Recherche des missions en double…';
+    OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'dedupe' }) })
+      .then(function (r) { $('know-live').textContent = r.merged ? r.merged + ' doublon(s) fusionné(s) : ' + r.details.map(function (x) { return '« ' + x.merged + ' » → « ' + x.kept + ' »'; }).join(' ; ') + '. Les doublons sont fermés, rien n’est supprimé.' : 'Aucune mission en double.'; })
+      .catch(function (e) { $('know-live').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
   loadKnow();
 

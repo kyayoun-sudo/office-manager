@@ -54,7 +54,7 @@ test('first scan understanding: team with CV profile, audit missions with their 
   const k = await learnFirm('org', { drive, folder: 'MEM', runAI, fetchRows });
   assert.equal(k.status, 'applied');
   assert.match(sentInput, /Awa Koné/); assert.match(sentInput, /CV Yao Kouassi/);
-  assert.deepEqual(k.applied, { team_added: 2, team_completed: 0, missions_added: 1, assignments_proposed: 1, firm_domains: ['cab.ci'] });
+  assert.deepEqual(k.applied, { missions_merged: 0, team_added: 2, team_completed: 0, missions_added: 1, assignments_proposed: 1, firm_domains: ['cab.ci'] });
   const yao = posts.find(p => p[0] === 'office_staff_profiles' && p[1][0].full_name === 'Yao Kouassi')[1][0];
   assert.deepEqual(yao.skills, ['IFRS', 'SYSCOHADA']); assert.equal(yao.cv_drive_file_id, 'cv1');
   const m = posts.find(p => p[0] === 'office_missions')[1][0];
