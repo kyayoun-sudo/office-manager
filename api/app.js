@@ -12,6 +12,7 @@ import { getSchedule, saveSchedule } from '../lib/schedule.js';
 import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 import { requireRole, logAccess } from '../lib/user-auth.js';
 import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
+import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -39,6 +40,10 @@ import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
 //   GET  /api/app?route=my-kpi                     my own indicators — any account (personal session)
 //   GET  /api/app?route=users                      firm accounts — OWNER ONLY
 //   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
+//   GET  /api/app?route=training                   agent training: campaign, missions, grades, report (personal session)
+//   POST /api/app?route=training {action}          start | stop | cleanup (remove the training missions) — OWNER ONLY
+//   POST /api/app?route=training-confirm           the team confirms / corrects the agent on a real mission (personal session)
+//   POST /api/app?route=training-step              next unit of training work (background chain)
 // Every route needs the pilot token, except the public login routes. Owner routes
 // also need the owner token (x-office-manager-owner-token), as in api/owner.js.
 
@@ -48,6 +53,7 @@ const open = run => Object.assign(run, { public: true });
 // Needs a personal session (Supabase access token) with one of these roles.
 const MANAGERS = ['owner', 'partner', 'manager'];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
+const ALL_ROLES = ['owner', 'partner', 'manager', 'collaborator'];
 
 export const ROUTES = Object.freeze({
   branding: {
@@ -108,6 +114,13 @@ export const ROUTES = Object.freeze({
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => myKpis(orgId, req.account)),
     unavailable: 'KPI_UNAVAILABLE'
   },
+  training: {
+    GET: users(ALL_ROLES, (orgId, req) => getTraining(orgId, req)),
+    POST: owner((orgId, req) => trainingAction(orgId, req)),
+    unavailable: 'TRAINING_UNAVAILABLE'
+  },
+  'training-confirm': { POST: users(ALL_ROLES, (orgId, req) => confirmCase(orgId, req)), unavailable: 'TRAINING_UNAVAILABLE' },
+  'training-step': { POST: (orgId, req) => trainingStep(orgId, req), unavailable: 'TRAINING_UNAVAILABLE' },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
@@ -140,6 +153,14 @@ async function tidyAction(orgId, req) {
   else throw fail('UNKNOWN_ACTION', 400);
   if (chainId) await continueInBackground(req, chainId);
   return result;
+}
+
+async function trainingAction(orgId, req) {
+  const action = String(req.body?.action || '');
+  if (action === 'start') return startCampaign(orgId, req);
+  if (action === 'stop') return stopCampaign(orgId);
+  if (action === 'cleanup') return cleanupCampaign(orgId, req);
+  throw fail('UNKNOWN_ACTION', 400);
 }
 
 export async function handleApp(req) {

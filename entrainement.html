@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entraînement des agents</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.bars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end;height:170px;padding-top:8px}
+.bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
+.bar .fill{width:100%;max-width:64px;background:var(--brand);border-radius:6px 6px 0 0;min-height:2px}
+.bar .fill.empty{background:#E3E7E5}
+.bar b{font-family:var(--mono);font-weight:500;font-size:14px}
+.bar small{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.case details{width:100%}
+.case summary{cursor:pointer;font-size:13px;color:var(--muted);margin-top:4px}
+.answer{white-space:pre-wrap;font-size:13px;line-height:1.5;background:#F6F7F6;border:1px solid var(--line);border-radius:8px;padding:12px;max-height:380px;overflow:auto;margin:8px 0}
+.trap{font-size:13px;margin:2px 0}
+.trap.ok{color:#0B4A43}.trap.ko{color:#8A2E0B}
+.score{font-family:var(--mono);font-size:20px;font-weight:500;min-width:56px;text-align:right}
+.mono{font-family:var(--mono)}
+.confirm{display:flex;flex-direction:column;gap:8px;width:100%}
+.confirm textarea{font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;min-height:60px}
+.small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+table.by-day td,table.by-day th{text-align:center}
+table.by-day td:first-child,table.by-day th:first-child{text-align:left}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html" aria-current="page">Entraînement</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Entraînement des agents</h1>
+      <p class="lead">Pendant 5 jours, des missions d'audit fictives arrivent chaque matin dans le dossier d'entraînement du Drive. Les agents les reconnaissent, Claude note leur travail, et chaque jour ils repartent avec les leçons de la veille. Vous pouvez aussi y déposer de vraies missions : l'agent s'entraîne dessus et l'équipe confirme ou corrige.</p>
+    </header>
+
+    <div class="callout" id="need-login" hidden style="text-decoration:none">
+      <span class="callout-label">Session personnelle requise</span>
+      <span class="callout-text">Connectez-vous avec votre e-mail et votre mot de passe pour voir l'entraînement.</span>
+    </div>
+
+    <div id="area" class="stack" style="gap:20px" hidden>
+      <section class="card" aria-labelledby="h-state">
+        <h2 id="h-state">Campagne <span class="meta" id="state-meta"></span></h2>
+        <div class="kpis" id="state-kpis"></div>
+        <p class="small" id="state-text"></p>
+        <div id="drive-link"></div>
+        <p class="small" id="state-error" style="color:#8A2E0B" hidden></p>
+        <div class="field" id="pick-wrap" hidden style="max-width:360px"><label for="pick">Autre campagne</label>
+          <select id="pick" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:10px 12px;min-height:44px;background:#fff"></select></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-owner" id="owner-card" hidden>
+        <h2 id="h-owner">Piloter l'entraînement</h2>
+        <div id="start-box" class="stack" style="gap:12px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <div class="field"><label for="parent">Dossier Drive où créer l'entraînement (lien ou identifiant)</label>
+              <input id="parent" type="text" maxlength="300" placeholder="https://drive.google.com/drive/folders/…">
+              <span class="hint">Choisissez l'espace Audit. Vide : à la racine du Drive partagé du cabinet.</span></div>
+            <div class="field"><label for="run-time">Heure des nouvelles missions (jours 2 à 5)</label><input id="run-time" type="time" class="mono" value="07:00"></div>
+            <div class="field"><label for="provider">Moteur de l'agent entraîné</label>
+              <select id="provider" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+                <option value="auto">Comme en production (automatique)</option><option value="anthropic">Claude</option><option value="openai">ChatGPT (OpenAI)</option>
+              </select></div>
+          </div>
+          <div class="btn-row"><button class="btn" id="start" type="button">Lancer l'entraînement de 5 jours</button></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="stop" type="button" hidden>Arrêter l'entraînement</button>
+          <button class="btn danger" id="cleanup" type="button" hidden>Dire à l'agent de supprimer les missions d'entraînement</button>
+        </div>
+        <p class="small">Suppression : l'agent indique d'abord quels dossiers sont des missions d'entraînement (c'est noté). Ensuite, seuls les dossiers <strong>créés par l'application</strong> partent dans la corbeille du Drive (récupérables 30 jours). Une vraie mission n'est jamais supprimée, même si l'agent se trompe.</p>
+        <p class="status" id="owner-status" role="status" aria-live="polite"></p>
+        <div id="cleanup-result"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prog">
+        <h2 id="h-prog">Progression <span class="meta">note moyenne sur 100, par jour</span></h2>
+        <div class="bars" id="bars"></div>
+        <p class="small" id="grading"></p>
+      </section>
+
+      <div class="grid2">
+        <section class="card" aria-labelledby="h-agents">
+          <h2 id="h-agents">Par agent</h2>
+          <div class="table-box"><table class="by-day">
+            <thead><tr><th scope="col">Agent</th><th scope="col">J1</th><th scope="col">J2</th><th scope="col">J3</th><th scope="col">J4</th><th scope="col">J5</th><th scope="col">Moy.</th></tr></thead>
+            <tbody id="agents"></tbody>
+          </table></div>
+        </section>
+        <section class="card" aria-labelledby="h-traps">
+          <h2 id="h-traps">Anomalies trouvées</h2>
+          <div id="traps" class="stack" style="gap:6px"></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="h-lessons">
+        <h2 id="h-lessons">Leçons retenues</h2>
+        <p class="small">Données à l'agent les jours suivants. Elles ne modifient pas l'agent en production tant que vous ne l'avez pas décidé.</p>
+        <ul id="lessons" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-cases">
+        <h2 id="h-cases">Missions</h2>
+        <div id="cases" class="stack" style="gap:16px"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var AGENT = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
+  var STATUS = {
+    to_create: ['Création sur le Drive', 'tag neutral'], creating: ['Création sur le Drive', 'tag neutral'],
+    pending: ['En attente de l’agent', 'tag neutral'], answering: ['L’agent travaille', 'tag neutral'],
+    answered: ['En attente de la note', 'tag neutral'], grading: ['Claude corrige', 'tag neutral'],
+    graded: ['Notée', 'tag'], to_confirm: ['À confirmer par l’équipe', 'tag warn'], confirmed: ['Confirmée', 'tag'], failed: ['Échec', 'tag warn']
+  };
+  var CAMPAIGN = { active: 'En cours', done: 'Terminée', stopped: 'Arrêtée', cleaned: 'Missions supprimées' };
+  var ERR = {
+    TRAINING_ALREADY_RUNNING: 'Un entraînement est déjà en cours.', TRAINING_PARENT_REQUIRED: 'Indiquez le dossier Drive (espace Audit) où créer l’entraînement.',
+    INVALID_DRIVE_FOLDER: 'Lien de dossier Drive non reconnu.', TRAINING_DRIVE_FOLDER_FAILED: 'Impossible de créer le dossier d’entraînement sur le Drive (droits ?).',
+    DRIVE_WRITE_REQUIRES_DIRECT_ACCESS: 'La suppression demande l’accès Google direct (GOOGLE_SERVICE_ACCOUNT_JSON dans Vercel).',
+    OWNER_ONLY: 'Réservé au propriétaire et aux associés-gérants.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail.',
+    CORRECTION_NOTE_REQUIRED: 'Écrivez la correction (ce que l’agent aurait dû voir).', NOT_WAITING_FOR_CONFIRMATION: 'Déjà confirmée.'
+  };
+  var msg = function (e) { return ERR[e.message] || e.message; };
+  var current = null, armed = false;
+
+  function ownerApi(body) {
+    return OM.api('/api/app?route=training', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }, body: JSON.stringify(body) });
+  }
+  function kpi(label, value) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', String(value))); return k; }
+  function say(t) { $('owner-status').textContent = t || ''; }
+
+  function render(d) {
+    $('area').hidden = false;
+    var c = d.campaign, r = d.report;
+    var owner = OM.isOwner();
+    $('owner-card').hidden = !owner;
+    var active = c && c.status === 'active';
+    $('start-box').hidden = Boolean(active);
+    $('stop').hidden = !active;
+    $('cleanup').hidden = !(c && c.status !== 'cleaned' && c.mode === 'drive');
+
+    var pick = $('pick'); pick.textContent = '';
+    (d.campaigns || []).forEach(function (x) { var o = el('option', 'Depuis le ' + UI.date(x.start_date) + ' · ' + (CAMPAIGN[x.status] || x.status)); o.value = x.id; if (c && x.id === c.id) o.selected = true; pick.appendChild(o); });
+    $('pick-wrap').hidden = (d.campaigns || []).length < 2;
+
+    var k = $('state-kpis'); k.textContent = '';
+    if (!c) {
+      $('state-meta').textContent = '· aucune';
+      $('state-text').textContent = owner ? 'Aucun entraînement pour l’instant. Lancez-le ci-dessous : le jour 1 démarre tout de suite.' : 'Aucun entraînement pour l’instant.';
+      if (!d.drive_ready) $('state-text').textContent += ' Le Drive n’est pas connecté : les missions seront données directement à l’agent (sans Drive).';
+      ['bars', 'agents', 'traps', 'lessons', 'cases'].forEach(function (id) { $(id).textContent = ''; });
+      return;
+    }
+    $('state-meta').textContent = '· ' + (CAMPAIGN[c.status] || c.status);
+    [['Jour', Math.min(Math.max(d.today || 1, 1), c.days) + ' / ' + c.days], ['Note moyenne', r.overall == null ? '—' : r.overall + ' / 100'],
+     ['Progression', r.progression ? (r.progression.delta >= 0 ? '+' : '') + r.progression.delta + ' pts' : '—'],
+     ['Vraies missions', r.real_missions.seen + (r.real_missions.waiting ? ' (' + r.real_missions.waiting + ' à confirmer)' : '')]]
+      .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
+    $('state-text').textContent = 'Lancée le ' + UI.date(c.start_date) + (c.created_by ? ' par ' + c.created_by : '') + ' · nouvelles missions chaque jour à ' + c.run_time +
+      ' (' + c.timezone + ') · ' + (c.mode === 'drive' ? 'missions créées sur le Drive' : 'sans Drive (missions données directement à l’agent)') + '.' +
+      (r.weakest.length ? ' Points faibles : ' + r.weakest.join(' ; ') + '.' : '');
+    var dl = $('drive-link'); dl.textContent = '';
+    if (c.drive_root_url) dl.appendChild(UI.safeLink(c.drive_root_url, 'Ouvrir le dossier d’entraînement sur le Drive'));
+    $('state-error').hidden = !c.last_error; $('state-error').textContent = c.last_error || '';
+    renderCleanup(c.cleanup);
+
+    var bars = $('bars'); bars.textContent = '';
+    r.days.forEach(function (x) {
+      var b = el('div', null, 'bar');
+      b.appendChild(el('b', x.average == null ? '—' : String(x.average)));
+      var f = el('div', null, 'fill' + (x.average == null ? ' empty' : '')); f.style.height = (x.average == null ? 2 : Math.max(2, x.average * 1.2)) + 'px'; b.appendChild(f);
+      b.appendChild(el('small', 'Jour ' + x.day + (x.missions ? ' · ' + x.fake + ' fictives' + (x.real ? ' + ' + x.real + ' réelles' : '') : '')));
+      if (x.detection_rate != null) b.appendChild(el('small', x.detection_rate + ' % des anomalies'));
+      bars.appendChild(b);
+    });
+    $('grading').textContent = r.grading;
+
+    var ag = $('agents'); ag.textContent = '';
+    r.agents.forEach(function (a) {
+      var tr = el('tr'); tr.appendChild(el('td', a.label));
+      a.by_day.forEach(function (v) { tr.appendChild(el('td', v == null ? '—' : String(v), 'mono')); });
+      tr.appendChild(el('td', a.average == null ? '—' : String(a.average), 'mono')); ag.appendChild(tr);
+    });
+    var tb = $('traps'); tb.textContent = '';
+    if (!r.traps.length) tb.appendChild(el('p', 'Pas encore de mission notée.', 'empty'));
+    r.traps.forEach(function (t) { tb.appendChild(el('p', (t.rate >= 60 ? '● ' : '▲ ') + t.label + ' — ' + t.found + '/' + t.seen + ' (' + t.rate + ' %)', 'trap ' + (t.rate >= 60 ? 'ok' : 'ko'))); });
+    var ls = $('lessons'); ls.textContent = '';
+    if (!r.lessons.length) ls.appendChild(el('li', 'Pas encore de leçon.'));
+    r.lessons.forEach(function (l) { ls.appendChild(el('li', l)); });
+
+    renderCases(d.cases || []);
+  }
+
+  function renderCleanup(x) {
+    var box = $('cleanup-result'); box.textContent = '';
+    if (!x) return;
+    box.appendChild(el('p', 'Suppression du ' + UI.dateTime(x.at) + ' : ' + x.trashed.length + ' mission(s) d’entraînement à la corbeille, ' + x.kept_real.length + ' vraie(s) mission(s) gardée(s).', 'small'));
+    if (x.agent && x.agent.score != null) box.appendChild(el('p', 'Tri fait par l’agent : ' + x.agent.score + ' / 100 (' + x.agent.wrong_real_chosen + ' vraie(s) mission(s) proposée(s) à tort, ' + x.agent.missed_fake + ' mission(s) fictive(s) oubliée(s)).', 'small'));
+    (x.refused || []).forEach(function (f) { box.appendChild(el('p', '▲ Refusé : « ' + f.name + ' » — ' + f.reason, 'trap ko')); });
+    (x.errors || []).forEach(function (e) { box.appendChild(el('p', '▲ ' + e, 'trap ko')); });
+  }
+
+  function renderCases(cases) {
+    var box = $('cases'); box.textContent = '';
+    if (!cases.length) { box.appendChild(el('p', 'Les missions du jour arrivent…', 'empty')); return; }
+    var days = {};
+    cases.forEach(function (c) { (days[c.day] = days[c.day] || []).push(c); });
+    Object.keys(days).sort(function (a, b) { return b - a; }).forEach(function (day) {
+      box.appendChild(el('h3', 'Jour ' + day, 'meta'));
+      days[day].forEach(function (c) { box.appendChild(caseItem(c)); });
+    });
+  }
+
+  function caseItem(c) {
+    var it = el('article', null, 'item case');
+    var t = el('div', null, 't');
+    t.appendChild(el('span', c.title));
+    t.appendChild(el('span', [AGENT[c.agent_key], c.kind === 'real' ? 'mission réelle' : 'mission fictive', c.provider, c.examiner ? 'notée par ' + c.examiner : null].filter(Boolean).join(' · '), 'meta'));
+    it.appendChild(t);
+    var st = STATUS[c.status] || [c.status, 'tag neutral']; it.appendChild(el('span', st[0], st[1]));
+    if (c.score != null) it.appendChild(el('span', String(Math.round(c.score)), 'score'));
+    if (c.error && c.status !== 'graded') it.appendChild(el('p', 'Dernière erreur : ' + c.error, 'small'));
+
+    if (c.answer || (c.grade && c.grade.traps)) {
+      var det = el('details'); det.appendChild(el('summary', 'Voir le travail de l’agent et la correction'));
+      if (c.grade) {
+        var g = c.grade;
+        det.appendChild(el('p', 'Reconnaissance ' + g.parts.recognition + '/20 · anomalies ' + g.parts.detection + '/40' + (g.parts.accuracy != null ? ' · exactitude ' + g.parts.accuracy + '/15' : '') +
+          ' · règles ' + g.parts.rules + '/15' + (g.parts.actions != null ? ' · actions ' + g.parts.actions + '/10' : '') + (g.partial ? ' (notation partielle, sans examinateur)' : ''), 'small'));
+        (g.traps || []).forEach(function (x) { det.appendChild(el('p', (x.detected ? '✓ ' : '✗ ') + x.label + ' — attendu : ' + x.expected, 'trap ' + (x.detected ? 'ok' : 'ko'))); });
+        (g.rule_issues || []).forEach(function (x) { det.appendChild(el('p', '▲ Règle : ' + x, 'trap ko')); });
+        (g.false_alarms || []).forEach(function (x) { det.appendChild(el('p', '▲ Fausse alerte : ' + x, 'trap ko')); });
+        (g.invented || []).forEach(function (x) { det.appendChild(el('p', '▲ Inventé : ' + x, 'trap ko')); });
+        if (g.comment) det.appendChild(el('p', 'Claude : ' + g.comment, 'small'));
+        if (c.lesson) det.appendChild(el('p', 'Leçon : ' + c.lesson, 'small'));
+      }
+      if (c.answer) det.appendChild(el('div', c.answer, 'answer'));
+      it.appendChild(det);
+    }
+    if (c.feedback) it.appendChild(el('p', (c.feedback.verdict === 'juste' ? '✓ Confirmé juste' : '✎ Corrigé') + (c.feedback.by ? ' par ' + c.feedback.by : '') + (c.feedback.note ? ' : ' + c.feedback.note : ''), 'small'));
+    if (c.status === 'to_confirm') it.appendChild(confirmBox(c));
+    return it;
+  }
+
+  function confirmBox(c) {
+    var box = el('div', null, 'confirm');
+    var note = el('textarea'); note.setAttribute('aria-label', 'Correction pour l’agent'); note.placeholder = 'Si l’agent s’est trompé : ce qu’il aurait dû reconnaître ou signaler.'; note.maxLength = 1000;
+    var row = el('div', null, 'btn-row');
+    var ok = el('button', 'C’est juste', 'btn ghost'); ok.type = 'button';
+    var fix = el('button', 'À corriger', 'btn ghost'); fix.type = 'button';
+    var out = el('span', '', 'status');
+    function send(verdict) {
+      ok.disabled = fix.disabled = true;
+      OM.api('/api/app?route=training-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ case_id: c.id, verdict: verdict, note: note.value }) })
+        .then(load).catch(function (e) { out.textContent = msg(e); ok.disabled = fix.disabled = false; });
+    }
+    ok.addEventListener('click', function () { send('juste'); });
+    fix.addEventListener('click', function () { send('a_corriger'); });
+    row.appendChild(ok); row.appendChild(fix); row.appendChild(out);
+    box.appendChild(note); box.appendChild(row);
+    return box;
+  }
+
+  function load() {
+    var id = current ? '&campaign_id=' + encodeURIComponent(current) : '';
+    return OM.api('/api/app?route=training' + id).then(render).catch(function (e) { $('area').hidden = false; UI.fail($('cases'), { message: msg(e) }); });
+  }
+
+  $('pick').addEventListener('change', function () { current = this.value; load(); });
+  $('start').addEventListener('click', function () {
+    var b = this; b.disabled = true; say('Lancement… création du dossier d’entraînement et des missions du jour 1.');
+    ownerApi({ action: 'start', parent_folder: $('parent').value, run_time: $('run-time').value, provider: $('provider').value, created_by: OM.getUserName() })
+      .then(function () { say('Entraînement lancé. Les missions du jour 1 sont en cours de création et de correction.'); current = null; return load(); })
+      .catch(function (e) { say(msg(e)); }).then(function () { b.disabled = false; });
+  });
+  $('stop').addEventListener('click', function () {
+    ownerApi({ action: 'stop' }).then(function () { say('Entraînement arrêté.'); return load(); }).catch(function (e) { say(msg(e)); });
+  });
+  $('cleanup').addEventListener('click', function () {
+    var b = this;
+    if (!armed) { armed = true; b.textContent = 'Confirmer : supprimer les missions d’entraînement'; say('Cliquez encore pour confirmer. Les vraies missions sont gardées.'); return; }
+    armed = false; b.disabled = true; b.textContent = 'Dire à l’agent de supprimer les missions d’entraînement'; say('L’agent trie les dossiers…');
+    ownerApi({ action: 'cleanup', campaign_id: current || undefined })
+      .then(function (x) { say('Terminé : ' + x.trashed.length + ' mission(s) d’entraînement à la corbeille du Drive.'); return load(); })
+      .catch(function (e) { say(msg(e)); }).then(function () { b.disabled = false; });
+  });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    if (!OM.hasPersonalSession()) { $('need-login').hidden = false; return; }
+    load();
+    // Live while work is in progress.
+    setInterval(function () { if (!document.hidden) load(); }, 30000);
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>
