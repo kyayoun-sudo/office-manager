@@ -75,6 +75,36 @@ Règles codées dans `lib/agent-persona.js` (et testées) :
   de session Supabase par utilisateur, puis ne plus transmettre le code pilote au
   navigateur (cela modifie un fichier d'origine : à valider avec Paul).
 
+### 3 ter. Orpailleur — « Rangement » du Drive en arrière-plan
+Écran `rangement.html`. L'utilisateur décrit le rangement (et peut limiter à un
+dossier), clique « Lancer », puis fait autre chose.
+- `lib/tidy.js` : demandes, étapes en arrière-plan (lot de 24 fichiers à planifier
+  ou 15 à déplacer par étape, enchaînées par `continueInBackground` dans
+  `api/app.js` ; la page relance la chaîne si elle s'arrête), décisions,
+  annulation, arrêt.
+- `lib/tidy-planner.js` (pur, testé) : pour chaque fichier, 1) préférences
+  apprises, 2) règle « dossier existant du client (et de l'année) », 3) IA sur
+  l'**extrait de contenu** (`orpailleur_inspection_queue`) — **jamais sur le nom
+  seul** ; un identifiant de dossier inventé par l'IA est ignoré.
+- Modes : `auto` (dossier existant, confiance ≥ 0,85 **et** carte du Drive validée
+  par le propriétaire via `mappingGate()` existant), `proposal` (sinon, ou nouveau
+  dossier à créer), `in_place`, `needs_reading` (contenu pas encore lu), `unsure`.
+- **Apprentissage** : chaque validation (+1), correction (+2), refus (−1),
+  annulation (−2) ajuste `office_tidy_preferences` (client, type, client+extension
+  → dossier). Apprentissage au niveau du cabinet (le Drive est partagé).
+- `lib/tidy-drive.js` : déplacer (vérifie que le fichier est encore dans son
+  dossier d'origine et dans le Drive du cabinet), créer un dossier. **Jamais de
+  suppression ni de renommage.** Le dossier précédent est conservé ⇒ annulation.
+- **Prérequis pour déplacer** : accès Google direct en écriture dans Vercel
+  (`GOOGLE_SERVICE_ACCOUNT_JSON` ou OAuth). Le pont Supabase n'a pas d'action
+  « move » : en mode pont seul, le plan est prêt mais l'exécution affiche
+  `DRIVE_WRITE_REQUIRES_DIRECT_ACCESS`. Pour l'aperçu protégé par Vercel, la
+  chaîne en arrière-plan utilise `VERCEL_AUTOMATION_BYPASS_SECRET` si présent.
+- **Ordinateur (PC) : pas encore fait.** Demande de Paul : l'Orpailleur lit les
+  fichiers du PC, range dans un dossier existant s'il convient, sinon propose ; il
+  apprend et s'adapte à chaque utilisateur (préférences par utilisateur).
+  Prévu via l'application de bureau (`desktop/`) avec accès explicite à des dossiers.
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -102,17 +132,19 @@ sans permission locale. Non compilée (voir `docs/WHITE_LABEL_DESKTOP.md`).
 | `session` | POST refresh_token (revérifie le compte) | public |
 | `logout` | POST | public |
 | `bootstrap-owner` | POST (premier propriétaire, si aucun compte) | code propriétaire |
+| `diagnostic` | POST (quel code a été tapé, ce qui manque ; aucun secret renvoyé) | public |
+| `tidy` | GET (liste / `&id=`) · POST `action` create, step, decide, undo, stop | code pilote |
 | `users` | GET / POST (créer, désactiver, rôle, mot de passe) | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
-`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`.
+`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`.
 Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
 Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
-`tests/verify-app-users-sql.mjs`.
+`tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`.
 
 ## État des tests
-147 tests : 146 OK. Le seul échec, `tests/browser-response.test.js`, **existait
+158 tests : 157 OK. Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes

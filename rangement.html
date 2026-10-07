@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rangement</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.field textarea{font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:90px;resize:vertical;line-height:1.5}
+.req{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);width:100%}
+.req[aria-pressed="true"]{border:2px solid var(--brand)}
+.req .t{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.move{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:12px 16px;background:#fff}
+.move .path{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.why{font-size:13px;color:#36403C;margin:0;line-height:1.45}
+.bar{height:8px;background:#EEF0EE;border-radius:4px;overflow:hidden}.bar span{display:block;height:8px;background:var(--brand)}
+.warn-box{background:var(--warn-bg);border:1px solid #EBD3A6;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.5;color:#5C3B06}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html" aria-current="page">Rangement</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Rangement du Drive</h1>
+      <p class="lead">Demandez un rangement à l'Orpailleur, puis faites autre chose. Il lit les fichiers, range tout seul ce qui a déjà un dossier évident, et vous propose le reste. Il ne supprime jamais rien, et chaque déplacement peut être annulé.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-new">
+      <h2 id="h-new">Nouveau rangement</h2>
+      <div class="field"><label for="instructions">Que voulez-vous ranger, et comment ?</label>
+        <textarea id="instructions" maxlength="2000" placeholder="Ex. Range les pièces reçues des clients dans le dossier de chaque client, puis par année."></textarea></div>
+      <div class="field" style="max-width:520px"><label for="scope">Limiter à un dossier (facultatif)</label>
+        <input id="scope" type="text" maxlength="500" placeholder="Ex. Clients 2025"></div>
+      <div class="btn-row" style="align-items:center">
+        <button class="btn" id="launch" type="button">Lancer le rangement</button>
+        <span class="status" id="launch-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-list">
+      <div class="card-head"><h2 id="h-list">Mes rangements</h2><button class="btn ghost" id="refresh" type="button" style="padding:8px 14px;min-height:40px">Actualiser</button></div>
+      <div id="requests" class="stack"></div>
+    </section>
+
+    <section class="card" id="detail" aria-labelledby="h-detail" hidden>
+      <h2 id="h-detail">Rangement</h2>
+      <p class="meta" id="d-meta"></p>
+      <div class="bar" aria-hidden="true"><span id="d-bar" style="width:0%"></span></div>
+      <div class="kpis" id="d-kpis"></div>
+      <div class="warn-box" id="d-warn" hidden></div>
+      <div class="btn-row">
+        <button class="btn" id="approve-all" type="button" hidden>Valider toutes les propositions</button>
+        <button class="btn danger" id="stop" type="button">Arrêter ce rangement</button>
+      </div>
+      <h3 style="margin:8px 0 0;font-size:15px">À valider</h3>
+      <div id="proposals" class="stack"></div>
+      <h3 style="margin:8px 0 0;font-size:15px">Déjà rangés</h3>
+      <div id="moved" class="stack"></div>
+      <h3 style="margin:8px 0 0;font-size:15px">À lire d'abord ou incertains</h3>
+      <div id="others" class="stack"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var current = null, timer = null;
+  var STATUS = { planning: 'Lecture et préparation…', ready: 'Plan prêt : à valider', executing: 'Rangement en cours…', done: 'Terminé', stopped: 'Arrêté', failed: 'Échec' };
+  var WARN = {
+    MAPPING_REVIEW_REQUIRED: 'Aucun fichier ne sera déplacé tant que le propriétaire n’a pas validé la carte du Drive de l’Orpailleur. C’est la règle de sécurité du cabinet. Le plan reste prêt.',
+    DRIVE_WRITE_REQUIRES_DIRECT_ACCESS: 'Le plan est prêt, mais l’accès Google en écriture n’est pas encore configuré pour l’application (variable GOOGLE_SERVICE_ACCOUNT_JSON ou accès OAuth dans Vercel). Aucun fichier n’a été déplacé.'
+  };
+
+  function post(body) { return OM.api('/api/app?route=tidy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+
+  $('launch').addEventListener('click', function () {
+    var instructions = $('instructions').value.trim(), scope = $('scope').value.trim();
+    if (!instructions && !scope) { $('launch-status').textContent = 'Décrivez le rangement souhaité.'; $('launch-status').className = 'status error'; return; }
+    $('launch').disabled = true; $('launch-status').textContent = 'Lancement…'; $('launch-status').className = 'status';
+    post({ action: 'create', instructions: instructions, scope_path: scope, requested_by: OM.getUserName() || null })
+      .then(function (r) {
+        $('launch-status').textContent = 'C’est parti. Vous pouvez faire autre chose : l’Orpailleur travaille en arrière-plan.';
+        $('instructions').value = ''; $('scope').value = '';
+        loadList(r.id);
+      }).catch(function (e) { $('launch-status').textContent = 'Échec : ' + e.message; $('launch-status').className = 'status error'; })
+      .then(function () { $('launch').disabled = false; });
+  });
+
+  function loadList(select) {
+    OM.api('/api/app?route=tidy').then(function (d) {
+      var box = $('requests'); box.textContent = '';
+      var list = (d && d.requests) || [];
+      if (!list.length) { box.appendChild(el('p', 'Aucun rangement pour le moment.', 'empty')); return; }
+      list.forEach(function (r) {
+        var b = el('button', null, 'req'); b.type = 'button'; b.setAttribute('aria-pressed', String(current === r.id || select === r.id));
+        var t = el('span', null, 't');
+        t.appendChild(el('span', r.title));
+        var c = r.counts || {};
+        t.appendChild(el('span', [UI.dateTime(r.created_at), r.requested_by, (c.total || 0) + ' fichiers', (c.moved || 0) + ' rangés', (c.to_review || 0) + ' à valider'].filter(Boolean).join(' · '), 'meta'));
+        b.appendChild(t);
+        b.appendChild(el('span', STATUS[r.status] || r.status, r.status === 'ready' ? 'tag warn' : r.status === 'done' ? 'tag' : 'tag neutral'));
+        b.addEventListener('click', function () { open(r.id); });
+        box.appendChild(b);
+      });
+      if (select) open(select);
+    }).catch(function (e) { UI.fail($('requests'), e); });
+  }
+
+  function kpi(label, value) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', String(value || 0))); return k; }
+
+  function moveCard(it, buttons) {
+    var c = el('div', null, 'move');
+    c.appendChild(el('strong', it.file_name));
+    c.appendChild(el('span', 'De : ' + (it.current_path || '?'), 'path'));
+    c.appendChild(el('span', 'Vers : ' + (it.dest_path || '?') + (it.new_folder_name ? '  (nouveau dossier)' : ''), 'path'));
+    if (it.rationale) c.appendChild(el('p', it.rationale + (it.confidence != null ? ' — confiance ' + Math.round(it.confidence * 100) + ' %' : ''), 'why'));
+    if (it.error && it.error !== 'EN_COURS') c.appendChild(el('p', 'Erreur : ' + it.error, 'why'));
+    if (buttons) c.appendChild(buttons);
+    return c;
+  }
+
+  function render(d) {
+    var r = d.request, items = d.items || [], c = r.counts || {};
+    $('detail').hidden = false;
+    $('h-detail').textContent = r.title;
+    $('d-meta').textContent = (STATUS[r.status] || r.status) + ' · lancé le ' + UI.dateTime(r.created_at) + (r.scope_path ? ' · dossier « ' + r.scope_path + ' »' : '');
+    var done = (c.moved || 0) + (c.in_place || 0) + (c.rejected || 0);
+    $('d-bar').style.width = (c.total ? Math.round(100 * done / c.total) : (r.status === 'planning' ? 5 : 0)) + '%';
+    var k = $('d-kpis'); k.textContent = '';
+    [['Fichiers lus', c.total], ['Rangés', c.moved], ['À valider', c.to_review], ['Déjà bien rangés', c.in_place], ['À lire d’abord', c.needs_reading], ['Échecs', c.failed]].forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
+    $('d-warn').hidden = !WARN[r.last_error]; $('d-warn').textContent = WARN[r.last_error] || '';
+    $('stop').hidden = ['done', 'stopped', 'failed'].indexOf(r.status) >= 0;
+
+    var proposals = items.filter(function (i) { return i.status === 'planned' && i.mode === 'proposal'; });
+    $('approve-all').hidden = !proposals.length;
+    fill('proposals', proposals, function (it) {
+      var row = el('div', null, 'btn-row');
+      var ok = el('button', 'Valider', 'btn'); ok.type = 'button';
+      var no = el('button', 'Refuser', 'btn danger'); no.type = 'button';
+      ok.addEventListener('click', function () { act({ action: 'decide', request_id: r.id, item_ids: [it.id], decision: 'approve', decided_by: OM.getUserName() || null }); });
+      no.addEventListener('click', function () { act({ action: 'decide', request_id: r.id, item_ids: [it.id], decision: 'reject', decided_by: OM.getUserName() || null }); });
+      row.appendChild(ok); row.appendChild(no);
+      return moveCard(it, row);
+    }, 'Aucune proposition en attente.');
+    fill('moved', items.filter(function (i) { return i.status === 'moved' || i.status === 'approved'; }), function (it) {
+      var row = el('div', null, 'btn-row');
+      if (it.status === 'moved') {
+        var back = el('button', 'Annuler ce déplacement', 'btn ghost'); back.type = 'button';
+        back.addEventListener('click', function () { act({ action: 'undo', item_id: it.id }); });
+        row.appendChild(el('span', 'Rangé' + (it.decided_by ? ' · ' + it.decided_by : ''), 'tag'));
+        row.appendChild(back);
+      } else row.appendChild(el('span', 'En attente de déplacement', 'tag warn'));
+      return moveCard(it, row);
+    }, 'Rien n’a encore été déplacé.');
+    fill('others', items.filter(function (i) { return i.mode === 'needs_reading' || i.mode === 'unsure' || i.status === 'failed'; }).slice(0, 100), function (it) {
+      var row = el('div', null, 'btn-row');
+      row.appendChild(el('span', it.status === 'failed' ? 'Échec' : it.mode === 'needs_reading' ? 'Contenu pas encore lu par l’Orpailleur' : 'Pas de dossier évident', 'tag neutral'));
+      return moveCard(it, row);
+    }, 'Rien à signaler.');
+  }
+
+  function fill(id, list, render, empty) {
+    var box = $(id); box.textContent = '';
+    if (!list.length) { box.appendChild(el('p', empty, 'empty')); return; }
+    list.slice(0, 200).forEach(function (x) { box.appendChild(render(x)); });
+  }
+
+  function act(body) {
+    post(body).then(function () { if (current) open(current); })
+      .catch(function (e) { $('d-warn').hidden = false; $('d-warn').textContent = 'Échec : ' + e.message; });
+  }
+
+  function open(id) {
+    current = id;
+    OM.api('/api/app?route=tidy&id=' + encodeURIComponent(id)).then(function (d) {
+      render(d);
+      clearTimeout(timer);
+      var r = d.request;
+      if (r.status === 'planning' || r.status === 'executing') {
+        // If the background chain stopped (page closed, server restart), this page restarts it.
+        var idle = Date.now() - Date.parse(r.updated_at) > 30000;
+        if (idle) post({ action: 'step', request_id: id }).catch(function () {});
+        timer = setTimeout(function () { if (current === id) open(id); }, 8000);
+      }
+    }).catch(function (e) { $('d-warn').hidden = false; $('d-warn').textContent = 'Indisponible : ' + e.message; });
+  }
+
+  $('approve-all').addEventListener('click', function () { if (current) act({ action: 'decide', request_id: current, item_ids: 'all', decision: 'approve', decided_by: OM.getUserName() || null }); });
+  $('stop').addEventListener('click', function () { if (current && window.confirm('Arrêter ce rangement ? Les fichiers déjà rangés restent où ils sont.')) act({ action: 'stop', request_id: current }); });
+  $('refresh').addEventListener('click', function () { loadList(current); });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    loadList(new URLSearchParams(location.search).get('id'));
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

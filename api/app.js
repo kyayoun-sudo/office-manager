@@ -7,6 +7,7 @@ import { getMissionView } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
 import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount } from '../lib/accounts.js';
 import { diagnose } from '../lib/diagnostic.js';
+import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -23,6 +24,8 @@ import { diagnose } from '../lib/diagnostic.js';
 //   POST /api/app?route=logout                     end the session (public)
 //   POST /api/app?route=bootstrap-owner            first owner account (owner code, only if no account)
 //   POST /api/app?route=diagnostic                 which code was typed, what is missing (public, no secret shown)
+//   GET  /api/app?route=tidy[&id=…]                Orpailleur tidy-up requests / one request with its plan
+//   POST /api/app?route=tidy {action}              create | step | decide | undo | stop (background chained)
 //   GET  /api/app?route=users                      firm accounts — OWNER ONLY
 //   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -64,6 +67,11 @@ export const ROUTES = Object.freeze({
   session: { POST: open((orgId, req) => refreshSession(orgId, req.body || {})), unavailable: 'SESSION_UNAVAILABLE' },
   logout: { POST: open((orgId, req) => logout(req.body || {})), unavailable: 'LOGOUT_UNAVAILABLE' },
   'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
+  tidy: {
+    GET: (orgId, req) => req.query?.id ? getRequest(orgId, req.query.id) : listRequests(orgId),
+    POST: (orgId, req) => tidyAction(orgId, req),
+    unavailable: 'TIDY_UNAVAILABLE'
+  },
   diagnostic: { POST: open((orgId, req) => diagnose(req.body || {})), unavailable: 'DIAGNOSTIC_UNAVAILABLE' },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
@@ -71,6 +79,33 @@ export const ROUTES = Object.freeze({
     unavailable: 'USERS_UNAVAILABLE'
   }
 });
+
+// Starts the next background step without waiting for it (separate invocation).
+export function continueInBackground(req, requestId, fetchImpl = fetch) {
+  const host = req.headers?.host;
+  if (!host || !requestId) return Promise.resolve(false);
+  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+  const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '' };
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const sent = fetchImpl(proto + '://' + host + '/api/app?route=tidy', {
+    method: 'POST', headers, body: JSON.stringify({ action: 'step', request_id: requestId })
+  }).then(() => true, () => false);
+  return Promise.race([sent, new Promise(r => setTimeout(() => r(true), 1500))]);
+}
+
+async function tidyAction(orgId, req) {
+  const body = req.body || {};
+  const action = String(body.action || '');
+  let result, chainId = null;
+  if (action === 'create') { result = await createRequest(orgId, body); chainId = result.id; }
+  else if (action === 'step') { result = await step(orgId, body.request_id); if (result.more) chainId = body.request_id; }
+  else if (action === 'decide') { result = await decide(orgId, body); if (body.decision !== 'reject') chainId = body.request_id; }
+  else if (action === 'undo') result = await undo(orgId, body);
+  else if (action === 'stop') result = await stop(orgId, body);
+  else throw fail('UNKNOWN_ACTION', 400);
+  if (chainId) await continueInBackground(req, chainId);
+  return result;
+}
 
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];

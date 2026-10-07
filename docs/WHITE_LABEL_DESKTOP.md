@@ -125,3 +125,11 @@ Le test `tests/app-router.test.js` vérifie aussi que `api/` reste à 12 fichier
 `logout`, `bootstrap-owner`, `users` dans `api/app.js`, session persistante et
 bouton « Se déconnecter » dans `assets/brand-theme.js`, gestion des comptes dans
 `parametres.html`. Détails et limites : `docs/POUR_CHATGPT.md`.
+
+## Ajout 5 — Rangement du Drive par l'Orpailleur (2026-10-07)
+
+`rangement.html`, `lib/tidy.js`, `lib/tidy-planner.js`, `lib/tidy-drive.js`,
+`db/tidy.sql`, route `tidy` dans `api/app.js`, lien « Rangement » dans tous les
+menus. Rangement en arrière-plan, automatique si le dossier existe et que la
+carte du Drive est validée, propositions sinon, apprentissage des décisions,
+annulation. Détails et prérequis : `docs/POUR_CHATGPT.md`.
