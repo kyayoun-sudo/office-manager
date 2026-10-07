@@ -90,7 +90,7 @@ test('mission view: adds team names only, keeps latest plan, summarises', async 
 });
 
 test('screens: new pages never inject HTML and links stay inside the app', () => {
-  for (const f of ['accueil.html', 'mission.html', 'validations.html', 'assets/screens.js']) {
+  for (const f of ['accueil.html', 'mission.html', 'validations.html', 'assistant.html', 'assets/screens.js']) {
     const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8');
     assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src), f);
   }
