@@ -362,7 +362,7 @@
       $('g-redirect').textContent = g.redirect_uri || '';
       if (!g.client_configured) box.appendChild(gLine(false, 'Client Google de l’application non configuré (Vercel : GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET).'));
       if (g.connected) {
-        box.appendChild(gLine(true, 'Connecté avec ' + g.email));
+        box.appendChild(gLine(true, 'Connecté avec ' + g.email + (g.via ? ' (' + g.via + ')' : '')));
         box.appendChild(gLine(g.drive, 'Drive : ' + (g.drive ? 'lire, ranger, créer' : 'non autorisé')));
         box.appendChild(gLine(g.gmail_send, 'Gmail : ' + (g.gmail_send ? 'envoyer (après validation)' : 'envoi non autorisé') + (g.gmail_read ? ', lire le libellé PBC' : '')));
         if (g.check && g.check !== 'ok') box.appendChild(gLine(false, 'Test : ' + (ERRORS[g.check] || g.check)));

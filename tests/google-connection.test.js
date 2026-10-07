@@ -130,3 +130,25 @@ test('Drive du cabinet: pasted link checked with Google, saved for the firm, the
     resetGoogleConnectionCache();
   }
 });
+
+test('existing connection of 2026-10-05 (Supabase taty-google-oauth) is used directly; in a preview, the real firm’s Google identity serves the test firm', async () => {
+  resetGoogleConnectionCache();
+  const fetchRows = async (path, o = {}) => {
+    if (path.startsWith('office_google_connections') || path.startsWith('office_firm_drive')) return [];
+    if (path === 'rpc/office_get_google_drive_secret') return JSON.parse(o.body).p_org_id === 'real-org' ? [{ client_id: 'old-cid', client_secret: 'old-cs', refresh_token: '1//old' }] : [];
+    if (path.startsWith('office_integration_connections')) return [{ account_email: 'paulkomenan@taty.info', granted_scopes: [SCOPES.drive, SCOPES.sheets], status: 'connected' }];
+    return [];
+  };
+  let body = null;
+  const fetchImpl = async (url, o) => { body = new URLSearchParams(o.body); return { ok: true, json: async () => ({ access_token: 'tok', expires_in: 3600 }) }; };
+  const c = await loadGoogleConnection('real-org', { env: { VERCEL_ENV: 'production' }, fetchRows });
+  assert.equal(c.email, 'paulkomenan@taty.info');
+  assert.equal(await connectionAccessToken({ env: {}, fetchImpl }), 'tok');
+  assert.equal(body.get('client_id'), 'old-cid', 'the client of that connection is used');
+  resetGoogleConnectionCache();
+  assert.equal(await loadGoogleConnection('test-org', { env: { VERCEL_ENV: 'production' }, fetchRows }), null, 'production: never another firm’s access');
+  resetGoogleConnectionCache();
+  const t = await loadGoogleConnection('test-org', { env: { VERCEL_ENV: 'preview', TEST_RUN_FORBIDDEN_ORG_IDS: 'real-org' }, fetchRows });
+  assert.equal(t.email, 'paulkomenan@taty.info', 'preview: same Google account, writes locked to the test Drive');
+  resetGoogleConnectionCache();
+});
