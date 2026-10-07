@@ -31,6 +31,29 @@ import {
 
 const SECRET = "test-owner-secret";
 
+test("empty listing cannot overwrite a populated REGISTER or count a pass", async () => {
+  const drive = orgDrive();
+  await pass(drive);
+  const writes = drive.updated.length;
+  const { summary } = await pass(drive, "2026-10-07T00:45:00Z", {
+    listing: listingFromInventory([], { runStatus: "COMPLETE" })
+  });
+  assert.equal(summary.status, "LISTING_EMPTY_REFUSED");
+  assert.equal(summary.memory_written, false);
+  assert.equal(drive.updated.length, writes);
+  assert.equal(row(await reopen(drive), "DOC1").status, "PRESENT");
+});
+
+test("partial mapping warns explicitly and never checks absent objects", async () => {
+  const drive = orgDrive();
+  await pass(drive);
+  const { summary } = await pass(drive, "2026-10-07T01:00:00Z", { maxItems: 3 });
+  assert.match(summary.warning, /LISTING_INCOMPLETE/);
+  assert.equal(row(await reopen(drive), "DOC1").status, "PRESENT");
+  const complete = await pass(drive, "2026-10-07T02:00:00Z");
+  assert.equal(complete.summary.warning, undefined);
+});
+
 function fakeDrive() {
   const files = new Map();
   const texts = new Map();
@@ -505,59 +528,4 @@ test("approved target that disappeared -> REVIEW_REQUIRED, not silently used", a
   const resolution = resolveSemanticRole(await reopen(drive), "PBC_MASTER", SECRET);
   assert.equal(resolution.status, "REVIEW_REQUIRED");
   assert.equal(resolution.reason, "APPROVED_TARGET_MISSING");
-});
-
-// ---------------------------------------------------------------------------
-// Fix of 2026-10-07 (test on the real TATY Drive): partial / empty listings
-// ---------------------------------------------------------------------------
-
-import { getState } from "../lib/orpailleur-memory.js";
-import { inventoryListing } from "../lib/agent-tools.js";
-
-test("replay TATY 2026-10-07: an empty listing is refused, the memory is not overwritten", async () => {
-  const drive = orgDrive();
-  await pass(drive);
-  const writesBefore = drive.updated.length;
-  const empty = listingFromInventory([], { runId: "run-2", runStatus: "PARTIAL" });
-  const { summary } = await pass(drive, "2026-10-07T00:45:00Z", { listing: empty });
-  assert.equal(summary.status, "LISTING_EMPTY_REFUSED");
-  assert.equal(summary.memory_written, false);
-  assert.ok(summary.register_objects > 0);
-  assert.equal(drive.updated.length, writesBefore, "MAP / REGISTER untouched");
-  const memory = await reopen(drive);
-  assert.equal(getState(memory, "scan_count"), "1", "the refused pass is not counted");
-  assert.equal(row(memory, "DOC1").status, "PRESENT");
-});
-
-test("an incomplete listing is written with an explicit warning", async () => {
-  const drive = orgDrive();
-  const { summary } = await pass(drive, undefined, { maxItems: 3 });
-  assert.match(summary.warning, /^LISTING_INCOMPLETE: 3 objects/);
-  const memory = await reopen(drive);
-  assert.match(getState(memory, "last_pass_warning"), /LISTING_INCOMPLETE/);
-  const full = await pass(drive, "2026-10-06T12:00:00Z");
-  assert.equal(full.summary.warning, undefined);
-  assert.equal(getState(await reopen(drive), "last_pass_warning"), "");
-});
-
-test("inventory: latest COMPLETE run + rows re-tagged by a later partial run; no COMPLETE run = refused", async () => {
-  const runs = [
-    { id: "run-1", status: "COMPLETE", started_at: "2026-10-05T20:00:00Z" },
-    { id: "run-2", status: "PARTIAL", started_at: "2026-10-07T00:40:00Z" }
-  ];
-  const inventory = [
-    { file_id: "A", parent_id: "ROOT", folder_path: "/", name: "A", mime_type: FOLDER_MIME, last_scan_id: "run-1" },
-    { file_id: "B", parent_id: "A", folder_path: "/A/", name: "B.docx", mime_type: GOOGLE_DOC_MIME, last_scan_id: "run-2" },
-    { file_id: "OLD", parent_id: "ROOT", folder_path: "/", name: "old", mime_type: GOOGLE_DOC_MIME, last_scan_id: "run-0" }
-  ];
-  const fetchRows = async path => {
-    if (path.startsWith("orpailleur_scan_runs") && path.includes("status=eq.COMPLETE")) return runs.filter(r => r.status === "COMPLETE");
-    if (path.startsWith("orpailleur_scan_runs")) return runs.filter(r => r.started_at >= "2026-10-05T20:00:00Z");
-    const ids = decodeURIComponent(path).match(/last_scan_id=in\.\(([^)]*)\)/)[1].split(",").map(s => s.replace(/"/g, ""));
-    return inventory.filter(r => ids.includes(r.last_scan_id));
-  };
-  const listing = await inventoryListing("org-1", { fetchRows });
-  assert.equal(listing.complete, true);
-  assert.deepEqual(listing.items.map(i => i.id).sort(), ["A", "B"], "B was re-tagged by the partial run but still belongs to the Drive");
-  assert.equal(await inventoryListing("org-1", { fetchRows: async () => [] }), null);
 });

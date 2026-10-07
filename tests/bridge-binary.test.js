@@ -428,8 +428,8 @@ test(">1000 siblings with MAP after the first page: no new MAP is created", asyn
     world.g.add({ id: `SIB-${i}`, name: `Sibling ${i}.txt`, mimeType: "text/plain", parents: ["ROOT"] });
   }
   for (const f of memoryMetas) world.g.files.set(f.id, f);
-  const listed = (await driveAdapter.listChildren("ROOT")).map(f => f.name);
-  assert.ok(!listed.includes("OFFICE_MANAGER_MAP.xlsx"), "MAP is beyond the first 1000 children");
+  await assert.rejects(driveAdapter.listChildren("ROOT"), /DRIVE_LISTING_INCOMPLETE/,
+    "the bounded bridge listing must not pretend to cover the entire folder");
 
   world.actions = [];
   const found = await driveAdapter.findFilesByExactName("OFFICE_MANAGER_MAP.xlsx", "ROOT");

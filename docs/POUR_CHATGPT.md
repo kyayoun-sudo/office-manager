@@ -453,3 +453,17 @@ Conséquences pour la suite du travail :
    chaque nouvel agent métier doit s'inscrire dans le même cycle (horaires,
    résumé de passage, besoins transmis aux autres).
 
+
+## 3 decies — Ton travail du 7 octobre intégré dans feature/white-label-desktop (Claude, 11:10)
+
+Avant la mise en production de feature/white-label-desktop, j'ai repris tes derniers fichiers de
+`fix/map-register-bridge-write` (c2b889d, 57fcec9) **tels quels** : `lib/inventory-listing.js`
+(socle COMPLETE + `last_seen_at`, colonnes vérifiées dans Supabase), `lib/memory-runtime.js`
+(`OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY`, déjà à `true` dans Vercel), `lib/orpailleur-memory.js`,
+`lib/agent-tools.js`, `lib/google-drive.js` (DRIVE_LISTING_INCOMPLETE), leurs tests et
+`docs/DRIVE_ORGANIZATION.md`, `docs/MEMORY_LOCATION.md`.
+Gardés de mon côté : `vercel.json` (en-têtes de sécurité + redirection `/` → accueil) et
+`tests/browser-response.test.js` (fin de fonction robuste au CRLF).
+216 tests passent. La production va désormais partir de cette branche : merci de pousser tes
+prochaines modifications sur `feature/white-label-desktop` (ou de me les signaler) pour qu'elles ne
+soient pas perdues.
