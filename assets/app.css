@@ -11,7 +11,7 @@
 body{margin:0}
 a{color:var(--brand)}
 .shell{display:flex;flex-wrap:wrap;min-height:100vh}
-.nav{flex:1 1 220px;max-width:100%;background:var(--nav);color:#E8EEEB;padding:24px 16px;display:flex;flex-direction:column;gap:4px}
+.nav{flex:0 0 240px;max-width:100%;background:var(--nav);color:#E8EEEB;padding:24px 16px;display:flex;flex-direction:column;gap:4px}
 .brand{display:flex;align-items:center;gap:10px;padding:0 8px 24px}
 .logo{width:34px;height:34px;border-radius:8px;background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden}
 .brand small{display:block;font-size:12px;color:#A9B8B2}
@@ -38,4 +38,4 @@ input[type=text],input[type=password],input[type=search]{font:inherit;font-size:
 .chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 16px;min-height:40px;cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-@media(max-width:700px){.main{padding:20px 16px 32px}}
+@media(max-width:700px){.nav{flex:1 1 100%}.main{padding:20px 16px 32px}}
