@@ -1,54 +1,102 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
-/* Shared styles for the application pages. Brand colour comes from --brand.
-   Futuristic typography: Space Grotesk (text, headings), JetBrains Mono (technical details). */
+@import url("https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap");
+/* Office Manager — workspace design (2026-10-07, Paul: « trop long, sans style, manque de futur »).
+   Lagoon green of the firm, deep mangrove rail, brass for what waits for a decision.
+   One family (Schibsted Grotesk), tabular figures for numbers. Long pages become tabs
+   (assets/brand-theme.js). Light and dark follow the computer's setting. */
 :root{
   --brand:#0E5A52; --on-brand:#FFFFFF;
-  --nav:#14231F; --nav-text:#D3DDD9; --nav-active:#22382F;
-  --ground:#F3F4F1; --surface:#FFFFFF; --ink:#17201D; --muted:#505A56; --line:#DADFDB;
-  --warn-bg:#FBF0DC; --warn-ink:#7A4F08; --soft:#E3EFEC;
-  font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --nav:#0C1A17; --nav-text:#B9C8C2; --nav-active:#17302A; --nav-line:#1F3A33;
+  --ground:#EDF1EF; --surface:#FFFFFF; --surface-2:#F6F8F7; --ink:#142019; --muted:#56635D; --line:#DCE3E0;
+  --brass:#C8922E; --brass-soft:#F7ECD6; --brass-ink:#6B4A0E;
+  --warn-bg:#F7ECD6; --warn-ink:#6B4A0E; --soft:#DDEDE8; --danger:#B5482B;
+  --radius:14px; --radius-s:9px;
+  --shadow:0 1px 0 rgba(20,32,25,.04),0 8px 24px -16px rgba(20,32,25,.18);
+  --mono:"Schibsted Grotesk",system-ui,sans-serif;
+  font-family:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-feature-settings:"tnum" 1;
   color:var(--ink); background:var(--ground);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --nav:#08110F; --nav-text:#9FB2AB; --nav-active:#132823; --nav-line:#18302A;
+    --ground:#0F1715; --surface:#16211E; --surface-2:#1B2824; --ink:#E6EEEA; --muted:#97A8A1; --line:#26362F;
+    --brass-soft:#3A2E16; --brass-ink:#F0C877; --warn-bg:#3A2E16; --warn-ink:#F0C877; --soft:#173A33;
+    --shadow:0 1px 0 rgba(0,0,0,.2),0 10px 28px -18px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+  input,textarea,select{background:var(--surface-2) !important;color:var(--ink) !important;border-color:var(--line) !important}
+  .item,.kpi,.searchbox{background:var(--surface) !important}
 }
 *{box-sizing:border-box}
-/* Elements marked hidden stay hidden, whatever their display rule (cards, rows…). */
 [hidden]{display:none !important}
-body{margin:0}
+html,body{margin:0;background:var(--ground)}
 a{color:var(--brand)}
-.shell{display:flex;flex-wrap:wrap;min-height:100vh}
-.nav{flex:0 0 240px;max-width:100%;background:var(--nav);color:#E8EEEB;padding:24px 16px;display:flex;flex-direction:column;gap:4px}
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px 24px}
-.logo{width:34px;height:34px;border-radius:8px;background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden}
-.brand small{display:block;font-size:12px;color:#A9B8B2}
-.nav a{color:var(--nav-text);text-decoration:none;padding:11px 12px;border-radius:8px;font-size:14px}
-.nav a[aria-current="page"]{background:var(--nav-active);color:#fff;font-weight:500}
-.nav .who{margin-top:auto;padding:16px 12px 0;border-top:1px solid #2C433A;font-size:12px;color:#A9B8B2}
-.main{flex:999 1 560px;min-width:0;padding:28px 32px 40px;display:flex;flex-direction:column;gap:20px;max-width:1140px}
-h1{margin:0;font-size:32px;font-weight:700;letter-spacing:-.03em}
-.lead{margin:0;color:var(--muted);line-height:1.5}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
-.card h2{margin:0;font-size:16px}
-label{font-size:13px;font-weight:500;color:#36403C}
-input[type=text],input[type=password],input[type=search]{font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;width:100%}
+::selection{background:var(--soft)}
+
+/* ---- Shell: fixed rail + content ---- */
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.nav{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--nav);color:#E8EEEB;padding:18px 12px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;margin-bottom:6px;border-bottom:1px solid var(--nav-line)}
+.brand span[data-firm-name]{font-weight:700;font-size:15px;line-height:1.2}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-weight:800;overflow:hidden;flex:none}
+.brand small{display:block;font-size:12px;color:var(--nav-text);opacity:.8}
+.nav a{display:flex;align-items:center;gap:11px;color:var(--nav-text);text-decoration:none;padding:9px 10px;border-radius:9px;font-size:14px;font-weight:500;line-height:1.2}
+.nav a svg{width:18px;height:18px;flex:none;opacity:.85}
+.nav a:hover{background:var(--nav-active);color:#fff}
+.nav a[aria-current="page"]{background:var(--brand);color:var(--on-brand)}
+.nav a[aria-current="page"] svg{opacity:1}
+.nav .badge{margin-left:auto}
+.nav .who{margin-top:auto;padding:14px 8px 4px;border-top:1px solid var(--nav-line);font-size:13px;color:var(--nav-text)}
+.nav-toggle{display:none}
+
+.main{min-width:0;width:100%;max-width:1240px;padding:28px 36px 56px;display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.025em;line-height:1.15}
+h2,h3{letter-spacing:-.015em}
+.lead{margin:0;color:var(--muted);line-height:1.5;max-width:72ch;font-size:15px}
+
+/* Sections: one surface level; list items are lighter so the hierarchy reads. */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.card h2{margin:0;font-size:17px;font-weight:700}
+label{font-size:13px;font-weight:600;color:var(--muted)}
+input[type=text],input[type=password],input[type=search],input[type=email],select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--surface);border:1px solid #C9D3CE;border-radius:var(--radius-s);padding:10px 12px;min-height:42px;width:100%}
+textarea{line-height:1.5}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
 .field{display:flex;flex-direction:column;gap:6px}
-.btn{font:inherit;font-size:14px;border:0;background:var(--brand);color:var(--on-brand);border-radius:8px;padding:11px 20px;min-height:44px;font-weight:500;cursor:pointer}
+.btn{font:inherit;font-size:14px;border:0;background:var(--brand);color:var(--on-brand);border-radius:var(--radius-s);padding:10px 18px;min-height:42px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:filter .12s,transform .12s}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
 .btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
-.btn:disabled{opacity:.55;cursor:not-allowed}
-.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.btn.ghost:hover{border-color:var(--brand);filter:none}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
 .grow{flex:999 1 460px;min-width:0;display:flex;flex-direction:column;gap:16px}
 .side{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px}
-.status{font-size:14px;min-height:20px}
-.status.error{color:#9A3412}
+.status{font-size:14px;min-height:20px;color:var(--muted)}
+.status.error{color:var(--danger)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 16px;min-height:40px;cursor:pointer}
-.chip[aria-pressed="true"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.chip{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px;min-height:36px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-@media(max-width:700px){.nav{flex:1 1 100%}.main{padding:20px 16px 32px}}
-
-/* Futuristic finish: tighter headings, mono labels, crisp focus ring. */
-h2,h3{letter-spacing:-.02em}
-.card h2,.card-head h2{font-weight:600}
-.lead{letter-spacing:-.005em}
-.brand small,.kpi span:first-child,.callout-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
-.nav a{letter-spacing:.01em}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+details>summary{cursor:pointer;font-weight:600}
+
+/* ---- Tabs built from a long page's sections ---- */
+.tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;padding:6px;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;scrollbar-width:none}
+.tabs button{font:inherit;font-size:14px;font-weight:600;white-space:nowrap;border:0;background:none;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer}
+.tabs button:hover{color:var(--ink);background:var(--surface)}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+/* ---- Small screens: the rail becomes a top bar with a menu ---- */
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .nav{position:sticky;top:0;height:auto;z-index:20;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 12px;gap:6px}
+  .brand{border:0;padding:0;margin:0;flex:1}
+  .nav-toggle{display:inline-flex;font:inherit;background:var(--nav-active);color:#fff;border:0;border-radius:8px;padding:8px 12px;min-height:40px;cursor:pointer}
+  .nav a,.nav .who{display:none;width:100%}
+  .nav.open a:not([hidden]),.nav.open .who{display:flex}
+  .nav.open .who{display:block}
+  .main{padding:18px 16px 40px}
+  h1{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;scroll-behavior:auto !important}}

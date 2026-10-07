@@ -148,14 +148,80 @@
     if (!who || document.getElementById('logout-btn')) return;
     var b = document.createElement('button');
     b.type = 'button'; b.id = 'logout-btn'; b.textContent = 'Se déconnecter';
-    b.style.cssText = 'display:block;margin-top:8px;font:inherit;font-size:13px;background:transparent;border:1px solid #2C433A;color:#D3DDD9;border-radius:8px;padding:8px 12px;min-height:36px;cursor:pointer';
+    b.style.cssText = 'display:block;margin-top:8px;font:inherit;font-size:13px;background:transparent;border:1px solid var(--nav-line);color:var(--nav-text);border-radius:8px;padding:8px 12px;min-height:36px;cursor:pointer';
     b.addEventListener('click', OM.logout);
     who.appendChild(b);
   }
 
+  // ---- Workspace shell: icons in the rail, a menu button on small screens, tabs for long pages ----
+  var ICONS = {
+    '/accueil.html': 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+    '/recherche.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5',
+    '/mission.html': 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
+    '/rangement.html': 'M3 6h7l2 2h9v11H3zM8 13h8',
+    '/equipe.html': 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a2.5 2.5 0 1 0 0-5M3 20c0-3 3-5 6-5s6 2 6 5m2-5c2 0 4 1.5 4 4',
+    '/validations.html': 'M5 12l4 4 10-10M4 20h16',
+    '/messagerie.html': 'M4 5h16v11H8l-4 4z',
+    '/assistant.html': 'M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z',
+    '/entrainement.html': 'M4 19V9l8-5 8 5v10M9 19v-6h6v6',
+    '/mise-en-service.html': 'M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6l3 3M18 6l-3 3M9 15l-3 3',
+    '/parametres.html': 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6l1.4 1.4m0-11.4l-1.4 1.4m-8.6 8.6l-1.4 1.4'
+  };
+  function decorateShell() {
+    var nav = document.querySelector('.nav');
+    if (!nav || nav.dataset.decorated) return;
+    nav.dataset.decorated = '1';
+    nav.querySelectorAll('a[href]').forEach(function (a) {
+      var d = ICONS[a.getAttribute('href')]; if (!d || a.querySelector('svg')) return;
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '1.8'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path);
+      a.insertBefore(svg, a.firstChild);
+    });
+    var brand = nav.querySelector('.brand');
+    if (brand && !nav.querySelector('.nav-toggle')) {
+      var t = document.createElement('button'); t.type = 'button'; t.className = 'nav-toggle'; t.textContent = 'Menu'; t.setAttribute('aria-expanded', 'false');
+      t.addEventListener('click', function () { var o = nav.classList.toggle('open'); t.setAttribute('aria-expanded', String(o)); });
+      brand.after(t);
+    }
+  }
+  // A page with many sections shows them as tabs instead of one long scroll.
+  function autoTabs() {
+    var main = document.querySelector('.main');
+    if (!main || main.dataset.tabs) return;
+    var groups = new Map();
+    main.querySelectorAll('section.card').forEach(function (sec) {
+      if (sec.id === 'login' || !sec.querySelector('h2')) return;
+      var p = sec.parentElement; if (!groups.has(p)) groups.set(p, []); groups.get(p).push(sec);
+    });
+    var best = null;
+    groups.forEach(function (list) { if (list.length >= 4 && (!best || list.length > best.length)) best = list; });
+    if (!best) return;
+    main.dataset.tabs = '1';
+    var bar = document.createElement('div'); bar.className = 'tabs'; bar.setAttribute('role', 'tablist');
+    var key = 'om_tab:' + location.pathname;
+    var saved = 0; try { saved = Number(sessionStorage.getItem(key)) || 0; } catch (e) {}
+    var buttons = best.map(function (sec, i) {
+      var h = sec.querySelector('h2');
+      var label = (h.firstChild && h.firstChild.nodeType === 3 ? h.firstChild.textContent : h.textContent).trim().replace(/\s*\(.*$/, '');
+      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = label;
+      b.addEventListener('click', function () { select(i); try { sessionStorage.setItem(key, String(i)); } catch (e) {} });
+      bar.appendChild(b); return b;
+    });
+    function select(i) {
+      best.forEach(function (sec, j) { sec.style.display = j === i ? '' : 'none'; buttons[j].setAttribute('aria-selected', String(j === i)); });
+    }
+    // Sections the page itself hides (not ready yet, owner only…) lose their tab too.
+    function sync() { buttons.forEach(function (b, j) { b.hidden = best[j].hidden; }); }
+    new MutationObserver(sync).observe(main, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    best[0].parentElement.insertBefore(bar, best[0]);
+    sync(); select(Math.min(saved, best.length - 1));
+  }
+
   if (!onLoginPage()) {
     if (!readSession()) { OM.forget(true); return; }
-    var ready = function () { addLogout(); OM.paintUser(); OM.checkSession(); };
+    var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
 })();
