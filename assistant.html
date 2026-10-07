@@ -137,6 +137,24 @@ details.card[open] summary{margin-bottom:6px}
     return (err && err.message) || 'La demande a échoué.';
   }
 
+  // The agents need the owner's go-ahead once (Drive, documents, AI).
+  function askPermission() {
+    var box = $('answer'); box.textContent = '';
+    var p = document.createElement('p'); p.style.margin = '0 0 10px';
+    p.textContent = 'Les agents attendent votre accord, une seule fois : lire votre Drive, lire les documents utiles à la demande et utiliser l’IA. Rien n’est envoyé à l’extérieur sans votre validation dans « À valider ».';
+    box.appendChild(p);
+    var OMx = window.OfficeManager;
+    if (!(OMx && OMx.isOwner && OMx.isOwner())) { var w = document.createElement('p'); w.style.margin = '0'; w.textContent = 'Demandez au propriétaire du cabinet de cliquer sur « Autoriser les agents ».'; box.appendChild(w); return; }
+    var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = 'Autoriser les agents';
+    b.addEventListener('click', function () {
+      b.disabled = true; b.textContent = 'Autorisation…';
+      OMx.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(function () { box.textContent = 'C’est autorisé. Envoi de votre demande…'; $('send').click(); })
+        .catch(function (e) { b.disabled = false; b.textContent = 'Autoriser les agents'; p.textContent = 'Autorisation impossible : ' + readable(e); });
+    });
+    box.appendChild(b);
+  }
+
   // Agent choice
   Array.prototype.forEach.call($('agents').children, function (b) {
     b.addEventListener('click', function () {
@@ -166,7 +184,11 @@ details.card[open] summary{margin-bottom:6px}
         lastReply = { missionId: replyMission, text: data.answer };
         $('plan-copy').disabled = false;
       }
-    }).catch(function (err) { $('answer').textContent = 'Erreur : ' + readable(err); })
+    }).catch(function (err) {
+      var code = err && err.message;
+      if (code === 'EXTERNAL_AI_APPROVAL_REQUIRED' || code === 'CONTENT_PROCESSING_APPROVAL_REQUIRED') return askPermission();
+      $('answer').textContent = 'Erreur : ' + readable(err);
+    })
       .then(function () { $('send').disabled = false; });
   });
 

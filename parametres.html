@@ -76,6 +76,9 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="g-drive" type="text" class="mono" style="flex:1;min-width:240px" placeholder="https://drive.google.com/drive/folders/0A…">
             <button class="btn ghost" id="g-drive-save" type="button">Utiliser ce Drive</button></div>
             <span class="hint" id="g-drive-now"></span></div>
+          <div class="stack" style="gap:6px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost" id="g-allow" type="button">Autoriser les agents</button>
+            <span class="hint" id="g-allow-state">Lire le Drive, lire les documents utiles et utiliser l’IA. Les envois passent toujours par « À valider ».</span></div></div>
           <details><summary class="hint">Première fois : adresse de retour à déclarer chez Google</summary>
             <p class="hint" style="margin:6px 0 0">Dans la console Google Cloud du cabinet (Identifiants → client OAuth de l'application → « URI de redirection autorisés »), ajoutez une fois cette adresse :</p>
             <p class="mono" id="g-redirect" style="overflow-wrap:anywhere;font-size:13px;margin:4px 0 0"></p>
@@ -387,6 +390,18 @@
       .catch(function (err) { $('g-status').textContent = explain(err); });
   });
   $('g-test').addEventListener('click', function () { loadGoogle(true); });
+  function loadAllow() {
+    return OM.api('/api/app?route=agent-permissions').then(function (p) {
+      $('g-allow-state').textContent = p.granted ? '✓ Agents autorisés (Drive, documents, IA). Les envois passent toujours par « À valider ».' : 'Les agents attendent votre accord : lire le Drive, lire les documents utiles et utiliser l’IA.';
+      $('g-allow').textContent = p.granted ? 'Autorisé' : 'Autoriser les agents'; $('g-allow').disabled = p.granted;
+    }).catch(function () {});
+  }
+  $('g-allow').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('g-allow-state').textContent = 'Autorisation…';
+    OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(loadAllow).catch(function (err) { b.disabled = false; $('g-allow-state').textContent = 'Autorisation impossible : ' + explain(err); });
+  });
+  loadAllow();
   $('g-drive-save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('g-status').textContent = 'Vérification du Drive auprès de Google…';
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', link: $('g-drive').value, by: OM.getUserName() || null }) })

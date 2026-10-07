@@ -20,6 +20,7 @@ import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogle
 import { assertIsolatedOrg } from '../lib/test-mode.js';
 import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
 import { googleClientConfigured } from '../lib/google-connection.js';
+import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -203,6 +204,14 @@ export const ROUTES = Object.freeze({
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'GOOGLE_UNAVAILABLE'
+  },
+  // "Autoriser les agents": Drive listing, reading of chosen documents, AI — granted by the owner
+  //   GET  /api/app?route=agent-permissions        granted or not (any account)
+  //   POST /api/app?route=agent-permissions        grant (owner / partner, personal session)
+  'agent-permissions': {
+    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
+    POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
+    unavailable: 'PERMISSIONS_UNAVAILABLE'
   },
   'google-callback': {
     GET: open(async (orgId, req) => {
