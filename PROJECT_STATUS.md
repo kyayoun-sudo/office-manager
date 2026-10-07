@@ -160,3 +160,7 @@ connected and deployed. Do not claim completion from mocked tests alone.
 - Build verified READY. GET /api/health returned HTTP 200, status ok.
   Provider flags were present for Supabase, OpenAI, Anthropic, Orpailleur and
   Google Drive/Sheets; these are configuration flags, not full live tests.
+
+## Intégration Codex — budget de mission (7 octobre 2026)
+
+Sur `fix/map-register-bridge-write`, ajout du budget de mission : proposition du Mission Controller, revue propriétaire, classeur vierge calculé et création dans le dossier de mission après validation. Détails et étapes de mise en service dans `docs/MISSION_BUDGETS.md`. Tables, route regroupée et action de relais ajoutées ; pas de nouvelle fonction dans `api/`. Aucun déploiement ni migration effectué pour cette fonctionnalité.

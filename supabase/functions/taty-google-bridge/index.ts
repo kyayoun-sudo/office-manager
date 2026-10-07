@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { oauthCredentials } from "./oauth-credentials.ts";
 import { DEFAULT_ORG_ID } from "./deployment-config.ts";
+import { tidyMoveAction } from './tidy-moves.ts';
+import { createMissionBudgetAction, budgetGoogleDeps } from './mission-budget-files.ts';
 import {
   BridgeError,
   createBinaryFileAction,
@@ -186,7 +188,7 @@ function driveParams(extra: Record<string, string> = {}) {
 async function fileMetadata(fileId: string) {
   const p = new URLSearchParams({
     supportsAllDrives: "true",
-    fields: "id,name,mimeType,parents,modifiedTime,createdTime,webViewLink,size,description,driveId"
+    fields: "id,name,mimeType,parents,modifiedTime,createdTime,webViewLink,size,description,driveId,trashed"
   });
   return gjson(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?${p.toString()}`
@@ -269,6 +271,29 @@ Deno.serve(async req => {
     const body = await req.json();
     const action = String(body?.action || "");
 
+    if (action === 'create_mission_budget') {
+      const read = async (table: string, filter: string) => {
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const response = await fetch((Deno.env.get('SUPABASE_URL') || '') + '/rest/v1/' + table + '?' + filter, { headers: { apikey: key, Authorization: 'Bearer ' + key } });
+        if (!response.ok) throw new BridgeError('BUDGET_RECORD_UNREADABLE', 503);
+        return (await response.json())[0] || null;
+      };
+      const scope = (org: string) => 'org_id=eq.' + encodeURIComponent(org);
+      return json(await createMissionBudgetAction({ ...budgetGoogleDeps(gfetch, DRIVE_ID),
+        orgId: Deno.env.get('DEFAULT_ORG_ID') || DEFAULT_ORG_ID,
+        getBudget: (org: string, id: string) => read('office_mission_budget_versions', scope(org) + '&id=eq.' + encodeURIComponent(id) + '&select=*&limit=1'),
+        getDecision: (org: string, id: string) => read('office_mission_budget_decisions', scope(org) + '&budget_id=eq.' + encodeURIComponent(id) + '&select=decision,content_hash&order=sequence.desc&limit=1'),
+        claimBudget: async (org: string, id: string, hash: string) => {
+          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+          const response = await fetch((Deno.env.get('SUPABASE_URL') || '') + '/rest/v1/office_mission_budget_exports', { method: 'POST', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ org_id: org, budget_id: id, content_hash: hash }) });
+          if (response.status === 409) return false;
+          if (!response.ok) throw new BridgeError('BUDGET_EXPORT_CLAIM_FAILED', 503);
+          return true;
+        },
+        folderLinked: async (org: string, mission: string, folder: string) => Boolean(await read('orpailleur_inventory', scope(org) + '&office_mission_id=eq.' + encodeURIComponent(mission) + '&file_id=eq.' + encodeURIComponent(folder) + '&is_folder=eq.true&select=file_id&limit=1'))
+      }, body));
+    }
+
     if (action === "status") {
       const drive = await gjson(
         `https://www.googleapis.com/drive/v3/drives/${encodeURIComponent(DRIVE_ID)}?fields=id,name`
@@ -315,6 +340,29 @@ Deno.serve(async req => {
           parents: [String(body.parent_id || "")]
         })
       }));
+    }
+
+    if (action === 'tidy_move') {
+      const readRow = async (table: string, filter: string) => {
+        const base = Deno.env.get('SUPABASE_URL') || '';
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const response = await fetch(base + '/rest/v1/' + table + '?' + filter + '&select=*&limit=1', {
+          headers: { apikey: key, Authorization: 'Bearer ' + key }
+        });
+        if (!response.ok) throw new BridgeError('TIDY_RECORD_UNREADABLE', 503);
+        return (await response.json())[0] || null;
+      };
+      const scope = 'org_id=eq.' + encodeURIComponent(String(body.org_id || '')) + '&request_id=eq.' + encodeURIComponent(String(body.request_id || ''));
+      return json(await tidyMoveAction({
+        orgId: Deno.env.get('DEFAULT_ORG_ID') || DEFAULT_ORG_ID, driveId: DRIVE_ID,
+        getItem: (_org: string, _request: string, id: string) => readRow('office_tidy_items', scope + '&id=eq.' + encodeURIComponent(id)),
+        getRequest: (org: string, id: string) => readRow('office_tidy_requests', 'org_id=eq.' + encodeURIComponent(org) + '&id=eq.' + encodeURIComponent(id)),
+        getMetadata: fileMetadata,
+        move: (id: string, from: string, to: string) => {
+          const params = new URLSearchParams({ supportsAllDrives: 'true', addParents: to, removeParents: from, fields: 'id,parents' });
+          return gjson('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?' + params.toString(), { method: 'PATCH', body: '{}' });
+        }
+      }, body));
     }
 
     if (action === "copy_file") {

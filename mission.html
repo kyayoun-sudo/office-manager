@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Missions</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html" aria-current="page">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <!-- List of missions (no id in the address) -->
+    <section id="list-view" hidden>
+      <header class="page-head" style="margin-bottom:16px">
+        <h1>Missions</h1>
+        <p class="lead">Choisissez une mission pour ouvrir son dossier.</p>
+      </header>
+      <div id="missions" class="stack"><p class="empty">Chargement…</p></div>
+    </section>
+
+    <!-- One mission -->
+    <section id="dossier-view" class="stack" style="gap:20px" hidden>
+      <header class="page-head">
+        <a href="/mission.html">← Toutes les missions</a>
+        <h1 id="m-name">Mission</h1>
+        <p class="meta" id="m-meta"></p>
+      </header>
+
+      <div class="kpis">
+        <div class="kpi"><span>Documents reliés</span><strong id="k-docs">–</strong></div>
+        <div class="kpi"><span>Documents vérifiés</span><strong id="k-ver">–</strong></div>
+        <div class="kpi"><span>Équipe active</span><strong id="k-team">–</strong></div>
+        <div class="kpi"><span>Actions ouvertes</span><strong id="k-act">–</strong></div>
+      </div>
+
+      <section class="card" id="blockers-card" aria-labelledby="h-block" hidden>
+        <h2 id="h-block">Points à régler</h2>
+        <ul class="blockers" id="blockers"></ul>
+      </section>
+
+      <div class="row">
+        <div class="grow">
+          <section class="card" aria-labelledby="h-team">
+            <h2 id="h-team">Équipe</h2>
+            <div class="table-box"><table>
+              <thead><tr><th scope="col">Personne</th><th scope="col">Rôle sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
+              <tbody id="team"></tbody>
+            </table></div>
+          </section>
+          <section class="card" aria-labelledby="h-act">
+            <div class="card-head"><h2 id="h-act">Actions de la mission</h2><a href="/validations.html">À valider</a></div>
+            <div id="actions" class="stack"></div>
+          </section>
+          <section class="card" aria-labelledby="h-docs">
+            <h2 id="h-docs">Documents</h2>
+            <div id="docs" class="stack"></div>
+          </section>
+        </div>
+        <aside class="side">
+          <section class="card" aria-labelledby="h-plan">
+            <h2 id="h-plan">Plan proposé (dernière version)</h2>
+            <p class="empty" id="plan-empty">Aucun plan enregistré.</p>
+            <ol class="blockers" id="phases"></ol>
+            <p class="meta" id="plan-guard"></p>
+            <a id="plan-decisions-link" hidden>Lire le plan et voir les décisions</a>
+            <p><a id="programme-link" hidden>Préparer le programme détaillé</a></p><p><a id="budget-link">Préparer le budget de mission</a></p>
+          </section>
+          <section class="card" aria-labelledby="h-steps">
+            <h2 id="h-steps">Prochaines étapes suggérées</h2>
+            <ol class="blockers" id="steps"></ol>
+          </section>
+        </aside>
+      </div>
+
+      <section class="ask" aria-labelledby="h-ask">
+        <h2 id="h-ask">Demander au Mission Controller sur cette mission</h2>
+        <label for="question" class="sr">Votre question</label>
+        <textarea id="question" maxlength="2000" placeholder="Ex. Quelles pièces manquent encore pour le cycle Achats ?"></textarea>
+        <div class="btn-row">
+          <button class="btn" id="ask" type="button" style="background:#E2B05A;color:#14231F">Demander</button>
+        </div>
+        <p class="note">Cette question est envoyée à l'IA (OpenAI) avec les informations de la mission. L'agent prépare et propose ; il n'envoie rien au client.</p>
+        <div class="answer" id="answer" role="status" aria-live="polite" hidden></div>
+      </section>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var missionId = params.get('id');
+  var current = null;
+
+  function showList() {
+    $('list-view').hidden = false;
+    OM.api('/api/missions').then(function (data) {
+      var box = $('missions'); box.textContent = '';
+      var list = (data && data.missions) || [];
+      if (!list.length) { box.appendChild(el('p', 'Aucune mission enregistrée.', 'empty')); return; }
+      list.forEach(function (m) {
+        var a = el('a', null, 'item link-item');
+        a.href = '/mission.html?id=' + encodeURIComponent(m.id);
+        var t = el('div', null, 't');
+        t.appendChild(el('span', m.name || m.mission_code || 'Mission'));
+        t.appendChild(el('span', [m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta'));
+        a.appendChild(t);
+        if (m.status) a.appendChild(el('span', m.status, 'tag'));
+        box.appendChild(a);
+      });
+    }).catch(function (e) { UI.fail($('missions'), e); });
+  }
+
+  function fillList(boxId, items, render, emptyText) {
+    var box = $(boxId); box.textContent = '';
+    if (!items.length) { box.appendChild(el('p', emptyText, 'empty')); return; }
+    items.forEach(function (x) { box.appendChild(render(x)); });
+  }
+
+  function showDossier(d) {
+    current = d;
+    $('dossier-view').hidden = false;
+    var m = d.mission || {};
+    $('m-name').textContent = m.name || m.mission_code || 'Mission';
+    document.title = (m.name || 'Mission') + ' · Missions';
+    $('m-meta').textContent = [m.mission_code, m.status, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · ');
+    var s = d.summary || {};
+    $('k-docs').textContent = s.documents_total; $('k-ver').textContent = s.documents_verified;
+    $('k-team').textContent = s.team_size; $('k-act').textContent = s.open_actions;
+
+    var blockers = d.blockers || [];
+    $('blockers-card').hidden = !blockers.length;
+    $('blockers').textContent = '';
+    blockers.forEach(function (b) { $('blockers').appendChild(el('li', b)); });
+
+    var tbody = $('team'); tbody.textContent = '';
+    if (!(d.assignments || []).length) {
+      var tr = el('tr'); var td = el('td', 'Aucune affectation enregistrée.', 'empty'); td.colSpan = 5; tr.appendChild(td); tbody.appendChild(tr);
+    }
+    (d.assignments || []).forEach(function (a) {
+      var tr = el('tr');
+      tr.appendChild(el('td', a.full_name || 'Profil non trouvé'));
+      tr.appendChild(el('td', a.mission_role || a.role_title || '–'));
+      tr.appendChild(el('td', UI.dateRange(a.planned_start, a.planned_end)));
+      tr.appendChild(el('td', a.allocation_pct != null ? a.allocation_pct + ' %' : '–'));
+      var st = el('td'); st.appendChild(el('span', a.status || '–', 'tag neutral')); tr.appendChild(st);
+      tbody.appendChild(tr);
+    });
+
+    fillList('actions', d.actions || [], function (a) {
+      var item = el('div', null, 'item');
+      var t = el('div', null, 't');
+      t.appendChild(el('span', a.summary || a.action_type));
+      t.appendChild(el('span', [a.agent_key, a.action_type, a.due_at ? 'échéance ' + UI.date(a.due_at) : ''].filter(Boolean).join(' · '), 'meta'));
+      item.appendChild(t);
+      item.appendChild(el('span', a.work_state || a.status || '–', a.status === 'proposed' ? 'tag warn' : 'tag neutral'));
+      return item;
+    }, 'Aucune action enregistrée.');
+
+    fillList('docs', d.documents || [], function (doc) {
+      var item = el('div', null, 'item');
+      var t = el('div', null, 't');
+      t.appendChild(el('span', doc.name || 'Sans nom'));
+      t.appendChild(el('span', doc.document_type || '', 'meta'));
+      item.appendChild(t);
+      item.appendChild(el('span', doc.content_verified_at ? 'Contenu vérifié' : 'À vérifier', doc.content_verified_at ? 'tag' : 'tag warn'));
+      return item;
+    }, 'Aucun document relié à cette mission.');
+
+    var plan = (d.plans || [])[0];
+    $('plan-empty').hidden = Boolean(plan);
+    $('phases').textContent = '';
+    if (plan) (plan.phases || []).forEach(function (p) { $('phases').appendChild(el('li', String(p))); });
+    $('plan-guard').textContent = plan ? 'Version ' + plan.version + ' — proposition, non approuvée.' : '';
+    $('plan-decisions-link').hidden = !plan;
+    $('budget-link').href = '/budget.html?mission_id=' + encodeURIComponent(m.id);
+    $('programme-link').hidden = !plan;
+    if (plan) $('programme-link').href = '/programme.html?mission_id=' + encodeURIComponent(m.id);
+    if (plan) {
+      $('plan-decisions-link').href = '/plan-validations.html?mission_id=' + encodeURIComponent(m.id);
+      $('plan-guard').textContent = 'Version ' + plan.version + ' — vérification de la décision…';
+      OM.api('/api/app?route=plan-decisions&mission_id=' + encodeURIComponent(m.id)).then(function (data) {
+        var latest = (data.plans || [])[0];
+        var labels = { approve: 'approuvée', defer: 'reportée', reject: 'refusée' };
+        if (latest && latest.id === plan.id) {
+          $('plan-guard').textContent = 'Version ' + plan.version + ' — ' + (latest.last_decision ? labels[latest.last_decision.decision] : 'à valider') + '. Aucune exécution automatique.';
+        } else { $('plan-guard').textContent = 'Une nouvelle version existe. Ouvrez les décisions pour la consulter.'; }
+      }).catch(function () { $('plan-guard').textContent = 'Version ' + plan.version + ' — décision indisponible.'; });
+    }
+
+    $('steps').textContent = '';
+    (d.next_steps || []).forEach(function (s) { $('steps').appendChild(el('li', s)); });
+  }
+
+  $('ask').addEventListener('click', function () {
+    var q = $('question').value.trim();
+    if (!q || !current) return;
+    var m = current.mission || {};
+    $('ask').disabled = true;
+    $('answer').hidden = false; $('answer').textContent = 'Le Mission Controller réfléchit…';
+    OM.api('/api/agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: 'Mission ' + (m.name || '') + ' (UUID ' + m.id + ') : ' + q,
+        agent: 'mission-controller', provider: 'auto', risk: 'normal'
+      })
+    }).then(function (data) { $('answer').textContent = (data && data.answer) || 'Réponse vide.'; })
+      .catch(function (err) { $('answer').textContent = 'Erreur : ' + err.message; })
+      .then(function () { $('ask').disabled = false; });
+  });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    if (!missionId) { showList(); return; }
+    OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId))
+      .then(showDossier)
+      .catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>
