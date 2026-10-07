@@ -34,3 +34,7 @@ Aucune migration, création de fichier réel, souscription ou mise en service n'
 `node tests/verify-programme-sql.mjs`
 
 Les tests couvrent les données sources périmées, les taux absents, les décisions, le calcul du classeur, les cellules de réel vides, le hash stable après passage JSONB, les créations concurrentes, le périmètre Drive, le contrôle après écriture, les droits SQL et l'idempotence du schéma. La publication réelle reste à tester après mise en service.
+
+## Complément — validations de l'étape 3
+
+Le budget utilise désormais `office_mission_team_versions` approuvée et le programme approuvé avec cette équipe, au lieu de déduire une approbation des lignes existantes du planning. Référence : docs/MISSION_REVIEWS.md. L'identifiant d'allocation fourni au moteur est le staff_profile_id dans cette équipe ; la version et son empreinte sont conservées dans le budget et revérifiées avant création. Il faut appliquer db/mission-reviews.sql et mettre à jour le relais avant la recette. Les validations ne modifient pas office_mission_assignments.

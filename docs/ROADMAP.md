@@ -44,3 +44,7 @@ Le budget de mission est construit et testé localement (201 tests). Le paquet b
 Le prochain jalon produit est de **compléter l'étape 3**, puis recetter l'étape 4 : valider séparément le programme et l'équipe avant le parcours budget → classement. Les étapes 3, 5 et 6 ne sont pas déclarées terminées. Les nouveautés de Claude restent des contributions à intégrer sélectivement, sans changer de branche.
 
 Horaires convenus : Grand Contrôleur 07:00 GMT ; Orpailleur 08:00 / 12:00 / 20:00 GMT ; Sika lundi, heure à préciser. Conserver le scheduler désactivé tant que ses passages ne sont pas recettés.
+
+### Incrément suivant de l'étape 3 : construit localement
+
+Propositions et approbations distinctes d'équipe et de programme ajoutées ; le budget consomme la version d'équipe validée. La capacité est relue manuellement. La publication de cet incrément, sa migration et sa recette restent à faire. Les affectations du planning global ne sont pas activées par ces décisions : ne pas déclarer toute l'étape 3 terminée. Voir docs/MISSION_REVIEWS.md.

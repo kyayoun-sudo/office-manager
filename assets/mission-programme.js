@@ -43,7 +43,7 @@ function render(data){
   if(!data.plan.phases.length){status('Ajoutez des phases au plan source avant de préparer un programme.');return;}
   $('programme-title').textContent=data.mission.name+' · plan version '+data.plan.version;
   $('plan-source').textContent=data.plan.content;
-  $('plan-guard').textContent=data.plan_approved?'Plan approuvé. Le programme reste une proposition à valider séparément.':'Plan à valider. Vous pouvez préparer le programme, aucune exécution n’est autorisée.';
+  $('plan-guard').textContent=data.plan_approved?'Plan approuvé. Consultez les validations de l’équipe et du programme dans « Valider l’équipe et le programme ».':'Plan à valider. Vous pouvez préparer le programme, aucune exécution n’est autorisée.';
   const latest=data.programmes[0];
   draft=latest&&latest.plan_id===data.plan.id?JSON.parse(JSON.stringify(latest.phases)):prepareProgramme(data.plan);
   renderDraft();status(latest&&latest.plan_id===data.plan.id?'Programme v'+latest.version+' chargé. Vous pouvez proposer une nouvelle version.':'Préparez les tâches à partir du plan affiché.');
@@ -52,6 +52,7 @@ async function load(){
   const id=$('mission-select').value,stamp=++generation;selected=id;state=null;draft=[];dirty=false;
   $('editor').hidden=true;$('history-section').hidden=true;$('dossier-link').hidden=!id;
   if(!id){status('Choisissez une mission.');return false;}
+  $('review-link').href='/mission-review.html?mission_id='+encodeURIComponent(id);
   $('dossier-link').href='/mission.html?id='+encodeURIComponent(id);status('Chargement du programme…');
   try{const data=await OM.api('/api/app?route=mission-programme&mission_id='+encodeURIComponent(id));if(stamp===generation)render(data);return true;}catch(e){if(stamp===generation)status(messages[e.message]||'Chargement impossible : '+e.message);return false;}
 }

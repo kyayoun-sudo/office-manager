@@ -1,3 +1,4 @@
+import { getMissionReviews, missionReviewAction } from '../lib/mission-reviews.js';
 import { requirePilotAccess } from '../lib/auth.js';
 import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
@@ -40,6 +41,7 @@ const owner = run => Object.assign(run, { ownerOnly: true });
 const open = run => Object.assign(run, { public: true });
 
 export const ROUTES = Object.freeze({
+  'mission-review': { GET: owner((orgId, req) => getMissionReviews(orgId, req.query?.mission_id)), POST: owner((orgId, req) => missionReviewAction(orgId, req.body || {})), unavailable: 'MISSION_REVIEW_UNAVAILABLE' },
   'mission-budget': {
     GET: owner((orgId, req) => listMissionBudgets(orgId, req.query?.mission_id)),
     POST: owner((orgId, req) => missionBudgetAction(orgId, req.body || {})),

@@ -83,7 +83,7 @@
             <ol class="blockers" id="phases"></ol>
             <p class="meta" id="plan-guard"></p>
             <a id="plan-decisions-link" hidden>Lire le plan et voir les décisions</a>
-            <p><a id="programme-link" hidden>Préparer le programme détaillé</a></p><p><a id="budget-link">Préparer le budget de mission</a></p>
+            <p><a id="programme-link" hidden>Préparer le programme détaillé</a></p><p><a id="review-link">Valider l’équipe et le programme</a></p><p><a id="budget-link">Préparer le budget de mission</a></p>
           </section>
           <section class="card" aria-labelledby="h-steps">
             <h2 id="h-steps">Prochaines étapes suggérées</h2>
@@ -197,6 +197,7 @@
     if (plan) (plan.phases || []).forEach(function (p) { $('phases').appendChild(el('li', String(p))); });
     $('plan-guard').textContent = plan ? 'Version ' + plan.version + ' — proposition, non approuvée.' : '';
     $('plan-decisions-link').hidden = !plan;
+    $('review-link').href = '/mission-review.html?mission_id=' + encodeURIComponent(m.id);
     $('budget-link').href = '/budget.html?mission_id=' + encodeURIComponent(m.id);
     $('programme-link').hidden = !plan;
     if (plan) $('programme-link').href = '/programme.html?mission_id=' + encodeURIComponent(m.id);

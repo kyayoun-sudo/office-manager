@@ -4,7 +4,7 @@ import { readdirSync } from 'node:fs';
 import { ROUTES, handleApp } from '../api/app.js';
 
 test('app router: one endpoint serves the four screens, methods are restricted', async () => {
-  assert.deepEqual(Object.keys(ROUTES).sort(), ['actions', 'agent-message', 'agent-persona', 'bootstrap-owner', 'branding', 'diagnostic', 'login', 'logout', 'mission-budget', 'mission-programme', 'mission-view', 'plan-decisions', 'search', 'session', 'tidy', 'users']);
+  assert.deepEqual(Object.keys(ROUTES).sort(), ['actions', 'agent-message', 'agent-persona', 'bootstrap-owner', 'branding', 'diagnostic', 'login', 'logout', 'mission-budget', 'mission-programme', 'mission-review', 'mission-view', 'plan-decisions', 'search', 'session', 'tidy', 'users']);
   assert.ok(!ROUTES.search.POST && !ROUTES['mission-view'].POST);
   process.env.OFFICE_MANAGER_ACCESS_TOKEN = 't';
   process.env.DEFAULT_ORG_ID = 'org-1';

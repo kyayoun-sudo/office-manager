@@ -6,6 +6,7 @@ export async function createMissionBudgetAction(deps: any, body: any) {
   const budget = await deps.getBudget(body.org_id, body.budget_id);
   const decision = await deps.getDecision(body.org_id, body.budget_id);
   if (!budget || decision?.decision !== 'approve' || decision.content_hash !== budget.content_hash || body.content_hash !== budget.content_hash) fail('BUDGET_APPROVAL_REQUIRED');
+  if (!(await deps.sourcesCurrent(body.org_id, budget))) fail('BUDGET_SOURCE_CHANGED');
   const folder = await deps.getMetadata(budget.data.destination_parent_id);
   if (!folder || folder.trashed || folder.mimeType !== 'application/vnd.google-apps.folder' || folder.driveId !== deps.driveId) fail('OUTSIDE_FIRM_DRIVE');
   if (!(await deps.folderLinked(body.org_id, budget.office_mission_id, folder.id))) fail('BUDGET_FOLDER_NOT_LINKED_TO_MISSION');
@@ -21,6 +22,7 @@ export async function createMissionBudgetAction(deps: any, body: any) {
   if (!(await deps.claimBudget(body.org_id, body.budget_id, budget.content_hash))) fail('BUDGET_EXPORT_ALREADY_CLAIMED');
   const currentDecision = await deps.getDecision(body.org_id, body.budget_id);
   if (currentDecision?.decision !== 'approve' || currentDecision.content_hash !== budget.content_hash) fail('BUDGET_APPROVAL_REQUIRED');
+  if (!(await deps.sourcesCurrent(body.org_id, budget))) fail('BUDGET_SOURCE_CHANGED');
   const created = await deps.uploadCreate({ name, parentId: folder.id, mimeType: XLSX_MIME, bytes });
   const verified = await deps.getMetadata(created.id);
   if (verified?.trashed || verified?.mimeType !== XLSX_MIME || !verified?.parents?.includes(folder.id) || verified.driveId !== deps.driveId || verified.name !== name) fail('BUDGET_UPLOAD_NOT_VERIFIED');

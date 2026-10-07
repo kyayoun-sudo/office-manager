@@ -283,6 +283,26 @@ Deno.serve(async req => {
         orgId: Deno.env.get('DEFAULT_ORG_ID') || DEFAULT_ORG_ID,
         getBudget: (org: string, id: string) => read('office_mission_budget_versions', scope(org) + '&id=eq.' + encodeURIComponent(id) + '&select=*&limit=1'),
         getDecision: (org: string, id: string) => read('office_mission_budget_decisions', scope(org) + '&budget_id=eq.' + encodeURIComponent(id) + '&select=decision,content_hash&order=sequence.desc&limit=1'),
+        sourcesCurrent: async (org: string, budget: any) => {
+          const filter = scope(org) + '&office_mission_id=eq.' + encodeURIComponent(budget.office_mission_id);
+          const [plan, programme, team, mission] = await Promise.all([
+            read('office_mission_plan_versions', filter + '&select=id,content_hash&order=version.desc&limit=1'),
+            read('office_mission_programme_versions', filter + '&select=id,plan_id,content_hash&order=version.desc&limit=1'),
+            read('office_mission_team_versions', filter + '&select=id,plan_id,content_hash&order=version.desc&limit=1'),
+            read('office_missions', scope(org) + '&id=eq.' + encodeURIComponent(budget.office_mission_id) + '&select=id,name,planned_start,planned_end&limit=1')
+          ]);
+          const data = budget.data;
+          if (!plan || !programme || !team || plan.id !== data.plan_id || plan.content_hash !== data.plan_hash || programme.id !== data.programme_id || programme.content_hash !== data.programme_hash || team.id !== data.team_version_id || team.content_hash !== data.team_hash || programme.plan_id !== plan.id || team.plan_id !== plan.id) return false;
+          if (!mission || mission.name !== data.mission.name || mission.planned_start !== data.mission.planned_start || mission.planned_end !== data.mission.planned_end) return false;
+          const profiles = await Promise.all(data.team.map((member: any) => read('office_staff_profiles', scope(org) + '&id=eq.' + encodeURIComponent(member.staff_profile_id) + '&active=eq.true&select=id,full_name&limit=1')));
+          if (profiles.some((profile: any, index: number) => !profile || profile.full_name !== data.team[index].name)) return false;
+          const [planDecision, teamDecision, programmeDecision] = await Promise.all([
+            read('office_mission_plan_decisions', scope(org) + '&plan_id=eq.' + encodeURIComponent(plan.id) + '&select=decision,content_hash&order=sequence.desc&limit=1'),
+            read('office_mission_review_decisions', scope(org) + '&target_kind=eq.team&target_id=eq.' + encodeURIComponent(team.id) + '&select=decision,content_hash&order=sequence.desc&limit=1'),
+            read('office_mission_review_decisions', scope(org) + '&target_kind=eq.programme&target_id=eq.' + encodeURIComponent(programme.id) + '&select=decision,content_hash,reviewed_team_id&order=sequence.desc&limit=1')
+          ]);
+          return planDecision?.decision === 'approve' && planDecision.content_hash === plan.content_hash && teamDecision?.decision === 'approve' && teamDecision.content_hash === team.content_hash && programmeDecision?.decision === 'approve' && programmeDecision.content_hash === programme.content_hash && programmeDecision.reviewed_team_id === team.id;
+        },
         claimBudget: async (org: string, id: string, hash: string) => {
           const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
           const response = await fetch((Deno.env.get('SUPABASE_URL') || '') + '/rest/v1/office_mission_budget_exports', { method: 'POST', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ org_id: org, budget_id: id, content_hash: hash }) });

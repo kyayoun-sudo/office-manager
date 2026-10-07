@@ -164,3 +164,7 @@ connected and deployed. Do not claim completion from mocked tests alone.
 ## Intégration Codex — budget de mission (7 octobre 2026)
 
 Sur `fix/map-register-bridge-write`, ajout du budget de mission : proposition du Mission Controller, revue propriétaire, classeur vierge calculé et création dans le dossier de mission après validation. Détails et étapes de mise en service dans `docs/MISSION_BUDGETS.md`. Tables, route regroupée et action de relais ajoutées ; pas de nouvelle fonction dans `api/`. Aucun déploiement ni migration effectué pour cette fonctionnalité.
+
+## Étape 3 — équipe et programme, incrément local
+
+Écran de revue propriétaire, versions d'équipe et décisions exactes du programme construits. Le budget exige désormais ces approbations et référence la version d'équipe. Aucun planning/queue/Drive modifié par les validations. La capacité reste une vérification manuelle déclarée par le responsable. L'activation des affectations dans le planning global reste un travail distinct. Voir docs/MISSION_REVIEWS.md. Migration, relais et preview non déployés pour cet incrément.
