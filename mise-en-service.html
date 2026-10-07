@@ -80,7 +80,7 @@
         <div class="kpis" id="map-kpis"></div>
         <p class="small" id="map-warning" style="color:#8A2E0B" hidden></p>
         <div class="btn-row">
-          <button class="btn ghost" id="map-pass" type="button">Lancer un passage de cartographie complet</button>
+          <button class="btn ghost" id="map-pass" type="button">Lancer le premier scan</button>
           <button class="btn" id="map-review" type="button" hidden>Valider la cartographie</button>
         </div>
         <p id="map-live" role="status" aria-live="polite" style="margin:0;font-size:15px;font-weight:600;color:#0B4A43"></p>
@@ -90,11 +90,10 @@
 
       <section class="card" aria-labelledby="h-know" id="know-card">
         <h2 id="h-know">Ce que l'Orpailleur a compris du cabinet</h2>
-        <p class="small" style="margin:0">Après la cartographie, l'Orpailleur lit les documents qui décrivent le cabinet (équipe, organigramme, clients, lettres de mission, budgets…). Cochez ce qui est juste : seules les lignes cochées entrent dans l'application.</p>
+        <p class="small" style="margin:0">Pendant le premier scan, l'Orpailleur lit avec l'IA les documents qui décrivent le cabinet (tableur de l'équipe, CV, organigramme, clients, lettres de mission, budgets, programmes de travail). Ce qu'il comprend entre directement dans Équipe, les missions et les indicateurs, et reste écrit dans sa mémoire du Drive (00_OFFICE_MANAGER). Corrigez ensuite dans Équipe si besoin.</p>
         <p id="know-live" role="status" aria-live="polite" style="margin:0;font-weight:600;color:#0B4A43"></p>
         <div id="know-body" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="btn-row">
-          <button class="btn" id="know-apply" type="button" hidden>Enregistrer les lignes cochées</button>
           <button class="btn ghost" id="know-learn" type="button">Relire le Drive pour apprendre le cabinet</button>
         </div>
       </section>
@@ -221,36 +220,33 @@
   // ---- What the Orpailleur understood of the firm ----
   var knowTimer = null, knowData = null;
   function el(tag, text, css) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (css) e.style.cssText = css; return e; }
-  function knowList(title, rows, kind, fmt) {
-    var box = el('div', null, 'display:flex;flex-direction:column;gap:6px');
+  function knowList(title, rows, fmt) {
+    var box = el('div', null, 'display:flex;flex-direction:column;gap:4px');
     box.appendChild(el('h3', title + ' (' + rows.length + ')', 'margin:4px 0 0;font-size:15px'));
     if (!rows.length) box.appendChild(el('p', 'Rien trouvé dans les documents lus.', 'margin:0;font-size:13px;color:#5B6660'));
-    rows.forEach(function (r, i) {
-      var lab = el('label', null, 'display:flex;gap:8px;align-items:flex-start;font-weight:400;font-size:14px');
-      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; cb.dataset.kind = kind; cb.dataset.idx = i;
-      if (kind === 'none') cb.disabled = true;
-      lab.appendChild(cb);
-      var t = el('span', fmt(r)); if (r.source) t.appendChild(el('small', '  — ' + r.source, 'color:#5B6660'));
-      lab.appendChild(t); box.appendChild(lab);
+    rows.forEach(function (r) {
+      var t = el('div', fmt(r), 'font-size:14px'); if (r.source) t.appendChild(el('small', '  — ' + r.source, 'color:#5B6660')); box.appendChild(t);
     });
     return box;
   }
   function renderKnow(k) {
-    knowData = k; var b = $('know-body'); b.textContent = '';
-    $('know-apply').hidden = !(k.status === 'proposed' || k.status === 'applied');
-    if (k.status === 'none') { $('know-live').textContent = 'Pas encore fait : lancez d’abord la cartographie (l’apprentissage suit tout seul).'; return; }
+    var b = $('know-body'); b.textContent = '';
+    if (k.status === 'none') { $('know-live').textContent = 'Pas encore fait : lancez le premier scan (la compréhension du cabinet suit toute seule).'; return; }
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
-    if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet…'; knowTimer = setTimeout(loadKnow, 6000); return; }
-    $('know-live').textContent = k.status === 'applied' ? 'Enregistré dans l’application (' + (k.applied ? k.applied.team + ' personnes, ' + k.applied.missions + ' missions' : '') + '). Vous pouvez en ajouter d’autres.' : 'Proposition prête : ' + (k.files_read || []).length + ' documents lus.';
+    if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet (équipe, CV, missions)…'; knowTimer = setTimeout(loadKnow, 6000); return; }
+    var a = k.applied || {};
+    $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s), ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s).';
     if ((k.files_read || []).length) {
       var dl = el('details', null, 'font-size:13px'); dl.appendChild(el('summary', 'Documents lus (' + k.files_read.length + ')', 'cursor:pointer'));
       k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:#5B6660;padding:2px 0')); }); b.appendChild(dl);
     }
     var f = k.firm || {};
     b.appendChild(el('p', (f.name || 'Cabinet') + (f.activity ? ' — ' + f.activity : '') + (f.summary ? ' : ' + f.summary : ''), 'margin:0;font-size:15px'));
-    b.appendChild(knowList('Équipe', k.team || [], 'team', function (p) { return [p.full_name, p.role_title, p.email].filter(Boolean).join(' · '); }));
-    b.appendChild(knowList('Missions', k.missions || [], 'missions', function (m) { return [m.name || m.client, m.type, m.year, m.status === 'completed' ? 'terminée' : ''].filter(Boolean).join(' · '); }));
-    b.appendChild(knowList('Clients', k.clients || [], 'none', function (c) { return [c.name, c.sector].filter(Boolean).join(' · '); }));
+    b.appendChild(knowList('Équipe', k.team || [], function (p) { return [p.full_name, p.role_title, p.grade_title, p.email, (p.skills || []).slice(0, 4).join(', ')].filter(Boolean).join(' · '); }));
+    var audits = (k.missions || []).filter(function (m) { return m.kind === 'audit'; });
+    b.appendChild(knowList('Missions d’audit', audits, function (m) { return [m.name || m.client, m.type, m.year, (m.team || []).map(function (t) { return t.person; }).join(', ')].filter(Boolean).join(' · '); }));
+    b.appendChild(knowList('Autres missions', (k.missions || []).filter(function (m) { return m.kind !== 'audit'; }), function (m) { return [m.name || m.client, m.kind, m.type, m.year].filter(Boolean).join(' · '); }));
+    b.appendChild(knowList('Clients', k.clients || [], function (c) { return [c.name, c.sector].filter(Boolean).join(' · '); }));
     if ((k.questions || []).length) { b.appendChild(el('h3', 'Questions de l’Orpailleur', 'margin:4px 0 0;font-size:15px')); k.questions.forEach(function (q) { b.appendChild(el('p', '• ' + q, 'margin:0;font-size:14px')); }); }
   }
   function loadKnow() {
@@ -261,13 +257,6 @@
     $('know-live').textContent = 'L’Orpailleur relit le Drive…';
     OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'learn' }) })
       .then(function () { knowTimer = setTimeout(loadKnow, 4000); }).catch(function (e) { $('know-live').textContent = msg(e); });
-  });
-  $('know-apply').addEventListener('click', function () {
-    var pick = function (kind) { return Array.prototype.filter.call(document.querySelectorAll('#know-body input[data-kind="' + kind + '"]'), function (c) { return c.checked; }).map(function (c) { return Number(c.dataset.idx); }); };
-    var b = this; b.disabled = true;
-    OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'apply', team: pick('team'), missions: pick('missions') }) })
-      .then(function (r) { $('know-live').textContent = 'Enregistré : ' + r.saved_team + ' personne(s) et ' + r.saved_missions + ' mission(s) ajoutées. Les agents les connaissent maintenant.'; })
-      .catch(function (e) { $('know-live').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
   loadKnow();
 

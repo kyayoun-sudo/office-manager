@@ -77,6 +77,9 @@
             <button class="btn ghost" id="g-drive-save" type="button">Utiliser ce Drive</button>
             <button class="btn" type="button" id="g-drive-save-all">Tout mon Google Drive</button></div>
             <span class="hint" id="g-drive-now"></span></div>
+          <div class="field" style="max-width:640px"><label for="g-home">Mémoire des agents (avec « Tout mon Google Drive ») : dans quel Drive partagé du cabinet ?</label>
+            <select id="g-home" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff"></select>
+            <span class="hint">Un dossier « 00_OFFICE_MANAGER » y est créé : carte du Drive, registre des fichiers, ce que les agents ont compris du cabinet.</span></div>
           <div class="stack" style="gap:6px">
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost" id="g-allow" type="button">Autoriser les agents</button>
             <span class="hint" id="g-allow-state">Lire le Drive, lire les documents utiles et utiliser l’IA. Les envois passent toujours par « À valider ».</span></div></div>
@@ -324,7 +327,7 @@
     invalid_grant: 'Le code Google a expiré ou a déjà servi : cliquez à nouveau sur « Connecter Google ».',
     OAUTH_STATE_OTHER_FIRM: 'Retour Google pour un autre cabinet : recommencez depuis ce cabinet.',
     redirect_uri_mismatch: 'Google ne connaît pas encore l’adresse de retour : déclarez-la (voir « Première fois » ci-dessous).',
-    DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Lien non reconnu : copiez l’adresse du Drive partagé depuis Google Drive.', GOOGLE_NOT_CONNECTED: 'Connectez d’abord Google.',
+    HOME_DRIVE_REQUIRED: 'Choisissez le Drive partagé qui gardera la mémoire des agents.', DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Lien non reconnu : copiez l’adresse du Drive partagé depuis Google Drive.', GOOGLE_NOT_CONNECTED: 'Connectez d’abord Google.',
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Le compte Google connecté ne voit pas ce Drive : ajoutez-le comme membre du Drive partagé.',
     DRIVE_MUST_BE_SHARED_DRIVE: 'Ce dossier est dans « Mon Drive » : il faut un Drive partagé du cabinet.',
     TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
@@ -377,6 +380,11 @@
       } else {
         box.appendChild(gLine(false, g.env_access ? 'Accès technique configuré dans Vercel (compte de service). Vous pouvez aussi connecter le compte Google du cabinet.' : 'Aucun compte Google connecté : les agents ne peuvent ni ranger le Drive ni envoyer d’e-mail.'));
       }
+      // Shared drives the connected account sees: where the agents' memory can live.
+      var hs = $('g-home'), keep = hs.value; hs.textContent = '';
+      var o0 = document.createElement('option'); o0.value = ''; o0.textContent = (g.shared_drives || []).length ? '— choisir le Drive partagé du cabinet —' : 'Aucun Drive partagé visible'; hs.appendChild(o0);
+      (g.shared_drives || []).forEach(function (d) { var o = document.createElement('option'); o.value = d.id; o.textContent = d.name; hs.appendChild(o); });
+      if (keep) hs.value = keep; else if ((g.shared_drives || []).length === 1) hs.value = g.shared_drives[0].id;
       $('g-drive-now').textContent = g.firm_drive ? 'Les agents travaillent sur : ' + (g.firm_drive.name || g.firm_drive.id) : 'Aucun Drive choisi : connectez Google, puis collez le lien du Drive.';
       $('g-drive-save').disabled = !g.connected; $('g-drive-save-all').disabled = !g.connected;
       $('g-disconnect').hidden = !g.connected;
@@ -411,8 +419,9 @@
   });
   $('g-drive-save-all').addEventListener('click', function () {
     var b = this; b.disabled = true; $('g-status').textContent = 'Les agents vont lire tout votre Google Drive (Mon Drive et les Drive partagés)…';
-    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', all: true, by: OM.getUserName() || null }) })
-      .then(function (r) { $('g-status').textContent = 'C’est fait : les agents lisent tout votre Google Drive. Leurs fichiers de travail vont dans « Office Manager - mémoire des agents » (Mon Drive)' + (r.mapping_started ? '. La cartographie a démarré.' : '.'); return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { loadAllow(); return loadGoogle(); }); })
+    if (!$('g-home').value) { $('g-status').textContent = 'Choisissez d’abord le Drive partagé qui gardera la mémoire des agents.'; b.disabled = false; return; }
+    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', all: true, home: $('g-home').value, by: OM.getUserName() || null }) })
+      .then(function (r) { $('g-status').textContent = 'C’est fait : les agents lisent tout votre Google Drive. Leur mémoire est dans ' + ((r.home && r.home.name) || 'le Drive partagé') + ' / 00_OFFICE_MANAGER' + (r.mapping_started ? '. Le premier scan a démarré (Mise en service).' : '.'); return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { loadAllow(); return loadGoogle(); }); })
       .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
   });
   $('g-disconnect').addEventListener('click', function () {

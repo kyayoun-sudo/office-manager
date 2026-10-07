@@ -57,6 +57,7 @@ body{background:var(--bg,#F4F5F3)}
     <div class="field"><label for="drive">Adresse du Drive</label><input id="drive" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/…"></div>
     <button class="btn" type="button" id="s3-save">Utiliser ce Drive</button>
             <button class="btn" type="button" id="s3-save-all">Tout mon Google Drive</button>
+    <div class="field"><label for="home">Avec « Tout mon Google Drive » : le Drive partagé qui garde la mémoire des agents (dossier 00_OFFICE_MANAGER)</label><select id="home"></select></div>
     <p class="small" id="s3-msg" role="status" aria-live="polite"></p>
   </section>
 
@@ -77,7 +78,7 @@ body{background:var(--bg,#F4F5F3)}
     WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.', INVALID_EMAIL: 'Adresse e-mail invalide.', INVALID_NAME: 'Indiquez votre nom.',
     EMAIL_ALREADY_USED_WRONG_PASSWORD: 'Cette adresse a déjà un mot de passe : utilisez le même.', ACCOUNT_ALREADY_EXISTS: 'Vous avez déjà un compte : connectez-vous.',
     ACCOUNT_PENDING: 'Le cabinet a déjà un propriétaire : votre compte attend qu’il vous donne un rôle.',
-    GOOGLE_CLIENT_NOT_CONFIGURED: 'La connexion Google n’est pas encore activée sur ce serveur.', DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Adresse non reconnue : copiez l’adresse du Drive partagé depuis Google Drive.',
+    GOOGLE_CLIENT_NOT_CONFIGURED: 'La connexion Google n’est pas encore activée sur ce serveur.', HOME_DRIVE_REQUIRED: 'Choisissez le Drive partagé qui gardera la mémoire des agents.', DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Adresse non reconnue : copiez l’adresse du Drive partagé depuis Google Drive.',
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Votre compte Google ne voit pas ce Drive.', DRIVE_MUST_BE_SHARED_DRIVE: 'Il faut un Drive partagé du cabinet (pas « Mon Drive »).',
     GOOGLE_NOT_CONNECTED: 'Connectez d’abord votre Google (étape 2).', TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
   };
@@ -93,6 +94,8 @@ body{background:var(--bg,#F4F5F3)}
     if (!s || !OM.isOwner()) { step(1, 'on'); step(2, 'off'); step(3, 'off'); step(4, 'off'); return; }
     step(1, 'done'); $('s1-form').hidden = true; $('s1-msg').textContent = 'Connecté : ' + (s.user.display_name || s.user.email) + ' — propriétaire du cabinet.'; $('s1-msg').className = 'small ok';
     return OM.api('/api/app?route=google', { headers: owner() }).then(function (g) {
+      var hs = $('home'); hs.textContent = '';
+      (g.shared_drives || []).forEach(function (d) { var o = document.createElement('option'); o.value = d.id; o.textContent = d.name; hs.appendChild(o); });
       if (g.connected) { step(2, 'done'); $('s2-msg').textContent = 'Google connecté : ' + g.email; $('s2-msg').className = 'small ok'; $('s2-connect').textContent = 'Reconnecter un autre compte'; }
       else step(2, 'on');
       if (g.firm_drive) { step(3, 'done'); $('s3-msg').textContent = 'Drive utilisé : ' + (g.firm_drive.name || g.firm_drive.id); $('s3-msg').className = 'small ok'; step(4, 'done'); }
@@ -121,7 +124,7 @@ body{background:var(--bg,#F4F5F3)}
   });
   $('s3-save-all').addEventListener('click', function () {
     var b = this; b.disabled = true; $('s3-msg').textContent = 'Les agents vont lire tout votre Google Drive…';
-    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', all: true, by: OM.getUserName() || null }) })
+    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', all: true, home: $('home').value, by: OM.getUserName() || null }) })
       .then(function (r) { window.__mapping = r && r.mapping_started;
         return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(refresh); })
       .then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Google Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } })

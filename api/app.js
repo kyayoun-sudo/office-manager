@@ -22,7 +22,7 @@ import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
 import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
-import { learnFirm, firmKnowledge, applyKnowledge } from '../lib/firm-learning.js';
+import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
 import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -217,13 +217,12 @@ export const ROUTES = Object.freeze({
   'mapping-step': { POST: (orgId, req) => scanStep(orgId, req), unavailable: 'MAPPING_UNAVAILABLE' },
   // « Ce que l'Orpailleur a compris du cabinet »: team, clients, missions read in the Drive.
   //   GET  firm-knowledge                       the proposal (owner)
-  //   POST firm-knowledge {action:learn|apply}   relearn (background) | save the ticked lines (owner)
+  //   POST firm-knowledge {action:learn}         read the firm again (background, owner)
   //   POST firm-learn                           background work (pilot token)
   'firm-knowledge': {
     GET: owner(() => firmKnowledge()),
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
-      if (req.body?.action === 'apply') return applyKnowledge(orgId, req.body);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
