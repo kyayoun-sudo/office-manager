@@ -53,3 +53,23 @@ test('loose files and unclear names are looked at first; the memory folder never
   const c = tidyCandidates([...items, { id: 'mem', name: 'OFFICE_MANAGER_MAP.xlsx', mimeType: 'x', path: '/TATY share drive/00_OFFICE_MANAGER/OFFICE_MANAGER_MAP.xlsx' }]);
   assert.equal(c[0].id, 'lm'); assert.ok(!c.some(i => i.id === 'mem'));
 });
+
+test('a work programme loose under 01_CLIENTS_ET_MISSIONS: read, its mission folder created like the firm\'s others, then filed there (on approval)', async () => {
+  const its = [
+    { id: 'CM', name: '01_CLIENTS_ET_MISSIONS', mimeType: F, path: '/TATY share drive/01_CLIENTS_ET_MISSIONS' },
+    { id: 'EX', name: 'CAC_2025', mimeType: F, path: '/TATY share drive/01_CLIENTS_ET_MISSIONS/Ivoire Logistique/CAC_2025' },
+    { id: 'p1', name: 'TEST-01_PROGRAMME_A_VALIDER.txt', mimeType: 'text/plain', path: '/TATY share drive/01_CLIENTS_ET_MISSIONS/TEST-01_PROGRAMME_A_VALIDER.txt', parents: ['CM'] }
+  ];
+  const drive = fakeDrive([{ ...json({ items: its }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }]);
+  const actions = []; let input = '';
+  const d = { drive, folder: 'MEM', fire: async () => true, readText: async () => ({ text: 'Programme de travail — Nova Distribution — CAC exercice 2026' }),
+    runAI: async (o) => { input = o.input; return { text: JSON.stringify({ decisions: [{ file_id: 'p1', action: 'create_and_move', create_parent_id: 'CM', create_names: ['Nova Distribution', 'CAC_2026'], new_name: 'PROGRAMME_CAC_NovaDistribution_2026.txt', reason: 'programme de travail CAC 2026 de Nova Distribution' }] }) }; },
+    fetchRows: async (p, o = {}) => { if (o.method === 'POST') actions.push(JSON.parse(o.body)[0]); return []; } };
+  await startTidyPlan('org', {}, d);
+  const st = await tidyPlanStep('org', {}, d);
+  assert.match(input, /Nova Distribution — CAC exercice 2026/, 'the content is read');
+  assert.match(input, /EXEMPLES DE DOSSIERS DE MISSION[\s\S]*Ivoire Logistique\/CAC_2025/);
+  assert.equal(st.created, 1);
+  assert.deepEqual(actions[0].payload.create, { parent_id: 'CM', names: ['Nova Distribution', 'CAC_2026'] });
+  assert.match(actions[0].summary, /Créer « \/TATY share drive\/01_CLIENTS_ET_MISSIONS\/Nova Distribution\/CAC_2026 »/);
+});

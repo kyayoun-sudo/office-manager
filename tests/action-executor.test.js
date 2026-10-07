@@ -101,3 +101,13 @@ test('FILE_MOVE: the file is moved / renamed only when a manager approves, never
   await executeDecision('org', action, 'reject', 'Paul', { fetchRows, tidyDrive: tidy });
   assert.equal(moved.length, 0);
 });
+
+test('FILE_MOVE with a mission folder to create: levels found or created, then the file moved in', async () => {
+  const fetchRows = async (path, o = {}) => (o.method === 'PATCH' ? [{ id: 'a1' }] : []);
+  const made = [], moved = [];
+  const tidy = { findOrCreateFolder: async (parent, name) => { made.push([parent, name]); return { id: parent + '/' + name }; }, move: async (...a) => { moved.push(a); return {}; } };
+  const r = await executeDecision('org', { id: 'a1', action_type: 'FILE_MOVE', payload: { file_id: 'p1', from_parent: 'CM', to_name: '…/Nova Distribution/CAC_2026', create: { parent_id: 'CM', names: ['Nova Distribution', 'CAC_2026'] } } }, 'approve', 'Paul', { fetchRows, tidyDrive: tidy });
+  assert.deepEqual(made, [['CM', 'Nova Distribution'], ['CM/Nova Distribution', 'CAC_2026']]);
+  assert.deepEqual(moved, [['p1', 'CM', 'CM/Nova Distribution/CAC_2026', null]]);
+  assert.match(r.effect, /Dossier « Nova Distribution \/ CAC_2026 » créé ou retrouvé/);
+});
