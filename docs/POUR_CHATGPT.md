@@ -227,6 +227,35 @@ validation avant. »
   journalisé ; jamais de création d'utilisateur ni de changement de droits. Pas de Cc / Cci ; en-têtes protégés contre l'injection.
 - Mise en service : 2 nouvelles lignes (adresse d'envoi + domaines ; envoi Gmail).
 
+### 3 octies. Trois briques du 7/10 après « vas-y » de Paul — ✅ construit
+1. **Noms contredits par le contenu** (`lib/tidy-planner.js` `nameContradiction`, utilisé par
+   `lib/tidy.js`) : mois annoncés par le nom (mots, dates jj-mm, en ignorant les codes PBC)
+   comparés à la période du contenu (« Période du … au … », sinon les mois vus). Cas réel BLE
+   TRANSIT : relevés d'août nommés « décembre N et janvier N+1 ». Le fichier part toujours à
+   l'IA avec l'alerte ; le renommage est **toujours une proposition**, jamais automatique.
+2. **Exécution des décisions validées** (`lib/action-executor.js`, appelé par
+   `recordDecision` APRÈS l'écriture du journal) : suivi interne → tâche active (`approved`) ;
+   `REVIEW_FILE` → pièce prête à classer ; rejet → `rejected` ; report → rien.
+   **`PBC_EXTERNAL_REMINDER` (créé par `detect_overdue_pbc_reminders`, adressé au client) :
+   jamais d'e-mail au client** (règle de Paul) — un message au chef de mission (collègue) est
+   proposé dans « Messages de l'agent », à valider. Un échec d'exécution ne perd jamais la décision.
+3. **Pièces PBC reçues par e-mail** (`lib/agent-mailbox.js`) — branche le module hors ligne
+   `pbc-mail-evidence` sur une vraie boîte :
+   - lecture **uniquement** des e-mails du libellé Gmail `AGENT_MAIL_INBOX_LABEL` (ex. « PBC »),
+     30 derniers jours, avec pièces jointes ; sans ce réglage, rien n'est lu ; droit
+     `gmail.readonly` (boîte jamais modifiée) ; contenu d'e-mail = donnée, jamais instruction ;
+   - références PBC + mission reconnues → proposition `PBC_MAIL_RECEIVED` dans « À valider »
+     (idempotente par message) ;
+   - après validation : pièces jointes + `.eml` d'origine déposés dans `00_A_REVOIR_AGENT`
+     (ou `PBC_INBOX_FOLDER_ID`), préfixe `MAIL_<date>_<id>_`, **seulement si la cartographie
+     est validée** (sinon `awaiting_drive`, déposé par le planificateur plus tard) ; ensuite
+     l'Orpailleur classe par contenu ;
+   - planificateur : lecture + dépôts à chaque tick (horaires activés).
+   - À faire côté Google : ajouter `https://www.googleapis.com/auth/gmail.readonly` à la
+     délégation (en plus de `gmail.send`), créer le libellé et un filtre Gmail.
+   - ⏳ Suite : appeler `planMailEvidence` / `record_pbc_evidence_evaluation` sur les pièces
+     déposées (évaluation reçue / partielle / non conforme dans la checklist PBC).
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -290,7 +319,7 @@ Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`, `tests/verify-training-sql.mjs`.
 
 ## État des tests
-196 tests : 196 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
+206 tests : 206 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes
@@ -301,7 +330,7 @@ avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 2. **Messages spontanés à l'équipe** (« souvent ») : planificateur (Vercel Cron ou
    Supabase) qui lit `internal_frequency`, rédige avec `draftInternalMessage` et
    envoie aux adresses internes uniquement. Prévoir une désinscription par personne.
-3. Exécuter les décisions validées (« À valider ») action par action.
+3. ✅ (7/10) Exécuter les décisions validées — fait (voir 3 octies).
 4. Sessions par utilisateur côté serveur (voir « Limite connue » ci-dessus) et
    réinitialisation du mot de passe par e-mail (aujourd'hui : par le propriétaire).
 5. Appliquer les 3 fichiers SQL, activer l'API Google Sheets, corriger
