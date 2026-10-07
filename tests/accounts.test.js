@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { login, refreshSession, bootstrapOwner, manageAccount, checkPassword, cleanEmail } from '../lib/accounts.js';
+import { login, refreshSession, bootstrapOwner, manageAccount, checkPassword, cleanEmail, signUp, claimOwner } from '../lib/accounts.js';
 import { handleApp, ROUTES } from '../api/app.js';
 
 const UID = '44444444-4444-4444-4444-444444444444';
@@ -45,7 +45,8 @@ test('login: right password + active account -> session with tokens by role', as
 test('login: wrong password, unknown or deactivated account are refused', async () => {
   const { fetchRows } = db([{ auth_user_id: UID, email: 'p@taty.info', display_name: 'P', role: 'owner', active: false }]);
   await assert.rejects(login('org-1', { email: 'p@taty.info', password: 'bad' }, { authCall: auth(400, {}), fetchRows }), /INVALID_CREDENTIALS/);
-  await assert.rejects(login('org-1', { email: 'p@taty.info', password: 'x' }, { authCall: auth(200, tokens(UID)), fetchRows }), /ACCOUNT_NOT_ALLOWED/);
+  // Inactive (waiting for the owner, or deactivated): still refused, with a clear reason.
+  await assert.rejects(login('org-1', { email: 'p@taty.info', password: 'x' }, { authCall: auth(200, tokens(UID)), fetchRows }), /ACCOUNT_PENDING/);
   await assert.rejects(login('org-1', { email: 'p@taty.info', password: 'x' }, { authCall: auth(200, tokens(UID2)), fetchRows }), /ACCOUNT_NOT_ALLOWED/);
   await assert.rejects(login('org-1', { email: 'p@taty.info', password: 'x' }, { authCall: auth(429, {}), fetchRows }), /TOO_MANY_ATTEMPTS/);
 });
@@ -103,4 +104,35 @@ test('pages: every app page redirects to login without a session and offers logo
     assert.match(src, /\/assets\/brand-theme\.js/, f + ' loads the session script');
     assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src), f + ' must not inject HTML');
   }
+});
+
+test('sign-up: anyone creates an account, it has NO access until the owner gives a role; the owner claims with the owner code', async () => {
+  const rows = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; }
+    if (o.method === 'PATCH') { const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1]; rows.filter(r => r.auth_user_id === id).forEach(r => Object.assign(r, JSON.parse(o.body))); return []; }
+    const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1];
+    return id ? rows.filter(r => r.auth_user_id === id) : rows;
+  };
+  const users = {}; // the auth server
+  const authCall = async (path, o = {}) => {
+    if (path === 'admin/users') { if (users[o.body.email]) return { status: 422, data: {} }; users[o.body.email] = { id: Object.keys(users).length ? UID2 : UID, password: o.body.password }; return { status: 200, data: { id: users[o.body.email].id } }; }
+    if (path.startsWith('token?grant_type=password')) { const u = users[o.body.email]; return u && u.password === o.body.password ? { status: 200, data: { refresh_token: 'r', user: { id: u.id } } } : { status: 400, data: {} }; }
+    return { status: 400, data: {} };
+  };
+  const r = await signUp('org-1', { display_name: 'Paul', email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows });
+  assert.deepEqual(r, { created: true, pending: true, email: 'kyayoun@gmail.com' });
+  assert.equal(rows[0].active, false);
+  await assert.rejects(login('org-1', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows }), /ACCOUNT_PENDING/);
+  await assert.rejects(signUp('org-1', { display_name: 'X', email: 'kyayoun@gmail.com', password: 'autrechose99' }, { authCall, fetchRows }), /EMAIL_ALREADY_USED_WRONG_PASSWORD/, 'nobody takes an address over');
+  await assert.rejects(signUp('org-1', { display_name: 'Paul', email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows }), /ACCOUNT_ALREADY_EXISTS/);
+
+  const req = (code, body) => ({ headers: { 'x-office-manager-owner-token': code }, body });
+  await assert.rejects(claimOwner('org-1', req('wrong', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }), { authCall, fetchRows }), /OWNER_ONLY/);
+  await assert.rejects(claimOwner('org-1', req('owner', { email: 'kyayoun@gmail.com', password: 'mauvais' }), { authCall, fetchRows }), /INVALID_CREDENTIALS/);
+  const s = await claimOwner('org-1', req('owner', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }), { authCall, fetchRows });
+  assert.equal(s.user.role, 'owner');
+  assert.equal(s.owner_token, 'owner');
+  assert.equal(rows[0].active, true);
+  assert.ok(ROUTES.signup.POST.public && ROUTES['claim-owner'].POST.public);
 });

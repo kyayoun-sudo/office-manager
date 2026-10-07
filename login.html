@@ -51,16 +51,26 @@
       <div id="diag-out" role="status" aria-live="polite" style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:6px"></div>
     </form>
 
-    <button type="button" class="link-btn" id="first-link">Première configuration du cabinet</button>
-    <form id="first-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
-      <h2 style="font-size:17px;margin:0">Créer le compte du propriétaire</h2>
-      <p style="margin:0;font-size:13px;color:var(--muted)">Une seule fois, quand aucun compte n'existe encore. Il faut le code propriétaire du cabinet.</p>
-      <div class="field"><label for="f-owner">Code propriétaire</label><input id="f-owner" type="password" autocomplete="off"></div>
-      <div class="field"><label for="f-name">Votre nom</label><input id="f-name" type="text" maxlength="120" autocomplete="name"></div>
-      <div class="field"><label for="f-email">Votre adresse e-mail</label><input id="f-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
-      <div class="field"><label for="f-pw">Mot de passe (10 caractères minimum, avec lettres et chiffres)</label><input id="f-pw" type="password" maxlength="128" autocomplete="new-password"></div>
-      <button class="btn" type="submit">Créer et se connecter</button>
-      <p class="status" id="first-status" role="status" aria-live="polite"></p>
+    <button type="button" class="link-btn" id="signup-link">Créer mon compte</button>
+    <form id="signup-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <h2 style="font-size:17px;margin:0">Créer mon compte</h2>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Votre compte sera actif dès que le propriétaire du cabinet vous aura donné un rôle. Si vous êtes le propriétaire, créez votre compte puis cliquez sur « Je suis le propriétaire du cabinet ».</p>
+      <div class="field"><label for="s-name">Votre nom</label><input id="s-name" type="text" maxlength="120" autocomplete="name"></div>
+      <div class="field"><label for="s-email">Votre adresse e-mail</label><input id="s-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="s-pw">Choisissez un mot de passe (10 caractères minimum, avec lettres et chiffres)</label><input id="s-pw" type="password" maxlength="128" autocomplete="new-password"></div>
+      <button class="btn" type="submit">Créer mon compte</button>
+      <p class="status" id="signup-status" role="status" aria-live="polite"></p>
+    </form>
+
+    <button type="button" class="link-btn" id="claim-link">Je suis le propriétaire du cabinet</button>
+    <form id="claim-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <h2 style="font-size:17px;margin:0">Je suis le propriétaire du cabinet</h2>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Votre e-mail et votre mot de passe (créez d'abord votre compte si besoin), puis le code propriétaire du cabinet, une seule fois.</p>
+      <div class="field"><label for="o-email">Votre adresse e-mail</label><input id="o-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="o-pw">Votre mot de passe</label><input id="o-pw" type="password" maxlength="128" autocomplete="current-password"></div>
+      <div class="field"><label for="o-code">Code propriétaire du cabinet</label><input id="o-code" type="password" autocomplete="off"></div>
+      <button class="btn" type="submit">Devenir propriétaire et entrer</button>
+      <p class="status" id="claim-status" role="status" aria-live="polite"></p>
     </form>
   </main>
 </div>
@@ -81,6 +91,11 @@
     ACCOUNTS_ALREADY_EXIST: 'Des comptes existent déjà : connectez-vous, ou demandez un compte au propriétaire.',
     EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.',
     INVALID_NAME: 'Indiquez votre nom.',
+    ACCOUNT_PENDING: 'Votre compte attend que le propriétaire du cabinet lui donne un rôle (ou il a été désactivé). Si vous êtes le propriétaire : « Je suis le propriétaire du cabinet ».',
+    EMAIL_ALREADY_USED_WRONG_PASSWORD: 'Cette adresse a déjà un mot de passe : utilisez le même, ou demandez une réinitialisation.',
+    ACCOUNT_ALREADY_EXISTS: 'Vous avez déjà un compte : connectez-vous.',
+    SIGNUP_UNAVAILABLE: 'Création de compte indisponible pour le moment.', CLAIM_UNAVAILABLE: 'Indisponible pour le moment.',
+    TEST_MODE_REAL_ORG_NOT_DECLARED: 'Aperçu de test mal configuré (cabinet réel non déclaré).',
     LOGIN_UNAVAILABLE: 'La connexion par e-mail n\u2019est pas encore activée sur le serveur (table des comptes à créer dans Supabase). Utilisez le code d\u2019accès ci-dessous.',
     BOOTSTRAP_UNAVAILABLE: 'Création impossible : la table des comptes n\u2019existe pas encore dans Supabase (fichier db/app-users.sql à appliquer).',
     SUPABASE_SERVER_CONFIG_MISSING: 'Configuration Supabase manquante sur le serveur.'
@@ -158,14 +173,25 @@
     }).catch(function () { line('Vérification impossible : le serveur ne répond pas.', false); });
   });
 
-  $('first-link').addEventListener('click', function () { $('first-form').hidden = !$('first-form').hidden; });
-  $('first-form').addEventListener('submit', function (e) {
+  $('signup-link').addEventListener('click', function () { $('signup-form').hidden = !$('signup-form').hidden; if (!$('signup-form').hidden) $('s-name').focus(); });
+  $('signup-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    say('first-status', 'Création…');
-    post('bootstrap-owner', { display_name: $('f-name').value.trim(), email: $('f-email').value.trim(), password: $('f-pw').value },
-      { 'x-office-manager-owner-token': $('f-owner').value.trim() })
+    say('signup-status', 'Création…');
+    post('signup', { display_name: $('s-name').value.trim(), email: $('s-email').value.trim(), password: $('s-pw').value })
+      .then(function () {
+        say('signup-status', 'Compte créé. Il sera actif dès que le propriétaire vous aura donné un rôle. Vous êtes le propriétaire ? Cliquez sur « Je suis le propriétaire du cabinet ».');
+        $('o-email').value = $('s-email').value.trim();
+      })
+      .catch(function (err) { say('signup-status', MESSAGES[err.message] || 'Création impossible pour le moment.', true); });
+  });
+  $('claim-link').addEventListener('click', function () { $('claim-form').hidden = !$('claim-form').hidden; if (!$('claim-form').hidden) ($('o-email').value ? $('o-pw') : $('o-email')).focus(); });
+  $('claim-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    say('claim-status', 'Vérification…');
+    post('claim-owner', { email: $('o-email').value.trim(), password: $('o-pw').value, display_name: $('s-name').value.trim() || null },
+      { 'x-office-manager-owner-token': $('o-code').value.trim() })
       .then(enter)
-      .catch(function (err) { say('first-status', MESSAGES[err.message] || 'Création impossible pour le moment.', true); });
+      .catch(function (err) { say('claim-status', MESSAGES[err.message] || 'Impossible pour le moment.', true); });
   });
 
   $('email').focus();
