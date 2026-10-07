@@ -201,8 +201,10 @@ export const ROUTES = Object.freeze({
     GET: open(async (orgId, req) => {
       try {
         const r = await finishConnect(orgId, req);
+        console.log('[google-callback] connected:', r.email, (r.scopes || []).length + ' scopes');
         return { __redirect: r.return_to + '?google=ok&email=' + encodeURIComponent(r.email) + '#google' };
       } catch (e) {
+        console.error('[google-callback] failed:', String(e.message || e).slice(0, 120));
         return { __redirect: '/parametres.html?google=error&code=' + encodeURIComponent(String(e.message || e).slice(0, 80)) + '#google' };
       }
     }),
