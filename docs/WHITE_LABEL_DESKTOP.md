@@ -140,3 +140,9 @@ Horaires des agents (Paramètres, propriétaire), passages complémentaires
 Orpailleur 08:00/12:00/20:00 → Grand Contrôleur (heures du propriétaire) → Sika
 (hebdomadaire), déclencheur Supabase `db/scheduler-cron.sql`, renommage des noms
 peu parlants dans le rangement. Détails : `docs/POUR_CHATGPT.md`.
+
+## Ajout 7 — Coordination, KPI de l'équipe et sécurité (2026-10-07)
+
+`equipe.html`, `lib/kpi.js`, `lib/user-auth.js`, `db/access-log.sql`, rôle
+`manager`, routes `coordination`, `team-kpi`, `my-kpi`, en-têtes de sécurité dans
+`vercel.json`, `docs/SECURITE.md`. Détails : `docs/POUR_CHATGPT.md`.

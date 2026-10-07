@@ -11,6 +11,8 @@
   color:var(--ink); background:var(--ground);
 }
 *{box-sizing:border-box}
+/* Elements marked hidden stay hidden, whatever their display rule (cards, rows…). */
+[hidden]{display:none !important}
 body{margin:0}
 a{color:var(--brand)}
 .shell{display:flex;flex-wrap:wrap;min-height:100vh}

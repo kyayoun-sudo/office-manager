@@ -10,6 +10,8 @@ import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
 import { tick, runNow, listPasses } from '../lib/agent-passes.js';
+import { requireRole, logAccess } from '../lib/user-auth.js';
+import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -32,6 +34,9 @@ import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 //   GET  /api/app?route=passes                     latest agent passes
 //   POST /api/app?route=scheduler-tick             called by the scheduler (x-scheduler-secret), runs due passes
 //   POST /api/app?route=scheduler-run {agent}      run a pass now — OWNER ONLY
+//   GET  /api/app?route=coordination               missions at risk, late and unassigned actions — MANAGERS (personal session)
+//   GET  /api/app?route=team-kpi                   team indicators — MANAGERS (personal session, access logged)
+//   GET  /api/app?route=my-kpi                     my own indicators — any account (personal session)
 //   GET  /api/app?route=users                      firm accounts — OWNER ONLY
 //   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -40,6 +45,9 @@ import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 const fail = (code, statusCode) => Object.assign(new Error(code), { statusCode });
 const owner = run => Object.assign(run, { ownerOnly: true });
 const open = run => Object.assign(run, { public: true });
+// Needs a personal session (Supabase access token) with one of these roles.
+const MANAGERS = ['owner', 'partner', 'manager'];
+const users = (roles, run) => Object.assign(run, { userRoles: roles });
 
 export const ROUTES = Object.freeze({
   branding: {
@@ -88,6 +96,18 @@ export const ROUTES = Object.freeze({
   // Public route: the scheduler secret is checked inside tick().
   'scheduler-tick': { POST: open((orgId, req) => tick(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
   'scheduler-run': { POST: owner((orgId, req) => runNow(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
+  coordination: {
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_coordination'); return coordination(orgId); }),
+    unavailable: 'COORDINATION_UNAVAILABLE'
+  },
+  'team-kpi': {
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); return teamKpis(orgId); }),
+    unavailable: 'KPI_UNAVAILABLE'
+  },
+  'my-kpi': {
+    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => myKpis(orgId, req.account)),
+    unavailable: 'KPI_UNAVAILABLE'
+  },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
@@ -131,6 +151,7 @@ export async function handleApp(req) {
   if (run.ownerOnly) requireFirmOwner(req);
   const orgId = process.env.DEFAULT_ORG_ID;
   if (!orgId && route !== ROUTES.diagnostic) throw new Error('DEFAULT_ORG_ID_MISSING');
+  if (run.userRoles) req.account = await requireRole(req, run.userRoles);
   return run(orgId, req);
 }
 

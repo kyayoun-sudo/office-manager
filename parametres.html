@@ -29,6 +29,7 @@
     <a href="/recherche.html">Recherche</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
     <a href="/validations.html">À valider</a>
     <a href="/assistant.html">Assistant</a>
     <a href="/parametres.html" aria-current="page">Paramètres</a>
@@ -150,7 +151,7 @@
 
         <section class="card" aria-labelledby="h-users">
           <h2 id="h-users">Comptes du cabinet</h2>
-          <p class="hint" style="margin:0">Chaque personne se connecte avec son e-mail et son mot de passe. Le propriétaire et les associés-gérants ont accès à ces paramètres ; les collaborateurs, non. Un compte se désactive, il ne se supprime pas.</p>
+          <p class="hint" style="margin:0">Chaque personne se connecte avec son e-mail et son mot de passe. Propriétaire et associés-gérants : tout, y compris ces paramètres. Managers : coordination et indicateurs de l'équipe. Collaborateurs : leur travail et leurs propres indicateurs. Un compte se désactive, il ne se supprime pas.</p>
           <div id="users" class="stack" style="display:flex;flex-direction:column;gap:8px"></div>
           <h3 style="margin:8px 0 0;font-size:15px">Ajouter une personne</h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
@@ -158,7 +159,7 @@
             <div class="field"><label for="u-email">E-mail</label><input id="u-email" type="text" inputmode="email" maxlength="254"></div>
             <div class="field"><label for="u-role">Rôle</label>
               <select id="u-role" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
-                <option value="collaborator">Collaborateur</option><option value="partner">Associé-gérant</option><option value="owner">Propriétaire</option>
+                <option value="collaborator">Collaborateur</option><option value="manager">Manager</option><option value="partner">Associé-gérant</option><option value="owner">Propriétaire</option>
               </select></div>
             <div class="field"><label for="u-pw">Mot de passe provisoire</label><input id="u-pw" type="text" maxlength="128" autocomplete="off" placeholder="10 caractères, lettres et chiffres"></div>
           </div>
@@ -420,7 +421,7 @@
   });
 
   // ---- Accounts (owner / partner) ----
-  var ROLE_LABEL = { owner: 'Propriétaire', partner: 'Associé-gérant', collaborator: 'Collaborateur' };
+  var ROLE_LABEL = { owner: 'Propriétaire', partner: 'Associé-gérant', manager: 'Manager', collaborator: 'Collaborateur' };
   Object.assign(ERRORS, {
     WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
     EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.', INVALID_EMAIL: 'Adresse e-mail invalide.',
@@ -441,7 +442,7 @@
     var role = document.createElement('select');
     role.setAttribute('aria-label', 'Rôle de ' + u.display_name);
     role.style.cssText = 'font:inherit;font-size:13px;border:1px solid #C9D0CC;border-radius:8px;padding:6px 8px;min-height:36px;background:#fff';
-    ['collaborator', 'partner', 'owner'].forEach(function (r) { var o = new Option(ROLE_LABEL[r], r); role.appendChild(o); });
+    ['collaborator', 'manager', 'partner', 'owner'].forEach(function (r) { var o = new Option(ROLE_LABEL[r], r); role.appendChild(o); });
     role.value = u.role;
     role.addEventListener('change', function () {
       manage({ action: 'set_role', auth_user_id: u.auth_user_id, role: role.value }).then(loadUsers)

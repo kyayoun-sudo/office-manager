@@ -7,8 +7,10 @@ create table if not exists public.office_app_users (
   auth_user_id uuid not null,
   email text not null check (length(email) <= 254 and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   display_name text not null check (length(btrim(display_name)) between 1 and 120),
-  -- owner / partner (associé-gérant): firm settings; collaborator: daily use.
-  role text not null default 'collaborator' check (role in ('owner', 'partner', 'collaborator')),
+  -- owner / partner (associé-gérant): firm settings; manager: team indicators and
+  -- coordination; collaborator: daily use and own indicators.
+  role text not null default 'collaborator' constraint office_app_users_role_check
+    check (role in ('owner', 'partner', 'manager', 'collaborator')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

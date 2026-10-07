@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Équipe et suivi</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.person{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.person h3{margin:0;font-size:16px}
+.load{height:8px;background:#EEF0EE;border-radius:4px;overflow:hidden}
+.load span{display:block;height:8px;background:var(--brand)}
+.load.over span{background:#B45309}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font-size:13px}
+.stats b{font-family:var(--mono);font-weight:500;font-size:14px}
+.sig{font-size:13px;margin:0;line-height:1.4}
+.sig.warn{color:#8A3B0B}
+.cov{font-size:12px;color:var(--muted);margin:0;line-height:1.4}
+.risk-high{background:#FBE4D8;color:#8A2E0B}
+.method{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html" aria-current="page">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Équipe &amp; suivi</h1>
+      <p class="lead">Qui fait quoi, ce qui est en retard, ce qui n'est pas assigné, et la charge de chacun. Des repères factuels pour piloter, pas des notes.</p>
+    </header>
+
+    <div class="callout" id="need-login" hidden style="text-decoration:none">
+      <span class="callout-label">Session personnelle requise</span>
+      <span class="callout-text">Les indicateurs sont personnels. Connectez-vous avec votre e-mail et votre mot de passe (pas avec le code d'accès du cabinet) pour les voir.</span>
+    </div>
+
+    <section class="card" aria-labelledby="h-me" id="me-card" hidden>
+      <h2 id="h-me">Mes indicateurs <span class="meta" id="me-period"></span></h2>
+      <div id="me"></div>
+    </section>
+
+    <div id="manager-area" class="stack" style="gap:20px" hidden>
+      <section class="card" aria-labelledby="h-coord">
+        <h2 id="h-coord">Coordination</h2>
+        <div class="kpis" id="coord-kpis"></div>
+        <h3 style="margin:6px 0 0;font-size:15px">Missions à surveiller</h3>
+        <div class="table-box"><table>
+          <thead><tr><th scope="col">Mission</th><th scope="col">Fin prévue</th><th scope="col">Actions ouvertes</th><th scope="col">En retard</th><th scope="col">Équipe</th><th scope="col">Risque</th></tr></thead>
+          <tbody id="missions"></tbody>
+        </table></div>
+        <div class="row">
+          <div class="grow" style="gap:8px">
+            <h3 style="margin:6px 0 0;font-size:15px">Actions en retard</h3>
+            <div id="overdue" class="stack"></div>
+          </div>
+          <div class="side" style="gap:8px">
+            <h3 style="margin:6px 0 0;font-size:15px">Sans responsable</h3>
+            <div id="unassigned" class="stack"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-team">
+        <h2 id="h-team">Indicateurs de l'équipe <span class="meta" id="team-period"></span></h2>
+        <div class="kpis" id="team-kpis"></div>
+        <p class="method" id="method"></p>
+        <div class="people" id="people"></div>
+        <p class="method">Consultation réservée au propriétaire, aux associés-gérants et aux managers. Chaque consultation est enregistrée dans le journal de sécurité. Chacun peut voir ses propres indicateurs.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var RISK = { high: ['Élevé', 'tag risk-high'], medium: ['À surveiller', 'tag warn'], low: ['Normal', 'tag'] };
+  var ERR = { USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail pour voir ces indicateurs.', ROLE_NOT_ALLOWED: 'Réservé aux managers.', ACCOUNT_NOT_ALLOWED: 'Compte désactivé ou non autorisé.' };
+  var pct = function (v) { return v == null ? '—' : v + ' %'; };
+  var num = function (v, suffix) { return v == null ? '—' : v + (suffix || ''); };
+
+  function kpi(label, value) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', String(value))); return k; }
+
+  function personCard(p, mine) {
+    var c = el('article', null, 'person');
+    var head = el('div'); head.appendChild(el('h3', mine ? 'Vous' : p.name));
+    head.appendChild(el('span', [p.role_title, p.department].filter(Boolean).join(' · '), 'meta'));
+    c.appendChild(head);
+    var lab = el('div', 'Charge planifiée : ' + pct(p.load_pct) + ' · ' + p.missions_active + ' mission' + (p.missions_active > 1 ? 's' : ''), 'meta');
+    c.appendChild(lab);
+    var bar = el('div', null, 'load' + (p.load_pct > 100 ? ' over' : '')); var fill = el('span'); fill.style.width = Math.min(100, p.load_pct || 0) + '%'; bar.appendChild(fill); c.appendChild(bar);
+    var st = el('div', null, 'stats');
+    [['Actions en cours', num(p.actions_open)], ['En retard', num(p.actions_overdue)], ['Terminées (période)', num(p.actions_done)],
+     ['Dans les délais', pct(p.on_time_rate)], ['Délai moyen', num(p.avg_cycle_days, ' j')], ['Vérifiées', pct(p.verified_rate)]]
+      .forEach(function (x) { var d = el('div'); d.appendChild(el('span', x[0] + ' ')); d.appendChild(el('b', x[1])); st.appendChild(d); });
+    c.appendChild(st);
+    (p.signals || []).forEach(function (s) { c.appendChild(el('p', (s.level === 'warn' ? '▲ ' : '● ') + s.text, 'sig ' + s.level)); });
+    (p.coverage || []).forEach(function (s) { c.appendChild(el('p', s, 'cov')); });
+    return c;
+  }
+
+  function loadMine() {
+    OM.api('/api/app?route=my-kpi').then(function (d) {
+      $('me-card').hidden = false; var box = $('me'); box.textContent = '';
+      if (!d.linked) { box.appendChild(el('p', d.message, 'empty')); return; }
+      $('me-period').textContent = '· ' + d.period_days + ' derniers jours';
+      box.appendChild(personCard(d, true));
+    }).catch(function (e) { $('me-card').hidden = false; UI.fail($('me'), { message: ERR[e.message] || e.message }); });
+  }
+
+  function loadCoordination() {
+    OM.api('/api/app?route=coordination').then(function (d) {
+      var k = $('coord-kpis'); k.textContent = '';
+      [['Missions en cours', d.totals.missions_live], ['Missions à risque', d.totals.missions_at_risk], ['Actions en retard', d.totals.overdue], ['Sans responsable', d.totals.unassigned]]
+        .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
+      var tb = $('missions'); tb.textContent = '';
+      if (!d.missions.length) { var tr0 = el('tr'); var td0 = el('td', 'Aucune mission en cours.', 'empty'); td0.colSpan = 6; tr0.appendChild(td0); tb.appendChild(tr0); }
+      d.missions.slice(0, 30).forEach(function (m) {
+        var tr = el('tr');
+        var a = el('a', m.name || 'Mission'); a.href = '/mission.html?id=' + encodeURIComponent(m.id);
+        var td = el('td'); td.appendChild(a); tr.appendChild(td);
+        tr.appendChild(el('td', m.planned_end ? UI.date(m.planned_end) + (m.days_left != null ? (m.days_left < 0 ? ' (dépassée de ' + (-m.days_left) + ' j)' : ' (J-' + m.days_left + ')') : '') : 'À définir'));
+        tr.appendChild(el('td', String(m.open_actions))); tr.appendChild(el('td', String(m.overdue_actions))); tr.appendChild(el('td', String(m.team_size)));
+        var r = el('td'); r.appendChild(el('span', RISK[m.risk][0], RISK[m.risk][1])); tr.appendChild(r);
+        tb.appendChild(tr);
+      });
+      list('overdue', d.overdue, function (x) { return [x.summary, [x.mission, x.assignee || 'sans responsable', x.days_late + ' j de retard'].filter(Boolean).join(' · ')]; }, 'Aucune action en retard.');
+      list('unassigned', d.unassigned, function (x) { return [x.summary, [x.mission, x.due_at ? 'échéance ' + UI.date(x.due_at) : 'sans échéance'].filter(Boolean).join(' · ')]; }, 'Tout est assigné.');
+    }).catch(function (e) { UI.fail($('missions'), { message: ERR[e.message] || e.message }); });
+  }
+
+  function list(id, rows, fmt, empty) {
+    var box = $(id); box.textContent = '';
+    if (!rows.length) { box.appendChild(el('p', empty, 'empty')); return; }
+    rows.slice(0, 20).forEach(function (r) {
+      var f = fmt(r); var item = el('div', null, 'item'); var t = el('div', null, 't');
+      t.appendChild(el('span', f[0] || 'Action')); t.appendChild(el('span', f[1], 'meta')); item.appendChild(t); box.appendChild(item);
+    });
+  }
+
+  function loadTeam() {
+    OM.api('/api/app?route=team-kpi').then(function (d) {
+      $('team-period').textContent = '· ' + d.period_days + ' derniers jours';
+      $('method').textContent = d.method;
+      var k = $('team-kpis'); k.textContent = '';
+      [['Personnes', d.team.people], ['En surcharge', d.team.overloaded], ['Disponibles', d.team.available], ['Actions en retard', d.team.actions_overdue], ['Terminées (période)', d.team.actions_done]]
+        .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
+      var box = $('people'); box.textContent = '';
+      if (!d.people.length) { box.appendChild(el('p', 'Aucune personne dans l’annuaire.', 'empty')); return; }
+      d.people.forEach(function (p) { box.appendChild(personCard(p, false)); });
+    }).catch(function (e) { UI.fail($('people'), { message: ERR[e.message] || e.message }); });
+  }
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    if (!OM.hasPersonalSession()) { $('need-login').hidden = false; return; }
+    loadMine();
+    if (OM.isManager()) { $('manager-area').hidden = false; loadCoordination(); loadTeam(); }
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

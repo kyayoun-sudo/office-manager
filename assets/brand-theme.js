@@ -26,7 +26,8 @@
     saveSession: function (s) {
       if (!s || !s.pilot_token) return;
       safeSet(window.localStorage, SESSION_KEY, JSON.stringify({
-        user: s.user, refresh_token: s.refresh_token, pilot_token: s.pilot_token, owner_token: s.owner_token || null
+        user: s.user, refresh_token: s.refresh_token, access_token: s.access_token || null,
+        pilot_token: s.pilot_token, owner_token: s.owner_token || null
       }));
       // Lets the original console (index.html) reuse the same login.
       safeSet(window.sessionStorage, LEGACY_TOKEN_KEY, s.pilot_token);
@@ -37,22 +38,37 @@
     getOwnerToken: function () { var s = readSession(); return (s && s.owner_token) || ''; },
     getRole: function () { var s = readSession(); return (s && s.user && s.user.role) || ''; },
     isOwner: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner'; },
+    isManager: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'manager'; },
+    hasPersonalSession: function () { var s = readSession(); return Boolean(s && s.access_token); },
     getUserName: function () {
       var s = readSession();
       return (s && s.user && s.user.display_name) || safeGet(window.localStorage, USER_KEY);
     },
     setUserName: function (n) { safeSet(window.localStorage, USER_KEY, String(n || '').trim().slice(0, 80)); },
 
-    api: function (path, options) {
+    api: function (path, options, retried) {
       options = options || {};
-      var headers = Object.assign({ 'x-office-manager-token': OM.getToken() }, options.headers || {});
+      var s = readSession();
+      var base = { 'x-office-manager-token': OM.getToken() };
+      // Personal token: lets the server check who you are on sensitive routes.
+      if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
+      var headers = Object.assign(base, options.headers || {});
       return fetch(path, Object.assign({}, options, { headers: headers })).then(function (r) {
         return r.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = { error: 'INVALID_RESPONSE' }; }
           if (!r.ok) {
-            if (r.status === 401 && !onLoginPage()) OM.forget(true);
-            var err = new Error((data && data.error) || ('HTTP_' + r.status)); err.status = r.status; throw err;
+            var code = (data && data.error) || ('HTTP_' + r.status);
+            // Expired personal token: refresh once, then retry.
+            if (r.status === 401 && code === 'TOKEN_EXPIRED' && !retried) {
+              return OM.checkSession().then(function (fresh) {
+                if (fresh) return OM.api(path, options, true);
+                var e1 = new Error('SESSION_EXPIRED'); e1.status = 401; throw e1;
+              });
+            }
+            // Wrong or changed access code: back to the login page.
+            if (r.status === 401 && (code === 'UNAUTHORIZED' || code === 'SESSION_EXPIRED') && !onLoginPage()) OM.forget(true);
+            var err = new Error(code); err.status = r.status; throw err;
           }
           return data;
         });

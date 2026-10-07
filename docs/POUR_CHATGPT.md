@@ -108,6 +108,29 @@ dossier), clique « Lancer », puis fait autre chose.
   apprend et s'adapte à chaque utilisateur (préférences par utilisateur).
   Prévu via l'application de bureau (`desktop/`) avec accès explicite à des dossiers.
 
+### 3 quater. Coordination, suivi et indicateurs de l'équipe (KPI) — ✅
+Écran `equipe.html` (menu « Équipe »).
+- **Coordination** (`lib/kpi.js` → `coordinationFrom`) : missions en cours triées par
+  risque (fin dépassée, retards, échéance proche, pas d'équipe), actions en
+  retard (avec responsable et jours de retard), actions sans responsable.
+- **Indicateurs par personne** (`personKpis`), sur 30 jours, **uniquement à partir
+  de faits de travail** : charge planifiée (% d'affectation actif), missions
+  actives, actions en cours / en retard / terminées, taux dans les délais, délai
+  moyen de traitement, taux de vérification ; plus des **signaux** (surcharge,
+  retards, disponibilité) et la **couverture des données** (ce qui n'est pas
+  mesurable est affiché « — », jamais 0).
+- **Règles** : pas de note globale ni de classement (ordre alphabétique), jamais
+  les questionnaires / profils RH / jugement de l'IA, chacun voit **ses propres**
+  indicateurs (`my-kpi`), repères pour un échange et jamais décision RH automatique.
+- **Accès** : managers (`owner`, `partner`, nouveau rôle **`manager`**) via une
+  **session personnelle vérifiée côté serveur** (`lib/user-auth.js` : jeton
+  Supabase `Authorization: Bearer` + rôle lu dans `office_app_users`). Le code
+  d'accès commun ne suffit pas. Chaque consultation est journalisée
+  (`office_access_log`, ajout seul, `db/access-log.sql`).
+- **Sécurité** : voir **`docs/SECURITE.md`** (rôles, vérifications, traçabilité,
+  en-têtes HTTP ajoutés dans `vercel.json` — CSP, X-Frame-Options, HSTS… —, règles
+  d'usage des indicateurs, risques restants).
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -141,18 +164,21 @@ sans permission locale. Non compilée (voir `docs/WHITE_LABEL_DESKTOP.md`).
 | `passes` | GET (derniers passages) | code pilote |
 | `scheduler-tick` | POST (lance les passages dus) | secret planificateur |
 | `scheduler-run` | POST `{agent}` (passage immédiat) | **propriétaire** |
+| `coordination` | GET | session personnelle, rôle owner/partner/manager (journalisé) |
+| `team-kpi` | GET | session personnelle, rôle owner/partner/manager (journalisé) |
+| `my-kpi` | GET | session personnelle, tout compte |
 | `users` | GET / POST (créer, désactiver, rôle, mot de passe) | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
 `db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`,
-`db/agent-schedule.sql`, puis `db/scheduler-cron.sql` (après avoir remplacé l'adresse et le secret).
+`db/agent-schedule.sql`, `db/access-log.sql`, puis `db/scheduler-cron.sql` (après avoir remplacé l'adresse et le secret).
 Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
 Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`.
 
 ## État des tests
-164 tests : 163 OK. Le seul échec, `tests/browser-response.test.js`, **existait
+170 tests : 169 OK. Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes
@@ -244,3 +270,25 @@ Un assistant de premier lancement de l'**application de bureau** (`desktop/`) :
   depuis le passage précédent).
 - ⏳ L'apprentissage porte sur les **dossiers** de destination ; l'apprentissage
   des **conventions de nommage** propres au cabinet reste à ajouter.
+
+---
+
+## ▶ Vision de Paul (7 octobre 2026)
+
+> « On veut créer la meilleure application de back-office par IA — toi (Claude) et
+> ChatGPT — pour les cabinets, mais pour tous les métiers. »
+
+Conséquences pour la suite du travail :
+1. **Garder le cœur générique** : missions (= projets / dossiers / chantiers),
+   actions, échéances, affectations, documents, validations, indicateurs. Le
+   vocabulaire métier (PBC, cycles d'audit, Working Papers…) doit rester une
+   **couche de configuration par métier**, pas être codé en dur dans les écrans.
+2. **Marque blanche** déjà en place (nom, logo, couleurs, e-mail et ton de l'agent).
+3. **Sécurité et confiance d'abord** : rôles vérifiés côté serveur, journal
+   d'accès, ajout seul, annulation possible, l'IA propose et l'humain décide.
+4. **Indicateurs justes** : faits de travail uniquement, transparents pour la
+   personne concernée, jamais de décision RH automatique.
+5. **Agents complémentaires et planifiés** (Orpailleur, Grand Contrôleur, Sika…) :
+   chaque nouvel agent métier doit s'inscrire dans le même cycle (horaires,
+   résumé de passage, besoins transmis aux autres).
+
