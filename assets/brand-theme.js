@@ -69,7 +69,7 @@
             }
             // Wrong or changed access code: back to the login page.
             if (r.status === 401 && (code === 'UNAUTHORIZED' || code === 'SESSION_EXPIRED') && !onLoginPage()) OM.forget(true);
-            var err = new Error(code); err.status = r.status; throw err;
+            var err = new Error(data && data.detail ? code + ' (' + data.detail + ')' : code); err.status = r.status; err.code = code; throw err;
           }
           return data;
         });

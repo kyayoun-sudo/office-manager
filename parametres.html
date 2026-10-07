@@ -196,7 +196,7 @@
           <h2 id="h-try">Essayer</h2>
           <div class="field"><label for="try-topic">Sujet du message à l'équipe</label><input id="try-topic" type="text" maxlength="300" placeholder="Ex. Rappeler que les pièces Nova Services sont attendues vendredi"></div>
           <div class="field"><label for="try-to">Destinataires (facultatif, adresses du cabinet uniquement)</label><input id="try-to" type="text" maxlength="500" placeholder="samira@taty.info, yannick@taty.info"></div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="try-btn" type="button">Rédiger un message test</button><span class="hint">Enregistrez d'abord. Rien n'est envoyé.</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="try-btn" type="button">Rédiger un message test</button><button class="btn" id="try-send" type="button" hidden>Envoyer pour validation</button><span class="hint" id="try-hint">Enregistrez d'abord. Rien n'est envoyé sans validation dans « À valider ».</span></div>
           <div id="try-out" style="white-space:pre-wrap;background:#F7F8F6;border:1px solid #EEF0EE;border-radius:10px;padding:14px;font-size:14px;line-height:1.55" hidden></div>
         </section>
 
@@ -462,9 +462,21 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic: $('try-topic').value.trim(), recipients: $('try-to').value })
     }).then(function (d) {
+      window.__draft = { subject: d.subject, body: d.body };
       $('try-out').textContent = 'Objet : ' + d.subject + '\n\n' + d.body + '\n\n— ' + d.note;
+      $('try-send').hidden = !$('try-to').value.trim();
+      $('try-hint').textContent = $('try-to').value.trim() ? 'Ce brouillon peut partir : il attendra votre validation dans « À valider ».' : 'Ajoutez des destinataires pour pouvoir l’envoyer.';
     }).catch(function (err) { $('try-out').textContent = 'Échec : ' + explain(err); })
       .then(function () { $('try-btn').disabled = false; });
+  });
+
+  // The draft goes to « À valider »: a manager approves it there, then it is sent.
+  $('try-send').addEventListener('click', function () {
+    var b = this; if (!window.__draft) return; b.disabled = true;
+    OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'propose', recipients: $('try-to').value, subject: window.__draft.subject, body: window.__draft.body, topic: $('try-topic').value.trim() }) })
+      .then(function () { var h = $('try-hint'); h.textContent = 'Envoyé pour validation : '; var a = document.createElement('a'); a.href = '/validations.html'; a.textContent = 'ouvrir « À valider »'; h.appendChild(a); b.hidden = true; })
+      .catch(function (err) { $('try-hint').textContent = 'Échec : ' + explain(err); }).then(function () { b.disabled = false; });
   });
 
   // ---- Agent schedule (owner) ----

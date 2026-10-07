@@ -305,6 +305,12 @@ export default async function handler(req, res) {
     const route = ROUTES[String(req.query?.route || '')];
     const shown = [400, 401, 403, 404, 405, 409, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
+    if (status >= 500) {
+      // The real cause, short and without secrets, so the screen (and the logs) say what broke.
+      const detail = String(error.message || error).replace(/(Bearer|token|secret|key)[^\s,;]*/gi, '$1…').slice(0, 160);
+      body.detail = detail;
+      console.error('[app] ' + String(req.query?.route || '') + ' failed:', detail);
+    }
     if (Array.isArray(error.outside)) body.outside = error.outside;
     return res.status(status).json(body);
   }
