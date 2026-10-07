@@ -467,3 +467,27 @@ Gardés de mon côté : `vercel.json` (en-têtes de sécurité + redirection `/`
 216 tests passent. La production va désormais partir de cette branche : merci de pousser tes
 prochaines modifications sur `feature/white-label-desktop` (ou de me les signaler) pour qu'elles ne
 soient pas perdues.
+
+## 3 undecies — « Test du cabinet » en preview (Claude, 7 octobre après-midi)
+
+Demande de Paul : tester toute l'application sur une **copie** du cabinet TATY — copie à l'identique du
+Drive, 5 missions d'audit sur 3 mois en accéléré (1 semaine = 1 jour), équipe fictive dont les e-mails
+sont les boîtes de Paul, Paul jouant le CFO des clients. Uniquement dans l'aperçu (preview).
+
+- `lib/test-mode.js` : **une seule** définition du mode test (`isTestMode` : preview, ou
+  `OFFICE_MANAGER_TEST_RUN`/`AGENT_MAIL_SANDBOX`=on — **jamais** si `VERCEL_ENV=production`) ;
+  `assertIsolatedOrg` appelé par toutes les routes (`api/app.js` et les autres `api/*.js`) : en mode test,
+  `TEST_RUN_FORBIDDEN_ORG_IDS` (le vrai cabinet) doit être réglé et ne pas être le cabinet courant.
+- **Verrou d'écriture Drive** `assertWritableTarget` (`lib/google-drive.js`) appelé par toutes les écritures
+  (Sheets update/append/clear, createBinary/updateBinary, createFolder, copy, tidy move/createFolder,
+  entraînement, copie) : en mode test la cible doit être dans `TATY_SHARED_DRIVE_ID` (Drive de test),
+  jamais dans `TEST_SOURCE_DRIVE_ID`. Sans effet en production.
+- En mode test : pont Supabase et scanner durable interdits (liés au vrai Drive) ; aucun repli sur les
+  identifiants « legacy » codés en dur (`TEST_MODE_DRIVE_ID_NOT_SET`) ; seul un libellé Gmail contenant
+  « TEST » est lu ; e-mails uniquement vers `AGENT_MAIL_SANDBOX_COLLEAGUES` / `_CLIENTS`
+  (dernier verrou dans `sendViaGmail`) ; ces adresses « équipe » comptent comme collègues (`isColleague`).
+- `lib/drive-copy.js` (copie reprenable, bail, réessais 429, jamais sur le Drive source),
+  `lib/test-run.js` + `lib/test-run-scenario.js` (cabinet TATY TEST, équipe, 5 missions depuis le modèle
+  `00_MODELE_AUDIT_VALIDE_A_DUPLIQUER`, lettre de mission, programme VALIDÉ, fiche client), page
+  `test-cabinet.html`, routes `test-run` / `test-run-step`, table `db/test-run.sql`.
+- Revue indépendante faite deux fois ; 234 tests. **Ne pas** régler `OFFICE_MANAGER_TEST_RUN` en production.
