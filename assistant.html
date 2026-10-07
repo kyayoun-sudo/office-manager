@@ -107,8 +107,8 @@ details.card[open] summary{margin-bottom:6px}
     <!-- 3. Équipe -->
     <details class="card" id="people">
       <summary>Équipe et briefing (People Intelligence)</summary>
-      <p class="hint">Personnes disponibles pour la mission choisie ci-dessus, avec les points à vérifier. Les compétences et la disponibilité restent à valider par le manager. Aucun appel à l'IA.</p>
-      <div class="btn-row"><button class="btn ghost" id="people-read" type="button" disabled>Consulter l'équipe possible</button></div>
+      <p class="hint">Pour la mission choisie ci-dessus, l'IA applique la politique de gestion des personnes du cabinet (dossier RH / CV du Drive) : rôle et autorité de chacun, style de management pour la tâche, briefing écrit selon le protocole de communication de la personne, RACI et alertes d'équipe mal composée. Les règles de l'application priment ; le responsable décide, rien n'est envoyé.</p>
+      <div class="btn-row"><button class="btn" id="people-brief" type="button" disabled>Préparer l'équipe et les briefings</button><button class="btn ghost" id="people-read" type="button" disabled>Consulter l'équipe possible (sans IA)</button></div>
       <div class="reply" id="people-answer">Choisissez d'abord une mission.</div>
     </details>
 
@@ -214,7 +214,7 @@ details.card[open] summary{margin-bottom:6px}
 
   function openMission(id) {
     opened = null; resetPlan();
-    $('mission-plan').disabled = true; $('people-read').disabled = !id; $('mission-link').hidden = !id;
+    $('mission-plan').disabled = true; $('people-read').disabled = !id; $('people-brief').disabled = !id; $('mission-link').hidden = !id;
     if (!id) { $('mission-dossier').textContent = 'Choisissez une mission.'; return; }
     $('mission-link').href = '/mission.html?id=' + encodeURIComponent(id);
     $('people-answer').textContent = 'Cliquez sur « Consulter l’équipe possible ».';
@@ -274,6 +274,27 @@ details.card[open] summary{margin-bottom:6px}
       openMission(id);
     }).catch(function (err) { $('plan-result').textContent = 'Erreur : ' + readable(err) + ' Vérifiez le dossier avant de réessayer.'; })
       .then(function () { $('plan-save').disabled = !opened; });
+  });
+
+  // 3a. Team and briefings with the firm's policy (AI)
+  $('people-brief').addEventListener('click', function () {
+    var id = $('mission-select').value; if (!id) return;
+    var b = this; b.disabled = true; $('people-answer').textContent = 'L’IA prépare l’équipe et les briefings selon la politique du cabinet…';
+    OM.api('/api/app?route=people-brief', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mission_id: id }) })
+      .then(function (d) {
+        var out = [d.policy_used ? 'Politique de gestion des personnes du cabinet appliquée.' : 'Aucune politique enregistrée (Paramètres → Gestion des personnes) : règles de base seulement.'];
+        (d.alerts || []).forEach(function (a) { out.push('⚠️ ' + a.message); });
+        (d.team || []).forEach(function (p) {
+          out.push(p.full_name + ' — ' + (p.mission_role || '') + '\nResponsabilité : ' + (p.ownership || '–') + '\nAutorité : ' + (p.authority || '–') + '\nRelecteur : ' + (p.reviewer || '–') +
+            '\nObjectif de développement : ' + (p.development_objective || '–') + '\nStyle : ' + (p.leadership_style || '–') + (p.why_style ? ' (' + p.why_style + ')' : '') +
+            '\n\nBriefing :\n' + (p.briefing || '–') + ((p.checks_before_staffing || []).length ? '\n\nÀ vérifier : ' + p.checks_before_staffing.join(' ; ') : ''));
+        });
+        if ((d.raci || []).length) out.push('RACI\n' + d.raci.map(function (r) { return r.activity + ' — R : ' + r.responsible + ' · Relecture : ' + r.reviewer + ' · Consulté : ' + (r.consulted || '–') + ' · Décide : ' + r.final_authority; }).join('\n'));
+        if ((d.missing_information || []).length) out.push('Manque : ' + d.missing_information.join(' ; '));
+        out.push(d.notice);
+        $('people-answer').textContent = out.join('\n\n');
+      }).catch(function (err) { $('people-answer').textContent = 'Erreur : ' + readable(err); })
+      .then(function () { b.disabled = !$('mission-select').value; });
   });
 
   // 3. People Intelligence

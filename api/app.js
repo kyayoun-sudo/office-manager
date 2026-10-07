@@ -26,6 +26,7 @@ import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
 import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/tidy-plan.js';
 import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
 import { dropFile } from '../lib/drop-box.js';
+import { peopleBrief } from '../lib/people-brief.js';
 import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -240,6 +241,8 @@ export const ROUTES = Object.freeze({
   // The firm's people-management policy, kept in the agents' Drive memory (owner).
   // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
   drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => dropFile(orgId, req.body || {}, req.account)), unavailable: 'DROP_UNAVAILABLE' },
+  // « Équipe et briefing » with the firm's people-management policy (AI) — managers.
+  'people-brief': { POST: users(MANAGERS, (orgId, req) => peopleBrief(orgId, req.body?.mission_id)), unavailable: 'PEOPLE_BRIEF_UNAVAILABLE' },
   'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner((orgId, req) => savePeoplePolicy(req.body || {})), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),

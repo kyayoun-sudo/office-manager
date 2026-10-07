@@ -89,7 +89,7 @@ test('after validation: deposit in the review folder only when the mapping is re
   const fetchRows = async (path, o = {}) => { if (o.method === 'PATCH') patches.push(JSON.parse(o.body)); return [{ id: 'a1' }]; };
   const r = await executeDecision('org', action, 'approve', 'Paul', { fetchRows, depositMail: async () => ({ deposited: false, waiting: 'MAPPING_REVIEW_REQUIRED' }) });
   assert.match(r.effect, /dès que la cartographie du Drive sera validée/);
-  assert.equal(patches[0].work_state, 'awaiting_drive');
+  assert.equal(patches[0].work_state, 'requested');
   const r2 = await executeDecision('org', action, 'approve', 'Paul', { fetchRows, depositMail: async () => ({ deposited: true, files: [1, 2] }) });
   assert.match(r2.effect, /2 fichier\(s\)/);
 });
@@ -105,5 +105,5 @@ test('review fixes: a message no longer in the label is never downloaded; one ba
   };
   const r = await depositWaiting('org', { ...base, fetchRows });
   assert.deepEqual(r, { deposited: 1, failed: 1, waiting: 0 });
-  assert.deepEqual(marks, [['bad', 'deposit_failed'], ['good', 'deposited']]);
+  assert.deepEqual(marks, [['bad', 'blocked'], ['good', 'executed']]);
 });
