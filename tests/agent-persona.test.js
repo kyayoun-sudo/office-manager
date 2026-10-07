@@ -74,3 +74,10 @@ test('owner-only settings: pilot token alone is refused', async () => {
   delete process.env.OFFICE_MANAGER_OWNER_TOKEN;
   await assert.rejects(handleApp(req('agent-persona', 'GET', { 'x-office-manager-owner-token': 'owner' })), /OWNER_SETTINGS_NOT_CONFIGURED/);
 });
+
+test('drafts are written with plain characters (no « », no long dash, no emoji, no bold)', async () => {
+  const { plainCharacters } = await import('../lib/agent-persona.js');
+  const d = plainCharacters({ subject: 'Point « Nova » — urgent 🚀', body: '**Yvan**, peux-tu relire — merci 🙏' });
+  assert.equal(d.subject, 'Point "Nova" - urgent');
+  assert.equal(d.body, 'Yvan, peux-tu relire - merci');
+});
