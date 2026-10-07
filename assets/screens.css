@@ -7,7 +7,7 @@
 .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 .item .t{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px}
 .item .t span:first-child{font-weight:500;overflow-wrap:anywhere}
-.meta{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted)}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .link-item{text-decoration:none;color:var(--ink)}
 .link-item:hover{border-color:var(--brand)}
 .tag{font-size:12px;background:var(--soft);color:#0B4A43;border-radius:6px;padding:4px 8px;font-weight:500}

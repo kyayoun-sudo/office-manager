@@ -94,7 +94,10 @@ dossier), clique « Lancer », puis fait autre chose.
   → dossier). Apprentissage au niveau du cabinet (le Drive est partagé).
 - `lib/tidy-drive.js` : déplacer (vérifie que le fichier est encore dans son
   dossier d'origine et dans le Drive du cabinet), créer un dossier. **Jamais de
-  suppression ni de renommage.** Le dossier précédent est conservé ⇒ annulation.
+  suppression.** Le dossier précédent est conservé ⇒ annulation.
+  ⚠️ **Correction :** le rôle de l'Orpailleur, défini par Paul, comprend aussi le
+  **renommage** (sur la base du contenu, jamais du nom seul). L'implémentation de
+  Claude ne renomme pas encore : voir « Demandes de Paul » ci-dessous.
 - **Prérequis pour déplacer** : accès Google direct en écriture dans Vercel
   (`GOOGLE_SERVICE_ACCOUNT_JSON` ou OAuth). Le pont Supabase n'a pas d'action
   « move » : en mode pont seul, le plan est prêt mais l'exécution affiche
@@ -160,3 +163,59 @@ avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
    réinitialisation du mot de passe par e-mail (aujourd'hui : par le propriétaire).
 5. Appliquer les 3 fichiers SQL, activer l'API Google Sheets, corriger
    `browser-response.test.js`, compiler l'app de bureau, brancher `taty.info`.
+
+---
+
+## ▶ Demandes de Paul du 7 octobre 2026 — À METTRE EN ŒUVRE
+
+> Message de Paul, transmis par Claude. Statut : ✅ fait · ⏳ à faire.
+
+### 1. Style futuriste — ✅ typographie / ⏳ textes
+- ✅ Typographie de toute l'application passée en **Space Grotesk** (texte, titres)
+  et **JetBrains Mono** (libellés et détails techniques) — `assets/app.css`
+  (`@import` + variable `--mono`), titres resserrés, libellés en capitales mono.
+- ⏳ Garder ce style partout (nouvelles pages comprises) et moderniser le ton des
+  textes de l'interface : phrases courtes, directes, dynamiques.
+
+### 2. Configuration de départ de l'ordinateur — ⏳
+Un assistant de premier lancement de l'**application de bureau** (`desktop/`) :
+1. connexion de l'utilisateur (e-mail + mot de passe, comptes déjà en place) ;
+2. choix des **dossiers de l'ordinateur** que l'Orpailleur peut lire et ranger
+   (accès explicite, révocable) ;
+3. rappel des horaires des agents (section 3) ;
+4. création du **profil d'apprentissage propre à cet utilisateur** (ses habitudes
+   de rangement sur son PC). Sur le PC, l'Orpailleur lit les fichiers, comprend,
+   **range dans un dossier existant s'il convient, sinon propose**, et apprend.
+
+### 3. Horaires de passage des agents — ⏳
+| Agent | Passages | Qui décide |
+|---|---|---|
+| **Grand Contrôleur** | heures définies **par le propriétaire du cabinet** lors de la configuration | propriétaire (écran Paramètres) |
+| **Sika** | **une fois par semaine** | jour/heure à proposer au propriétaire |
+| **Orpailleur** | **3 passages par jour : 8 h, 12 h, 20 h** | fixé par Paul |
+- Fuseau horaire du cabinet à saisir à la configuration.
+- Contrainte technique : l'offre Vercel Hobby limite les tâches planifiées
+  (cron) ; prévoir un « tic » horaire déclenché par **Supabase pg_cron + pg_net**
+  (ou GitHub Actions) vers une route de `api/app.js` (rester ≤ 12 fonctions), qui
+  lance les agents dont l'heure est venue et journalise chaque passage.
+
+### 4. Orpailleur et Grand Contrôleur : travail complémentaire — ⏳
+- Chaque **passage de l'Orpailleur** (8 h / 12 h / 20 h) : inventaire des
+  nouveautés, lecture, **rangement et renommage**, pièces reçues rattachées aux
+  missions → résumé du passage.
+- Chaque **passage du Grand Contrôleur** part du dernier résumé de l'Orpailleur :
+  pièces PBC reçues / manquantes, échéances, affectations, alertes. Il renvoie à
+  l'Orpailleur ses besoins (pièces attendues, dossiers à surveiller), traités au
+  passage suivant. Aucun des deux ne refait le travail de l'autre.
+- **Sika**, une fois par semaine, s'appuie sur les deux pour la facturation et
+  les relances administratives.
+
+### 5. Rôle de l'Orpailleur — rappel de Paul
+- Le rôle était **déjà défini** : il range **et renomme** (sur le contenu).
+- ✅ Claude a construit le rangement en arrière-plan (`rangement.html`,
+  `lib/tidy*.js`) et **ajouté l'apprentissage** par-dessus cette logique.
+- ⏳ **Renommage à ajouter** au rangement : nouveau nom proposé d'après le
+  contenu (et la convention du cabinet), ancien nom conservé pour l'annulation,
+  validation selon les mêmes règles que les déplacements, appris comme eux.
+- ⏳ Brancher les passages automatiques (section 3) sur ce rangement : chaque
+  passage ne traite que les fichiers nouveaux ou modifiés depuis le précédent.
