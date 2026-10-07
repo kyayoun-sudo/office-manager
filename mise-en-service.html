@@ -239,6 +239,7 @@
     knowData = k; var b = $('know-body'); b.textContent = '';
     $('know-apply').hidden = !(k.status === 'proposed' || k.status === 'applied');
     if (k.status === 'none') { $('know-live').textContent = 'Pas encore fait : lancez d’abord la cartographie (l’apprentissage suit tout seul).'; return; }
+    if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
     if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet…'; knowTimer = setTimeout(loadKnow, 6000); return; }
     $('know-live').textContent = k.status === 'applied' ? 'Enregistré dans l’application (' + (k.applied ? k.applied.team + ' personnes, ' + k.applied.missions + ' missions' : '') + '). Vous pouvez en ajouter d’autres.' : 'Proposition prête : ' + (k.files_read || []).length + ' documents lus.';
     var f = k.firm || {};

@@ -171,7 +171,11 @@
       [['Personnes', d.team.people], ['En surcharge', d.team.overloaded], ['Disponibles', d.team.available], ['Actions en retard', d.team.actions_overdue], ['Terminées (période)', d.team.actions_done]]
         .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
       var box = $('people'); box.textContent = '';
-      if (!d.people.length) { box.appendChild(el('p', 'Aucune personne dans l’annuaire.', 'empty')); return; }
+      if (!d.people.length) {
+        var p0 = el('p', 'Aucune personne dans l’annuaire pour l’instant. L’Orpailleur peut la proposer à partir de votre Drive : ', 'empty');
+        var a0 = document.createElement('a'); a0.href = '/mise-en-service.html#know-card'; a0.textContent = 'Mise en service → Ce que l’Orpailleur a compris du cabinet';
+        p0.appendChild(a0); box.appendChild(p0); return;
+      }
       d.people.forEach(function (p) { box.appendChild(personCard(p, false)); });
     }).catch(function (e) { UI.fail($('people'), { message: ERR[e.message] || e.message }); });
   }
