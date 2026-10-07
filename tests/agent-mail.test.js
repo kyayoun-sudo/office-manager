@@ -48,13 +48,13 @@ test('validation before sending: proposed → pending; collaborator cannot valid
   assert.deepEqual(p.recipients, ['aya@taty.info', 'koffi@taty.info']);
   assert.equal(sent.length, 0, 'nothing leaves before validation');
   await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve' }, collaborator, d), /ROLE_NOT_ALLOWED/);
-  const r = await decideMessage('org', { id: p.id, decision: 'approve', body: 'Texte corrigé par Aya' }, manager, d);
+  const r = await decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: p.content_sha256, body: 'Texte corrigé par Aya' }, manager, d);
   assert.equal(r.status, 'sent');
   assert.equal(r.provider_message_id, 'gmail-123');
   assert.equal(sent[0].msg.body, 'Texte corrigé par Aya', 'the validated text is what is sent');
   assert.equal(rows[0].content_sha256, contentHash(sent[0].msg));
   assert.equal(rows[0].decided_by, 'Aya');
-  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve' }, manager, d), /NOT_PENDING/, 'never sent twice');
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: rows[0].content_sha256 }, manager, d), /NOT_PENDING/, 'never sent twice');
 });
 
 test('a validator cannot slip a client in, and a domain removed before sending stops the send', async () => {
@@ -63,9 +63,9 @@ test('a validator cannot slip a client in, and a domain removed before sending s
   const d = { fetchRows, send: async () => { throw new Error('must not send'); },
     getPersona: async () => (++calls <= 3 ? PERSONA : { ...PERSONA, internal_domains: ['autre.ci'] }) };
   const p = await proposeMessage('org', { recipients: 'aya@taty.info', subject: 'Point', body: 'Salut' }, manager, d);
-  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', recipients: 'aya@taty.info, dg@client.ci' }, manager, d), /RECIPIENT_OUTSIDE_FIRM/);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: p.content_sha256, recipients: 'aya@taty.info, dg@client.ci' }, manager, d), /RECIPIENT_OUTSIDE_FIRM/);
   assert.equal(rows[0].status, 'pending_approval');
-  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve' }, manager, d), /RECIPIENT_OUTSIDE_FIRM/);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: p.content_sha256 }, manager, d), /RECIPIENT_OUTSIDE_FIRM/);
   assert.equal(rows[0].status, 'failed', 'checked again right before sending');
 });
 
@@ -157,4 +157,31 @@ test('alias of a person\'s mailbox: signs in as the real mailbox, sends From the
   await sendViaGmail({ recipients: ['aya@taty.info'], subject: 'S', body: 'B' }, PERSONA, { env, fetchImpl });
   assert.equal(sub, 'paulkomenan@taty.info');
   assert.match(Buffer.from(raw, 'base64url').toString(), /^From: Office Manager TATY <assistant@taty\.info>/);
+});
+
+test('review fixes: approve only what was seen; a send that may have left is never re-sent; stricter addresses and settings', async () => {
+  const { rows, fetchRows } = db();
+  const flaky = { fetchRows, getPersona: async () => PERSONA, send: async () => { throw new Error('ECONNRESET'); } };
+  const p = await proposeMessage('org', { recipients: 'aya@taty.info', subject: 'Point', body: 'Salut' }, manager, flaky);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve' }, manager, flaky), /SEEN_HASH_REQUIRED/);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: 'x'.repeat(64) }, manager, flaky), /MESSAGE_CHANGED_RELOAD/);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: p.content_sha256 }, manager, flaky), /ECONNRESET/);
+  assert.equal(rows[0].status, 'sending', 'network cut: maybe sent → stays to check');
+  assert.match(rows[0].error, /À VÉRIFIER/);
+  await assert.rejects(decideMessage('org', { id: p.id, decision: 'approve', seen_sha256: rows[0].content_sha256 }, manager, flaky), /NOT_PENDING/, 'no double send');
+  const okButNotRecorded = { fetchRows: async (path, o = {}) => (o.method === 'PATCH' && JSON.parse(o.body).status === 'sent') ? Promise.reject(new Error('db down')) : fetchRows(path, o),
+    getPersona: async () => PERSONA, send: async () => 'gm-9' };
+  const p2 = await proposeMessage('org', { recipients: 'aya@taty.info', subject: 'P2', body: 'B' }, manager, okButNotRecorded);
+  const r2 = await decideMessage('org', { id: p2.id, decision: 'approve', seen_sha256: p2.content_sha256 }, manager, okButNotRecorded);
+  assert.equal(r2.warning, 'SENT_BUT_NOT_RECORDED');
+  assert.equal(rows.find(r => r.id === p2.id).status, 'sending', 'never "failed" once Gmail accepted it');
+  await assert.rejects(proposeMessage('org', { recipients: ['a,b@taty.info'], subject: 'x', body: 'y' }, manager, flaky), /INVALID_RECIPIENTS/);
+});
+
+test('review fixes: persona refuses public domains and an external reply-to', async () => {
+  const { validatePersona } = await import('../lib/agent-persona.js');
+  assert.throws(() => validatePersona({ sender_email: 'paul@gmail.com' }), /PUBLIC_DOMAIN_NOT_ALLOWED/);
+  assert.throws(() => validatePersona({ sender_email: 'assistant@taty.info', internal_domains: 'taty.info, yahoo.fr' }), /PUBLIC_DOMAIN_NOT_ALLOWED|SENDER_OUTSIDE/);
+  assert.throws(() => validatePersona({ sender_email: 'assistant@taty.info', reply_to: 'paul@gmail.com' }), /REPLY_TO_OUTSIDE_FIRM_DOMAINS/);
+  assert.equal(validatePersona({ sender_email: 'assistant@taty.info', reply_to: 'hit@taty.info' }).reply_to, 'hit@taty.info');
 });

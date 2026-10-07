@@ -47,6 +47,8 @@ function gmailFake(calls) {
       return { ok: true, json: async () => ({ access_token: 't' }) };
     }
     if (url.includes('/messages?')) return { ok: true, json: async () => ({ messages: [{ id: 'g123' }, { id: 'gOld' }] }) };
+    if (url.endsWith('/labels')) return { ok: true, json: async () => ({ labels: [{ id: 'Label_7', name: 'PBC' }, { id: 'INBOX', name: 'INBOX' }] }) };
+    if (url.includes('format=minimal')) return { ok: true, json: async () => ({ id: 'x', labelIds: url.includes('gOutside') ? ['INBOX'] : ['INBOX', 'Label_7'] }) };
     if (url.includes('/attachments/')) return { ok: true, json: async () => ({ data: b64u('%PDF relevé') }) };
     if (url.includes('format=raw')) return { ok: true, json: async () => ({ raw: b64u('From: compta@bletransit.ci\r\n\r\nbody') }) };
     return { ok: true, json: async () => GMAIL_MSG };
@@ -90,4 +92,18 @@ test('after validation: deposit in the review folder only when the mapping is re
   assert.equal(patches[0].work_state, 'awaiting_drive');
   const r2 = await executeDecision('org', action, 'approve', 'Paul', { fetchRows, depositMail: async () => ({ deposited: true, files: [1, 2] }) });
   assert.match(r2.effect, /2 fichier\(s\)/);
+});
+
+test('review fixes: a message no longer in the label is never downloaded; one bad message does not block the others', async () => {
+  const { depositWaiting } = await import('../lib/agent-mailbox.js');
+  const base = { env: ENV, gate: async () => ({ allowed: true }), reviewFolderId: 'REVIEW', fetchImpl: gmailFake([]), getPersona: async () => PERSONA, createFile: async () => ({ id: 'f' }) };
+  await assert.rejects(depositMail('org', { id: 'x', payload: { gmail_id: 'gOutside', attachments: [{ id: 'a', name: 'n.pdf', size: 1 }] } }, base), /MESSAGE_NOT_IN_LABEL/);
+  const marks = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'PATCH') { marks.push([path.match(/&id=eq\.([^&]+)/)[1], JSON.parse(o.body).work_state]); return []; }
+    return [{ id: 'bad', payload: { gmail_id: 'gOutside', attachments: [] } }, { id: 'good', payload: { gmail_id: 'g123', sent_at: '2026-10-06', attachments: [] } }];
+  };
+  const r = await depositWaiting('org', { ...base, fetchRows });
+  assert.deepEqual(r, { deposited: 1, failed: 1, waiting: 0 });
+  assert.deepEqual(marks, [['bad', 'deposit_failed'], ['good', 'deposited']]);
 });

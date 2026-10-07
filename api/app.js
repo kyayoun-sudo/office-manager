@@ -73,7 +73,8 @@ export const ROUTES = Object.freeze({
   },
   actions: {
     GET: (orgId) => listPendingActions(orgId),
-    POST: (orgId, req) => recordDecision(orgId, req.body || {}),
+    // Validators only, and the journal records who they really are (never a typed name).
+    POST: users(MANAGERS, (orgId, req) => recordDecision(orgId, { ...(req.body || {}), decided_by: req.account?.display_name || req.account?.email || null })),
     unavailable: 'ACTIONS_UNAVAILABLE'
   },
   'mission-view': {

@@ -256,6 +256,26 @@ validation avant. »
    - ⏳ Suite : appeler `planMailEvidence` / `record_pbc_evidence_evaluation` sur les pièces
      déposées (évaluation reçue / partielle / non conforme dans la checklist PBC).
 
+### 3 nonies. Revue de sécurité indépendante (7/10) — corrections faites
+Un agent relecteur séparé a vérifié les règles « collègues seulement / après validation »,
+« lecture limitée au libellé », « pas d'écriture Drive sans cartographie validée » : elles tiennent.
+Corrigé ensuite :
+- **pas de double envoi** : une coupure réseau pendant l'envoi laisse le message « sending »
+  (à vérifier), jamais « failed » re-validable ; Gmail accepté puis base en panne → jamais « failed » ;
+- **on valide ce qu'on a vu** : l'écran renvoie l'empreinte `content_sha256` affichée
+  (`SEEN_HASH_REQUIRED`, `MESSAGE_CHANGED_RELOAD`) ;
+- **« À valider » réservé aux propriétaire / associé / manager** (session personnelle) et le
+  journal enregistre le vrai nom du compte, plus un nom tapé ;
+- relance PBC : le message interne est proposé AVANT de fermer l'action (rien de perdu) ;
+  deux décisions simultanées n'agissent jamais deux fois ;
+- dépôt d'un e-mail : le message doit **encore** porter le libellé (sinon `MESSAGE_NOT_IN_LABEL`),
+  taille réelle des pièces vérifiée, un message en erreur ne bloque plus les autres ;
+- paramètres de l'agent : domaines publics (gmail.com, yahoo…) refusés ; adresse de réponse
+  obligatoirement dans les domaines du cabinet ; adresses avec `,;:()[]` refusées.
+- À savoir : `OFFICE_MANAGER_REQUIRE_MAPPING=false` désactive la porte de cartographie — **ne
+  jamais le mettre en production**. L'entraînement écrit sans cette porte, mais uniquement dans
+  son propre dossier `ENTRAINEMENT_AUDIT_OFFICE_MANAGER`.
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -286,7 +306,7 @@ depuis ; `runMappingPass` : refus `LISTING_EMPTY_REFUSED` d'une liste vide, aver
 |---|---|---|
 | `branding` | GET (tous) / POST | POST : **propriétaire** |
 | `search` | GET | code pilote |
-| `actions` | GET / POST | code pilote |
+| `actions` | GET / POST (valider = exécuter, à l'intérieur du cabinet) | GET : code pilote ; POST : propriétaire / associé / manager (session personnelle) |
 | `mission-view` | GET | code pilote |
 | `agent-persona` | GET / POST | **propriétaire** |
 | `agent-message` | POST (brouillon interne, jamais envoyé) | code pilote |
@@ -319,7 +339,7 @@ Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`, `tests/verify-training-sql.mjs`.
 
 ## État des tests
-206 tests : 206 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
+210 tests : 210 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes

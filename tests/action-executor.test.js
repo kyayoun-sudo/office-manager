@@ -57,3 +57,13 @@ test('other actions: file review approved, follow-up becomes a task, reject clos
   assert.equal(d.executed, false);
   assert.equal(w.patches.length, 0);
 });
+
+test('review fixes: two decisions at once never act twice; a failed proposal leaves the reminder pending', async () => {
+  const none = async (path, o = {}) => (o.method === 'PATCH' ? [] : path.startsWith('office_mission_assignments') ? [{ staff_profile_id: 's2', mission_role: 'Chef de mission' }] : path.startsWith('office_staff_profiles') ? [{ email: 'koffi@taty.info' }] : []);
+  const r = await executeDecision('org', { id: 'a1', action_type: 'FOLLOWUP' }, 'approve', 'Paul', { fetchRows: none });
+  assert.equal(r.executed, false);
+  assert.match(r.effect, /Déjà traitée/);
+  const w = world();
+  await assert.rejects(executeDecision('org', reminder, 'approve', 'Paul', { fetchRows: w.fetchRows, getPersona: async () => PERSONA, proposeMessage: async () => { throw new Error('INTERNAL_DOMAINS_NOT_CONFIGURED'); } }), /INTERNAL_DOMAINS/);
+  assert.equal(w.patches.length, 0, 'still pending, nothing lost');
+});
