@@ -31,6 +31,29 @@ import {
 
 const SECRET = "test-owner-secret";
 
+test("empty listing cannot overwrite a populated REGISTER or count a pass", async () => {
+  const drive = orgDrive();
+  await pass(drive);
+  const writes = drive.updated.length;
+  const { summary } = await pass(drive, "2026-10-07T00:45:00Z", {
+    listing: listingFromInventory([], { runStatus: "COMPLETE" })
+  });
+  assert.equal(summary.status, "LISTING_EMPTY_REFUSED");
+  assert.equal(summary.memory_written, false);
+  assert.equal(drive.updated.length, writes);
+  assert.equal(row(await reopen(drive), "DOC1").status, "PRESENT");
+});
+
+test("partial mapping warns explicitly and never checks absent objects", async () => {
+  const drive = orgDrive();
+  await pass(drive);
+  const { summary } = await pass(drive, "2026-10-07T01:00:00Z", { maxItems: 3 });
+  assert.match(summary.warning, /LISTING_INCOMPLETE/);
+  assert.equal(row(await reopen(drive), "DOC1").status, "PRESENT");
+  const complete = await pass(drive, "2026-10-07T02:00:00Z");
+  assert.equal(complete.summary.warning, undefined);
+});
+
 function fakeDrive() {
   const files = new Map();
   const texts = new Map();
