@@ -92,3 +92,41 @@ test('callback: code exchanged, refresh token stored ENCRYPTED, then used for Dr
     resetGoogleConnectionCache();
   }
 });
+
+import { parseDriveLink, setFirmDrive, firmDriveId, loadFirmDrive } from '../lib/google-connection.js';
+import { configuredDriveId } from '../lib/google-drive.js';
+
+test('Drive du cabinet: pasted link checked with Google, saved for the firm, then used by the agents; the real Drive stays protected in a preview', async () => {
+  assert.equal(parseDriveLink('https://drive.google.com/drive/folders/0ABcdEFghIJklMN?usp=sharing'), '0ABcdEFghIJklMN');
+  assert.equal(parseDriveLink('https://drive.google.com/drive/u/0/folders/1x2y3z4w5v6u'), '1x2y3z4w5v6u');
+  assert.throws(() => parseDriveLink('mon drive'), /DRIVE_LINK_INVALID/);
+  resetGoogleConnectionCache();
+  const w = world();
+  const firm = [];
+  const fetchRows = async (path, o = {}) => {
+    if (path.startsWith('office_firm_drive')) { if (o.method === 'POST') { firm.splice(0, 1, JSON.parse(o.body)[0]); return []; } return firm; }
+    return w.fetchRows(path, o);
+  };
+  const fetchImpl = async (url, o) => {
+    if (url.includes('/drives/0ATEST')) return { ok: true, json: async () => ({ id: '0ATEST0000', name: 'TATY share drive' }) };
+    if (url.includes('/drives/0AREAL')) return { ok: true, json: async () => ({ id: '0AREAL0000', name: 'TATY ET ASSOCIES PERSONNEL' }) };
+    if (url.includes('/drives/')) return { ok: false, json: async () => ({}) };
+    if (url.includes('/files/1folder')) return { ok: true, json: async () => ({ id: '1folder0000', driveId: '0ATEST0000' }) };
+    return w.fetchImpl(url, o);
+  };
+  const saved = { ...process.env }; Object.assign(process.env, ENV);
+  try {
+    const state = new URL(startConnect('org-1', REQ, ENV).url).searchParams.get('state');
+    await finishConnect('org-1', { ...REQ, query: { code: 'c', state } }, { env: ENV, fetchRows, fetchImpl });
+    await loadGoogleConnection('org-1', { env: ENV, fetchRows });
+    const r = await setFirmDrive('org-1', { body: { link: 'https://drive.google.com/drive/folders/1folder0000' }, account: { display_name: 'Paul' } }, { env: ENV, fetchRows, fetchImpl });
+    assert.deepEqual(r, { drive_id: '0ATEST0000', drive_name: 'TATY share drive' }, 'a folder link gives its shared drive');
+    assert.equal(firmDriveId(), '0ATEST0000');
+    assert.equal(configuredDriveId(), '0ATEST0000', 'the agents now work on the chosen Drive');
+    await assert.rejects(setFirmDrive('org-1', { body: { link: '0AREAL0000' } }, { env: { ...ENV, VERCEL_ENV: 'preview', TEST_SOURCE_DRIVE_ID: '0AREAL0000' }, fetchRows, fetchImpl }), /TEST_MODE_REAL_DRIVE_REFUSED/);
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+    Object.assign(process.env, saved);
+    resetGoogleConnectionCache();
+  }
+});

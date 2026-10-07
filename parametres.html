@@ -72,6 +72,10 @@
             <button class="btn ghost" id="g-disconnect" type="button" hidden>Déconnecter</button>
             <span class="status" id="g-status" role="status" aria-live="polite"></span>
           </div>
+          <div class="field" style="max-width:640px"><label for="g-drive">Drive du cabinet — collez le lien du Drive partagé (ou d'un de ses dossiers)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="g-drive" type="text" class="mono" style="flex:1;min-width:240px" placeholder="https://drive.google.com/drive/folders/0A…">
+            <button class="btn ghost" id="g-drive-save" type="button">Utiliser ce Drive</button></div>
+            <span class="hint" id="g-drive-now"></span></div>
           <details><summary class="hint">Première fois : adresse de retour à déclarer chez Google</summary>
             <p class="hint" style="margin:6px 0 0">Dans la console Google Cloud du cabinet (Identifiants → client OAuth de l'application → « URI de redirection autorisés »), ajoutez une fois cette adresse :</p>
             <p class="mono" id="g-redirect" style="overflow-wrap:anywhere;font-size:13px;margin:4px 0 0"></p>
@@ -312,7 +316,11 @@
     GOOGLE_RECONNECT_REQUIRED: 'Google a retiré l’accès (mot de passe changé ou accès révoqué) : reconnectez Google.',
     GOOGLE_NO_REFRESH_TOKEN: 'Google n’a pas donné d’accès durable : déconnectez l’application dans votre compte Google puis reconnectez.',
     OAUTH_STATE_EXPIRED: 'La demande a expiré : cliquez à nouveau sur « Connecter Google ».', OAUTH_STATE_INVALID: 'Retour Google non reconnu : recommencez.',
-    redirect_uri_mismatch: 'Google ne connaît pas encore l’adresse de retour : déclarez-la (voir « Première fois » ci-dessous).'
+    redirect_uri_mismatch: 'Google ne connaît pas encore l’adresse de retour : déclarez-la (voir « Première fois » ci-dessous).',
+    DRIVE_LINK_INVALID: 'Lien non reconnu : copiez l’adresse du Drive partagé depuis Google Drive.', GOOGLE_NOT_CONNECTED: 'Connectez d’abord Google.',
+    DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Le compte Google connecté ne voit pas ce Drive : ajoutez-le comme membre du Drive partagé.',
+    DRIVE_MUST_BE_SHARED_DRIVE: 'Ce dossier est dans « Mon Drive » : il faut un Drive partagé du cabinet.',
+    TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
   };
   function explain(err) { return ERRORS[err.message] || err.message; }
 
@@ -362,6 +370,8 @@
       } else {
         box.appendChild(gLine(false, g.env_access ? 'Accès technique configuré dans Vercel (compte de service). Vous pouvez aussi connecter le compte Google du cabinet.' : 'Aucun compte Google connecté : les agents ne peuvent ni ranger le Drive ni envoyer d’e-mail.'));
       }
+      $('g-drive-now').textContent = g.firm_drive ? 'Les agents travaillent sur : ' + (g.firm_drive.name || g.firm_drive.id) : 'Aucun Drive choisi : connectez Google, puis collez le lien du Drive.';
+      $('g-drive-save').disabled = !g.connected;
       $('g-disconnect').hidden = !g.connected;
       $('g-connect').textContent = g.connected ? 'Reconnecter Google' : 'Connecter Google';
       $('g-status').textContent = '';
@@ -374,6 +384,12 @@
       .catch(function (err) { $('g-status').textContent = explain(err); });
   });
   $('g-test').addEventListener('click', function () { loadGoogle(true); });
+  $('g-drive-save').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('g-status').textContent = 'Vérification du Drive auprès de Google…';
+    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', link: $('g-drive').value, by: OM.getUserName() || null }) })
+      .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus.'; $('g-drive').value = ''; return loadGoogle(); })
+      .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
+  });
   $('g-disconnect').addEventListener('click', function () {
     $('g-status').textContent = 'Déconnexion…';
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) })

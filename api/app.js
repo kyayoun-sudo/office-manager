@@ -16,7 +16,7 @@ import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
 import { listMessages, proposeMessage, decideMessage } from '../lib/agent-mail.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
-import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogleConnection } from '../lib/google-connection.js';
+import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogleConnection, setFirmDrive } from '../lib/google-connection.js';
 import { assertIsolatedOrg } from '../lib/test-mode.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -177,6 +177,7 @@ export const ROUTES = Object.freeze({
     POST: owner((orgId, req) => {
       if (req.body?.action === 'connect') return startConnect(orgId, req);
       if (req.body?.action === 'disconnect') return disconnectGoogle(orgId);
+      if (req.body?.action === 'set-drive') return setFirmDrive(orgId, req);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'GOOGLE_UNAVAILABLE'
