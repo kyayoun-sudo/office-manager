@@ -235,7 +235,7 @@
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
     if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet (équipe, CV, missions)…'; knowTimer = setTimeout(loadKnow, 6000); return; }
     var a = k.applied || {};
-    $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s), ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s).';
+    $('know-live').textContent = 'Compris et enregistré : ' + (a.team_added || 0) + ' personne(s) ajoutée(s), ' + (a.team_completed || 0) + ' profil(s) complété(s), ' + (a.missions_added || 0) + ' mission(s), ' + (a.assignments_proposed || 0) + ' affectation(s) proposée(s)' + ((a.firm_domains || []).length ? ' ; domaines du cabinet ajoutés dans Paramètres : ' + a.firm_domains.join(', ') : '') + '.';
     if ((k.files_read || []).length) {
       var dl = el('details', null, 'font-size:13px'); dl.appendChild(el('summary', 'Documents lus (' + k.files_read.length + ')', 'cursor:pointer'));
       k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:#5B6660;padding:2px 0')); }); b.appendChild(dl);

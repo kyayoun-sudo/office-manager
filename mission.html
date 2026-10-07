@@ -103,6 +103,19 @@
         <p class="note">Cette question est envoyée à l'IA (OpenAI) avec les informations de la mission. L'agent prépare et propose ; il n'envoie rien au client.</p>
         <div class="answer" id="answer" role="status" aria-live="polite" hidden></div>
       </section>
+
+      <section class="ask" aria-labelledby="h-write">
+        <h2 id="h-write">Écrire à l'équipe de la mission</h2>
+        <p class="note">Pour une validation ou une question : les personnes de la mission (programme de travail, planning) sont déjà choisies. Ajoutez ou retirez qui vous voulez dans la liste du cabinet. Le message attend la validation d'un responsable dans « À valider » avant de partir.</p>
+        <label for="w-to">Destinataires</label>
+        <input id="w-to" type="text" list="w-people" maxlength="1000" placeholder="adresses séparées par des virgules" style="width:100%;box-sizing:border-box">
+        <datalist id="w-people"></datalist>
+        <div id="w-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"></div>
+        <label for="w-topic">Ce que vous voulez demander ou faire valider</label>
+        <textarea id="w-topic" maxlength="2000" placeholder="Ex. Valider le programme de travail du cycle Ventes avant vendredi"></textarea>
+        <div class="btn-row"><button class="btn" id="w-send" type="button">Préparer et envoyer pour validation</button></div>
+        <p class="note" id="w-status" role="status" aria-live="polite"></p>
+      </section>
     </section>
   </main>
 </div>
@@ -219,8 +232,37 @@
       .then(function () { $('ask').disabled = false; });
   });
 
+  // ---- Message to the mission's people (they are pre-selected) ----
+  function loadContacts() {
+    OM.api('/api/app?route=mission-contacts&mission_id=' + encodeURIComponent(missionId)).then(function (c) {
+      var dl = $('w-people'); dl.textContent = '';
+      (c.all || []).forEach(function (p) { var o = document.createElement('option'); o.value = p.email; o.label = p.name + (p.role ? ' — ' + p.role : ''); dl.appendChild(o); });
+      $('w-to').value = (c.team || []).map(function (p) { return p.email; }).join(', ');
+      var chips = $('w-chips'); chips.textContent = '';
+      if (!(c.team || []).length) chips.appendChild(el('span', 'Personne n’est encore affecté à cette mission : choisissez dans la liste du cabinet.', 'note'));
+      (c.team || []).forEach(function (p) { chips.appendChild(el('span', p.name + (p.role ? ' · ' + p.role : ''), 'tag neutral')); });
+      (c.all || []).forEach(function (p) {
+        if ((c.team || []).some(function (t) { return t.email === p.email; })) return;
+        var b = el('button', '+ ' + p.name, 'tag'); b.type = 'button';
+        b.addEventListener('click', function () { var v = $('w-to').value.trim(); $('w-to').value = v ? v + ', ' + p.email : p.email; b.remove(); });
+        chips.appendChild(b);
+      });
+    }).catch(function () {});
+  }
+  $('w-send').addEventListener('click', function () {
+    var topic = $('w-topic').value.trim(), to = $('w-to').value.trim();
+    if (!topic || !to) { $('w-status').textContent = 'Indiquez les destinataires et ce que vous voulez demander.'; return; }
+    var m = (current && current.mission) || {};
+    var b = this; b.disabled = true; $('w-status').textContent = 'L’agent prépare le message…';
+    OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'propose', recipients: to, topic: 'Mission ' + (m.name || '') + ' : ' + topic }) })
+      .then(function () { $('w-status').textContent = 'Préparé : il attend la validation dans « À valider ».'; $('w-topic').value = ''; })
+      .catch(function (err) { $('w-status').textContent = 'Échec : ' + err.message; }).then(function () { b.disabled = false; });
+  });
+
   function start() {
     OM.loadBranding().catch(function () {});
+    if (missionId) loadContacts();
     if (!missionId) { showList(); return; }
     OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId))
       .then(showDossier)

@@ -3,7 +3,7 @@ import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
 import { globalSearch } from '../lib/global-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
-import { getMissionView } from '../lib/mission-view.js';
+import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
 import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState } from '../lib/accounts.js';
 import { diagnose } from '../lib/diagnostic.js';
@@ -228,6 +228,8 @@ export const ROUTES = Object.freeze({
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
   },
   'firm-learn': { POST: (orgId) => learnFirm(orgId), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  // People a message about a mission goes to: the mission team first, then the whole firm.
+  'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
