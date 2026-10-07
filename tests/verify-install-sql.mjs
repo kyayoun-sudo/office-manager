@@ -12,5 +12,11 @@ for (const [t] of TABLES) {
   const r = (await db.query(`select to_regclass('public.${t}') is not null as ok, has_table_privilege('anon','public.${t}','SELECT') as anon`)).rows[0];
   assert.deepEqual(r, { ok: true, anon: false }, t);
 }
+const org = '00000000-0000-0000-0000-000000000001';
+const m = (await db.query("insert into public.office_agent_messages(org_id,recipients,subject,body) values ($1,'{aya@taty.info}','Point','Salut') returning id, status", [org])).rows[0];
+assert.equal(m.status, 'pending_approval');
+await assert.rejects(db.query("update public.office_agent_messages set status='sent'"), 'never sent without a human decision');
+await db.query("update public.office_agent_messages set status='sent', decided_by='Aya', decided_at=now(), sent_at=now()");
+await assert.rejects(db.query("insert into public.office_agent_messages(org_id,recipients,subject,body) values ($1,'{}','x','y')", [org]), 'at least one recipient');
 console.log('INSTALL_TOUT.sql passed: up to date, runs twice, creates the ' + TABLES.length + ' tables checked by the Mise en service, none public.');
 await db.close();

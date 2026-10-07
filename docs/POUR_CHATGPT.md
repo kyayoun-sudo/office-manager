@@ -191,6 +191,30 @@ Demande de Paul (7/10) : « créer les conditions pour que tout marche ensemble 
   `orchestrator.js`, `index.ts`, `missions.js`…), restes d'envois manuels. Le code utilisé
   est celui de `lib/`, `api/`, `supabase/functions/` ; ne pas modifier les copies.
 
+### 3 septies. E-mails de l'agent aux collègues — ✅ construit (envoi à brancher côté Google)
+Règle de Paul (7/10) : « il envoie les messages aux collègues, mais pas aux clients. Il demande
+validation avant. »
+- `lib/agent-mail.js`, table `office_agent_messages` (`db/agent-messages.sql`, inclus dans
+  `INSTALL_TOUT.sql`), route `messages`, section « Messages de l'agent aux collègues » dans
+  `validations.html`.
+- **Collègues seulement** : chaque destinataire doit appartenir aux domaines du cabinet
+  (`internal_domains` de `agent-persona`). Vérifié 3 fois : à la proposition, à la validation,
+  juste avant l'envoi. Une adresse externe = refus du message entier (jamais « retirée en silence »).
+- **Validation avant envoi** : statut `pending_approval` → un propriétaire / associé / manager
+  relit, peut corriger, puis « Valider et envoyer » (ou « Refuser » avec motif). Le texte
+  validé est exactement celui envoyé (empreinte SHA-256). La base refuse `sent` sans décideur.
+- **Initiative de l'agent** : au tick du planificateur (horaires activés), selon
+  `internal_frequency` (quotidien / 3 fois par semaine / hebdo, après 9 h), l'agent **propose**
+  un petit mot à l'équipe (comptes actifs du cabinet, ton nouchi/fun) basé sur le dernier point
+  du Grand Contrôleur. Toujours en attente de validation.
+- **Envoi** : API Gmail, compte de service Google (`GOOGLE_SERVICE_ACCOUNT_JSON` ou
+  `AGENT_MAIL_SERVICE_ACCOUNT_JSON`) agissant au nom de l'adresse de l'agent. Le **super
+  administrateur Google Workspace** doit autoriser ce compte de service (délégation à l'échelle
+  du domaine, droit `https://www.googleapis.com/auth/gmail.send`). Sinon : erreur claire
+  `MAIL_DELEGATION_MISSING`, le message reste « échec d'envoi » et peut être revalidé.
+  Limite : 100 envois par jour. Pas de Cc / Cci ; en-têtes protégés contre l'injection.
+- Mise en service : 2 nouvelles lignes (adresse d'envoi + domaines ; envoi Gmail).
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -242,6 +266,7 @@ depuis ; `runMappingPass` : refus `LISTING_EMPTY_REFUSED` d'une liste vide, aver
 | `training` | GET (campagne, missions, notes, rapport) · POST `action` start, stop, cleanup | GET : session personnelle ; POST : **propriétaire** |
 | `training-confirm` | POST (l'équipe confirme / corrige l'agent sur une vraie mission) | session personnelle |
 | `training-step` | POST (unité de travail suivante, chaîne d'arrière-plan) | code pilote |
+| `messages` | GET (messages de l'agent) · POST `action` propose (tout compte) / decide approve-reject | GET : managers ; decide : propriétaire / associé / manager |
 | `readiness` | GET (Mise en service : toute la chaîne vérifiée) · POST `mapping-pass` | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
@@ -253,11 +278,11 @@ Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`, `tests/verify-training-sql.mjs`.
 
 ## État des tests
-188 tests : 188 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
+196 tests : 196 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes
-1. **Envoi réel des e-mails de l'agent.** Il faut une boîte d'envoi (par ex. Gmail
+1. ✅ (7/10) **Envoi réel des e-mails de l'agent** — fait pour les collègues, après validation ; reste la délégation Google à faire par le super administrateur. Ancien texte : Il faut une boîte d'envoi (par ex. Gmail
    API avec délégation sur l'adresse de l'agent, ou un fournisseur SMTP/transactionnel)
    et ses secrets dans Vercel. À brancher sur `agent-persona` + `toneFor`, avec
    validation humaine pour tout message externe.

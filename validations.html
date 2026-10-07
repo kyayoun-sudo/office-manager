@@ -34,8 +34,23 @@
 
     <header class="page-head">
       <h1>À valider</h1>
-      <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Elle ne déclenche aucun envoi, classement ou affectation automatique.</p>
+      <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Les décisions sur les propositions ne déclenchent rien automatiquement ; seuls les messages aux collègues que vous validez ci-dessous partent par e-mail.</p>
     </header>
+
+    <section class="card" aria-labelledby="h-mail" id="mail-card">
+      <h2 id="h-mail">Messages de l'agent aux collègues <span class="meta" id="mail-meta"></span></h2>
+      <p class="hint" style="margin:0">L'agent écrit <strong>uniquement aux collègues</strong> (adresses du cabinet), jamais aux clients. Aucun message ne part sans validation d'un propriétaire, associé ou manager. Vous pouvez corriger le texte avant de valider : c'est ce texte-là qui part.</p>
+      <details>
+        <summary style="cursor:pointer;font-size:14px">Demander un message à l'agent</summary>
+        <div class="stack" style="gap:10px;margin-top:10px">
+          <div class="field"><label for="m-to">Destinataires (adresses du cabinet, séparées par des virgules)</label><input id="m-to" type="text" maxlength="2000" placeholder="aya@taty.info, koffi@taty.info"></div>
+          <div class="field"><label for="m-topic">Sujet du message</label><input id="m-topic" type="text" maxlength="500" placeholder="Ex. Rappel : pièces PBC BLE TRANSIT à relancer cette semaine"></div>
+          <div class="btn-row"><button class="btn ghost" id="m-propose" type="button">Faire rédiger par l'agent</button></div>
+        </div>
+      </details>
+      <p class="status" id="mail-status" role="status" aria-live="polite"></p>
+      <div id="mail-list" class="stack" style="gap:12px"></div>
+    </section>
 
     <div class="chips" id="filters" aria-label="Filtrer par agent"></div>
     <p class="status" id="status" role="status" aria-live="polite"></p>
@@ -151,8 +166,82 @@
     rows.forEach(function (a) { list.appendChild(card(a)); });
   }
 
+
+  // ---- Agent messages to colleagues (validated before sending) ----
+  var MSTATUS = { pending_approval: ['À valider', 'tag warn'], sending: ['Envoi…', 'tag neutral'], sent: ['Envoyé', 'tag'], failed: ['Échec d’envoi', 'tag warn'], rejected: ['Refusé', 'tag neutral'] };
+  var MERR = { RECIPIENT_OUTSIDE_FIRM: 'Refusé : au moins une adresse n’est pas du cabinet. L’agent n’écrit jamais aux clients.',
+    INTERNAL_DOMAINS_NOT_CONFIGURED: 'Domaines du cabinet non configurés (Paramètres → E-mail de l’agent).', AGENT_SENDER_NOT_CONFIGURED: 'Adresse d’envoi de l’agent non configurée (Paramètres).',
+    MAIL_NOT_CONFIGURED: 'Envoi non branché : il manque l’accès Google du cabinet (voir Mise en service).', MAIL_DELEGATION_MISSING: 'Google refuse l’envoi : le super administrateur doit autoriser l’envoi au nom de l’agent (voir Mise en service).',
+    ROLE_NOT_ALLOWED: 'Validation réservée au propriétaire, aux associés et aux managers.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail.', COMMENT_REQUIRED: 'Indiquez pourquoi vous refusez.',
+    RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', TOPIC_REQUIRED: 'Indiquez le sujet du message.' };
+  function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || m; }
+  function msay(t) { $('mail-status').textContent = t || ''; }
+  function mailApi(body) { return OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+
+  function mailCard(m) {
+    var c = el('article', null, 'item'); c.style.flexDirection = 'column'; c.style.alignItems = 'stretch';
+    var head = el('div', null, 't'); head.style.flex = '0 0 auto';
+    head.appendChild(el('span', 'À : ' + m.recipients.join(', ')));
+    head.appendChild(el('span', [m.source === 'agent' ? 'initiative de l’agent' : (m.requested_by ? 'demandé par ' + m.requested_by : null), UI.dateTime(m.created_at),
+      m.decided_by ? (m.status === 'rejected' ? 'refusé par ' : 'validé par ') + m.decided_by : null].filter(Boolean).join(' · '), 'meta'));
+    c.appendChild(head);
+    var st = MSTATUS[m.status] || [m.status, 'tag neutral']; var tag = el('span', st[0], st[1]); tag.style.alignSelf = 'flex-start'; c.appendChild(tag);
+    if (m.status === 'pending_approval' || m.status === 'failed') {
+      var subj = el('input'); subj.type = 'text'; subj.value = m.subject; subj.maxLength = 200; subj.setAttribute('aria-label', 'Objet');
+      subj.style.cssText = 'font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;font-weight:500';
+      var body = el('textarea'); body.value = m.body; body.rows = 7; body.maxLength = 10000; body.setAttribute('aria-label', 'Texte du message');
+      body.style.cssText = 'font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;line-height:1.5';
+      var why = el('input'); why.type = 'text'; why.maxLength = 1000; why.placeholder = 'Pourquoi refuser (obligatoire pour refuser)'; why.setAttribute('aria-label', 'Motif du refus');
+      why.style.cssText = 'font:inherit;font-size:13px;border:1px solid #C9D0CC;border-radius:8px;padding:6px 10px';
+      if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || m.error), 'hint'));
+      c.appendChild(subj); c.appendChild(body); c.appendChild(why);
+      var row = el('div', null, 'btn-row');
+      var ok = el('button', 'Valider et envoyer', 'btn'); ok.type = 'button';
+      var no = el('button', 'Refuser', 'btn ghost'); no.type = 'button';
+      ok.addEventListener('click', function () {
+        ok.disabled = no.disabled = true; msay('Envoi en cours…');
+        mailApi({ action: 'decide', decision: 'approve', id: m.id, subject: subj.value, body: body.value })
+          .then(function () { msay('Message envoyé aux collègues.'); loadMail(); })
+          .catch(function (e) { msay(mmsg(e)); loadMail(); });
+      });
+      no.addEventListener('click', function () {
+        ok.disabled = no.disabled = true;
+        mailApi({ action: 'decide', decision: 'reject', id: m.id, comment: why.value })
+          .then(function () { msay('Message refusé.'); loadMail(); })
+          .catch(function (e) { msay(mmsg(e)); ok.disabled = no.disabled = false; });
+      });
+      row.appendChild(ok); row.appendChild(no); c.appendChild(row);
+    } else {
+      c.appendChild(el('strong', m.subject));
+      var pre = el('div', m.body, 'hint'); pre.style.whiteSpace = 'pre-wrap'; c.appendChild(pre);
+      if (m.decision_comment) c.appendChild(el('p', 'Commentaire : ' + m.decision_comment, 'hint'));
+      if (m.status === 'failed' && m.error) c.appendChild(el('p', MERR[m.error] || m.error, 'hint'));
+    }
+    return c;
+  }
+
+  function loadMail() {
+    if (!OM.hasPersonalSession()) { $('mail-list').textContent = ''; msay('Connectez-vous avec votre e-mail pour gérer les messages.'); return; }
+    if (!OM.isManager()) { $('mail-meta').textContent = ''; return; }
+    OM.api('/api/app?route=messages').then(function (d) {
+      $('mail-meta').textContent = '· ' + d.pending + ' à valider' + (d.sender ? ' · envoyés depuis ' + d.sender : '');
+      if (!d.mail_configured) msay('Envoi pas encore branché : vous pouvez valider, l’envoi se fera une fois l’accès Google configuré (voir Mise en service).');
+      var box = $('mail-list'); box.textContent = '';
+      if (!d.messages.length) box.appendChild(el('p', 'Aucun message pour le moment.', 'empty'));
+      d.messages.slice(0, 20).forEach(function (m) { box.appendChild(mailCard(m)); });
+    }).catch(function (e) { msay(mmsg(e)); });
+  }
+
+  $('m-propose').addEventListener('click', function () {
+    var b = this; b.disabled = true; msay('L’agent rédige…');
+    mailApi({ action: 'propose', recipients: $('m-to').value, topic: $('m-topic').value })
+      .then(function () { msay(OM.isManager() ? 'Message rédigé : relisez-le ci-dessous puis validez.' : 'Message rédigé : il attend la validation d’un manager.'); $('m-topic').value = ''; loadMail(); })
+      .catch(function (e) { msay(mmsg(e)); }).then(function () { b.disabled = false; });
+  });
+
   function start() {
     OM.loadBranding().catch(function () {});
+    loadMail();
     show('Chargement…');
     OM.api('/api/app?route=actions').then(function (data) {
       all = (data && data.actions) || [];
