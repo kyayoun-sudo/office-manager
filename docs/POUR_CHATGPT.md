@@ -212,6 +212,9 @@ validation avant. »
   administrateur Google Workspace** doit autoriser ce compte de service (délégation à l'échelle
   du domaine, droit `https://www.googleapis.com/auth/gmail.send`). Sinon : erreur claire
   `MAIL_DELEGATION_MISSING`, le message reste « échec d'envoi » et peut être revalidé.
+  **Alias** : si l'adresse de l'agent est un alias de la boîte d'une personne (sans licence en plus), mettre
+  `AGENT_MAIL_MAILBOX` = la vraie boîte (ex. paulkomenan@taty.info) : l'app se connecte comme elle et écrit
+  « De : alias ». La boîte doit être dans les domaines du cabinet.
   Limite : 100 envois par jour. Pas de Cc / Cci ; en-têtes protégés contre l'injection.
 - Mise en service : 2 nouvelles lignes (adresse d'envoi + domaines ; envoi Gmail).
 

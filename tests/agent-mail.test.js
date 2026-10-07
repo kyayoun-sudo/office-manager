@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { proposeMessage, decideMessage, listMessages, buildMime, sendViaGmail, assertColleaguesOnly, messageDue, proposeTeamMessage, contentHash } from '../lib/agent-mail.js';
+import { proposeMessage, decideMessage, listMessages, buildMime, sendViaGmail, sendingMailbox, assertColleaguesOnly, messageDue, proposeTeamMessage, contentHash } from '../lib/agent-mail.js';
 import { ROUTES } from '../api/app.js';
 
 const PERSONA = { agent_display_name: 'Office Manager TATY', sender_email: 'assistant@taty.info', reply_to: 'hit@taty.info',
@@ -141,4 +141,20 @@ test('routes and page: managers validate, everyone can ask; the page states the 
   assert.match(html, /uniquement aux collègues/);
   assert.match(html, /Valider et envoyer/);
   assert.match(readFileSync(new URL('../db/INSTALL_TOUT.sql', import.meta.url), 'utf8'), /office_agent_messages/);
+});
+
+test('alias of a person\'s mailbox: signs in as the real mailbox, sends From the alias', async () => {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const env = { AGENT_MAIL_MAILBOX: 'PaulKomenan@taty.info', GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: 'om@p.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }) }) };
+  assert.equal(sendingMailbox(PERSONA, env), 'paulkomenan@taty.info');
+  assert.equal(sendingMailbox(PERSONA, {}), 'assistant@taty.info');
+  assert.throws(() => sendingMailbox(PERSONA, { AGENT_MAIL_MAILBOX: 'paul@gmail.com' }), /AGENT_MAILBOX_OUTSIDE_FIRM/);
+  let sub = null, raw = null;
+  const fetchImpl = async (url, o) => {
+    if (url.includes('oauth2')) { sub = JSON.parse(Buffer.from(new URLSearchParams(o.body).get('assertion').split('.')[1], 'base64url')).sub; return { ok: true, json: async () => ({ access_token: 't' }) }; }
+    raw = JSON.parse(o.body).raw; return { ok: true, json: async () => ({ id: 'g' }) };
+  };
+  await sendViaGmail({ recipients: ['aya@taty.info'], subject: 'S', body: 'B' }, PERSONA, { env, fetchImpl });
+  assert.equal(sub, 'paulkomenan@taty.info');
+  assert.match(Buffer.from(raw, 'base64url').toString(), /^From: Office Manager TATY <assistant@taty\.info>/);
 });
