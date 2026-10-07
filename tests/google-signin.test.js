@@ -49,3 +49,19 @@ test('session for a Google-verified e-mail: an existing user is reused', async (
   const s = await sessionForEmail('a@b.c', 'A', async (p) => p === 'admin/users' ? { status: 422 } : auth(p));
   assert.equal(s.refresh_token, 'sess-r');
 });
+
+test('an account whose login was deleted and recreated is re-attached by the Google-verified e-mail', async () => {
+  const calls = [];
+  const fetchRows = async (path, o = {}) => {
+    calls.push([o.method || 'GET', path, o.body || null]);
+    if (path.includes('auth_user_id=eq.')) return [];
+    if (path.includes('email=eq.') && !o.method) return [{ role: 'owner', active: true, auth_user_id: 'old' }];
+    return [{ auth_user_id: 'someone' }];
+  };
+  const st = makeState('org1', '', env, Date.now(), '/parametres.html', 'signin');
+  const out = await completeGoogleReturn('org1', req(st), { env, fetchImpl: googleFetch('openid email'), fetchRows, authCall: auth });
+  assert.equal(out.__redirect, '/login.html#refresh_token=sess-r');
+  const patch = calls.find(c => c[0] === 'PATCH');
+  assert.ok(patch && patch[1].includes('email=eq.boss%40firm.com'));
+  assert.deepEqual(JSON.parse(patch[2]), { auth_user_id: 'u1' });
+});
