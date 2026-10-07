@@ -13,6 +13,7 @@
 // POST { action: "mark_mapping_reviewed", approved_by }
 import crypto from "node:crypto";
 import { driveAdapter } from "../lib/drive-adapter.js";
+import { loadGoogleConnection } from "../lib/google-connection.js";
 import { loadMemory, ownerSecret } from "../lib/memory-runtime.js";
 import {
   buildMappingReport,
@@ -120,6 +121,8 @@ export default async function handler(req, res) {
     if (!["GET", "POST"].includes(req.method)) {
       return res.status(405).json({ error: "Method not allowed" });
     }
+    // The firm's Google connection (Paramètres → Connecter Google) for the memory files.
+    if (process.env.DEFAULT_ORG_ID) await loadGoogleConnection(process.env.DEFAULT_ORG_ID).catch(() => null);
     return res.status(200).json(await handleOwnerRequest(req));
   } catch (error) {
     return res

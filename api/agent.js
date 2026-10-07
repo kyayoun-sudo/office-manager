@@ -10,6 +10,7 @@ import {
 import { requirePilotAccess } from "../lib/auth.js";
 import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
+import { loadGoogleConnection } from "../lib/google-connection.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -145,6 +146,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
     assertIsolatedOrg(orgId);
+    await loadGoogleConnection(orgId).catch(() => null);
 
     const permissions = await getPermissions(orgId);
 

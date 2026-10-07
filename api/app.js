@@ -16,6 +16,7 @@ import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
 import { listMessages, proposeMessage, decideMessage } from '../lib/agent-mail.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
+import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogleConnection } from '../lib/google-connection.js';
 import { assertIsolatedOrg } from '../lib/test-mode.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -166,7 +167,31 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'TEST_RUN_UNAVAILABLE'
   },
-  'test-run-step': { POST: (orgId, req) => copyTick(orgId, req), unavailable: 'TEST_RUN_UNAVAILABLE' }
+  'test-run-step': { POST: (orgId, req) => copyTick(orgId, req), unavailable: 'TEST_RUN_UNAVAILABLE' },
+  // "Connecter Google" (Drive + Gmail of the firm), from Paramètres.
+  //   GET  /api/app?route=google                   connected account, rights, shared drives seen — OWNER ONLY
+  //   POST /api/app?route=google {action}          connect (returns Google's consent address) | disconnect — OWNER ONLY
+  //   GET  /oauth/google/callback (rewrite)        Google sends the owner back here (signed state checked)
+  google: {
+    GET: owner((orgId, req) => googleStatus(orgId, { req })),
+    POST: owner((orgId, req) => {
+      if (req.body?.action === 'connect') return startConnect(orgId, req);
+      if (req.body?.action === 'disconnect') return disconnectGoogle(orgId);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'GOOGLE_UNAVAILABLE'
+  },
+  'google-callback': {
+    GET: open(async (orgId, req) => {
+      try {
+        const r = await finishConnect(orgId, req);
+        return { __redirect: '/parametres.html?google=ok&email=' + encodeURIComponent(r.email) + '#google' };
+      } catch (e) {
+        return { __redirect: '/parametres.html?google=error&code=' + encodeURIComponent(String(e.message || e).slice(0, 80)) + '#google' };
+      }
+    }),
+    unavailable: 'GOOGLE_UNAVAILABLE'
+  }
 });
 
 // Starts the next background step without waiting for it (separate invocation).
@@ -216,13 +241,20 @@ export async function handleApp(req) {
   // Test mode (preview): never on the real firm's organisation (test run TATY TEST).
   if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
+  // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
+  if (orgId) await loadGoogleConnection(orgId).catch(() => null);
   return run(orgId, req);
 }
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    return res.status(200).json(await handleApp(req));
+    const out = await handleApp(req);
+    // Only the Google callback redirects, and only to a page of this app.
+    if (out && typeof out.__redirect === 'string' && out.__redirect.startsWith('/')) {
+      res.statusCode = 302; res.setHeader('Location', out.__redirect); return res.end();
+    }
+    return res.status(200).json(out);
   } catch (error) {
     const status = error.statusCode || 500;
     const route = ROUTES[String(req.query?.route || '')];

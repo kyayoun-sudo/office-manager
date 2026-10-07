@@ -8,6 +8,12 @@
       "maxDuration": 60
     }
   },
+  "rewrites": [
+    {
+      "source": "/oauth/google/callback",
+      "destination": "/api/app?route=google-callback"
+    }
+  ],
   "redirects": [
     {
       "source": "/",

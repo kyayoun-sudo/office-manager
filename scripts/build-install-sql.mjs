@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 export const INSTALL_PARTS = ['org-branding.sql', 'action-decisions.sql', 'agent-persona.sql', 'app-users.sql',
-  'tidy.sql', 'agent-schedule.sql', 'access-log.sql', 'training.sql', 'agent-messages.sql', 'agent-messages-client.sql', 'test-run.sql'];
+  'tidy.sql', 'agent-schedule.sql', 'access-log.sql', 'training.sql', 'agent-messages.sql', 'agent-messages-client.sql', 'test-run.sql', 'google-connection.sql'];
 
 export function buildInstallSql() {
   const head = '-- OFFICE MANAGER — INSTALLATION DE TOUTES LES TABLES DE L’APPLICATION\n' +

@@ -62,6 +62,22 @@
 
     <div class="row" id="owner-area" hidden>
       <div class="grow">
+        <section class="card" id="google" aria-labelledby="h-google" style="border-left:4px solid var(--brand)">
+          <h2 id="h-google">Accès Google du cabinet (Drive et Gmail)</h2>
+          <p class="hint" style="margin:0">Pour que les agents travaillent sur le Drive du cabinet (lire, ranger, créer les dossiers de mission) et envoient ou lisent les e-mails, connectez le compte Google du cabinet. Google vous demandera d'autoriser l'accès ; vous pourrez le retirer à tout moment. Utilisez de préférence le compte qui envoie les e-mails de l'agent (adresse d'envoi ci-dessous).</p>
+          <div id="g-state" class="stack" style="gap:6px"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+            <button class="btn" id="g-connect" type="button">Connecter Google</button>
+            <button class="btn ghost" id="g-test" type="button">Tester l'accès</button>
+            <button class="btn ghost" id="g-disconnect" type="button" hidden>Déconnecter</button>
+            <span class="status" id="g-status" role="status" aria-live="polite"></span>
+          </div>
+          <details><summary class="hint">Première fois : adresse de retour à déclarer chez Google</summary>
+            <p class="hint" style="margin:6px 0 0">Dans la console Google Cloud du cabinet (Identifiants → client OAuth de l'application → « URI de redirection autorisés »), ajoutez une fois cette adresse :</p>
+            <p class="mono" id="g-redirect" style="overflow-wrap:anywhere;font-size:13px;margin:4px 0 0"></p>
+          </details>
+        </section>
+
         <section class="card" aria-labelledby="h-id">
           <h2 id="h-id">Identité</h2>
           <div class="field"><label for="firm">Nom du cabinet</label><input id="firm" type="text" maxlength="120"></div>
@@ -291,7 +307,12 @@
     INVALID_INTERNAL_DOMAINS: 'Un domaine du cabinet est invalide (ex. taty.info).',
     RECIPIENT_OUTSIDE_FIRM: 'Un destinataire n’est pas une adresse du cabinet : l’agent ne parle en nouchi qu’aux collègues.',
     INTERNAL_DOMAINS_NOT_CONFIGURED: 'Renseignez et enregistrez d’abord l’adresse d’envoi ou les domaines du cabinet.',
-    TOPIC_REQUIRED: 'Indiquez le sujet du message.'
+    TOPIC_REQUIRED: 'Indiquez le sujet du message.',
+    GOOGLE_CLIENT_NOT_CONFIGURED: 'Le client Google de l’application n’est pas configuré (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET dans Vercel).',
+    GOOGLE_RECONNECT_REQUIRED: 'Google a retiré l’accès (mot de passe changé ou accès révoqué) : reconnectez Google.',
+    GOOGLE_NO_REFRESH_TOKEN: 'Google n’a pas donné d’accès durable : déconnectez l’application dans votre compte Google puis reconnectez.',
+    OAUTH_STATE_EXPIRED: 'La demande a expiré : cliquez à nouveau sur « Connecter Google ».', OAUTH_STATE_INVALID: 'Retour Google non reconnu : recommencez.',
+    redirect_uri_mismatch: 'Google ne connaît pas encore l’adresse de retour : déclarez-la (voir « Première fois » ci-dessous).'
   };
   function explain(err) { return ERRORS[err.message] || err.message; }
 
@@ -321,12 +342,58 @@
   }
   $('humor').addEventListener('input', function () { $('humor-label').textContent = HUMOR[Number($('humor').value)]; });
 
+  // ---- Google access of the firm ----
+  function gLine(ok, text) {
+    var r = document.createElement('div'); r.className = 'hint'; r.style.cssText = 'margin:0;font-size:14px;color:' + (ok ? '#0B4A43' : '#8A2E0B');
+    r.textContent = (ok ? '✓ ' : '○ ') + text; return r;
+  }
+  function loadGoogle(check) {
+    var box = $('g-state'); box.textContent = ''; $('g-status').textContent = check ? 'Vérification auprès de Google…' : '';
+    return ownerApi('google').then(function (g) {
+      box.textContent = '';
+      $('g-redirect').textContent = g.redirect_uri || '';
+      if (!g.client_configured) box.appendChild(gLine(false, 'Client Google de l’application non configuré (Vercel : GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET).'));
+      if (g.connected) {
+        box.appendChild(gLine(true, 'Connecté avec ' + g.email));
+        box.appendChild(gLine(g.drive, 'Drive : ' + (g.drive ? 'lire, ranger, créer' : 'non autorisé')));
+        box.appendChild(gLine(g.gmail_send, 'Gmail : ' + (g.gmail_send ? 'envoyer (après validation)' : 'envoi non autorisé') + (g.gmail_read ? ', lire le libellé PBC' : '')));
+        if (g.check && g.check !== 'ok') box.appendChild(gLine(false, 'Test : ' + (ERRORS[g.check] || g.check)));
+        if (g.shared_drives) box.appendChild(gLine(g.shared_drives.length > 0, 'Drive partagés visibles : ' + (g.shared_drives.map(function (d) { return d.name; }).join(', ') || 'aucun')));
+      } else {
+        box.appendChild(gLine(false, g.env_access ? 'Accès technique configuré dans Vercel (compte de service). Vous pouvez aussi connecter le compte Google du cabinet.' : 'Aucun compte Google connecté : les agents ne peuvent ni ranger le Drive ni envoyer d’e-mail.'));
+      }
+      $('g-disconnect').hidden = !g.connected;
+      $('g-connect').textContent = g.connected ? 'Reconnecter Google' : 'Connecter Google';
+      $('g-status').textContent = '';
+    }).catch(function (err) { $('g-status').textContent = explain(err); });
+  }
+  $('g-connect').addEventListener('click', function () {
+    $('g-status').textContent = 'Ouverture de Google…';
+    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'connect', by: OM.getUserName() || null, login_hint: $('sender').value.trim() || null }) })
+      .then(function (r) { window.location.assign(r.url); })
+      .catch(function (err) { $('g-status').textContent = explain(err); });
+  });
+  $('g-test').addEventListener('click', function () { loadGoogle(true); });
+  $('g-disconnect').addEventListener('click', function () {
+    $('g-status').textContent = 'Déconnexion…';
+    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) })
+      .then(function () { return loadGoogle(); }).catch(function (err) { $('g-status').textContent = explain(err); });
+  });
+  (function googleReturn() {
+    var p = new URLSearchParams(location.search);
+    if (!p.get('google')) return;
+    var msg = p.get('google') === 'ok' ? 'Google connecté avec ' + (p.get('email') || 'le compte du cabinet') + '. Les agents peuvent travailler sur le Drive et Gmail.'
+      : 'Connexion Google non aboutie : ' + (ERRORS[(p.get('code') || '').replace(/^GOOGLE_TOKEN_EXCHANGE_FAILED: /, '')] || ERRORS[p.get('code')] || p.get('code'));
+    setTimeout(function () { $('g-status').textContent = msg; }, 600);
+    history.replaceState(null, '', location.pathname + '#google');
+  })();
+
   function unlock() {
     $('owner-status').textContent = 'Vérification…'; $('owner-status').className = 'status';
     ownerApi('agent-persona').then(function (p) {
       fillPersona(p);
       $('owner-gate').hidden = true; $('owner-area').hidden = false;
-      loadUsers(); loadSchedule();
+      loadUsers(); loadSchedule(); loadGoogle(false);
     }).catch(function (err) {
       $('owner-area').hidden = true; $('owner-gate').hidden = false;
       $('owner-status').textContent = explain(err); $('owner-status').className = 'status error';
