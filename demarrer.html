@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Démarrer</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+body{background:var(--bg,#F4F5F3)}
+.wrap{max-width:620px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:18px}
+.step{background:#fff;border:1px solid var(--line,#E3E7E5);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.step h2{margin:0;font-size:18px;display:flex;gap:10px;align-items:center}
+.num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#E3E7E5;font-size:14px;font-weight:600}
+.step.done .num{background:#0B4A43;color:#fff}
+.step.off{opacity:.55}
+.step.off button,.step.off input{pointer-events:none}
+.small{font-size:13px;color:var(--muted,#5B6670);margin:0;line-height:1.5}
+.ok{color:#0B4A43;font-weight:500}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff!important;color:#1F2933!important;border:1px solid #C9D0CC!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0">Démarrer Office Manager</h1>
+    <p class="small">Trois étapes, une seule fois. Vous pourrez tout modifier ensuite dans Paramètres.</p>
+  </header>
+
+  <section class="step" id="st1">
+    <h2><span class="num">1</span> Votre compte</h2>
+    <div id="s1-form" style="display:flex;flex-direction:column;gap:12px">
+      <button class="btn gbtn" type="button" id="s1-google">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        Continuer avec Google</button>
+      <p class="small" style="text-align:center">ou</p>
+      <div class="field"><label for="name">Votre nom</label><input id="name" type="text" maxlength="120" autocomplete="name"></div>
+      <div class="field"><label for="email">Votre e-mail</label><input id="email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="pw">Choisissez un mot de passe (10 caractères, lettres et chiffres)</label><input id="pw" type="password" maxlength="128" autocomplete="new-password"></div>
+      <button class="btn" type="button" id="s1-create">Créer mon compte</button>
+    </div>
+    <p class="small" id="s1-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="step off" id="st2">
+    <h2><span class="num">2</span> Votre Google (Drive et Gmail)</h2>
+    <p class="small">Google vous demande d'autoriser Office Manager à travailler sur votre Drive et à envoyer les e-mails validés. Vous pourrez retirer cet accès à tout moment.</p>
+    <button class="btn" type="button" id="s2-connect">Connecter mon Google</button>
+    <p class="small" id="s2-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="step off" id="st3">
+    <h2><span class="num">3</span> L'adresse de votre Drive</h2>
+    <p class="small">Ouvrez votre Drive partagé du cabinet dans Google Drive, copiez l'adresse en haut du navigateur et collez-la ici.</p>
+    <div class="field"><label for="drive">Adresse du Drive</label><input id="drive" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/…"></div>
+    <button class="btn" type="button" id="s3-save">Utiliser ce Drive</button>
+    <p class="small" id="s3-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="step off" id="st4">
+    <h2><span class="num">✓</span> C'est prêt</h2>
+    <p class="small">Les agents commencent par apprendre votre Drive (cartographie), puis travaillent seuls aux heures du cabinet. Leurs propositions arrivent dans « À valider » : rien n'est déplacé ni envoyé sans votre accord.</p>
+    <div class="btn-row"><a class="btn" href="/mise-en-service.html">Voir la mise en service</a><a class="btn ghost" href="/accueil.html">Aller à l'accueil</a></div>
+  </section>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager;
+  var $ = function (id) { return document.getElementById(id); };
+  var M = {
+    WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.', INVALID_EMAIL: 'Adresse e-mail invalide.', INVALID_NAME: 'Indiquez votre nom.',
+    EMAIL_ALREADY_USED_WRONG_PASSWORD: 'Cette adresse a déjà un mot de passe : utilisez le même.', ACCOUNT_ALREADY_EXISTS: 'Vous avez déjà un compte : connectez-vous.',
+    ACCOUNT_PENDING: 'Le cabinet a déjà un propriétaire : votre compte attend qu’il vous donne un rôle.',
+    GOOGLE_CLIENT_NOT_CONFIGURED: 'La connexion Google n’est pas encore activée sur ce serveur.', DRIVE_LINK_INVALID: 'Adresse non reconnue : copiez l’adresse du Drive partagé depuis Google Drive.',
+    DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Votre compte Google ne voit pas ce Drive.', DRIVE_MUST_BE_SHARED_DRIVE: 'Il faut un Drive partagé du cabinet (pas « Mon Drive »).',
+    GOOGLE_NOT_CONNECTED: 'Connectez d’abord votre Google (étape 2).', TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
+  };
+  var msg = function (e) { var m = String(e && e.message || e); return M[m] || m; };
+  function post(route, body, headers) {
+    return fetch('/api/app?route=' + route, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}), body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || 'HTTP_' + r.status); return d; }); });
+  }
+  function owner() { return { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }; }
+  function step(n, state) { var s = $('st' + n); s.classList.toggle('off', state === 'off'); s.classList.toggle('done', state === 'done'); }
+  function refresh() {
+    var s = OM.getSession();
+    if (!s || !OM.isOwner()) { step(1, 'on'); step(2, 'off'); step(3, 'off'); step(4, 'off'); return; }
+    step(1, 'done'); $('s1-form').hidden = true; $('s1-msg').textContent = 'Connecté : ' + (s.user.display_name || s.user.email) + ' — propriétaire du cabinet.'; $('s1-msg').className = 'small ok';
+    return OM.api('/api/app?route=google', { headers: owner() }).then(function (g) {
+      if (g.connected) { step(2, 'done'); $('s2-msg').textContent = 'Google connecté : ' + g.email; $('s2-msg').className = 'small ok'; $('s2-connect').textContent = 'Reconnecter un autre compte'; }
+      else step(2, 'on');
+      if (g.firm_drive) { step(3, 'done'); $('s3-msg').textContent = 'Drive utilisé : ' + (g.firm_drive.name || g.firm_drive.id); $('s3-msg').className = 'small ok'; step(4, 'done'); }
+      else step(3, g.connected ? 'on' : 'off');
+    }).catch(function (e) { $('s2-msg').textContent = msg(e); step(2, 'on'); });
+  }
+
+  $('s1-google').addEventListener('click', function () {
+    fetch('/api/app?route=oauth-start&provider=google').then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.url) throw new Error(d.error); try { sessionStorage.setItem('om_after_login', '/demarrer.html'); } catch (x) {} location.assign(d.url); })
+      .catch(function (e) { $('s1-msg').textContent = msg(e); });
+  });
+  $('s1-create').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('s1-msg').textContent = 'Création…'; $('s1-msg').className = 'small';
+    post('signup', { display_name: $('name').value.trim(), email: $('email').value.trim(), password: $('pw').value })
+      .then(function (r) {
+        if (r.owner && r.session) { OM.saveSession(r.session); return refresh(); }
+        $('s1-msg').textContent = M.ACCOUNT_PENDING;
+      })
+      .catch(function (e) { $('s1-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('s2-connect').addEventListener('click', function () {
+    $('s2-msg').textContent = 'Ouverture de Google…';
+    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'connect', return_to: '/demarrer.html', by: OM.getUserName() || null }) })
+      .then(function (r) { location.assign(r.url); }).catch(function (e) { $('s2-msg').textContent = msg(e); });
+  });
+  $('s3-save').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('s3-msg').textContent = 'Vérification auprès de Google…'; $('s3-msg').className = 'small';
+    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', link: $('drive').value, by: OM.getUserName() || null }) })
+      .then(function () { return refresh(); }).catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+
+  var q = new URLSearchParams(location.search);
+  if (q.get('google') === 'error') $('s2-msg').textContent = 'Connexion Google non aboutie : ' + (q.get('code') || '');
+  if (q.get('google')) history.replaceState(null, '', location.pathname);
+  refresh();
+})();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@ import { globalSearch } from '../lib/global-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl } from '../lib/accounts.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState } from '../lib/accounts.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -99,6 +99,7 @@ export const ROUTES = Object.freeze({
   'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
   // Sign-up for everyone (account inactive until the owner gives a role) and owner claim (owner code).
   signup: { POST: open((orgId, req) => signUp(orgId, req.body || {})), unavailable: 'SIGNUP_UNAVAILABLE' },
+  'setup-state': { GET: open((orgId) => setupState(orgId)), unavailable: 'SIGNUP_UNAVAILABLE' },
   'claim-owner': { POST: open((orgId, req) => claimOwner(orgId, req)), unavailable: 'CLAIM_UNAVAILABLE' },
   // "Continuer avec Google": start address (public) and session check after Google (public).
   'oauth-start': { GET: open((orgId, req) => {
@@ -196,7 +197,7 @@ export const ROUTES = Object.freeze({
     GET: open(async (orgId, req) => {
       try {
         const r = await finishConnect(orgId, req);
-        return { __redirect: '/parametres.html?google=ok&email=' + encodeURIComponent(r.email) + '#google' };
+        return { __redirect: r.return_to + '?google=ok&email=' + encodeURIComponent(r.email) + '#google' };
       } catch (e) {
         return { __redirect: '/parametres.html?google=error&code=' + encodeURIComponent(String(e.message || e).slice(0, 80)) + '#google' };
       }

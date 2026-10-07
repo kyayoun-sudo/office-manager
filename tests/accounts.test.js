@@ -120,9 +120,10 @@ test('sign-up: anyone creates an account, it has NO access until the owner gives
     if (path.startsWith('token?grant_type=password')) { const u = users[o.body.email]; return u && u.password === o.body.password ? { status: 200, data: { refresh_token: 'r', user: { id: u.id } } } : { status: 400, data: {} }; }
     return { status: 400, data: {} };
   };
+  rows.push({ auth_user_id: '99999999-9999-9999-9999-999999999999', email: 'owner@taty.info', role: 'owner', active: true }); // the firm already has its owner
   const r = await signUp('org-1', { display_name: 'Paul', email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows });
   assert.deepEqual(r, { created: true, pending: true, email: 'kyayoun@gmail.com' });
-  assert.equal(rows[0].active, false);
+  assert.equal(rows[1].active, false);
   await assert.rejects(login('org-1', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows }), /ACCOUNT_PENDING/);
   await assert.rejects(signUp('org-1', { display_name: 'X', email: 'kyayoun@gmail.com', password: 'autrechose99' }, { authCall, fetchRows }), /EMAIL_ALREADY_USED_WRONG_PASSWORD/, 'nobody takes an address over');
   await assert.rejects(signUp('org-1', { display_name: 'Paul', email: 'kyayoun@gmail.com', password: 'motdepasse2026' }, { authCall, fetchRows }), /ACCOUNT_ALREADY_EXISTS/);
@@ -133,7 +134,7 @@ test('sign-up: anyone creates an account, it has NO access until the owner gives
   const s = await claimOwner('org-1', req('owner', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }), { authCall, fetchRows });
   assert.equal(s.user.role, 'owner');
   assert.equal(s.owner_token, 'owner');
-  assert.equal(rows[0].active, true);
+  assert.equal(rows[1].active, true);
   assert.ok(ROUTES.signup.POST.public && ROUTES['claim-owner'].POST.public);
 });
 
@@ -160,4 +161,24 @@ test('Continuer avec Google: session re-checked with Supabase; first person of a
   await assert.rejects(oauthLogin('org-2', { refresh_token: 'rt-yvan' }, { authCall, fetchRows: f2, env: { FIRST_OWNER_EMAILS: 'kyayoun@gmail.com' } }), /ACCOUNT_PENDING/);
   assert.match(authStartUrl('google', 'https://app.example/login.html', { SUPABASE_URL: 'https://x.supabase.co' }), /^https:\/\/x\.supabase\.co\/auth\/v1\/authorize\?provider=google&redirect_to=https%3A%2F%2Fapp\.example%2Flogin\.html$/);
   assert.throws(() => authStartUrl('evil', 'x', { SUPABASE_URL: 'https://x' }), /PROVIDER_NOT_SUPPORTED/);
+});
+
+test('a new firm: the first person who signs up becomes the owner, no code; the next ones wait', async () => {
+  const rows = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; }
+    const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1];
+    return id ? rows.filter(r => r.auth_user_id === id) : rows;
+  };
+  const users = {};
+  const authCall = async (path, o = {}) => {
+    if (path === 'admin/users') { users[o.body.email] = { id: Object.keys(users).length ? UID2 : UID, password: o.body.password }; return { status: 200, data: { id: users[o.body.email].id } }; }
+    const u = users[o.body.email]; return u && u.password === o.body.password ? { status: 200, data: { refresh_token: 'r', user: { id: u.id } } } : { status: 400, data: {} };
+  };
+  const first = await signUp('org-9', { display_name: 'Awa', email: 'awa@cabinet.ci', password: 'motdepasse2026' }, { authCall, fetchRows });
+  assert.equal(first.owner, true);
+  assert.equal(first.session.user.role, 'owner');
+  assert.equal(first.session.owner_token, 'owner', 'the owner can configure right away');
+  const second = await signUp('org-9', { display_name: 'Koffi', email: 'koffi@cabinet.ci', password: 'motdepasse2026' }, { authCall, fetchRows });
+  assert.equal(second.pending, true);
 });
