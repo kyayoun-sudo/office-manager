@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startTidyPlan, tidyPlanStep, answerQuestion, tidyCandidates } from '../lib/tidy-plan.js';
+import { startTidyPlan, tidyPlanStep, answerQuestion, tidyCandidates, startChangesPass, tidyStatus } from '../lib/tidy-plan.js';
 
 const F = 'application/vnd.google-apps.folder';
 function fakeDrive(files) {
@@ -72,4 +72,40 @@ test('a work programme loose under 01_CLIENTS_ET_MISSIONS: read, its mission fol
   assert.equal(st.created, 1);
   assert.deepEqual(actions[0].payload.create, { parent_id: 'CM', names: ['Nova Distribution', 'CAC_2026'] });
   assert.match(actions[0].summary, /Créer « \/TATY share drive\/01_CLIENTS_ET_MISSIONS\/Nova Distribution\/CAC_2026 »/);
+});
+
+test('pass: only files created, uploaded or modified since the last pass; the date moves forward when the pass is done', async () => {
+  const drive = fakeDrive([{ ...json({ items, finished_at: '2026-10-01T08:00:00Z' }), name: 'OFFICE_MANAGER_SCAN_STATE.json' },
+    { ...json({ status: 'done', mode: 'changes', last_pass_at: '2026-10-07T08:00:00Z' }), name: 'OFFICE_MANAGER_TIDY_STATE.json' }]);
+  let askedSince = null, input = '';
+  const d = { drive, folder: 'MEM', fire: async () => true,
+    changedSince: async (since) => { askedSince = since; return [
+      { id: 'new1', name: 'Engagement letter signed.pdf', mimeType: 'application/pdf', parents: ['D1'], lastModifyingUser: { emailAddress: 'awa@taty.info' } },
+      { id: 'memf', name: 'OFFICE_MANAGER_MAP.xlsx', mimeType: 'x', parents: ['MEM'] }]; },
+    readText: async () => 'This engagement letter sets out the terms of the statutory audit',
+    runAI: async (o) => { input = o.input; return { text: JSON.stringify({ decisions: [{ file_id: 'new1', action: 'ok' }] }) }; },
+    fetchRows: async () => [] };
+  const r = await startChangesPass('org', {}, d);
+  assert.equal(askedSince, '2026-10-07T08:00:00Z');
+  assert.equal(r.files, 1);
+  let st = await tidyStatus(d);
+  assert.equal(st.last_pass_at, '2026-10-07T08:00:00Z');
+  st = await tidyPlanStep('org', {}, d);
+  assert.match(input, /new1 \| \/TATY share drive\/Clients\/Ivoire Logistique\/CAC 2026\/Engagement letter signed.pdf/);
+  assert.match(input, /statutory audit/);
+  assert.equal(st.status, 'done'); assert.equal(st.ok, 1);
+  assert.equal(st.last_pass_at, st.pass_started_at);
+  assert.ok(st.last_pass_at > '2026-10-07T08:00:00Z');
+});
+
+test('pass: nothing new → done at once, date moves forward; a running first scan is not interrupted', async () => {
+  const drive = fakeDrive([{ ...json({ items }), name: 'OFFICE_MANAGER_SCAN_STATE.json' },
+    { ...json({ status: 'done', last_pass_at: '2026-10-07T08:00:00Z' }), name: 'OFFICE_MANAGER_TIDY_STATE.json' }]);
+  const d = { drive, folder: 'MEM', fire: async () => { throw new Error('no step'); }, changedSince: async () => [], fetchRows: async () => [] };
+  const r = await startChangesPass('org', {}, d);
+  assert.equal(r.started, false);
+  assert.ok((await tidyStatus(d)).last_pass_at > '2026-10-07T08:00:00Z');
+  const busy = fakeDrive([{ ...json({ status: 'planning', mode: 'first-scan', started_at: new Date().toISOString() }), name: 'OFFICE_MANAGER_TIDY_STATE.json' }]);
+  const r2 = await startChangesPass('org', {}, { ...d, drive: busy });
+  assert.equal(r2.reason, 'FIRST_SCAN_RUNNING');
 });

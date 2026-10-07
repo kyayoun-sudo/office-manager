@@ -51,6 +51,7 @@
       options = options || {};
       var s = readSession();
       var base = { 'x-office-manager-token': OM.getToken() };
+      if (OM.getLang && OM.getLang() === 'en') base['x-om-lang'] = 'en';
       // Personal token: lets the server check who you are on sensitive routes.
       if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
       var headers = Object.assign(base, options.headers || {});

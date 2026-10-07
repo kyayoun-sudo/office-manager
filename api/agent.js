@@ -255,8 +255,12 @@ export default async function handler(req, res) {
     rootContext = { ...(rootContext || {}), people_management: policy };
     if (contexts && contexts["mission-controller"]) contexts["mission-controller"] = { ...contexts["mission-controller"], people_management: policy };
 
+    // The person reads the app in English (settings wheel): the agents answer in English.
+    const english = String(req.headers?.["x-om-lang"] || body.lang || "").toLowerCase() === "en";
+    if (english) rootContext = { ...(rootContext || {}), reply_language: "English" };
+
     const result = await runOfficeManager({
-      message,
+      message: english ? message + "\n\n(Answer in English. The firm's documents can be in French or English.)" : message,
       requestedAgent,
       contexts,
       rootContext,

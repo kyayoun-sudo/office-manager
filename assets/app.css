@@ -117,8 +117,8 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);b
 details>summary{cursor:pointer;font-weight:600}
 
 /* ---- Tabs built from a long page's sections ---- */
-.tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;padding:6px;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;scrollbar-width:none}
-.tabs button{font:inherit;font-size:14px;font-weight:600;white-space:nowrap;border:0;background:none;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer}
+.tabs{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;scrollbar-width:none}
+.tabs button{font:inherit;font-size:14px;font-weight:600;white-space:nowrap;min-height:36px;border:0;background:none;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer}
 .tabs button:hover{color:var(--ink);background:var(--surface)}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 
@@ -134,5 +134,7 @@ details>summary{cursor:pointer;font-weight:600}
   .gear-menu{position:static;width:100%;margin-top:8px;box-shadow:none}
   .main{padding:18px 16px 40px}
   h1{font-size:24px}
+  .tabs{position:static}
+  .tabs button{font-size:13px;padding:7px 10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important;scroll-behavior:auto !important}}
