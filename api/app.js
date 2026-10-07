@@ -15,6 +15,7 @@ import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
 import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
 import { listMessages, proposeMessage, decideMessage } from '../lib/agent-mail.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
+import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -150,7 +151,21 @@ export const ROUTES = Object.freeze({
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
     unavailable: 'USERS_UNAVAILABLE'
-  }
+  },
+  // Test of the whole app on a copy of the firm — works only in a preview on a test firm.
+  //   GET  /api/app?route=test-run                 environment check, copy progress, missions — OWNER ONLY
+  //   POST /api/app?route=test-run {action}        copy (the Drive) | seed (team + 5 missions) — OWNER ONLY
+  //   POST /api/app?route=test-run-step            next chunk of the copy (background chain)
+  'test-run': {
+    GET: owner((orgId) => getTestRun(orgId)),
+    POST: owner((orgId, req) => {
+      if (req.body?.action === 'copy') return startCopy(orgId, req);
+      if (req.body?.action === 'seed') return seedTestRun(orgId, req);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'TEST_RUN_UNAVAILABLE'
+  },
+  'test-run-step': { POST: (orgId, req) => copyTick(orgId, req), unavailable: 'TEST_RUN_UNAVAILABLE' }
 });
 
 // Starts the next background step without waiting for it (separate invocation).

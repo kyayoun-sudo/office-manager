@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test du cabinet</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.chk{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.chk .ico{font-family:var(--mono);text-align:center;border-radius:6px;line-height:22px}
+.chk.ok .ico{color:#0B4A43;background:#E3F1EE}
+.chk.todo .ico{color:#8A2E0B;background:#FBE4D8}
+.small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.mission{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.mission strong{font-size:14px}
+.mono{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+.progress{height:10px;background:#E3E7E5;border-radius:5px;overflow:hidden}
+.progress span{display:block;height:10px;background:var(--brand)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/test-cabinet.html" aria-current="page">Test du cabinet</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <header class="page-head">
+      <h1>Test du cabinet</h1>
+      <p class="lead">Toute l'application testée sur une <strong>copie</strong> du cabinet : copie à l'identique du Drive, 5 missions d'audit sur 3 mois en accéléré (1 semaine = 1 jour), une équipe fictive dont les e-mails sont vos boîtes, et vous dans le rôle du CFO des clients. Fonctionne uniquement dans l'aperçu (preview) : le vrai cabinet n'est jamais touché.</p>
+    </header>
+
+    <div class="callout" id="not-owner" hidden><span class="callout-label">Réservé au propriétaire</span><span class="callout-text">Connectez-vous avec le compte propriétaire du cabinet de test.</span></div>
+
+    <div id="area" class="stack" style="gap:20px" hidden>
+      <section class="card" aria-labelledby="h-env">
+        <h2 id="h-env">1. Environnement de test</h2>
+        <p class="small">Chaque ligne doit être verte avant de commencer. Elles se règlent dans Vercel, variables de l'environnement <strong>Preview</strong>.</p>
+        <div id="env" class="stack" style="gap:6px"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-copy">
+        <h2 id="h-copy">2. Copie du Drive <span class="meta" id="copy-meta"></span></h2>
+        <p class="small">Tout le Drive du cabinet est copié dans le Drive partagé de test, sauf la mémoire de l'Orpailleur et les dossiers d'entraînement. Le vrai Drive est seulement lu.</p>
+        <div class="progress" aria-hidden="true"><span id="copy-bar" style="width:0"></span></div>
+        <p class="small" id="copy-text"></p>
+        <div class="btn-row"><button class="btn" id="copy-btn" type="button">Copier le Drive</button><button class="btn ghost" id="refresh" type="button">Actualiser</button></div>
+        <details><summary class="small">Éléments non copiés ou en échec</summary><div id="copy-issues" class="stack" style="gap:4px"></div></details>
+      </section>
+
+      <section class="card" aria-labelledby="h-team">
+        <h2 id="h-team">3. Vos boîtes mail et l'équipe</h2>
+        <p class="small">Chaque rôle reçoit les e-mails de l'agent dans une de vos boîtes. Une même boîte peut tenir plusieurs rôles. Les adresses doivent figurer dans les listes du verrou mail (Vercel : <span class="mono">AGENT_MAIL_SANDBOX_COLLEAGUES</span> pour l'équipe, <span class="mono">AGENT_MAIL_SANDBOX_CLIENTS</span> pour le CFO).</p>
+        <div class="grid2" id="roles"></div>
+        <div class="field" style="max-width:240px"><label for="start">Début du test (semaine 1)</label><input id="start" type="date" class="mono"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-missions">
+        <h2 id="h-missions">4. Les 5 missions</h2>
+        <div id="missions" class="grid2"></div>
+        <div class="btn-row"><button class="btn" id="seed-btn" type="button">Créer le cabinet de test et les 5 missions</button></div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div id="seed-out" class="stack" style="gap:6px"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var PROBLEMS = {
+    NOT_A_PREVIEW: 'Ceci n’est pas l’aperçu (preview) : le test ne tourne jamais en production.',
+    DEFAULT_ORG_ID_MISSING: 'DEFAULT_ORG_ID (identifiant du cabinet de test) manque.',
+    REAL_FIRM_ORG_ID: 'DEFAULT_ORG_ID est celui du vrai cabinet : mettez l’identifiant du cabinet de test.',
+    TEST_SOURCE_DRIVE_ID_MISSING: 'TEST_SOURCE_DRIVE_ID (le vrai Drive, à copier) manque.',
+    TATY_SHARED_DRIVE_ID_MISSING: 'TATY_SHARED_DRIVE_ID (le Drive partagé de test) manque.',
+    TEST_DRIVE_IS_THE_REAL_DRIVE: 'Le Drive de test est le vrai Drive : créez un Drive partagé « TATY TEST » et mettez son identifiant.',
+    GOOGLE_SERVICE_ACCOUNT_JSON_MISSING: 'L’accès Google du cabinet (GOOGLE_SERVICE_ACCOUNT_JSON) manque.',
+    MAIL_SANDBOX_EMPTY: 'Le verrou mail est vide : AGENT_MAIL_SANDBOX_COLLEAGUES et AGENT_MAIL_SANDBOX_CLIENTS.',
+    REQUIRE_EXISTING_MEMORY_MUST_BE_FALSE_IN_PREVIEW: 'OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY doit valoir false en Preview (la copie démarre sans mémoire).'
+  };
+  var ERR = { COPY_NOT_FINISHED: 'Attendez la fin de la copie du Drive.', MAILBOX_MISSING: 'Renseignez une boîte pour chaque rôle.',
+    MAILBOX_NOT_IN_SANDBOX: 'Une adresse ne figure pas dans le verrou mail de Vercel.', TEST_ENVIRONMENT_NOT_READY: 'L’environnement de test n’est pas prêt (voir étape 1).',
+    ORG_IS_NOT_A_TEST_FIRM: 'Ce cabinet n’est pas un cabinet de test : rien n’a été créé.', COPY_ALREADY_DONE: 'La copie est déjà faite.', COPY_ALREADY_RUNNING: 'La copie est en cours.' };
+  var msg = function (e) { var m = String(e && e.message || e); return ERR[m] || m; };
+  var say = function (t) { $('status').textContent = t || ''; };
+  var H = function () { return { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }; };
+  var timer = null;
+
+  function render(d) {
+    $('area').hidden = false;
+    var env = $('env'); env.textContent = '';
+    var problems = d.environment.problems || [];
+    if (!problems.length) env.appendChild(line(true, 'Prêt : aperçu, cabinet de test, Drive de test, accès Google et verrou mail en place.'));
+    problems.forEach(function (p) { env.appendChild(line(false, PROBLEMS[p] || p)); });
+    if (d.sandbox) env.appendChild(el('p', 'Verrou mail — équipe : ' + (d.sandbox.colleagues.join(', ') || 'aucune') + ' · clients : ' + (d.sandbox.clients.join(', ') || 'aucun'), 'small'));
+
+    var c = d.copy;
+    $('copy-btn').disabled = !d.environment.ok || Boolean(c);
+    if (c) {
+      var total = c.folders + c.copied + c.skipped + c.failed;
+      $('copy-meta').textContent = c.done ? '— terminée ✓' : '— en cours';
+      $('copy-bar').style.width = c.done ? '100%' : Math.min(95, Math.round(total / 7)) + '%';
+      $('copy-text').textContent = c.folders + ' dossiers recréés, ' + c.copied + ' fichiers copiés, ' + c.skipped + ' non copiés, ' + c.failed + ' en échec' + (c.done ? '.' : ' — ' + c.waiting_folders + ' dossiers restent à parcourir.');
+      var issues = $('copy-issues'); issues.textContent = '';
+      (c.skipped_items || []).forEach(function (s) { issues.appendChild(el('div', 'Non copié (' + s.why + ') : ' + s.path, 'mono')); });
+      (c.failed_items || []).forEach(function (s) { issues.appendChild(el('div', 'Échec : ' + s.path + ' — ' + s.error, 'mono')); });
+      clearTimeout(timer); if (!c.done) timer = setTimeout(load, 8000);
+    }
+    if (d.last_error) $('copy-text').textContent += ' Dernière erreur : ' + d.last_error;
+
+    var roles = $('roles');
+    if (!roles.children.length) d.roles.forEach(function (r) {
+      var f = el('div', null, 'field');
+      var l = el('label', r.label + (r.key === 'cfo' ? ' (vous, côté client)' : ' — ' + r.person)); l.htmlFor = 'm-' + r.key;
+      var i = el('input'); i.id = 'm-' + r.key; i.type = 'text'; i.inputMode = 'email'; i.maxLength = 254; i.className = 'mono';
+      i.value = (d.config.emails || {})[r.key] || '';
+      f.appendChild(l); f.appendChild(i); roles.appendChild(f);
+    });
+    if (!$('start').value) $('start').value = d.config.start_date || new Date().toISOString().slice(0, 10);
+
+    var ms = $('missions'); ms.textContent = '';
+    d.missions.forEach(function (m) {
+      var b = el('div', null, 'mission');
+      b.appendChild(el('strong', m.client));
+      b.appendChild(el('span', m.type, 'small'));
+      b.appendChild(el('span', 'Semaines ' + m.weeks[0] + ' à ' + m.weeks[1] + ' · ' + m.roles.join(', '), 'small'));
+      b.appendChild(el('span', m.code, 'mono'));
+      ms.appendChild(b);
+    });
+    $('seed-btn').disabled = !(c && c.done);
+    var out = $('seed-out'); out.textContent = '';
+    if (d.seed && d.seed.missions) {
+      out.appendChild(el('p', 'Cabinet de test créé. Test du ' + d.seed.start_date + ' au ' + d.seed.end_date + '. Les agents passent seuls aux heures du cabinet ; les propositions arrivent dans « À valider ».', 'small'));
+    }
+  }
+  function line(ok, text) {
+    var r = el('div', null, 'chk ' + (ok ? 'ok' : 'todo'));
+    r.appendChild(el('span', ok ? '✓' : '○', 'ico')); r.appendChild(el('span', text)); return r;
+  }
+  function load() { return OM.api('/api/app?route=test-run', { headers: H() }).then(render).catch(function (e) { $('area').hidden = false; say(msg(e)); }); }
+
+  $('refresh').addEventListener('click', load);
+  $('copy-btn').addEventListener('click', function () {
+    var b = this; b.disabled = true; say('Copie lancée…');
+    OM.api('/api/app?route=test-run', { method: 'POST', headers: H(), body: JSON.stringify({ action: 'copy' }) })
+      .then(function () { say('Copie en cours : elle continue seule, cette page se met à jour.'); return load(); })
+      .catch(function (e) { say(msg(e)); b.disabled = false; });
+  });
+  $('seed-btn').addEventListener('click', function () {
+    var b = this, emails = {};
+    document.querySelectorAll('#roles input').forEach(function (i) { emails[i.id.slice(2)] = i.value.trim(); });
+    b.disabled = true; say('Création du cabinet de test et des missions…');
+    OM.api('/api/app?route=test-run', { method: 'POST', headers: H(), body: JSON.stringify({ action: 'seed', emails: emails, start_date: $('start').value, by: OM.getUserName() }) })
+      .then(function (r) { say(r.missions.length + ' missions créées.'); return load(); })
+      .catch(function (e) { say(msg(e)); }).then(function () { b.disabled = false; });
+  });
+
+  UI.requireLogin(function () {
+    OM.loadBranding().catch(function () {});
+    if (!OM.isOwner()) { $('not-owner').hidden = false; return; }
+    load();
+  });
+})();
+</script>
+</body>
+</html>
