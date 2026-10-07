@@ -30,7 +30,7 @@ l'application en ligne (`office-manager-personal-pilot.vercel.app`).
 
 ## 2. Problèmes trouvés
 
-### 🔴 P1 — La mémoire de l'Orpailleur est incomplète (bug du code)
+### ✅ P1 — La mémoire de l'Orpailleur est incomplète (bug du code) — CORRIGÉ le 7/10
 - `OFFICE_MANAGER_REGISTER.xlsx` : **100 lignes** pour plus de 460 objets lus (et davantage
   au-delà de 5 niveaux). Profondeur maximale : 3 niveaux. Dans `01_CLIENTS_ET_MISSIONS`,
   seuls les 7 dossiers de premier niveau sont connus : **aucune mission** (BLE TRANSIT absente),
@@ -44,9 +44,22 @@ l'application en ligne (`office-manager-personal-pilot.vercel.app`).
   (`last_scan_id = run.id`). Un scan partiel ou à peine commencé ne contient que quelques
   objets (100 au premier passage, 0 au second). `runMappingPass` enregistre alors
   « 0 changement » sans signaler que la liste était vide.
-- **Correctif proposé** : (a) prendre le dernier scan **COMPLETE** ; à défaut, refuser avec
-  `INVENTORY_INCOMPLETE` au lieu de passer ; (b) si la liste est vide alors que le REGISTER
-  ne l'est pas, ne rien écrire et alerter ; (c) ou utiliser `DRIVE_WALK` (limite 20 000 objets).
+- **Cause aggravante** : le scanneur (`orpailleur-durable-worker`) ré-étiquette chaque ligne
+  qu'il touche avec le scan en cours (`last_scan_id`). Lire « les lignes du dernier scan »
+  ne donne donc jamais tout le Drive dès qu'un nouveau scan a commencé.
+- **Correctif appliqué** (branche `feature/white-label-desktop`) :
+  1. `inventoryListing` (`lib/agent-tools.js`) part du dernier scan **COMPLETE** et lit toutes
+     les lignes vues depuis son début (ce scan + les suivants). Sans scan complet : refus
+     `NO_COMPLETE_INVENTORY_RUN`, rien n'est écrit (utiliser `DRIVE_WALK` ou attendre la fin du scan).
+  2. `runMappingPass` (`lib/orpailleur-memory.js`) : liste vide alors que le REGISTER connaît
+     des objets → refus `LISTING_EMPTY_REFUSED`, MAP / REGISTER **non modifiés**, passage non compté.
+  3. Liste incomplète → avertissement `LISTING_INCOMPLETE` dans le résultat et dans STATE
+     (`last_pass_warning`), effacé au premier passage complet.
+  4. Tests : rejeu exact du passage du 7/10 00:45, avertissement, scan complet + lignes
+     ré-étiquetées. 181 / 181 tests OK.
+- **À faire sur le vrai Drive** : relancer un passage de cartographie (demander à l'Orpailleur
+  « lance un passage de cartographie DRIVE_WALK », ou attendre un scan COMPLETE), vérifier
+  que le REGISTER contient les missions, puis revue par le propriétaire (P2).
 
 ### 🔴 P2 — Conséquence : rien ne peut être rangé
 `mappingGate()` (`lib/memory-runtime.js`) n'autorise les écritures documentaires qu'après
@@ -86,11 +99,11 @@ d'acceptation remplie suffit.
 - Base de connaissance `00_OFFICE_MANAGER_KNOWLEDGE_BASE` : copies des SOP et modèles de
   `06_METHODES…` (`KB_TATY_…`). Voulu ? Sinon, deux versions à maintenir.
 
-### 🟡 P7 — Test automatique `tests/browser-response.test.js`
+### ✅ P7 — Test automatique `tests/browser-response.test.js` — CORRIGÉ le 7/10
 Il découpe `index.html` entre `async function readApiResponse(` et
 `document.getElementById('runs-read')` ; du code des missions a été ajouté entre les deux,
-le morceau extrait n'est plus une fonction seule. La page fonctionne ; le test est à
-réécrire (s'arrêter à la fin de la fonction).
+le morceau extrait n'est plus une fonction seule. La page fonctionne. Corrigé : le test
+s'arrête à la fin de la fonction (en tenant compte des fins de ligne Windows de `index.html`).
 
 ## 3. Application en ligne
 

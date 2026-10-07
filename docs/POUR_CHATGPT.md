@@ -185,6 +185,10 @@ Rapport complet : **`docs/TEST_DRIVE_TATY_2026-10-07.md`**. À traiter en premie
 dernier scan COMPLETE **ou PARTIAL** ; le REGISTER n'a que 100 objets sur plus de 460,
 aucune mission, et le passage du 7/10 00:45 a tout compté à 0 sans alerte. La cartographie
 reste en FIRST_MAPPING, donc `mappingGate()` bloque tout rangement.
+**✅ Corrigé par Claude le 7/10** (`inventoryListing` : dernier scan COMPLETE + lignes vues
+depuis ; `runMappingPass` : refus `LISTING_EMPTY_REFUSED` d'une liste vide, avertissement
+`LISTING_INCOMPLETE`). Reste à relancer une cartographie complète puis la revue du propriétaire.
+`tests/browser-response.test.js` corrigé aussi : **181 / 181 tests OK**.
 
 ## Routes de `api/app.js`
 
@@ -223,7 +227,7 @@ Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`, `tests/verify-training-sql.mjs`.
 
 ## État des tests
-176 tests : 175 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
+181 tests : 181 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes

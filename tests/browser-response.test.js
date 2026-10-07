@@ -5,7 +5,9 @@ import vm from 'node:vm';
 
 const page = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const start = page.indexOf('async function readApiResponse(');
-const end = page.indexOf("document.getElementById('runs-read')", start);
+// End of the function itself (code was later added between it and 'runs-read').
+const close = page.slice(start).search(/\r?\n\}\r?\n/);
+const end = start + close + page.slice(start + close).indexOf('}') + 1;
 const readResponse = vm.runInNewContext('(' + page.slice(start, end).trim() + ')');
 
 test('server timeout text becomes a clear message, without echoing server details', async () => {
