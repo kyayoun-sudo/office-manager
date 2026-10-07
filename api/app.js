@@ -238,6 +238,9 @@ export function continueInBackground(req, requestId, fetchImpl = fetch) {
   const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
   const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '' };
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  // Protected preview (Vercel Authentication): the owner's own preview cookie lets the background call through.
+  const jwt = String(req?.headers?.cookie || '').match(/(?:^|;\s*)(_vercel_jwt=[^;]+)/);
+  if (jwt) headers.Cookie = jwt[1];
   const sent = fetchImpl(proto + '://' + host + '/api/app?route=tidy', {
     method: 'POST', headers, body: JSON.stringify({ action: 'step', request_id: requestId })
   }).then(() => true, () => false);
