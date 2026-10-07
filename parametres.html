@@ -316,6 +316,9 @@
     GOOGLE_RECONNECT_REQUIRED: 'Google a retiré l’accès (mot de passe changé ou accès révoqué) : reconnectez Google.',
     GOOGLE_NO_REFRESH_TOKEN: 'Google n’a pas donné d’accès durable : déconnectez l’application dans votre compte Google puis reconnectez.',
     OAUTH_STATE_EXPIRED: 'La demande a expiré : cliquez à nouveau sur « Connecter Google ».', OAUTH_STATE_INVALID: 'Retour Google non reconnu : recommencez.',
+    invalid_client: 'Google refuse la clé de l’application : GOOGLE_CLIENT_SECRET dans Vercel ne correspond pas au client « Office Manager AI – Pilote ».',
+    invalid_grant: 'Le code Google a expiré ou a déjà servi : cliquez à nouveau sur « Connecter Google ».',
+    OAUTH_STATE_OTHER_FIRM: 'Retour Google pour un autre cabinet : recommencez depuis ce cabinet.',
     redirect_uri_mismatch: 'Google ne connaît pas encore l’adresse de retour : déclarez-la (voir « Première fois » ci-dessous).',
     DRIVE_LINK_INVALID: 'Lien non reconnu : copiez l’adresse du Drive partagé depuis Google Drive.', GOOGLE_NOT_CONNECTED: 'Connectez d’abord Google.',
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Le compte Google connecté ne voit pas ce Drive : ajoutez-le comme membre du Drive partagé.',
@@ -374,7 +377,7 @@
       $('g-drive-save').disabled = !g.connected;
       $('g-disconnect').hidden = !g.connected;
       $('g-connect').textContent = g.connected ? 'Reconnecter Google' : 'Connecter Google';
-      $('g-status').textContent = '';
+      $('g-status').textContent = window.__googleReturn || '';
     }).catch(function (err) { $('g-status').textContent = explain(err); });
   }
   $('g-connect').addEventListener('click', function () {
@@ -400,7 +403,8 @@
     if (!p.get('google')) return;
     var msg = p.get('google') === 'ok' ? 'Google connecté avec ' + (p.get('email') || 'le compte du cabinet') + '. Les agents peuvent travailler sur le Drive et Gmail.'
       : 'Connexion Google non aboutie : ' + (ERRORS[(p.get('code') || '').replace(/^GOOGLE_TOKEN_EXCHANGE_FAILED: /, '')] || ERRORS[p.get('code')] || p.get('code'));
-    setTimeout(function () { $('g-status').textContent = msg; }, 600);
+    // Kept on screen (the Google card refresh used to erase it).
+    window.__googleReturn = msg; $('g-status').textContent = msg;
     history.replaceState(null, '', location.pathname + '#google');
   })();
 
