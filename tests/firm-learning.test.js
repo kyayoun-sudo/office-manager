@@ -39,3 +39,11 @@ test('learn the firm from the Drive, then save only the ticked team members and 
   assert.deepEqual(r, { saved_team: 1, saved_missions: 1 });
   assert.equal(posts[0][1][0].full_name, 'Awa Koné'); assert.equal(posts[1][1][0].name, 'CAC Ivoire Logistique 2026');
 });
+
+test('a team spreadsheet in an HR / CV folder is read first', () => {
+  const list = [
+    { id: 'a', name: 'Lettre de mission.pdf', mimeType: 'application/pdf', path: '/A/Lettre de mission.pdf' },
+    { id: 'x', name: 'Liste.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', path: '/Equipe HR CV/Liste.xlsx' }
+  ];
+  assert.equal(pickCandidates(list)[0].id, 'x');
+});

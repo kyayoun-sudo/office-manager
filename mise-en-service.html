@@ -242,6 +242,10 @@
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
     if (k.status === 'learning') { $('know-live').textContent = 'L’Orpailleur lit les documents du cabinet…'; knowTimer = setTimeout(loadKnow, 6000); return; }
     $('know-live').textContent = k.status === 'applied' ? 'Enregistré dans l’application (' + (k.applied ? k.applied.team + ' personnes, ' + k.applied.missions + ' missions' : '') + '). Vous pouvez en ajouter d’autres.' : 'Proposition prête : ' + (k.files_read || []).length + ' documents lus.';
+    if ((k.files_read || []).length) {
+      var dl = el('details', null, 'font-size:13px'); dl.appendChild(el('summary', 'Documents lus (' + k.files_read.length + ')', 'cursor:pointer'));
+      k.files_read.forEach(function (p) { dl.appendChild(el('div', p, 'color:#5B6660;padding:2px 0')); }); b.appendChild(dl);
+    }
     var f = k.firm || {};
     b.appendChild(el('p', (f.name || 'Cabinet') + (f.activity ? ' — ' + f.activity : '') + (f.summary ? ' : ' + f.summary : ''), 'margin:0;font-size:15px'));
     b.appendChild(knowList('Équipe', k.team || [], 'team', function (p) { return [p.full_name, p.role_title, p.email].filter(Boolean).join(' · '); }));
