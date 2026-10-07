@@ -34,7 +34,7 @@
 
     <header class="page-head">
       <h1>À valider</h1>
-      <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Les décisions sur les propositions ne déclenchent rien automatiquement ; seuls les messages aux collègues que vous validez ci-dessous partent par e-mail.</p>
+      <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Valider lance l'action à l'intérieur du cabinet : tâche pour l'équipe, pièce à classer, ou message à un collègue (lui aussi à valider). Jamais d'e-mail à un client, jamais de suppression.</p>
     </header>
 
     <section class="card" aria-labelledby="h-mail" id="mail-card">
@@ -78,9 +78,10 @@
     OM.api('/api/app?route=actions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_id: action.id, decision: decision, note: note || null, decided_by: OM.getUserName() || null })
-    }).then(function () {
+    }).then(function (r) {
       action.last_decision = { decision: decision, note: note || null, decided_by: OM.getUserName() || null, created_at: new Date().toISOString() };
-      show('Décision enregistrée : ' + LABELS[decision] + '.');
+      show('Décision enregistrée : ' + LABELS[decision] + '.' + (r && r.effect ? ' ' + r.effect : ''));
+      if (r && r.message_id) loadMail();
       render();
     }).catch(function (err) {
       show('Échec : ' + err.message, true);

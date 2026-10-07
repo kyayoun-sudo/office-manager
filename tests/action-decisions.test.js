@@ -41,23 +41,28 @@ test('decisions: pending list excludes private staffing advice and attaches the 
   assert.equal(r.actions[0].last_decision.decision, 'defer');
 });
 
-test('decisions: recording only appends to the journal and never touches the queue', async () => {
+test('decisions: journaled first (content hash), then the validated action is carried out inside the firm', async () => {
   const calls = [];
   const fake = async (path, options = {}) => {
     calls.push({ path, method: options.method || 'GET', body: options.body });
     if (path.startsWith('office_action_queue')) {
-      return [{ id: A1, agent_key: 'mission-controller', action_type: 'PBC_EMAIL_DRAFT', summary: 'Relance', status: 'proposed', approved_at: null, executed_at: null }];
+      return [{ id: A1, agent_key: 'mission-controller', action_type: 'FOLLOWUP', summary: 'Relance', status: 'proposed', approved_at: null, executed_at: null }];
     }
     return [JSON.parse(options.body)[0]];
   };
   const r = await recordDecision('org-1', { action_id: A1, decision: 'approve', decided_by: 'Paul' }, fake);
   assert.equal(r.recorded, true);
-  assert.equal(r.executed, false);
+  assert.equal(r.executed, true);
+  assert.match(r.effect, /tâche active/);
   const writes = calls.filter(c => c.method !== 'GET');
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].path, 'office_action_decisions');
+  assert.equal(writes[0].path, 'office_action_decisions', 'the decision is journaled before anything runs');
   assert.equal(JSON.parse(writes[0].body)[0].org_id, 'org-1');
-  assert.ok(calls.every(c => !(c.path.startsWith('office_action_queue') && c.method !== 'GET')));
+  assert.match(writes[1].path, /^office_action_queue\?.*status=in\.\(proposed,awaiting_approval\)/, 'only a still-pending action is changed');
+  assert.deepEqual(Object.keys(JSON.parse(writes[1].body)).sort(), ['approved_at', 'status', 'work_state']);
+  assert.ok(!writes.some(c => c.method === 'DELETE'));
+  const failing = await recordDecision('org-1', { action_id: A1, decision: 'approve' }, fake, { execute: async () => { throw new Error('boom'); } });
+  assert.equal(failing.recorded, true, 'a failed execution never loses the decision');
+  assert.match(failing.effect, /exécution impossible/);
 });
 
 test('decisions: missing or already handled actions are refused', async () => {
