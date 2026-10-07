@@ -23,6 +23,7 @@ import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
 import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
+import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/tidy-plan.js';
 import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -220,14 +221,18 @@ export const ROUTES = Object.freeze({
   //   POST firm-knowledge {action:learn}         read the firm again (background, owner)
   //   POST firm-learn                           background work (pilot token)
   'firm-knowledge': {
-    GET: owner(() => firmKnowledge()),
+    GET: owner(async () => ({ ...(await firmKnowledge()), tidy: await tidyStatus().catch(() => null) })),
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
+      if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
+      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
   },
-  'firm-learn': { POST: (orgId) => learnFirm(orgId), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  // Understanding the firm, then (same first scan) where every file goes.
+  'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
   'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   'agent-permissions': {

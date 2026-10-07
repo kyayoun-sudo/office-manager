@@ -1,0 +1,55 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { startTidyPlan, tidyPlanStep, answerQuestion, tidyCandidates } from '../lib/tidy-plan.js';
+
+const F = 'application/vnd.google-apps.folder';
+function fakeDrive(files) {
+  const store = new Map(files.map((f, i) => ['x' + i, f])); let n = 0;
+  return {
+    store,
+    findFilesByExactName: async (name) => [...store.entries()].filter(([, f]) => f.name === name).map(([id]) => ({ id })),
+    downloadBuffer: async id => store.get(id).buffer,
+    getMeta: async id => ({ id, modifiedTime: 't' }),
+    createBinary: async ({ name, buffer }) => { const id = 'n' + (++n); store.set(id, { name, buffer }); return { id }; },
+    updateBinary: async (id, { buffer }) => { store.get(id).buffer = buffer; }
+  };
+}
+const items = [
+  { id: 'D1', name: 'CAC 2026', mimeType: F, path: '/TATY share drive/Clients/Ivoire Logistique/CAC 2026' },
+  { id: 'lm', name: 'Scan_0012.pdf', mimeType: 'application/pdf', path: '/TATY share drive/Scan_0012.pdf', parents: ['ROOT'] },
+  { id: 'amb', name: 'doc final v3.docx', mimeType: 'application/msword', path: '/TATY share drive/doc final v3.docx', parents: ['ROOT'] },
+  { id: 'okf', name: 'Programme.xlsx', mimeType: 'x', path: '/TATY share drive/Clients/Ivoire Logistique/CAC 2026/Programme.xlsx', parents: ['D1'] }
+];
+const json = o => ({ name: '', buffer: Buffer.from(JSON.stringify(o)) });
+
+test('first-scan tidy-up: the AI decides; moves/renames go to « À valider », ambiguous files become a question to whoever saved them', async () => {
+  const drive = fakeDrive([{ ...json({ items }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }, { ...json({ status: 'applied', missions: [], answers: [{ question: 'q', answer: 'a' }] }), name: 'OFFICE_MANAGER_FIRM_KNOWLEDGE.json' }]);
+  const fired = [], actions = [], messages = [];
+  let input = '';
+  const d = { drive, folder: 'MEM', fire: async (r, p) => { fired.push(p); return true; },
+    runAI: async (o) => { input = o.input; return { text: JSON.stringify({ decisions: [
+      { file_id: 'lm', action: 'move_rename', to_folder_id: 'D1', new_name: 'LM_CAC_IvoireLogistique_2026.pdf', reason: 'lettre de mission CAC 2026' },
+      { file_id: 'amb', action: 'ask', question: 'À quelle mission correspond ce document ?' },
+      { file_id: 'okf', action: 'ok' }] }) }; },
+    fetchRows: async (path, o = {}) => { if (o.method === 'POST') actions.push(JSON.parse(o.body)[0]); return []; },
+    proposeMessage: async (org, m) => { messages.push(m); return { id: 'm1' }; },
+    getMeta: async () => ({ lastModifyingUser: { emailAddress: 'Yao@taty.info' } }) };
+  await startTidyPlan('org', {}, d);
+  const st = await tidyPlanStep('org', {}, d);
+  assert.match(input, /RÉPONSES DU PROPRIÉTAIRE : \[\{"question":"q","answer":"a"/);
+  assert.equal(st.status, 'done'); assert.equal(st.moves, 1); assert.equal(st.renames, 1); assert.equal(st.questions, 1); assert.equal(st.ok, 1);
+  assert.equal(actions[0].action_type, 'FILE_MOVE'); assert.equal(actions[0].status, 'proposed');
+  assert.deepEqual([actions[0].payload.to_parent, actions[0].payload.new_name], ['D1', 'LM_CAC_IvoireLogistique_2026.pdf']);
+  assert.deepEqual(messages[0].recipients, ['yao@taty.info']); assert.match(messages[0].body, /doc final v3/);
+});
+
+test('owner answers are kept in the Orpailleur memory', async () => {
+  const drive = fakeDrive([{ ...json({ status: 'applied', questions: ['Qui est Yao ?'] }), name: 'OFFICE_MANAGER_FIRM_KNOWLEDGE.json' }]);
+  const r = await answerQuestion({ question: 'Qui est Yao ?', answer: 'Senior, équipe audit' }, { drive, folder: 'MEM' });
+  assert.equal(r.answers[0].answer, 'Senior, équipe audit');
+});
+
+test('loose files and unclear names are looked at first; the memory folder never', () => {
+  const c = tidyCandidates([...items, { id: 'mem', name: 'OFFICE_MANAGER_MAP.xlsx', mimeType: 'x', path: '/TATY share drive/00_OFFICE_MANAGER/OFFICE_MANAGER_MAP.xlsx' }]);
+  assert.equal(c[0].id, 'lm'); assert.ok(!c.some(i => i.id === 'mem'));
+});
