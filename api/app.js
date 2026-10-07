@@ -13,7 +13,7 @@ import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 import { requireRole, logAccess } from '../lib/user-auth.js';
 import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
 import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
-import { listMessages, proposeMessage, decideMessage } from '../lib/agent-mail.js';
+import { listMessages, proposeMessage, decideMessage, messageThread } from '../lib/agent-mail.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
 import { googleStatus, startConnect, finishConnect, disconnectGoogle, loadGoogleConnection, setFirmDrive } from '../lib/google-connection.js';
@@ -245,6 +245,8 @@ export const ROUTES = Object.freeze({
   drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => dropFile(orgId, req.body || {}, req.account)), unavailable: 'DROP_UNAVAILABLE' },
   // « Équipe et briefing » with the firm's people-management policy (AI) — managers.
   'people-brief': { POST: users(MANAGERS, (orgId, req) => peopleBrief(orgId, req.body?.mission_id)), unavailable: 'PEOPLE_BRIEF_UNAVAILABLE' },
+  // Messagerie: the Gmail conversation of a sent message (replies of the colleagues) — managers.
+  'mail-thread': { GET: users(MANAGERS, (orgId, req) => messageThread(orgId, req.query?.id)), unavailable: 'MAIL_THREAD_UNAVAILABLE' },
   'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner((orgId, req) => savePeoplePolicy(req.body || {})), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
