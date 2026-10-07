@@ -11,6 +11,7 @@ import { requirePilotAccess } from "../lib/auth.js";
 import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
+import { ensureAgentSettings } from "../lib/agent-permissions.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -161,6 +162,9 @@ export default async function handler(req, res) {
         .status(409)
         .json({ error: "CONTENT_PROCESSING_APPROVAL_REQUIRED" });
     }
+
+    // A firm set up in the app (go-ahead given) gets its agents on first use.
+    await ensureAgentSettings(orgId).catch(() => null);
 
     let contexts;
     let rootContext = {};
