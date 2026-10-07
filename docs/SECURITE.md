@@ -70,6 +70,8 @@ Les rôles sont vérifiés **côté serveur**, jamais seulement dans l'écran.
 
 ## 6. Risques restants (à traiter)
 
+Plan complet pour le lancement : **`docs/SECURITE_LANCEMENT.md`**.
+
 1. **Code d'accès commun** : les anciennes routes (`/api/agent`, `/api/missions`…)
    acceptent encore le code pilote partagé, remis aux sessions connectées. Étape
    suivante : faire accepter le jeton personnel par `lib/auth.js` (fichier

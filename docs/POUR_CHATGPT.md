@@ -127,7 +127,10 @@ dossier), clique « Lancer », puis fait autre chose.
   Supabase `Authorization: Bearer` + rôle lu dans `office_app_users`). Le code
   d'accès commun ne suffit pas. Chaque consultation est journalisée
   (`office_access_log`, ajout seul, `db/access-log.sql`).
-- **Sécurité** : voir **`docs/SECURITE.md`** (rôles, vérifications, traçabilité,
+- **Sécurité** : voir **`docs/SECURITE.md`** (état actuel) et
+  **`docs/SECURITE_LANCEMENT.md`** (plan de sécurité des données pour le lancement
+  commercial : failles F1–F7, isolation par cabinet, chiffrement, identité, IA,
+  surveillance, poste de travail, conformité, ordre de réalisation) (rôles, vérifications, traçabilité,
   en-têtes HTTP ajoutés dans `vercel.json` — CSP, X-Frame-Options, HSTS… —, règles
   d'usage des indicateurs, risques restants).
 
