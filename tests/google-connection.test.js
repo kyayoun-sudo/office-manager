@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeState, readState, encryptToken, decryptToken, startConnect, finishConnect, loadGoogleConnection, googleStatus, disconnectGoogle,
-  connectionAccessToken, resetGoogleConnectionCache, firmConnected, redirectUri, SCOPES } from '../lib/google-connection.js';
+  connectionAccessToken, resetGoogleConnectionCache, firmConnected, firmDriveKind, redirectUri, SCOPES } from '../lib/google-connection.js';
 import { gmailToken, mailConfigured } from '../lib/agent-mail.js';
 import { googleAccessToken, directGoogleAccess } from '../lib/google-drive.js';
 
@@ -112,6 +112,7 @@ test('Drive du cabinet: pasted link checked with Google, saved for the firm, the
     if (url.includes('/drives/0AREAL')) return { ok: true, json: async () => ({ id: '0AREAL0000', name: 'TATY ET ASSOCIES PERSONNEL' }) };
     if (url.includes('/drives/')) return { ok: false, json: async () => ({}) };
     if (url.includes('/files/1folder')) return { ok: true, json: async () => ({ id: '1folder0000', driveId: '0ATEST0000' }) };
+    if (url.includes('/files/1mydrive')) return { ok: true, json: async () => ({ id: '1mydrive000', name: 'Cabinet Paul', mimeType: 'application/vnd.google-apps.folder' }) };
     return w.fetchImpl(url, o);
   };
   const saved = { ...process.env }; Object.assign(process.env, ENV);
@@ -120,9 +121,13 @@ test('Drive du cabinet: pasted link checked with Google, saved for the firm, the
     await finishConnect('org-1', { ...REQ, query: { code: 'c', state } }, { env: ENV, fetchRows, fetchImpl });
     await loadGoogleConnection('org-1', { env: ENV, fetchRows });
     const r = await setFirmDrive('org-1', { body: { link: 'https://drive.google.com/drive/folders/1folder0000' }, account: { display_name: 'Paul' } }, { env: ENV, fetchRows, fetchImpl });
-    assert.deepEqual(r, { drive_id: '0ATEST0000', drive_name: 'TATY share drive' }, 'a folder link gives its shared drive');
+    assert.deepEqual(r, { drive_id: '0ATEST0000', drive_name: 'TATY share drive', kind: 'drive' }, 'a folder link gives its shared drive');
     assert.equal(firmDriveId(), '0ATEST0000');
     assert.equal(configuredDriveId(), '0ATEST0000', 'the agents now work on the chosen Drive');
+    const my = await setFirmDrive('org-1', { body: { link: 'https://drive.google.com/drive/u/0/folders/1mydrive000' }, account: { display_name: 'Paul' } }, { env: ENV, fetchRows, fetchImpl });
+    assert.deepEqual(my, { drive_id: '1mydrive000', drive_name: 'Cabinet Paul', kind: 'folder' }, 'a « Mon Drive » folder becomes the firm’s Drive');
+    assert.equal(firmDriveId(), '1mydrive000'); assert.equal(firmDriveKind(), 'folder');
+    assert.equal(firm[0].drive_id, 'folder:1mydrive000');
     await assert.rejects(setFirmDrive('org-1', { body: { link: '0AREAL0000' } }, { env: { ...ENV, VERCEL_ENV: 'preview', TEST_SOURCE_DRIVE_ID: '0AREAL0000' }, fetchRows, fetchImpl }), /TEST_MODE_REAL_DRIVE_REFUSED/);
   } finally {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
@@ -172,4 +177,13 @@ test('the refresh token can be sealed with OAUTH_STATE_SECRET when no dedicated 
   const sealed = encryptToken('1//abc', env);
   assert.equal(decryptToken(sealed, env), '1//abc');
   assert.throws(() => encryptToken('x', {}), /TOKEN_ENCRYPTION_KEY_MISSING/);
+});
+
+test('« Mon Drive » folder as the firm’s Drive: a target is accepted only if it sits under that folder', async () => {
+  const { insideFolder } = await import('../lib/google-drive.js');
+  const tree = { a: 'b', b: 'root', x: 'y', y: 'other' };
+  const meta = async (id) => ({ id, parents: tree[id] ? [tree[id]] : [] });
+  assert.equal(await insideFolder('a', 'root', meta), true);
+  assert.equal(await insideFolder('x', 'root', meta), false);
+  assert.equal(await insideFolder('root', 'root', meta), true);
 });
