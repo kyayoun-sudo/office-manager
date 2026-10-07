@@ -43,6 +43,14 @@
       <p class="status" id="code-status" role="status" aria-live="polite"></p>
     </form>
 
+    <button type="button" class="link-btn" id="diag-link">Vérifier mon code</button>
+    <form id="diag-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Tapez un code : l'application vous dit si c'est le code d'accès, le code propriétaire, ou aucun des deux, et ce qui manque sur le serveur. Aucun secret n'est affiché.</p>
+      <div class="field"><label for="d-code">Code à vérifier</label><input id="d-code" type="password" autocomplete="off"></div>
+      <button class="btn ghost" type="submit">Vérifier</button>
+      <div id="diag-out" role="status" aria-live="polite" style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:6px"></div>
+    </form>
+
     <button type="button" class="link-btn" id="first-link">Première configuration du cabinet</button>
     <form id="first-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
       <h2 style="font-size:17px;margin:0">Créer le compte du propriétaire</h2>
@@ -121,6 +129,33 @@
     }).catch(function (err) {
       say('code-status', err.message === 'BAD_CODE' ? 'Code d\u2019accès incorrect.' : 'Serveur injoignable pour le moment.', true);
     });
+  });
+
+  $('diag-link').addEventListener('click', function () { $('diag-form').hidden = !$('diag-form').hidden; if (!$('diag-form').hidden) $('d-code').focus(); });
+  function line(text, ok) {
+    var p = document.createElement('p');
+    p.style.margin = '0';
+    p.style.color = ok === true ? '#0B4A43' : ok === false ? '#9A3412' : 'inherit';
+    p.textContent = (ok === true ? '✔ ' : ok === false ? '✖ ' : '• ') + text;
+    $('diag-out').appendChild(p);
+  }
+  function explainCode(label, varName, c) {
+    if (!c.configured) { line(label + ' : la variable ' + varName + ' n\u2019existe pas sur ce déploiement (ou « Preview » n\u2019est pas coché, ou il faut redéployer).', false); return; }
+    if (c.matches) { line('Ce code EST le ' + label.toLowerCase() + '.', true); return; }
+    if (c.matches_without_spaces) { line('C\u2019est bien le ' + label.toLowerCase() + ', mais la valeur dans Vercel contient un espace en trop au début ou à la fin : corrigez-la, puis redéployez.', false); return; }
+    line('Ce code n\u2019est pas le ' + label.toLowerCase() + '.' + (c.extra_spaces ? ' Attention : la valeur dans Vercel contient un espace en trop.' : ''), null);
+  }
+  $('diag-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    $('diag-out').textContent = '';
+    post('diagnostic', { code: $('d-code').value }).then(function (d) {
+      line('Déploiement : ' + (d.environment === 'preview' ? 'aperçu (Preview)' : d.environment === 'production' ? 'production' : d.environment) + (d.branch ? ' — branche ' + d.branch : ''), null);
+      explainCode('Code d\u2019accès', 'OFFICE_MANAGER_ACCESS_TOKEN', d.access_code);
+      explainCode('Code propriétaire', 'OFFICE_MANAGER_OWNER_TOKEN', d.owner_code);
+      if (d.access_code.matches && d.owner_code.matches) line('Les deux variables ont la même valeur : choisissez un code propriétaire différent.', false);
+      if (!d.supabase_configured) line('Supabase n\u2019est pas configuré sur ce déploiement (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).', false);
+      if (!d.organisation_configured) line('DEFAULT_ORG_ID manque sur ce déploiement.', false);
+    }).catch(function () { line('Vérification impossible : le serveur ne répond pas.', false); });
   });
 
   $('first-link').addEventListener('click', function () { $('first-form').hidden = !$('first-form').hidden; });

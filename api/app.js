@@ -6,6 +6,7 @@ import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
 import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount } from '../lib/accounts.js';
+import { diagnose } from '../lib/diagnostic.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -21,6 +22,7 @@ import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAcco
 //   POST /api/app?route=session                    re-check a session with its refresh token (public)
 //   POST /api/app?route=logout                     end the session (public)
 //   POST /api/app?route=bootstrap-owner            first owner account (owner code, only if no account)
+//   POST /api/app?route=diagnostic                 which code was typed, what is missing (public, no secret shown)
 //   GET  /api/app?route=users                      firm accounts — OWNER ONLY
 //   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -62,6 +64,7 @@ export const ROUTES = Object.freeze({
   session: { POST: open((orgId, req) => refreshSession(orgId, req.body || {})), unavailable: 'SESSION_UNAVAILABLE' },
   logout: { POST: open((orgId, req) => logout(req.body || {})), unavailable: 'LOGOUT_UNAVAILABLE' },
   'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
+  diagnostic: { POST: open((orgId, req) => diagnose(req.body || {})), unavailable: 'DIAGNOSTIC_UNAVAILABLE' },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
@@ -77,7 +80,7 @@ export async function handleApp(req) {
   if (!run.public) requirePilotAccess(req);
   if (run.ownerOnly) requireFirmOwner(req);
   const orgId = process.env.DEFAULT_ORG_ID;
-  if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
+  if (!orgId && route !== ROUTES.diagnostic) throw new Error('DEFAULT_ORG_ID_MISSING');
   return run(orgId, req);
 }
 
