@@ -387,7 +387,7 @@
   $('g-drive-save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('g-status').textContent = 'Vérification du Drive auprès de Google…';
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', link: $('g-drive').value, by: OM.getUserName() || null }) })
-      .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus.'; $('g-drive').value = ''; return loadGoogle(); })
+      .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus' + (r.mapping_started ? ' : la cartographie a démarré (quelques minutes, voir Mise en service).' : '.'); $('g-drive').value = ''; return loadGoogle(); })
       .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
   });
   $('g-disconnect').addEventListener('click', function () {

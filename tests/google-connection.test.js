@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeState, readState, encryptToken, decryptToken, startConnect, finishConnect, loadGoogleConnection, googleStatus, disconnectGoogle,
-  connectionAccessToken, resetGoogleConnectionCache, redirectUri, SCOPES } from '../lib/google-connection.js';
+  connectionAccessToken, resetGoogleConnectionCache, firmConnected, redirectUri, SCOPES } from '../lib/google-connection.js';
 import { gmailToken, mailConfigured } from '../lib/agent-mail.js';
 import { googleAccessToken, directGoogleAccess } from '../lib/google-drive.js';
 
@@ -131,7 +131,7 @@ test('Drive du cabinet: pasted link checked with Google, saved for the firm, the
   }
 });
 
-test('existing connection of 2026-10-05 (Supabase taty-google-oauth) is used directly; in a preview, the real firm’s Google identity serves the test firm', async () => {
+test('existing connection of 2026-10-05 (Supabase taty-google-oauth) is used directly by ITS firm only; no other firm borrows it, not even in a preview', async () => {
   resetGoogleConnectionCache();
   const fetchRows = async (path, o = {}) => {
     if (path.startsWith('office_google_connections') || path.startsWith('office_firm_drive')) return [];
@@ -149,6 +149,20 @@ test('existing connection of 2026-10-05 (Supabase taty-google-oauth) is used dir
   assert.equal(await loadGoogleConnection('test-org', { env: { VERCEL_ENV: 'production' }, fetchRows }), null, 'production: never another firm’s access');
   resetGoogleConnectionCache();
   const t = await loadGoogleConnection('test-org', { env: { VERCEL_ENV: 'preview', TEST_RUN_FORBIDDEN_ORG_IDS: 'real-org' }, fetchRows });
-  assert.equal(t.email, 'paulkomenan@taty.info', 'preview: same Google account, writes locked to the test Drive');
+  assert.equal(t, null, 'preview: each firm connects its own Google (2026-10-07)');
+  resetGoogleConnectionCache();
+});
+
+test('a firm connected in the app comes first; the old relay connection does not count as the firm’s own', async () => {
+  resetGoogleConnectionCache();
+  const fetchRows = async (path, o = {}) => {
+    if (path.startsWith('office_google_connections')) return [];
+    if (path.startsWith('office_firm_drive')) return [];
+    if (path === 'rpc/office_get_google_drive_secret') return [{ client_id: 'c', client_secret: 's', refresh_token: '1//x' }];
+    if (path.startsWith('office_integration_connections')) return [{ account_email: 'a@b.c', granted_scopes: [SCOPES.drive], status: 'connected' }];
+    return [];
+  };
+  await loadGoogleConnection('org-a', { env: { VERCEL_ENV: 'production' }, fetchRows });
+  assert.equal(firmConnected(), false, 'legacy relay connection');
   resetGoogleConnectionCache();
 });

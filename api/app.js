@@ -188,7 +188,11 @@ export const ROUTES = Object.freeze({
     POST: owner((orgId, req) => {
       if (req.body?.action === 'connect') return startConnect(orgId, req);
       if (req.body?.action === 'disconnect') return disconnectGoogle(orgId);
-      if (req.body?.action === 'set-drive') return setFirmDrive(orgId, req);
+      if (req.body?.action === 'set-drive') return setFirmDrive(orgId, req).then(async (r) => {
+        // The agents start on the Drive right away: first the mapping (cartographie) by the Orpailleur.
+        const m = await launchMappingPass(req).catch(() => ({ started: false }));
+        return { ...r, mapping_started: Boolean(m.started) };
+      });
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'GOOGLE_UNAVAILABLE'

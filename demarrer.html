@@ -59,6 +59,7 @@ body{background:var(--bg,#F4F5F3)}
   <section class="step off" id="st4">
     <h2><span class="num">✓</span> C'est prêt</h2>
     <p class="small">Les agents commencent par apprendre votre Drive (cartographie), puis travaillent seuls aux heures du cabinet. Leurs propositions arrivent dans « À valider » : rien n'est déplacé ni envoyé sans votre accord.</p>
+    <p class="small" id="s4-msg" role="status" aria-live="polite"></p>
     <div class="btn-row"><a class="btn" href="/mise-en-service.html">Voir la mise en service</a><a class="btn ghost" href="/accueil.html">Aller à l'accueil</a></div>
   </section>
 </div>
@@ -117,7 +118,7 @@ body{background:var(--bg,#F4F5F3)}
   $('s3-save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('s3-msg').textContent = 'Vérification auprès de Google…'; $('s3-msg').className = 'small';
     OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', link: $('drive').value, by: OM.getUserName() || null }) })
-      .then(function () { return refresh(); }).catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
+      .then(function (r) { window.__mapping = r && r.mapping_started; return refresh(); }).then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } }).catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
 
   var q = new URLSearchParams(location.search);
