@@ -52,6 +52,7 @@
       <div id="mail-list" class="stack" style="gap:12px"></div>
     </section>
 
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600"><input type="checkbox" id="open-only" checked> Seulement ce qui attend encore une réponse</label>
     <div class="chips" id="filters" aria-label="Filtrer par agent"></div>
     <p class="status" id="status" role="status" aria-live="polite"></p>
     <div id="list" class="stack" style="gap:16px"></div>
@@ -67,6 +68,8 @@
   var AGENTS = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
   var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
   var all = [], filter = 'all';
+  var isOpen = function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; };
+  var openOnly = function () { return $('open-only').checked; };
 
   function agentName(key) { return AGENTS[key] || key || 'Agent'; }
 
@@ -160,10 +163,10 @@
 
   function render() {
     var list = $('list'); list.textContent = '';
-    var rows = all.filter(function (a) { return filter === 'all' || (a.agent_key || 'autre') === filter; });
+    var rows = all.filter(function (a) { return (filter === 'all' || (a.agent_key || 'autre') === filter) && (!openOnly() || isOpen(a)); });
     var open = all.filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
     $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
-    if (!rows.length) { list.appendChild(el('p', 'Rien à valider pour le moment.', 'empty')); return; }
+    if (!rows.length) { list.appendChild(el('p', openOnly() ? 'Rien n’attend de réponse. Décochez le filtre pour revoir ce qui a déjà été décidé.' : 'Rien à valider pour le moment.', 'empty')); return; }
     rows.forEach(function (a) { list.appendChild(card(a)); });
   }
 
@@ -235,7 +238,9 @@
       if (!d.mail_configured) msay('Envoi pas encore branché : vous pouvez valider, l’envoi se fera une fois l’accès Google configuré (voir Mise en service).');
       var box = $('mail-list'); box.textContent = '';
       if (!d.messages.length) box.appendChild(el('p', 'Aucun message pour le moment.', 'empty'));
-      d.messages.slice(0, 20).forEach(function (m) { box.appendChild(mailCard(m)); });
+      var shown = d.messages.filter(function (m) { return !openOnly() || m.status === 'pending_approval' || m.status === 'failed'; });
+      if (d.messages.length && !shown.length) box.appendChild(el('p', 'Aucun message n’attend de réponse.', 'empty'));
+      shown.slice(0, 30).forEach(function (m) { box.appendChild(mailCard(m)); });
     }).catch(function (e) { msay(mmsg(e)); });
   }
 
@@ -245,6 +250,8 @@
       .then(function () { msay(OM.isManager() ? 'Message rédigé : relisez-le ci-dessous puis validez.' : 'Message rédigé : il attend la validation d’un manager.'); $('m-topic').value = ''; loadMail(); })
       .catch(function (e) { msay(mmsg(e)); }).then(function () { b.disabled = false; });
   });
+
+  $('open-only').addEventListener('change', function () { renderFilters(); render(); loadMail(); });
 
   function start() {
     OM.loadBranding().catch(function () {});
