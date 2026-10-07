@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { planPbcFromSops } from '../lib/pbc-sop-plan.js';
+const text = 'Verifier le rattachement des ventes. Objectif exactitude des comptes. Risque ventes mauvais exercice. Assertion separation exercices. Obtenir journal des ventes et factures selectionnees.';
+const control = { name: 'Rattachement ventes', cycle: 'VEN', programme_excerpt: 'Verifier le rattachement des ventes.', sop_file_id: 'sop', sop_excerpt: 'Verifier le rattachement des ventes.', objective_excerpt: 'Objectif exactitude des comptes.', risk_excerpt: 'Risque ventes mauvais exercice.', assertion_excerpt: 'Assertion separation exercices.', documents: [{ name: 'Journal ventes', sop_excerpt: 'Obtenir journal des ventes et factures selectionnees.', completeness_criteria: 'Periode complete', after_selection: false }] };
+const input = { programmeText: text, sops: [{file_id:'sop', cycle:'VEN', supported:true, truncated:false, text}], controls:[control] };
+test('source chain produces a manager draft without sending', () => { const r=planPbcFromSops(input); assert.equal(r.requests.length,1); assert.equal(r.email.status,'DRAFT_NOT_SENT'); assert.equal(r.remote_writes,0); });
+test('missing SOP evidence blocks request', () => { const r=planPbcFromSops({...input,controls:[{...control,risk_excerpt:'Invented risk without a source'}]}); assert.equal(r.requests.length,0); assert.equal(r.status,'REVIEW_REQUIRED'); });
+test('wrong cycle or truncated SOP requires review', () => { for(const patch of [{cycle:'TRE'},{truncated:true}]) assert.equal(planPbcFromSops({...input,sops:[{...input.sops[0],...patch}]}).requests.length,0); });
+test('shared document is requested once with both controls', () => { const r=planPbcFromSops({...input,controls:[control,{...control,name:'Second control'}]}); assert.equal(r.requests.length,1); assert.equal(r.requests[0].controls.length,2); });
+test('selected evidence is not requested before selection', () => { const r=planPbcFromSops({...input,controls:[{...control,documents:[{...control.documents[0],after_selection:true}]}]}); assert.equal(r.requests[0].status,'EN ATTENTE SELECTION'); assert.ok(!r.email.body.includes('Journal ventes')); });

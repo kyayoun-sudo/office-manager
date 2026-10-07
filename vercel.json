@@ -7,5 +7,12 @@
     "api/**/*.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/accueil.html",
+      "permanent": false
+    }
+  ]
 }
