@@ -371,3 +371,45 @@ alter table public.office_agent_messages enable row level security;
 revoke all on public.office_agent_messages from public, anon, authenticated, service_role;
 grant select, insert, update on public.office_agent_messages to service_role;
 commit;
+
+-- ===== agent-messages-client.sql =====
+-- Client e-mails drafted by the agent (rule of 2026-10-07, Paul): the agent PROPOSES a draft,
+-- a manager / partner / owner reviews (can edit) and validates it in "À valider"; only then is
+-- it sent, and only to the client contact registered on the mission. Additive only.
+begin;
+alter table public.office_agent_messages add column if not exists audience text not null default 'colleagues';
+alter table public.office_agent_messages add column if not exists office_mission_id uuid;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'office_agent_messages_audience_check') then
+    alter table public.office_agent_messages add constraint office_agent_messages_audience_check
+      check (audience in ('colleagues', 'client'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'office_agent_messages_client_mission_check') then
+    alter table public.office_agent_messages add constraint office_agent_messages_client_mission_check
+      check (audience <> 'client' or office_mission_id is not null);
+  end if;
+end $$;
+-- The client contact(s) of a mission: the only addresses a client e-mail can go to.
+do $$ begin
+  if to_regclass('public.office_missions') is not null then
+    alter table public.office_missions add column if not exists client_contact_emails text[];
+  end if;
+end $$;
+commit;
+
+-- ===== test-run.sql =====
+-- Test run "TATY TEST" (2026-10-07): state of the test of the whole application in preview
+-- (identical copy of the Drive, 5 missions over 3 months accelerated). One row per test firm.
+begin;
+create table if not exists public.office_test_runs (
+  org_id uuid primary key,
+  status text not null default 'new' check (status in ('new', 'copying', 'copied', 'seeded', 'running', 'stopped')),
+  copy_state jsonb not null default '{}'::jsonb check (jsonb_typeof(copy_state) = 'object'),
+  config jsonb not null default '{}'::jsonb check (jsonb_typeof(config) = 'object'),
+  seed_result jsonb not null default '{}'::jsonb check (jsonb_typeof(seed_result) = 'object'),
+  last_error text check (last_error is null or length(last_error) <= 1000),
+  updated_by text check (updated_by is null or length(updated_by) <= 120),
+  updated_at timestamptz not null default now()
+);
+alter table public.office_test_runs enable row level security;
+commit;

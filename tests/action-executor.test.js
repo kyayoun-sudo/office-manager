@@ -19,27 +19,47 @@ const reminder = {
     pbc_item: { reference: 'PBC-03-02', document: 'Relevés bancaires', deadline: '2026-09-30', lifecycle_state: 'MISSING' } }
 };
 
-test('PBC client reminder: never an e-mail to the client — a message to the mission manager is proposed for validation', async () => {
+// Rule updated by Paul on 2026-10-07: the client may be written to, but only as a DRAFT the agent
+// proposes, validated by a manager, and only to the contact registered on the mission.
+test('PBC reminder: message to the responsible colleague; NO client draft when no client contact is registered on the mission', async () => {
   const w = world();
   const proposed = [];
   const r = await executeDecision('org', reminder, 'approve', 'Paul', { fetchRows: w.fetchRows, getPersona: async () => PERSONA,
-    proposeMessage: async (orgId, input) => { proposed.push(input); return { id: 'msg1', status: 'pending_approval' }; } });
+    proposeMessage: async (orgId, input) => { proposed.push(input); return { id: 'msg' + proposed.length, status: 'pending_approval' }; } });
   assert.equal(r.executed, true);
   assert.equal(r.message_id, 'msg1');
+  assert.equal(proposed.length, 1);
   assert.deepEqual(proposed[0].recipients, ['koffi@taty.info'], 'the mission manager, a colleague');
-  assert.ok(!JSON.stringify(proposed).includes('bletransit'), 'the client address is never used');
-  assert.match(proposed[0].body, /PBC-03-02[\s\S]*Peux-tu relancer le client \? L’agent ne lui écrit pas directement/);
+  assert.ok(!JSON.stringify(proposed).includes('bletransit'), 'an address found in the payload is never used for the client');
+  assert.match(proposed[0].body, /PBC-03-02[\s\S]*Tu es responsable de son suivi/);
   assert.equal(w.patches[0].body.status, 'approved');
-  assert.match(r.effect, /Aucun e-mail au client/);
+  assert.match(r.effect, /Rien n’est envoyé avant/);
 });
 
-test('PBC client reminder: no manager found, or a manager outside the firm → nothing is sent, the task stays', async () => {
+test('PBC reminder: the responsible person named in the programme is used; a formal client draft goes ONLY to the mission’s registered contact', async () => {
+  const w = world();
+  const base = w.fetchRows;
+  const fetchRows = async (path, o) => path.startsWith('office_missions') ? [{ id: 'm1', client_contact_emails: ['cfo@bletransit.ci'] }] : base(path, o);
+  const proposed = [];
+  const withOwner = { ...reminder, payload: { ...reminder.payload, pbc_item: { ...reminder.payload.pbc_item, responsible_email: 'aya@taty.info' } } };
+  const r = await executeDecision('org', withOwner, 'approve', 'Paul', { fetchRows, getPersona: async () => ({ ...PERSONA, agent_display_name: 'Office Manager TATY' }),
+    proposeMessage: async (orgId, input) => { proposed.push(input); return { id: 'msg' + proposed.length }; } });
+  assert.deepEqual(proposed[0].recipients, ['aya@taty.info'], 'the person responsible in the work programme');
+  assert.equal(proposed[1].audience, 'client');
+  assert.equal(proposed[1].office_mission_id, 'm1');
+  assert.deepEqual(proposed[1].recipients, ['cfo@bletransit.ci'], 'the registered contact, not dg@bletransit.ci from the payload');
+  assert.match(proposed[1].body, /^Madame, Monsieur,[\s\S]*PBC-03-02[\s\S]*Cordialement,\nOffice Manager TATY$/);
+  assert.deepEqual(r.message_ids, ['msg1', 'msg2']);
+  assert.match(r.effect, /brouillon de relance au client \(cfo@bletransit\.ci\)/);
+});
+
+test('PBC reminder: no manager and no client contact → nothing proposed, the task stays', async () => {
   for (const opts of [{ role: 'Assistant' }, { email: 'koffi@gmail.com' }]) {
     const w = world(opts);
     let called = false;
     const r = await executeDecision('org', reminder, 'approve', 'Paul', { fetchRows: w.fetchRows, getPersona: async () => PERSONA, proposeMessage: async () => { called = true; } });
     assert.equal(called, false);
-    assert.match(r.effect, /Chef de mission introuvable/);
+    assert.match(r.effect, /Ni responsable ni contact client/);
   }
 });
 

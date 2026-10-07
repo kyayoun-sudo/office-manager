@@ -174,7 +174,8 @@
     INTERNAL_DOMAINS_NOT_CONFIGURED: 'Domaines du cabinet non configurés (Paramètres → E-mail de l’agent).', AGENT_SENDER_NOT_CONFIGURED: 'Adresse d’envoi de l’agent non configurée (Paramètres).',
     MESSAGE_CHANGED_RELOAD: 'Le message a changé depuis l’affichage : rechargez la page.', SEEN_HASH_REQUIRED: 'Rechargez la page avant de valider.', MAIL_NOT_CONFIGURED: 'Envoi non branché : il manque l’accès Google du cabinet (voir Mise en service).', MAIL_DELEGATION_MISSING: 'Google refuse l’envoi : le super administrateur doit autoriser l’envoi au nom de l’agent (voir Mise en service).',
     ROLE_NOT_ALLOWED: 'Validation réservée au propriétaire, aux associés et aux managers.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail.', COMMENT_REQUIRED: 'Indiquez pourquoi vous refusez.',
-    RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', TOPIC_REQUIRED: 'Indiquez le sujet du message.' };
+    RECIPIENT_NOT_CLIENT_CONTACT: 'Ce destinataire n’est pas le contact client enregistré sur la mission.', CLIENT_CONTACT_NOT_REGISTERED: 'Aucun contact client enregistré sur la mission.',
+    MAIL_SANDBOX_RECIPIENT_REFUSED: 'Mode test : cette adresse n’est pas dans la liste autorisée.', RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', TOPIC_REQUIRED: 'Indiquez le sujet du message.' };
   function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || m; }
   function msay(t) { $('mail-status').textContent = t || ''; }
   function mailApi(body) { return OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
@@ -182,11 +183,16 @@
   function mailCard(m) {
     var c = el('article', null, 'item'); c.style.flexDirection = 'column'; c.style.alignItems = 'stretch';
     var head = el('div', null, 't'); head.style.flex = '0 0 auto';
-    head.appendChild(el('span', 'À : ' + m.recipients.join(', ')));
+    var client = m.audience === 'client';
+    head.appendChild(el('span', (client ? 'AU CLIENT — ' : 'À : ') + m.recipients.join(', ')));
     head.appendChild(el('span', [m.source === 'agent' ? 'initiative de l’agent' : (m.requested_by ? 'demandé par ' + m.requested_by : null), UI.dateTime(m.created_at),
       m.decided_by ? (m.status === 'rejected' ? 'refusé par ' : 'validé par ') + m.decided_by : null].filter(Boolean).join(' · '), 'meta'));
     c.appendChild(head);
     var st = MSTATUS[m.status] || [m.status, 'tag neutral']; var tag = el('span', st[0], st[1]); tag.style.alignSelf = 'flex-start'; c.appendChild(tag);
+    if (client) {
+      var warn = el('p', 'Brouillon de l’agent destiné au client (ton formel). Relisez et corrigez si besoin : il ne part qu’après votre validation, et seulement au contact enregistré sur la mission.', 'hint');
+      warn.style.cssText = 'margin:0;color:#8A4B08;font-weight:500'; c.appendChild(warn);
+    }
     if (m.status === 'pending_approval' || m.status === 'failed') {
       var subj = el('input'); subj.type = 'text'; subj.value = m.subject; subj.maxLength = 200; subj.setAttribute('aria-label', 'Objet');
       subj.style.cssText = 'font:inherit;font-size:14px;border:1px solid #C9D0CC;border-radius:8px;padding:8px 10px;font-weight:500';
@@ -197,12 +203,12 @@
       if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || m.error), 'hint'));
       c.appendChild(subj); c.appendChild(body); c.appendChild(why);
       var row = el('div', null, 'btn-row');
-      var ok = el('button', 'Valider et envoyer', 'btn'); ok.type = 'button';
+      var ok = el('button', client ? 'Valider et envoyer au client' : 'Valider et envoyer', 'btn'); ok.type = 'button';
       var no = el('button', 'Refuser', 'btn ghost'); no.type = 'button';
       ok.addEventListener('click', function () {
         ok.disabled = no.disabled = true; msay('Envoi en cours…');
         mailApi({ action: 'decide', decision: 'approve', id: m.id, seen_sha256: m.content_sha256, subject: subj.value, body: body.value })
-          .then(function () { msay('Message envoyé aux collègues.'); loadMail(); })
+          .then(function () { msay(client ? 'Message envoyé au client.' : 'Message envoyé aux collègues.'); loadMail(); })
           .catch(function (e) { msay(mmsg(e)); loadMail(); });
       });
       no.addEventListener('click', function () {
