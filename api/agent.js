@@ -12,6 +12,7 @@ import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { ensureAgentSettings } from "../lib/agent-permissions.js";
+import { loadPeoplePolicy, peoplePolicyContext } from "../lib/people-policy.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -247,6 +248,12 @@ export default async function handler(req, res) {
           ? "Grand Contrôleur / Office Manager AI multi-agent request started"
           : `${requestedAgent} operational direct request started`
     });
+
+    // The firm's people-management policy (from its Drive memory), under the app's hard rules,
+    // for the Grand Contrôleur and the Mission Controller (staffing, briefings, messages, KPIs).
+    const policy = peoplePolicyContext((await loadPeoplePolicy().catch(() => ({ text: '' }))).text);
+    rootContext = { ...(rootContext || {}), people_management: policy };
+    if (contexts && contexts["mission-controller"]) contexts["mission-controller"] = { ...contexts["mission-controller"], people_management: policy };
 
     const result = await runOfficeManager({
       message,

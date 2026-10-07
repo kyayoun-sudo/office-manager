@@ -142,6 +142,14 @@
           <p class="hint" style="margin:0"><strong>Avec les clients</strong> et toute personne hors du cabinet, l'agent écrit toujours sur un ton formel, quel que soit ce réglage. Pas de blague sur les sujets sérieux (santé, RH, retards graves).</p>
         </section>
 
+        <section class="card" aria-labelledby="h-people">
+          <h2 id="h-people">Gestion des personnes (People intelligence)</h2>
+          <p class="hint" style="margin:0">La politique du cabinet pour composer les équipes, briefer, écrire à chacun selon son protocole de communication, détecter les équipes mal composées, recommander les formations et lire les KPI. Elle est gardée dans la mémoire des agents du Drive (00_OFFICE_MANAGER) et donnée aux agents à chaque demande. Les règles de l'application restent prioritaires : pas de diagnostic clinique, pas de décision RH sensible sur un questionnaire seul, profils révisés seulement sur des observations validées.</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="btn ghost" style="cursor:pointer">Charger un fichier (.md, .txt)<input id="pp-file" type="file" accept=".md,.txt,text/plain,text/markdown" hidden></label><span class="hint" id="pp-meta"></span></div>
+          <textarea id="pp-text" rows="12" maxlength="120000" style="width:100%;box-sizing:border-box;font:inherit;font-size:13px" placeholder="Collez ici la politique de gestion des personnes du cabinet"></textarea>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="pp-save" type="button">Enregistrer dans la mémoire des agents</button><span class="status" id="pp-status" role="status" aria-live="polite"></span></div>
+        </section>
+
         <section class="card" aria-labelledby="h-sched">
           <h2 id="h-sched">Horaires des agents</h2>
           <p class="hint" style="margin:0">Les agents passent seuls, à heures fixes, et se complètent : l'Orpailleur range et renomme, le Grand Contrôleur part de son travail et lui laisse ses besoins pour le passage suivant, Sika fait le point de la semaine.</p>
@@ -411,6 +419,22 @@
       .then(loadAllow).catch(function (err) { b.disabled = false; $('g-allow-state').textContent = 'Autorisation impossible : ' + explain(err); });
   });
   loadAllow();
+  // ---- People-management policy (in the agents' Drive memory) ----
+  ownerApi('people-policy').then(function (p) {
+    $('pp-text').value = p.text || '';
+    $('pp-meta').textContent = p.text ? 'Politique en place (' + p.text.length + ' caractères).' : 'Aucune politique enregistrée : les agents appliquent les règles de base.';
+  }).catch(function () {});
+  $('pp-file').addEventListener('change', function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    if (f.size > 120000) { $('pp-status').textContent = 'Fichier trop long (120 000 caractères au plus).'; return; }
+    f.text().then(function (t) { $('pp-text').value = t; $('pp-status').textContent = 'Fichier chargé : vérifiez puis enregistrez.'; });
+  });
+  $('pp-save').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('pp-status').textContent = 'Enregistrement dans le Drive…';
+    ownerApi('people-policy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: $('pp-text').value }) })
+      .then(function (r) { $('pp-status').textContent = 'Enregistrée (' + r.characters + ' caractères) : les agents l’appliquent dès maintenant.'; $('pp-meta').textContent = 'Politique en place.'; })
+      .catch(function (err) { $('pp-status').textContent = 'Échec : ' + explain(err); }).then(function () { b.disabled = false; });
+  });
   // Everyone of the firm with an e-mail (read in the team document), to pick recipients from.
   OM.api('/api/app?route=mission-contacts').then(function (c) {
     var dl = $('try-people'); dl.textContent = '';

@@ -24,6 +24,8 @@ import { agentPermissions, grantAgentPermissions } from '../lib/agent-permission
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
 import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
 import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/tidy-plan.js';
+import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
+import { dropFile } from '../lib/drop-box.js';
 import { fireInternal } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -235,6 +237,10 @@ export const ROUTES = Object.freeze({
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
   'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
+  // The firm's people-management policy, kept in the agents' Drive memory (owner).
+  // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
+  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => dropFile(orgId, req.body || {}, req.account)), unavailable: 'DROP_UNAVAILABLE' },
+  'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner((orgId, req) => savePeoplePolicy(req.body || {})), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
