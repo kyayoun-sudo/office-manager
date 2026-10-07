@@ -8,6 +8,8 @@ import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-pers
 import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount } from '../lib/accounts.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
+import { getSchedule, saveSchedule } from '../lib/schedule.js';
+import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -26,6 +28,10 @@ import { createRequest, listRequests, getRequest, step, decide, undo, stop } fro
 //   POST /api/app?route=diagnostic                 which code was typed, what is missing (public, no secret shown)
 //   GET  /api/app?route=tidy[&id=…]                Orpailleur tidy-up requests / one request with its plan
 //   POST /api/app?route=tidy {action}              create | step | decide | undo | stop (background chained)
+//   GET  /api/app?route=agent-schedule             agent pass times — OWNER ONLY (POST: save)
+//   GET  /api/app?route=passes                     latest agent passes
+//   POST /api/app?route=scheduler-tick             called by the scheduler (x-scheduler-secret), runs due passes
+//   POST /api/app?route=scheduler-run {agent}      run a pass now — OWNER ONLY
 //   GET  /api/app?route=users                      firm accounts — OWNER ONLY
 //   POST /api/app?route=users                      create / deactivate / role / password — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -73,6 +79,15 @@ export const ROUTES = Object.freeze({
     unavailable: 'TIDY_UNAVAILABLE'
   },
   diagnostic: { POST: open((orgId, req) => diagnose(req.body || {})), unavailable: 'DIAGNOSTIC_UNAVAILABLE' },
+  'agent-schedule': {
+    GET: owner((orgId) => getSchedule(orgId)),
+    POST: owner((orgId, req) => saveSchedule(orgId, req.body || {}, req.body?.updated_by)),
+    unavailable: 'SCHEDULE_UNAVAILABLE'
+  },
+  passes: { GET: (orgId) => listPasses(orgId), unavailable: 'PASSES_UNAVAILABLE' },
+  // Public route: the scheduler secret is checked inside tick().
+  'scheduler-tick': { POST: open((orgId, req) => tick(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
+  'scheduler-run': { POST: owner((orgId, req) => runNow(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),

@@ -112,6 +112,42 @@
           <p class="hint" style="margin:0"><strong>Avec les clients</strong> et toute personne hors du cabinet, l'agent écrit toujours sur un ton formel, quel que soit ce réglage. Pas de blague sur les sujets sérieux (santé, RH, retards graves).</p>
         </section>
 
+        <section class="card" aria-labelledby="h-sched">
+          <h2 id="h-sched">Horaires des agents</h2>
+          <p class="hint" style="margin:0">Les agents passent seuls, à heures fixes, et se complètent : l'Orpailleur range et renomme, le Grand Contrôleur part de son travail et lui laisse ses besoins pour le passage suivant, Sika fait le point de la semaine.</p>
+          <label style="display:flex;gap:10px;align-items:center;font-weight:500;font-size:14px"><input type="checkbox" id="s-enabled"> Activer les passages automatiques</label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <div class="field"><label for="s-tz">Fuseau horaire du cabinet</label>
+              <select id="s-tz" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+                <option value="Africa/Abidjan">Abidjan (GMT)</option><option value="Africa/Lagos">Lagos, Douala, Kinshasa (UTC+1)</option>
+                <option value="Africa/Lubumbashi">Lubumbashi (UTC+2)</option><option value="Europe/Paris">Paris</option>
+                <option value="Europe/Budapest">Budapest</option><option value="UTC">UTC</option>
+              </select></div>
+            <div class="field"><label for="s-ctrl">Grand Contrôleur — heures de passage</label>
+              <input id="s-ctrl" type="text" class="mono" maxlength="60" placeholder="09:00, 16:00"></div>
+            <div class="field"><label for="s-sika-day">Sika — jour (une fois par semaine)</label>
+              <select id="s-sika-day" style="font:inherit;font-size:15px;border:1px solid #C9D0CC;border-radius:8px;padding:11px 12px;min-height:44px;background:#fff">
+                <option value="1">Lundi</option><option value="2">Mardi</option><option value="3">Mercredi</option><option value="4">Jeudi</option>
+                <option value="5">Vendredi</option><option value="6">Samedi</option><option value="7">Dimanche</option>
+              </select></div>
+            <div class="field"><label for="s-sika-time">Sika — heure</label><input id="s-sika-time" type="time" class="mono"></div>
+          </div>
+          <p class="hint" style="margin:0"><strong>Orpailleur :</strong> trois passages par jour, à <span class="mono">08:00</span>, <span class="mono">12:00</span> et <span class="mono">20:00</span> (règle du cabinet).</p>
+          <p class="meta" id="s-next" style="margin:0"></p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+            <button class="btn" id="s-save" type="button">Enregistrer les horaires</button>
+            <span class="status" id="s-status" role="status" aria-live="polite"></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <span class="hint">Lancer un passage maintenant :</span>
+            <button class="btn ghost" type="button" data-run="orpailleur" style="padding:6px 12px;min-height:36px;font-size:13px">Orpailleur</button>
+            <button class="btn ghost" type="button" data-run="grand-controleur" style="padding:6px 12px;min-height:36px;font-size:13px">Grand Contrôleur</button>
+            <button class="btn ghost" type="button" data-run="sika" style="padding:6px 12px;min-height:36px;font-size:13px">Sika</button>
+          </div>
+          <h3 style="margin:8px 0 0;font-size:15px">Derniers passages</h3>
+          <div id="s-passes" style="display:flex;flex-direction:column;gap:6px"></div>
+        </section>
+
         <section class="card" aria-labelledby="h-users">
           <h2 id="h-users">Comptes du cabinet</h2>
           <p class="hint" style="margin:0">Chaque personne se connecte avec son e-mail et son mot de passe. Le propriétaire et les associés-gérants ont accès à ces paramètres ; les collaborateurs, non. Un compte se désactive, il ne se supprime pas.</p>
@@ -287,7 +323,7 @@
     ownerApi('agent-persona').then(function (p) {
       fillPersona(p);
       $('owner-gate').hidden = true; $('owner-area').hidden = false;
-      loadUsers();
+      loadUsers(); loadSchedule();
     }).catch(function (err) {
       $('owner-area').hidden = true; $('owner-gate').hidden = false;
       $('owner-status').textContent = explain(err); $('owner-status').className = 'status error';
@@ -317,6 +353,70 @@
       $('try-out').textContent = 'Objet : ' + d.subject + '\n\n' + d.body + '\n\n— ' + d.note;
     }).catch(function (err) { $('try-out').textContent = 'Échec : ' + explain(err); })
       .then(function () { $('try-btn').disabled = false; });
+  });
+
+  // ---- Agent schedule (owner) ----
+  var AGENT_NAMES = { orpailleur: 'Orpailleur', 'grand-controleur': 'Grand Contrôleur', sika: 'Sika' };
+  Object.assign(ERRORS, {
+    INVALID_TIMEZONE: 'Fuseau horaire invalide.', INVALID_CONTROLLER_TIMES: 'Heures du Grand Contrôleur invalides (format 09:00, 6 maximum).',
+    INVALID_SIKA_DAY: 'Jour de Sika invalide.', INVALID_SIKA_TIME: 'Heure de Sika invalide.'
+  });
+  function sSay(t, e) { $('s-status').textContent = t; $('s-status').className = 'status' + (e ? ' error' : ''); }
+  function showNext(next) {
+    if (!next) { $('s-next').textContent = ''; return; }
+    var txt = Object.keys(AGENT_NAMES).map(function (k) {
+      var n = next[k]; if (!n) return null;
+      return AGENT_NAMES[k] + ' : ' + (n.in_days === 0 ? 'aujourd\u2019hui' : n.in_days === 1 ? 'demain' : 'dans ' + n.in_days + ' j') + ' à ' + n.time;
+    }).filter(Boolean).join('  ·  ');
+    $('s-next').textContent = 'Prochains passages — ' + txt;
+  }
+  function fillSchedule(sc) {
+    $('s-enabled').checked = Boolean(sc.enabled);
+    if (!Array.prototype.some.call($('s-tz').options, function (o) { return o.value === sc.timezone; })) $('s-tz').appendChild(new Option(sc.timezone, sc.timezone));
+    $('s-tz').value = sc.timezone;
+    $('s-ctrl').value = (sc.controller_times || []).join(', ');
+    $('s-sika-day').value = String(sc.sika_weekday || 5);
+    $('s-sika-time').value = sc.sika_time || '09:00';
+    showNext(sc.next);
+  }
+  function loadPasses() {
+    OM.api('/api/app?route=passes').then(function (d) {
+      var box = $('s-passes'); box.textContent = '';
+      var list = (d && d.passes) || [];
+      if (!list.length) { var p = document.createElement('p'); p.textContent = 'Aucun passage pour le moment.'; p.style.cssText = 'margin:0;color:var(--muted);font-size:14px'; box.appendChild(p); return; }
+      list.slice(0, 10).forEach(function (x) {
+        var row = document.createElement('div');
+        row.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.45';
+        var head = document.createElement('div');
+        head.style.cssText = 'font-family:var(--mono);font-size:12px;color:var(--muted)';
+        head.textContent = (AGENT_NAMES[x.agent_key] || x.agent_key) + ' · ' + x.slot + ' · ' + ({ started: 'en cours', done: 'fait', failed: 'échec' }[x.status] || x.status);
+        var body = document.createElement('div'); body.textContent = x.summary || '';
+        row.appendChild(head); row.appendChild(body); box.appendChild(row);
+      });
+    }).catch(function () {});
+  }
+  function loadSchedule() {
+    ownerApi('agent-schedule').then(fillSchedule).catch(function (err) { sSay(explain(err), true); });
+    loadPasses();
+  }
+  $('s-save').addEventListener('click', function () {
+    $('s-save').disabled = true; sSay('Enregistrement…');
+    ownerApi('agent-schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      enabled: $('s-enabled').checked, timezone: $('s-tz').value, controller_times: $('s-ctrl').value,
+      sika_weekday: Number($('s-sika-day').value), sika_time: $('s-sika-time').value, updated_by: OM.getUserName() || null
+    }) }).then(function (sc) { fillSchedule(sc); sSay(sc.enabled ? 'Horaires enregistrés. Passages automatiques activés.' : 'Horaires enregistrés (passages automatiques désactivés).'); })
+      .catch(function (err) { sSay(explain(err), true); })
+      .then(function () { $('s-save').disabled = false; });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-run]'), function (b) {
+    b.addEventListener('click', function () {
+      var agent = b.getAttribute('data-run');
+      b.disabled = true; sSay('Passage de ' + AGENT_NAMES[agent] + ' lancé…');
+      ownerApi('scheduler-run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: agent }) })
+        .then(function (r) { sSay(r.failed ? 'Échec : ' + r.failed : (r.summary || 'Passage lancé.'), Boolean(r.failed)); loadPasses(); })
+        .catch(function (err) { sSay(explain(err), true); })
+        .then(function () { b.disabled = false; });
+    });
   });
 
   // ---- Accounts (owner / partner) ----

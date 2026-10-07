@@ -137,17 +137,22 @@ sans permission locale. Non compilée (voir `docs/WHITE_LABEL_DESKTOP.md`).
 | `bootstrap-owner` | POST (premier propriétaire, si aucun compte) | code propriétaire |
 | `diagnostic` | POST (quel code a été tapé, ce qui manque ; aucun secret renvoyé) | public |
 | `tidy` | GET (liste / `&id=`) · POST `action` create, step, decide, undo, stop | code pilote |
+| `agent-schedule` | GET / POST (horaires des agents) | **propriétaire** |
+| `passes` | GET (derniers passages) | code pilote |
+| `scheduler-tick` | POST (lance les passages dus) | secret planificateur |
+| `scheduler-run` | POST `{agent}` (passage immédiat) | **propriétaire** |
 | `users` | GET / POST (créer, désactiver, rôle, mot de passe) | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
-`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`.
+`db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`,
+`db/agent-schedule.sql`, puis `db/scheduler-cron.sql` (après avoir remplacé l'adresse et le secret).
 Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
 Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`.
 
 ## État des tests
-158 tests : 157 OK. Le seul échec, `tests/browser-response.test.js`, **existait
+164 tests : 163 OK. Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes
@@ -187,19 +192,25 @@ Un assistant de premier lancement de l'**application de bureau** (`desktop/`) :
    de rangement sur son PC). Sur le PC, l'Orpailleur lit les fichiers, comprend,
    **range dans un dossier existant s'il convient, sinon propose**, et apprend.
 
-### 3. Horaires de passage des agents — ⏳
+### 3. Horaires de passage des agents — ✅ construit (à activer)
 | Agent | Passages | Qui décide |
 |---|---|---|
 | **Grand Contrôleur** | heures définies **par le propriétaire du cabinet** lors de la configuration | propriétaire (écran Paramètres) |
 | **Sika** | **une fois par semaine** | jour/heure à proposer au propriétaire |
 | **Orpailleur** | **3 passages par jour : 8 h, 12 h, 20 h** | fixé par Paul |
-- Fuseau horaire du cabinet à saisir à la configuration.
-- Contrainte technique : l'offre Vercel Hobby limite les tâches planifiées
-  (cron) ; prévoir un « tic » horaire déclenché par **Supabase pg_cron + pg_net**
-  (ou GitHub Actions) vers une route de `api/app.js` (rester ≤ 12 fonctions), qui
-  lance les agents dont l'heure est venue et journalise chaque passage.
+- ✅ Fuseau horaire du cabinet saisi par le propriétaire (Paramètres → Horaires des agents).
+- ✅ `lib/schedule.js` (heures, créneaux dus, prochains passages ; Orpailleur figé à
+  08:00/12:00/20:00), `db/agent-schedule.sql` (horaires + journal
+  `office_agent_passes`, **un seul passage par créneau**).
+- ✅ `lib/agent-passes.js` : `tick` (route publique `scheduler-tick`, protégée par
+  l'en-tête `x-scheduler-secret` = `OFFICE_MANAGER_SCHEDULER_SECRET`, à défaut
+  `ORPAILLEUR_JOB_SECRET`), `runNow` (route propriétaire `scheduler-run`),
+  `listPasses` (route `passes`, affichée sur l'Accueil et dans Paramètres).
+- ✅ Déclencheur : `db/scheduler-cron.sql` (**Supabase pg_cron + pg_net**, toutes
+  les 15 min, vers l'adresse de **production** — un aperçu Vercel protégé refuse
+  l'appel). Rien ne tourne tant que le propriétaire n'a pas coché « Activer ».
 
-### 4. Orpailleur et Grand Contrôleur : travail complémentaire — ⏳
+### 4. Orpailleur et Grand Contrôleur : travail complémentaire — ✅ construit
 - Chaque **passage de l'Orpailleur** (8 h / 12 h / 20 h) : inventaire des
   nouveautés, lecture, **rangement et renommage**, pièces reçues rattachées aux
   missions → résumé du passage.
@@ -209,13 +220,27 @@ Un assistant de premier lancement de l'**application de bureau** (`desktop/`) :
   passage suivant. Aucun des deux ne refait le travail de l'autre.
 - **Sika**, une fois par semaine, s'appuie sur les deux pour la facturation et
   les relances administratives.
+- ✅ Mise en œuvre (`lib/agent-passes.js`) : passage Orpailleur = relance du scan
+  Drive existant + rangement/renommage limité aux fichiers nouveaux ou modifiés
+  depuis le passage précédent (`since`), avec les « BESOINS POUR L'ORPAILLEUR »
+  extraits du dernier résumé du Grand Contrôleur. Passage Grand Contrôleur =
+  demande à `/api/agent` partant du bilan du dernier passage Orpailleur, et
+  finissant par la section « BESOINS POUR L'ORPAILLEUR : ». Passage Sika = demande
+  hebdomadaire à `/api/agent` (agent `sika`). Aux créneaux communs, l'Orpailleur
+  passe toujours en premier. Aucun envoi hors du cabinet, aucune suppression.
 
 ### 5. Rôle de l'Orpailleur — rappel de Paul
 - Le rôle était **déjà défini** : il range **et renomme** (sur le contenu).
 - ✅ Claude a construit le rangement en arrière-plan (`rangement.html`,
   `lib/tidy*.js`) et **ajouté l'apprentissage** par-dessus cette logique.
-- ⏳ **Renommage à ajouter** au rangement : nouveau nom proposé d'après le
-  contenu (et la convention du cabinet), ancien nom conservé pour l'annulation,
-  validation selon les mêmes règles que les déplacements, appris comme eux.
-- ⏳ Brancher les passages automatiques (section 3) sur ce rangement : chaque
-  passage ne traite que les fichiers nouveaux ou modifiés depuis le précédent.
+- ✅ **Renommage** : noms peu parlants détectés (`isPoorName` : scan001, IMG_2045,
+  Document (3), sans titre…) ; nouveau nom « Client - Type - Période.ext » par
+  règle (client, type et période lus) ou par l'IA **d'après le contenu** ;
+  extension conservée ; caractères interdits retirés. Automatique seulement si
+  carte validée **et** confiance ≥ 0,90 (0,85 pour un simple déplacement), sinon
+  proposition. Ancien nom gardé (`previous_name`) ⇒ annulation complète.
+  Déplacement + renommage en un seul appel Drive (`lib/tidy-drive.js`).
+- ✅ Passages automatiques branchés sur ce rangement (fichiers nouveaux ou modifiés
+  depuis le passage précédent).
+- ⏳ L'apprentissage porte sur les **dossiers** de destination ; l'apprentissage
+  des **conventions de nommage** propres au cabinet reste à ajouter.

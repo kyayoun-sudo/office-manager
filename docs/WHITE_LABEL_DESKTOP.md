@@ -133,3 +133,10 @@ bouton « Se déconnecter » dans `assets/brand-theme.js`, gestion des comptes d
 menus. Rangement en arrière-plan, automatique si le dossier existe et que la
 carte du Drive est validée, propositions sinon, apprentissage des décisions,
 annulation. Détails et prérequis : `docs/POUR_CHATGPT.md`.
+
+## Ajout 6 — Passages automatiques et renommage (2026-10-07)
+
+Horaires des agents (Paramètres, propriétaire), passages complémentaires
+Orpailleur 08:00/12:00/20:00 → Grand Contrôleur (heures du propriétaire) → Sika
+(hebdomadaire), déclencheur Supabase `db/scheduler-cron.sql`, renommage des noms
+peu parlants dans le rangement. Détails : `docs/POUR_CHATGPT.md`.

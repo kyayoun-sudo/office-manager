@@ -139,7 +139,7 @@ test('decisions teach the Orpailleur; undo moves back and unlearns', async () =>
   Object.assign(state.items[0], { status: 'moved', previous_parent_id: 'F-inbox' });
   const moves = [];
   await undo('org-1', { item_id: IT }, { fetchRows, drive: { move: async (...a) => moves.push(a) } });
-  assert.deepEqual(moves[0], ['f9', 'F-nova', 'F-inbox']);
+  assert.deepEqual(moves[0], ['f9', 'F-nova', 'F-inbox', null], 'no rename to restore');
   assert.equal(state.items[0].status, 'undone');
   await assert.rejects(undo('org-1', { item_id: IT }, { fetchRows, drive: {} }), /NOT_UNDOABLE/);
   await assert.rejects(decide('org-1', { request_id: REQ, decision: 'delete', item_ids: [IT] }, { fetchRows }), /INVALID_DECISION/);

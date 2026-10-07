@@ -60,6 +60,10 @@
           <span class="callout-num" id="pending">–</span>
           <span class="callout-text">L'agent propose, vous décidez. Rien ne part sans votre accord.</span>
         </a>
+        <section class="card" aria-labelledby="h-passes">
+          <h2 id="h-passes">Passages des agents</h2>
+          <div id="passes" class="stack"><p class="empty">Chargement…</p></div>
+        </section>
         <section class="card" aria-labelledby="h-next">
           <h2 id="h-next">Raccourcis</h2>
           <a href="/recherche.html">Recherche avancée</a>
@@ -136,11 +140,28 @@
     if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); $('q').focus(); }
   });
 
+  function loadPasses() {
+    var NAMES = { orpailleur: 'Orpailleur', 'grand-controleur': 'Grand Contrôleur', sika: 'Sika' };
+    OM.api('/api/app?route=passes').then(function (d) {
+      var box = $('passes'); box.textContent = '';
+      var list = ((d && d.passes) || []).slice(0, 4);
+      if (!list.length) { box.appendChild(UI.el('p', 'Aucun passage pour le moment. Le propriétaire active les horaires dans Paramètres.', 'empty')); return; }
+      list.forEach(function (x) {
+        var item = UI.el('div', null, 'item');
+        var t = UI.el('div', null, 't');
+        t.appendChild(UI.el('span', (NAMES[x.agent_key] || x.agent_key) + ' — ' + x.slot.slice(-5)));
+        t.appendChild(UI.el('span', x.summary || '', 'meta'));
+        item.appendChild(t);
+        box.appendChild(item);
+      });
+    }).catch(function (e) { UI.fail($('passes'), e); });
+  }
+
   function start() {
     var name = OM.getUserName();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
     OM.loadBranding().catch(function () {});
-    loadMissions(); loadRuns(); loadPending();
+    loadMissions(); loadRuns(); loadPending(); loadPasses();
   }
   UI.requireLogin(start);
 })();

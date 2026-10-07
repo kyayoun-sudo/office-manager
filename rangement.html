@@ -42,7 +42,7 @@
 
     <header class="page-head">
       <h1>Rangement du Drive</h1>
-      <p class="lead">Demandez un rangement à l'Orpailleur, puis faites autre chose. Il lit les fichiers, range tout seul ce qui a déjà un dossier évident, et vous propose le reste. Il ne supprime jamais rien, et chaque déplacement peut être annulé.</p>
+      <p class="lead">Demandez un rangement à l'Orpailleur, puis faites autre chose. Il lit les fichiers, les range et renomme les noms peu parlants (scan001, IMG_2045…). Quand c'est évident, il le fait seul ; sinon il vous propose. Il ne supprime jamais rien, et chaque opération peut être annulée. Il passe aussi tout seul à 8 h, 12 h et 20 h.</p>
     </header>
 
     <section class="card" aria-labelledby="h-new">
@@ -137,6 +137,7 @@
     c.appendChild(el('strong', it.file_name));
     c.appendChild(el('span', 'De : ' + (it.current_path || '?'), 'path'));
     c.appendChild(el('span', 'Vers : ' + (it.dest_path || '?') + (it.new_folder_name ? '  (nouveau dossier)' : ''), 'path'));
+    if (it.new_name) c.appendChild(el('span', 'Nouveau nom : ' + it.new_name, 'path'));
     if (it.rationale) c.appendChild(el('p', it.rationale + (it.confidence != null ? ' — confiance ' + Math.round(it.confidence * 100) + ' %' : ''), 'why'));
     if (it.error && it.error !== 'EN_COURS') c.appendChild(el('p', 'Erreur : ' + it.error, 'why'));
     if (buttons) c.appendChild(buttons);
@@ -169,7 +170,7 @@
     fill('moved', items.filter(function (i) { return i.status === 'moved' || i.status === 'approved'; }), function (it) {
       var row = el('div', null, 'btn-row');
       if (it.status === 'moved') {
-        var back = el('button', 'Annuler ce déplacement', 'btn ghost'); back.type = 'button';
+        var back = el('button', 'Annuler', 'btn ghost'); back.type = 'button';
         back.addEventListener('click', function () { act({ action: 'undo', item_id: it.id }); });
         row.appendChild(el('span', 'Rangé' + (it.decided_by ? ' · ' + it.decided_by : ''), 'tag'));
         row.appendChild(back);

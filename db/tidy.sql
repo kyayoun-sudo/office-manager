@@ -9,7 +9,9 @@ create table if not exists public.office_tidy_requests (
   org_id uuid not null,
   title text not null check (length(btrim(title)) between 1 and 200),
   scope_path text check (scope_path is null or length(scope_path) <= 500),
-  instructions text check (instructions is null or length(instructions) <= 2000),
+  instructions text check (instructions is null or length(instructions) <= 3000),
+  -- Scheduled passes only look at files new or modified since this moment.
+  since timestamptz,
   requested_by text check (requested_by is null or length(requested_by) <= 120),
   status text not null default 'planning'
     check (status in ('planning', 'ready', 'executing', 'done', 'stopped', 'failed')),
@@ -18,6 +20,7 @@ create table if not exists public.office_tidy_requests (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.office_tidy_requests add column if not exists since timestamptz;
 create index if not exists office_tidy_requests_org_idx on public.office_tidy_requests (org_id, created_at desc);
 
 create table if not exists public.office_tidy_items (
@@ -43,11 +46,17 @@ create table if not exists public.office_tidy_items (
   moved_at timestamptz,
   previous_parent_id text,
   error text check (error is null or length(error) <= 500),
+  -- Renaming (content-based): proposed new name, and the old one kept for undo.
+  new_name text check (new_name is null or length(new_name) between 1 and 250),
+  previous_name text,
   -- File features the decision teaches about (client, type…), for learning.
   learn_keys text[] not null default '{}',
   created_at timestamptz not null default now(),
   unique (request_id, file_id)
 );
+-- Safe if an earlier version of this file was already applied.
+alter table public.office_tidy_items add column if not exists new_name text;
+alter table public.office_tidy_items add column if not exists previous_name text;
 create index if not exists office_tidy_items_request_idx on public.office_tidy_items (org_id, request_id, status);
 
 -- What the firm taught the Orpailleur: a file feature (client, type, extension)
