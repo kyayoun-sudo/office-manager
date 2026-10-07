@@ -39,3 +39,19 @@ test('merge: assignments and actions moved to the kept mission, duplicate closed
   assert.ok(calls.some(c => c[1].includes('id=eq.a2') && JSON.parse(c[2]).status === 'cancelled'));
   assert.ok(!calls.some(c => c[0] === 'DELETE'));
 });
+
+test('mission dedupe: the AI groups the same mission under other names, only with listed ids', async () => {
+  const missions = [
+    { id: 'a', name: 'Proposition Expertise France — IMPLUS SERA (Lots 1-3)', status: 'active' },
+    { id: 'b', name: 'Proposition Lots 1-3 (SERA, genre, revue documentaire)', status: 'active' },
+    { id: 'c', name: 'Revue de paie 2026', status: 'active' }
+  ];
+  const patches = [];
+  const fetchRows = async (path, opts) => { if (!opts) return missions; patches.push([path, opts.body]); return []; };
+  const runAI = async () => ({ text: JSON.stringify({ groups: [{ keep: 'a', same: ['b', 'zzz'], reason: 'même proposition' }] }) });
+  const out = await dedupeMissions('org', { fetchRows, ai: true, runAI, knowledge: { missions: [] } });
+  assert.equal(out.merged, 1);
+  assert.equal(out.details[0].how, 'ai');
+  assert.ok(patches.some(([p, b]) => p.includes('id=eq.b') && b.includes('cancelled')));
+  assert.ok(!patches.some(([p]) => p.includes('zzz')));
+});

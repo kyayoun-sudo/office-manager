@@ -5,7 +5,8 @@ import { globalSearch } from '../lib/global-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState } from '../lib/accounts.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount } from '../lib/accounts.js';
+import { translateTexts } from '../lib/translate-ui.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -73,6 +74,7 @@ const open = run => Object.assign(run, { public: true });
 // Needs a personal session (Supabase access token) with one of these roles.
 const MANAGERS = ['owner', 'partner', 'manager'];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
+const lastAiDedupe = new Map();
 const ALL_ROLES = ['owner', 'partner', 'manager', 'collaborator'];
 
 export const ROUTES = Object.freeze({
@@ -140,7 +142,13 @@ export const ROUTES = Object.freeze({
   'scheduler-tick': { POST: open((orgId, req) => tick(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
   'scheduler-run': { POST: owner((orgId, req) => runNow(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
   coordination: {
-    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_coordination'); return coordination(orgId); }),
+    GET: users(MANAGERS, async (orgId, req) => {
+      await logAccess(orgId, req.account, 'view_coordination');
+      // One mission, one row: obvious duplicates merged before showing, the AI pass now and then.
+      await dedupeMissions(orgId).catch(() => null);
+      if (Date.now() - (lastAiDedupe.get(orgId) || 0) > 30 * 60 * 1000) { lastAiDedupe.set(orgId, Date.now()); fireInternal(req, '/api/app?route=mission-dedupe', {}).catch(() => null); }
+      return coordination(orgId);
+    }),
     unavailable: 'COORDINATION_UNAVAILABLE'
   },
   'team-kpi': {
@@ -230,13 +238,17 @@ export const ROUTES = Object.freeze({
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
-      if (req.body?.action === 'dedupe') return dedupeMissions(orgId);
+      if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
   },
   // Understanding the firm, then (same first scan) where every file goes.
   'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  // The settings wheel: close one's own account (typed e-mail), the interface in English.
+  'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
+  translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
+  'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
   'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },

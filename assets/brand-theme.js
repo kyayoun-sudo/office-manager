@@ -143,16 +143,168 @@
   window.OfficeManager = OM;
 
   // Logout button under the user's name in the side menu.
+  // ---- Settings wheel at the bottom of the menu (Paul, 2026-10-07: « une roue en bas où il y a
+  // Se déconnecter, Paramètres avec les rubriques »): the setup and settings sections (owner), the
+  // language, closing one's own account, logging out. ----
+  var SETTINGS = [
+    ['Mise en service', '/mise-en-service.html', [['h-sum', 'État'], ['h-steps', 'Les étapes'], ['h-map', 'Cartographie du Drive'], ['h-know', 'Ce que l’Orpailleur a compris']]],
+    ['Paramètres', '/parametres.html', [['h-google', 'Accès Google (Drive et Gmail)'], ['h-id', 'Identité'], ['h-logo', 'Logo'], ['h-col', 'Couleur principale'], ['h-mail', 'E-mail de l’agent'],
+      ['h-tone', 'Ton avec les collègues'], ['h-people', 'Gestion des personnes'], ['h-sched', 'Horaires des agents'], ['h-users', 'Comptes du cabinet'], ['h-try', 'Essayer']]]
+  ];
+  function svgIcon(d) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path); return svg;
+  }
+  function node(tag, text, cls) { var n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; }
   function addLogout() {
     var who = document.querySelector('.nav .who');
-    if (!who || document.getElementById('logout-btn')) return;
-    var b = document.createElement('button');
-    b.type = 'button'; b.id = 'logout-btn'; b.textContent = 'Se déconnecter';
-    b.style.cssText = 'display:block;margin-top:8px;font:inherit;font-size:13px;background:transparent;border:1px solid var(--nav-line);color:var(--nav-text);border-radius:8px;padding:8px 12px;min-height:36px;cursor:pointer';
-    b.addEventListener('click', OM.logout);
-    who.appendChild(b);
+    if (!who || document.getElementById('gear-btn')) return;
+    var nameEl = who.querySelector('[data-user-name]');
+    var me = node('div', null, 'me');
+    var av = node('span', (OM.getUserName() || 'U').trim().charAt(0).toUpperCase(), 'avatar'); av.setAttribute('aria-hidden', 'true');
+    me.appendChild(av); if (nameEl) me.appendChild(nameEl);
+    var b = node('button', null, 'gear'); b.type = 'button'; b.id = 'gear-btn';
+    b.setAttribute('aria-label', 'Réglages'); b.setAttribute('aria-haspopup', 'true'); b.setAttribute('aria-expanded', 'false');
+    b.appendChild(svgIcon(ICONS['/parametres.html']));
+    me.appendChild(b);
+    who.textContent = ''; who.appendChild(me);
+    var menu = node('div', null, 'gear-menu'); menu.hidden = true; menu.id = 'gear-menu';
+    who.appendChild(menu);
+    function build() {
+      menu.textContent = '';
+      if (OM.isOwner()) SETTINGS.forEach(function (g) {
+        var box = node('div', null, 'gm-group');
+        var head = node('a', g[0], 'gm-head'); head.href = g[1]; box.appendChild(head);
+        g[2].forEach(function (x) { var a = node('a', x[1], 'gm-link'); a.href = g[1] + '#' + x[0]; box.appendChild(a); });
+        menu.appendChild(box);
+      });
+      var lang = node('div', null, 'gm-group gm-row');
+      lang.appendChild(node('span', 'Langue', 'gm-label'));
+      var seg = node('div', null, 'seg');
+      [['fr', 'Français'], ['en', 'English']].forEach(function (x) {
+        var l = node('button', x[1]); l.type = 'button'; l.setAttribute('data-keep', ''); l.setAttribute('aria-pressed', String(OM.getLang() === x[0]));
+        l.addEventListener('click', function () { OM.setLang(x[0]); }); seg.appendChild(l);
+      });
+      lang.appendChild(seg); menu.appendChild(lang);
+      var acc = node('div', null, 'gm-group');
+      var close = node('button', 'Fermer mon compte…', 'gm-link gm-danger'); close.type = 'button'; close.addEventListener('click', function () { toggle(false); openClose(); });
+      var out = node('button', 'Se déconnecter', 'gm-link'); out.type = 'button'; out.id = 'logout-btn'; out.addEventListener('click', OM.logout);
+      acc.appendChild(close); acc.appendChild(out); menu.appendChild(acc);
+    }
+    function toggle(open) { if (open) build(); menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); }
+    b.addEventListener('click', function (e) { e.stopPropagation(); toggle(menu.hidden); });
+    document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) toggle(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { toggle(false); b.focus(); } });
+  }
+  function openClose() {
+    var s = readSession() || {}, email = (s.user && s.user.email) || '';
+    var d = node('dialog', null, 'om-dialog');
+    d.appendChild(node('h2', 'Fermer mon compte'));
+    d.appendChild(node('p', 'Votre accès à l’application s’arrête. Rien n’est supprimé : le Drive du cabinet reste tel quel et un propriétaire peut réactiver votre compte.'));
+    var owner = OM.getRole() === 'owner', firm = null;
+    if (owner) {
+      var lab = node('label', null, 'om-check'); firm = node('input'); firm.type = 'checkbox';
+      lab.appendChild(firm); lab.appendChild(document.createTextNode(' Si je suis le dernier propriétaire : fermer aussi l’espace du cabinet (l’accès Google est retiré, les agents s’arrêtent).'));
+      d.appendChild(lab);
+    }
+    var f = node('div', null, 'field'); var l = node('label', 'Pour confirmer, tapez votre e-mail' + (email ? ' (' + email + ')' : '')); var inp = node('input'); inp.type = 'email'; inp.id = 'close-confirm'; l.htmlFor = 'close-confirm';
+    f.appendChild(l); f.appendChild(inp); d.appendChild(f);
+    var msg = node('p', '', 'status'); d.appendChild(msg);
+    var row = node('div', null, 'om-actions');
+    var cancel = node('button', 'Annuler', 'btn ghost'); cancel.type = 'button'; cancel.addEventListener('click', function () { d.close(); d.remove(); });
+    var go = node('button', 'Fermer mon compte', 'btn danger'); go.type = 'button';
+    go.addEventListener('click', function () {
+      go.disabled = true; msg.className = 'status'; msg.textContent = 'Fermeture…';
+      OM.api('/api/app?route=close-account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: inp.value, close_firm: Boolean(firm && firm.checked) }) })
+        .then(function () { OM.forget(false); location.replace(LOGIN_PAGE); })
+        .catch(function (e) {
+          go.disabled = false; msg.className = 'status error';
+          msg.textContent = { CONFIRM_WITH_YOUR_EMAIL: 'L’e-mail tapé ne correspond pas à votre compte.', LAST_OWNER_CLOSES_FIRM: 'Vous êtes le dernier propriétaire : cochez la case pour fermer aussi l’espace du cabinet, ou nommez d’abord un autre propriétaire.', USER_SESSION_REQUIRED: 'Reconnectez-vous avec Google ou votre e-mail pour fermer votre compte.' }[e.message] || e.message;
+        });
+    });
+    row.appendChild(cancel); row.appendChild(go); d.appendChild(row);
+    document.body.appendChild(d); d.showModal(); inp.focus();
   }
 
+  // ---- English (Paul, 2026-10-07: « il peut être français et anglais »). The pages are written in
+  // French; in English, every French text shown is replaced by its translation: the login page
+  // from a small built-in list, the other pages from the server (AI, once per text), kept in this
+  // browser. Names (people, clients, missions, files) are not translated. ----
+  var LANG_KEY = 'om_lang', I18N_KEY = 'om_i18n_en_v1';
+  OM.getLang = function () { return safeGet(window.localStorage, LANG_KEY) === 'en' ? 'en' : 'fr'; };
+  OM.setLang = function (l) { safeSet(window.localStorage, LANG_KEY, l === 'en' ? 'en' : 'fr'); location.reload(); };
+  var LOGIN_EN = {
+    'Connexion': 'Sign in', 'Espace du cabinet': 'Firm workspace',
+    'Avec le compte Google du cabinet. Première fois ? Le même bouton crée votre compte : aucun mot de passe à retenir.': 'With the firm’s Google account. First time? The same button creates your account: no password to remember.',
+    'Nouveau cabinet ? Démarrer ici': 'New firm? Start here', 'Continuer avec Google': 'Continue with Google',
+    'Se connecter avec un e-mail et un mot de passe': 'Sign in with an e-mail and a password', 'ou': 'or',
+    'Adresse e-mail': 'E-mail address', 'Mot de passe': 'Password', 'Afficher le mot de passe': 'Show password', 'Se connecter': 'Sign in',
+    'Pas encore de compte ?': 'No account yet?', 'Créer un compte': 'Create an account', 'Autres options': 'Other options',
+    'Je suis le propriétaire du cabinet': 'I am the firm’s owner',
+    'Votre e-mail et votre mot de passe (créez d\'abord votre compte si besoin), puis le code propriétaire du cabinet, une seule fois.': 'Your e-mail and password (create your account first if needed), then the firm’s owner code, once.',
+    'Votre adresse e-mail': 'Your e-mail address', 'Votre mot de passe': 'Your password', 'Code propriétaire du cabinet': 'Firm owner code',
+    'Devenir propriétaire et entrer': 'Become owner and enter', 'Créer mon compte': 'Create my account',
+    'Votre compte sera actif dès que le propriétaire du cabinet vous aura donné un rôle. Si vous êtes le propriétaire, créez votre compte puis cliquez sur « Je suis le propriétaire du cabinet ».': 'Your account becomes active once the firm’s owner gives you a role. If you are the owner, create your account, then click “I am the firm’s owner”.',
+    'Votre nom': 'Your name', 'Choisissez un mot de passe (10 caractères minimum, avec lettres et chiffres)': 'Choose a password (at least 10 characters, letters and digits)',
+    'Se connecter avec le code d\'accès du cabinet': 'Sign in with the firm’s access code',
+    'Solution provisoire, tant que les comptes ne sont pas créés : le même code que l\'ancienne console pilote.': 'Temporary option until accounts exist: the same code as the old pilot console.',
+    'Code d\'accès du cabinet': 'Firm access code', 'Entrer': 'Enter', 'Vérifier mon code': 'Check my code', 'Code à vérifier': 'Code to check', 'Vérifier': 'Check',
+    'Tapez un code : l\'application vous dit si c\'est le code d\'accès, le code propriétaire, ou aucun des deux, et ce qui manque sur le serveur. Aucun secret n\'est affiché.': 'Type a code: the app tells you whether it is the access code, the owner code or neither, and what is missing on the server. No secret is shown.',
+    'Connexion annulée dans Google.': 'Sign-in cancelled in Google.', 'Adresse e-mail invalide.': 'Invalid e-mail address.', 'E-mail ou mot de passe incorrect.': 'Wrong e-mail or password.',
+    'Trop de tentatives. Réessayez dans quelques minutes.': 'Too many attempts. Try again in a few minutes.', 'Indisponible pour le moment.': 'Unavailable for now.',
+    'Connexion impossible pour le moment (serveur de comptes).': 'Sign-in unavailable for now (accounts server).',
+    'La demande a expiré : cliquez à nouveau sur « Continuer avec Google ».': 'The request expired: click “Continue with Google” again.',
+    'Cette adresse n’a pas encore de compte ici. Cliquez sur « Continuer avec Google » : votre compte est créé en un clic.': 'This address has no account here yet. Click “Continue with Google”: your account is created in one click.',
+    'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.': 'Password too weak: at least 10 characters, with letters and digits.',
+    'Cette adresse a déjà un compte.': 'This address already has an account.', 'Indiquez votre nom.': 'Enter your name.', 'Vous avez déjà un compte : connectez-vous.': 'You already have an account: sign in.'
+  };
+  function startI18n() {
+    if (OM.getLang() !== 'en') return;
+    document.documentElement.lang = 'en';
+    var cache = {}; try { cache = JSON.parse(safeGet(window.localStorage, I18N_KEY) || '{}') || {}; } catch (e) { cache = {}; }
+    Object.keys(LOGIN_EN).forEach(function (k) { if (!cache[k]) cache[k] = LOGIN_EN[k]; });
+    var english = new Set(Object.keys(cache).map(function (k) { return cache[k]; }));
+    var queue = new Set(), timer = null, sending = false;
+    var SKIP = 'script,style,textarea,code,pre,[data-keep],[data-user-name],[data-firm-name],.mtile .client,.mtile .name,.avatar';
+    var worth = function (t) { return t.length > 1 && /[A-Za-zÀ-ÿ]{2}/.test(t) && !english.has(t) && !/^[\w.+-]+@[\w.-]+$/.test(t) && !/^[A-Z0-9_\-]{2,}$/.test(t) && !/^https?:/.test(t); };
+    function tr(t) { var k = t.trim(); if (!worth(k)) return null; if (cache[k]) return t.replace(k, cache[k]); queue.add(k); return null; }
+    function pass(root) {
+      if (!root || root.nodeType !== 1 && root.nodeType !== 9) return;
+      var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) { return n.parentElement && n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; } });
+      var n; while ((n = w.nextNode())) { var v = tr(n.nodeValue); if (v != null && v !== n.nodeValue) n.nodeValue = v; }
+      (root.querySelectorAll ? root.querySelectorAll('[placeholder],[aria-label],[title]') : []).forEach(function (el) {
+        if (el.closest(SKIP)) return;
+        ['placeholder', 'aria-label', 'title'].forEach(function (a) { var x = el.getAttribute(a); if (!x) return; var v = tr(x); if (v != null && v !== x) el.setAttribute(a, v); });
+      });
+      if (document.title) { var tt = tr(document.title); if (tt) document.title = tt; }
+      if (queue.size) send();
+    }
+    function send() {
+      if (sending || !OM.getToken()) return;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var batch = [], size = 0;
+        queue.forEach(function (t) { if (batch.length < 120 && size + t.length < 20000) { batch.push(t); size += t.length; } });
+        if (!batch.length) return;
+        sending = true;
+        OM.api('/api/app?route=translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: 'en', texts: batch }) })
+          .then(function (d) {
+            var got = (d && d.translations) || {};
+            Object.keys(got).forEach(function (k) { cache[k] = got[k]; english.add(got[k]); });
+            var keys = Object.keys(cache); if (keys.length > 6000) keys.slice(0, keys.length - 6000).forEach(function (k) { delete cache[k]; });
+            safeSet(window.localStorage, I18N_KEY, JSON.stringify(cache));
+          })
+          .catch(function () {})
+          .then(function () { batch.forEach(function (t) { queue.delete(t); }); sending = false; pass(document.body); });
+      }, 250);
+    }
+    var pending = false;
+    new MutationObserver(function () { if (pending) return; pending = true; setTimeout(function () { pending = false; pass(document.body); }, 60); })
+      .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    pass(document.body);
+  }
   // ---- Workspace shell: icons in the rail, a menu button on small screens, tabs for long pages ----
   var ICONS = {
     '/accueil.html': 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -171,6 +323,8 @@
     var nav = document.querySelector('.nav');
     if (!nav || nav.dataset.decorated) return;
     nav.dataset.decorated = '1';
+    // Setup and settings live in the settings wheel at the bottom of the menu.
+    nav.querySelectorAll('a[href="/parametres.html"], a[href="/mise-en-service.html"]').forEach(function (a) { if (a.getAttribute('aria-current') !== 'page') a.remove(); else a.classList.add('in-wheel'); });
     nav.querySelectorAll('a[href]').forEach(function (a) {
       var d = ICONS[a.getAttribute('href')]; if (!d || a.querySelector('svg')) return;
       var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -209,16 +363,43 @@
       b.addEventListener('click', function () { select(i); try { sessionStorage.setItem(key, String(i)); } catch (e) {} });
       bar.appendChild(b); return b;
     });
+    var current = 0;
     function select(i) {
+      current = i;
       best.forEach(function (sec, j) { sec.style.display = j === i ? '' : 'none'; buttons[j].setAttribute('aria-selected', String(j === i)); });
     }
-    // Sections the page itself hides (not ready yet, owner only…) lose their tab too.
-    function sync() { buttons.forEach(function (b, j) { b.hidden = best[j].hidden; }); }
+    // Sections the page itself hides (not ready yet, owner only…) lose their tab too; if the
+    // open tab disappears, the first visible one opens.
+    function sync() {
+      // Written only when it changes: the observer below watches « hidden ».
+      buttons.forEach(function (b, j) { if (b.hidden !== best[j].hidden) b.hidden = best[j].hidden; });
+      var visible = best.filter(function (sec) { return !sec.hidden; });
+      if (bar.hidden !== (visible.length < 2)) bar.hidden = visible.length < 2;
+      if (best[current].hidden && visible.length) select(best.indexOf(visible[0]));
+    }
     new MutationObserver(sync).observe(main, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     best[0].parentElement.insertBefore(bar, best[0]);
-    sync(); select(Math.min(saved, best.length - 1));
+    // A link to a section (/parametres.html#h-google, the settings wheel) opens its tab.
+    function fromHash() {
+      var id = decodeURIComponent(location.hash.slice(1)); if (!id) return false;
+      for (var i = 0; i < best.length; i++) {
+        if (best[i].id === id || best[i].querySelector('[id="' + id.replace(/"/g, '') + '"]')) { select(i); window.scrollTo(0, 0); return true; }
+      }
+      return false;
+    }
+    window.addEventListener('hashchange', fromHash);
+    sync(); if (!fromHash()) select(Math.min(saved, best.length - 1));
   }
 
+  var i18nReady = function () { startI18n(); if (onLoginPage()) loginLangSwitch(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', i18nReady); else i18nReady();
+  function loginLangSwitch() {
+    var host = document.querySelector('.login-card') || document.querySelector('.main') || document.body;
+    var p = node('p', null, 'lang-switch'); p.setAttribute('data-keep', '');
+    var other = OM.getLang() === 'en' ? ['fr', 'Français'] : ['en', 'English'];
+    var b = node('button', other[1], 'link-lang'); b.type = 'button'; b.addEventListener('click', function () { OM.setLang(other[0]); });
+    p.appendChild(b); host.appendChild(p);
+  }
   if (!onLoginPage()) {
     if (!readSession()) { OM.forget(true); return; }
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };

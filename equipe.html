@@ -20,6 +20,32 @@
 .cov{font-size:12px;color:var(--muted);margin:0;line-height:1.4}
 .risk-high{background:var(--danger-soft);color:var(--danger-ink)}
 .method{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+.mtools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mtools input{max-width:320px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.mtile{position:relative;display:flex;flex-direction:column;gap:4px;padding:12px 14px 12px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);text-decoration:none;color:var(--ink);transition:border-color .12s}
+.mtile:hover{border-color:var(--brand)}
+.mtile::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--line)}
+.mtile.r-medium::before{background:var(--brass)}
+.mtile.r-high::before{background:var(--danger)}
+.mtile .client{font-size:12px;color:var(--muted);font-weight:600}
+.mtile .name{font-size:14.5px;font-weight:700;line-height:1.3}
+.mtile .facts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.mtile .facts b{color:var(--ink);font-weight:600}
+.mtile .facts .late b{color:var(--danger-ink)}
+.mgroup{font-size:13px;font-weight:700;color:var(--muted);margin:8px 0 0}
+.duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.duo h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
+.count{font-size:12px;font-weight:700;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted)}
+.tasks{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tasks li{display:grid;grid-template-columns:8px 1fr;gap:4px 12px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface)}
+.tasks li:first-child{border-top:0}
+.tasks .dot{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--brass)}
+.tasks.late .dot{background:var(--danger)}
+.tasks .sum{font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tasks .sub{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--muted)}
+.tasks .sub span{background:var(--surface-2);border-radius:6px;padding:1px 7px}
+.tasks .none{padding:14px;font-size:14px;color:var(--muted);display:block}
 </style>
 </head>
 <body>
@@ -57,40 +83,33 @@
       <span class="callout-text">Les indicateurs sont personnels. Connectez-vous avec votre e-mail et votre mot de passe (pas avec le code d'accès du cabinet) pour les voir.</span>
     </div>
 
+    <section class="card" aria-labelledby="h-coord" id="coord-card" hidden>
+      <h2 id="h-coord">Vue d'ensemble</h2>
+      <div class="kpis" id="coord-kpis"></div>
+      <div class="duo">
+        <div><h3>Actions en retard <span class="count" id="n-overdue">0</span></h3><ul class="tasks late" id="overdue"></ul></div>
+        <div><h3>Sans responsable <span class="count" id="n-unassigned">0</span></h3><ul class="tasks" id="unassigned"></ul></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-missions" id="missions-card" hidden>
+      <h2 id="h-missions">Missions</h2>
+      <div class="mtools"><input type="search" id="mfilter" placeholder="Filtrer : client, mission…" aria-label="Filtrer les missions"><span class="meta" id="mcount"></span></div>
+      <div id="missions"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-team" id="team-card" hidden>
+      <h2 id="h-team">L'équipe <span class="meta" id="team-period"></span></h2>
+      <div class="kpis" id="team-kpis"></div>
+      <p class="method" id="method"></p>
+      <div class="people" id="people"></div>
+      <p class="method">Consultation réservée au propriétaire, aux associés-gérants et aux managers. Chaque consultation est enregistrée dans le journal de sécurité. Chacun peut voir ses propres indicateurs.</p>
+    </section>
+
     <section class="card" aria-labelledby="h-me" id="me-card" hidden>
       <h2 id="h-me">Mes indicateurs <span class="meta" id="me-period"></span></h2>
       <div id="me"></div>
     </section>
-
-    <div id="manager-area" class="stack" style="gap:20px" hidden>
-      <section class="card" aria-labelledby="h-coord">
-        <h2 id="h-coord">Coordination</h2>
-        <div class="kpis" id="coord-kpis"></div>
-        <h3 style="margin:6px 0 0;font-size:15px">Missions à surveiller</h3>
-        <div class="table-box"><table>
-          <thead><tr><th scope="col">Mission</th><th scope="col">Fin prévue</th><th scope="col">Actions ouvertes</th><th scope="col">En retard</th><th scope="col">Équipe</th><th scope="col">Risque</th></tr></thead>
-          <tbody id="missions"></tbody>
-        </table></div>
-        <div class="row">
-          <div class="grow" style="gap:8px">
-            <h3 style="margin:6px 0 0;font-size:15px">Actions en retard</h3>
-            <div id="overdue" class="stack"></div>
-          </div>
-          <div class="side" style="gap:8px">
-            <h3 style="margin:6px 0 0;font-size:15px">Sans responsable</h3>
-            <div id="unassigned" class="stack"></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card" aria-labelledby="h-team">
-        <h2 id="h-team">Indicateurs de l'équipe <span class="meta" id="team-period"></span></h2>
-        <div class="kpis" id="team-kpis"></div>
-        <p class="method" id="method"></p>
-        <div class="people" id="people"></div>
-        <p class="method">Consultation réservée au propriétaire, aux associés-gérants et aux managers. Chaque consultation est enregistrée dans le journal de sécurité. Chacun peut voir ses propres indicateurs.</p>
-      </section>
-    </div>
   </main>
 </div>
 
@@ -134,33 +153,58 @@
     }).catch(function (e) { $('me-card').hidden = false; UI.fail($('me'), { message: ERR[e.message] || e.message }); });
   }
 
+  var MISSIONS = [];
+  function splitName(n) { var m = String(n || '').split(/\s+[—–]\s+|\s+\/\s+/); return m.length > 1 ? { client: m[0], name: m.slice(1).join(' — ') } : { client: '', name: n || 'Mission' }; }
+  function fact(label, value, cls) { var f = el('span', null, cls || ''); f.appendChild(el('b', String(value))); f.appendChild(document.createTextNode(' ' + label)); return f; }
+  function tile(m) {
+    var t = el('a', null, 'mtile r-' + m.risk); t.href = '/mission.html?id=' + encodeURIComponent(m.id);
+    var n = splitName(m.name);
+    if (n.client) t.appendChild(el('span', n.client, 'client'));
+    t.appendChild(el('span', n.name, 'name'));
+    var f = el('div', null, 'facts');
+    f.appendChild(el('span', m.planned_end ? UI.date(m.planned_end) + (m.days_left != null ? (m.days_left < 0 ? ' · dépassée de ' + (-m.days_left) + ' j' : ' · J-' + m.days_left) : '') : 'Fin à définir'));
+    f.appendChild(fact(m.team_size > 1 ? 'personnes' : 'personne', m.team_size));
+    if (m.open_actions) f.appendChild(fact('ouvertes', m.open_actions));
+    if (m.overdue_actions) f.appendChild(fact('en retard', m.overdue_actions, 'late'));
+    t.appendChild(f); t.title = RISK[m.risk][0];
+    return t;
+  }
+  function renderMissions() {
+    var box = $('missions'); box.textContent = '';
+    var qy = $('mfilter').value.trim().toLowerCase();
+    var rows = MISSIONS.filter(function (m) { return !qy || String(m.name || '').toLowerCase().indexOf(qy) >= 0; });
+    $('mcount').textContent = rows.length + ' mission' + (rows.length > 1 ? 's' : '');
+    if (!rows.length) { box.appendChild(el('p', qy ? 'Aucune mission ne correspond.' : 'Aucune mission en cours.', 'empty')); return; }
+    var training = function (m) { return /entra[iî]nement|training/i.test(m.name || ''); };
+    [['Avec une date de fin', function (m) { return m.planned_end && !training(m); }],
+     ['Date de fin à définir', function (m) { return !m.planned_end && !training(m); }],
+     ['Entraînement des agents', training]].forEach(function (g) {
+      var part = rows.filter(g[1]); if (!part.length) return;
+      box.appendChild(el('p', g[0] + ' · ' + part.length, 'mgroup'));
+      var grid = el('div', null, 'mgrid'); part.forEach(function (m) { grid.appendChild(tile(m)); }); box.appendChild(grid);
+    });
+  }
+
   function loadCoordination() {
     OM.api('/api/app?route=coordination').then(function (d) {
       var k = $('coord-kpis'); k.textContent = '';
       [['Missions en cours', d.totals.missions_live], ['Missions à risque', d.totals.missions_at_risk], ['Actions en retard', d.totals.overdue], ['Sans responsable', d.totals.unassigned]]
         .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
-      var tb = $('missions'); tb.textContent = '';
-      if (!d.missions.length) { var tr0 = el('tr'); var td0 = el('td', 'Aucune mission en cours.', 'empty'); td0.colSpan = 6; tr0.appendChild(td0); tb.appendChild(tr0); }
-      d.missions.slice(0, 30).forEach(function (m) {
-        var tr = el('tr');
-        var a = el('a', m.name || 'Mission'); a.href = '/mission.html?id=' + encodeURIComponent(m.id);
-        var td = el('td'); td.appendChild(a); tr.appendChild(td);
-        tr.appendChild(el('td', m.planned_end ? UI.date(m.planned_end) + (m.days_left != null ? (m.days_left < 0 ? ' (dépassée de ' + (-m.days_left) + ' j)' : ' (J-' + m.days_left + ')') : '') : 'À définir'));
-        tr.appendChild(el('td', String(m.open_actions))); tr.appendChild(el('td', String(m.overdue_actions))); tr.appendChild(el('td', String(m.team_size)));
-        var r = el('td'); r.appendChild(el('span', RISK[m.risk][0], RISK[m.risk][1])); tr.appendChild(r);
-        tb.appendChild(tr);
-      });
-      list('overdue', d.overdue, function (x) { return [x.summary, [x.mission, x.assignee || 'sans responsable', x.days_late + ' j de retard'].filter(Boolean).join(' · ')]; }, 'Aucune action en retard.');
-      list('unassigned', d.unassigned, function (x) { return [x.summary, [x.mission, x.due_at ? 'échéance ' + UI.date(x.due_at) : 'sans échéance'].filter(Boolean).join(' · ')]; }, 'Tout est assigné.');
+      MISSIONS = d.missions || []; renderMissions();
+      list('overdue', d.overdue, function (x) { return [x.summary, [x.mission, x.assignee || 'sans responsable', x.days_late + ' j de retard']]; }, 'Aucune action en retard.');
+      list('unassigned', d.unassigned, function (x) { return [x.summary, [x.mission, x.due_at ? 'échéance ' + UI.date(x.due_at) : 'sans échéance']]; }, 'Tout est assigné.');
     }).catch(function (e) { UI.fail($('missions'), { message: ERR[e.message] || e.message }); });
   }
 
   function list(id, rows, fmt, empty) {
     var box = $(id); box.textContent = '';
-    if (!rows.length) { box.appendChild(el('p', empty, 'empty')); return; }
+    $('n-' + id).textContent = String(rows.length);
+    if (!rows.length) { var li0 = el('li'); li0.style.display = 'block'; li0.appendChild(el('span', empty, 'none')); box.appendChild(li0); return; }
     rows.slice(0, 20).forEach(function (r) {
-      var f = fmt(r); var item = el('div', null, 'item'); var t = el('div', null, 't');
-      t.appendChild(el('span', f[0] || 'Action')); t.appendChild(el('span', f[1], 'meta')); item.appendChild(t); box.appendChild(item);
+      var f = fmt(r); var li = el('li');
+      li.appendChild(el('span', null, 'dot')); li.appendChild(el('span', f[0] || 'Action', 'sum'));
+      var sub = el('div', null, 'sub'); f[1].filter(Boolean).forEach(function (x) { sub.appendChild(el('span', x)); }); li.appendChild(sub);
+      box.appendChild(li);
     });
   }
 
@@ -185,7 +229,8 @@
     OM.loadBranding().catch(function () {});
     if (!OM.hasPersonalSession()) { $('need-login').hidden = false; return; }
     loadMine();
-    if (OM.isManager()) { $('manager-area').hidden = false; loadCoordination(); loadTeam(); }
+    if (OM.isManager()) { ['coord-card', 'missions-card', 'team-card'].forEach(function (id) { $(id).hidden = false; }); loadCoordination(); loadTeam(); }
+    $('mfilter').addEventListener('input', renderMissions);
   }
   UI.requireLogin(start);
 })();
