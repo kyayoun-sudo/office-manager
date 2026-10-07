@@ -1,6 +1,7 @@
 import { requirePilotAccess } from '../lib/auth.js';
 import { rest } from '../lib/supabase.js';
 import { presentRun } from '../lib/run-status.js';
+import { assertIsolatedOrg } from '../lib/test-mode.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -9,6 +10,7 @@ export default async function handler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     const orgId = process.env.DEFAULT_ORG_ID;
     if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
+    assertIsolatedOrg(orgId);
     // Ignore any client-supplied organisation. Do not expose error details or metrics.
     const rows = await rest('office_agent_runs?org_id=eq.' + encodeURIComponent(orgId) +
       '&metrics->>release=eq.v2.3-architecture-phase1' +

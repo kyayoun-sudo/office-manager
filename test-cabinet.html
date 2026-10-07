@@ -57,15 +57,21 @@
         <details><summary class="small">Éléments non copiés ou en échec</summary><div id="copy-issues" class="stack" style="gap:4px"></div></details>
       </section>
 
+      <section class="card" aria-labelledby="h-ids">
+        <h2 id="h-ids">3. Les fichiers du cabinet utilisés par les agents</h2>
+        <p class="small">Après la copie, chaque réglage doit pointer vers la <strong>copie</strong>, jamais vers le vrai fichier. Pour une ligne orange : dans Vercel (Preview), mettez la variable indiquée à l'identifiant de la copie, puis redéployez l'aperçu. Quoi qu'il arrive, le code refuse toute écriture hors du Drive de test.</p>
+        <div id="ids" class="stack" style="gap:6px"></div>
+      </section>
+
       <section class="card" aria-labelledby="h-team">
-        <h2 id="h-team">3. Vos boîtes mail et l'équipe</h2>
+        <h2 id="h-team">4. Vos boîtes mail et l'équipe</h2>
         <p class="small">Chaque rôle reçoit les e-mails de l'agent dans une de vos boîtes. Une même boîte peut tenir plusieurs rôles. Les adresses doivent figurer dans les listes du verrou mail (Vercel : <span class="mono">AGENT_MAIL_SANDBOX_COLLEAGUES</span> pour l'équipe, <span class="mono">AGENT_MAIL_SANDBOX_CLIENTS</span> pour le CFO).</p>
         <div class="grid2" id="roles"></div>
         <div class="field" style="max-width:240px"><label for="start">Début du test (semaine 1)</label><input id="start" type="date" class="mono"></div>
       </section>
 
       <section class="card" aria-labelledby="h-missions">
-        <h2 id="h-missions">4. Les 5 missions</h2>
+        <h2 id="h-missions">5. Les 5 missions</h2>
         <div id="missions" class="grid2"></div>
         <div class="btn-row"><button class="btn" id="seed-btn" type="button">Créer le cabinet de test et les 5 missions</button></div>
         <p class="status" id="status" role="status" aria-live="polite"></p>
@@ -90,10 +96,14 @@
     TEST_DRIVE_IS_THE_REAL_DRIVE: 'Le Drive de test est le vrai Drive : créez un Drive partagé « TATY TEST » et mettez son identifiant.',
     GOOGLE_SERVICE_ACCOUNT_JSON_MISSING: 'L’accès Google du cabinet (GOOGLE_SERVICE_ACCOUNT_JSON) manque.',
     MAIL_SANDBOX_EMPTY: 'Le verrou mail est vide : AGENT_MAIL_SANDBOX_COLLEAGUES et AGENT_MAIL_SANDBOX_CLIENTS.',
+    REAL_FIRM_ORG_NOT_DECLARED: 'TEST_RUN_FORBIDDEN_ORG_IDS (identifiant du VRAI cabinet, à protéger) manque.',
+    INBOX_LABEL_NOT_A_TEST_LABEL: 'AGENT_MAIL_INBOX_LABEL doit être un libellé de test (contenant « TEST »), pour ne pas lire les vrais e-mails clients.',
     REQUIRE_EXISTING_MEMORY_MUST_BE_FALSE_IN_PREVIEW: 'OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY doit valoir false en Preview (la copie démarre sans mémoire).'
   };
   var ERR = { COPY_NOT_FINISHED: 'Attendez la fin de la copie du Drive.', MAILBOX_MISSING: 'Renseignez une boîte pour chaque rôle.',
     MAILBOX_NOT_IN_SANDBOX: 'Une adresse ne figure pas dans le verrou mail de Vercel.', TEST_ENVIRONMENT_NOT_READY: 'L’environnement de test n’est pas prêt (voir étape 1).',
+    TEST_DRIVE_NOT_EMPTY: 'Le Drive partagé de test doit être vide au départ.', TEST_DRIVE_NAME_MUST_CONTAIN_TEST: 'Le nom du Drive partagé de test doit contenir « TEST ».',
+    TEST_DRIVE_IDS_NOT_ON_COPY: 'Des réglages pointent encore vers les vrais fichiers (voir étape 3).', TEST_MODE_ON_REAL_ORG: 'Refusé : c’est le vrai cabinet.',
     ORG_IS_NOT_A_TEST_FIRM: 'Ce cabinet n’est pas un cabinet de test : rien n’a été créé.', COPY_ALREADY_DONE: 'La copie est déjà faite.', COPY_ALREADY_RUNNING: 'La copie est en cours.' };
   var msg = function (e) { var m = String(e && e.message || e); return ERR[m] || m; };
   var say = function (t) { $('status').textContent = t || ''; };
@@ -109,7 +119,8 @@
     if (d.sandbox) env.appendChild(el('p', 'Verrou mail — équipe : ' + (d.sandbox.colleagues.join(', ') || 'aucune') + ' · clients : ' + (d.sandbox.clients.join(', ') || 'aucun'), 'small'));
 
     var c = d.copy;
-    $('copy-btn').disabled = !d.environment.ok || Boolean(c);
+    $('copy-btn').disabled = !d.environment.ok || Boolean(c && (c.done || c.busy));
+    $('copy-btn').textContent = c && !c.done ? 'Reprendre la copie' : 'Copier le Drive';
     if (c) {
       var total = c.folders + c.copied + c.skipped + c.failed;
       $('copy-meta').textContent = c.done ? '— terminée ✓' : '— en cours';
@@ -121,6 +132,18 @@
       clearTimeout(timer); if (!c.done) timer = setTimeout(load, 8000);
     }
     if (d.last_error) $('copy-text').textContent += ' Dernière erreur : ' + d.last_error;
+
+    var ids = $('ids'); ids.textContent = '';
+    (d.drive_ids || []).forEach(function (s) {
+      var r = line(s.ok, s.label + ' — ' + s.state);
+      if (!s.ok) {
+        var hint = el('div', 'Vercel (Preview) : ' + s.env_to_set + (s.suggested_copy_id ? ' = ' + s.suggested_copy_id : ' = identifiant de la copie (disponible après la copie)'), 'mono');
+        hint.style.gridColumn = '2'; r.appendChild(hint);
+      }
+      ids.appendChild(r);
+    });
+    if (!(d.drive_ids || []).length) ids.appendChild(el('p', 'Vérifié une fois l’environnement prêt.', 'small'));
+    (d.limits || []).forEach(function (t) { ids.appendChild(el('p', 'Limite connue : ' + t, 'small')); });
 
     var roles = $('roles');
     if (!roles.children.length) d.roles.forEach(function (r) {
@@ -144,7 +167,7 @@
     $('seed-btn').disabled = !(c && c.done);
     var out = $('seed-out'); out.textContent = '';
     if (d.seed && d.seed.missions) {
-      out.appendChild(el('p', 'Cabinet de test créé. Test du ' + d.seed.start_date + ' au ' + d.seed.end_date + '. Les agents passent seuls aux heures du cabinet ; les propositions arrivent dans « À valider ».', 'small'));
+      out.appendChild(el('p', 'Cabinet de test créé. Test du ' + d.seed.start_date + ' au ' + d.seed.end_date + '. Les agents passent aux heures du cabinet une fois le planificateur de l’aperçu branché (sinon : Paramètres → « Lancer un passage maintenant ») ; les propositions arrivent dans « À valider ».', 'small'));
     }
   }
   function line(ok, text) {
@@ -157,7 +180,7 @@
   $('copy-btn').addEventListener('click', function () {
     var b = this; b.disabled = true; say('Copie lancée…');
     OM.api('/api/app?route=test-run', { method: 'POST', headers: H(), body: JSON.stringify({ action: 'copy' }) })
-      .then(function () { say('Copie en cours : elle continue seule, cette page se met à jour.'); return load(); })
+      .then(function (r) { say(r && r.resumed ? 'Copie relancée.' : 'Copie en cours : elle continue seule, cette page se met à jour.'); return load(); })
       .catch(function (e) { say(msg(e)); b.disabled = false; });
   });
   $('seed-btn').addEventListener('click', function () {

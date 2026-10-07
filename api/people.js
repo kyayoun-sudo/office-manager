@@ -1,6 +1,7 @@
 import { requirePilotAccess } from '../lib/auth.js';
 import { getAgentSetting } from '../lib/supabase.js';
 import { getPeopleIntelligence } from '../lib/people-intelligence.js';
+import { assertIsolatedOrg } from '../lib/test-mode.js';
 
 // Deterministic internal reading only: no external AI call, assignment or notification.
 export default async function handler(req, res) {
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     const orgId = process.env.DEFAULT_ORG_ID;
     if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
+    assertIsolatedOrg(orgId);
     const missionId = req.body?.mission_id;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(missionId || '')) {
       return res.status(400).json({ error: 'VALID_MISSION_ID_REQUIRED' });

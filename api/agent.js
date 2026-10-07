@@ -10,6 +10,7 @@ import {
 import { requirePilotAccess } from "../lib/auth.js";
 import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import {
+import { assertIsolatedOrg } from "../lib/test-mode.js";
   createAgentRun,
   finishAgentRun,
   getAgentSetting,
@@ -143,6 +144,7 @@ export default async function handler(req, res) {
     if (!orgId) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
+    assertIsolatedOrg(orgId);
 
     const permissions = await getPermissions(orgId);
 

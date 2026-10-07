@@ -6,6 +6,7 @@ import {
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
 import {
+import { assertIsolatedOrg } from "../lib/test-mode.js";
   getAgentSetting,
   getPermissions
 } from "../lib/supabase.js";
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
     if (!orgId) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
+    assertIsolatedOrg(orgId);
 
     const [permissions, rootSetting, ...specialistSettings] =
       await Promise.all([

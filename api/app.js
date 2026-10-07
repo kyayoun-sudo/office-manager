@@ -16,6 +16,7 @@ import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
 import { listMessages, proposeMessage, decideMessage } from '../lib/agent-mail.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 import { getTestRun, startCopy, copyTick, seed as seedTestRun } from '../lib/test-run.js';
+import { assertIsolatedOrg } from '../lib/test-mode.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -212,6 +213,8 @@ export async function handleApp(req) {
   if (run.ownerOnly) requireFirmOwner(req);
   const orgId = process.env.DEFAULT_ORG_ID;
   if (!orgId && route !== ROUTES.diagnostic) throw new Error('DEFAULT_ORG_ID_MISSING');
+  // Test mode (preview): never on the real firm's organisation (test run TATY TEST).
+  if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
   return run(orgId, req);
 }
