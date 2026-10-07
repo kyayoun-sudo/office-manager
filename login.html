@@ -35,6 +35,14 @@
       <p class="hint" style="margin:0;font-size:12px;color:var(--muted)">Vous restez connecté sur cet ordinateur jusqu'à ce que vous cliquiez sur « Se déconnecter ». Mot de passe oublié : demandez au propriétaire du cabinet de le réinitialiser.</p>
     </form>
 
+    <button type="button" class="link-btn" id="code-link">Se connecter avec le code d'accès du cabinet</button>
+    <form id="code-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Solution provisoire, tant que les comptes ne sont pas créés : le même code que l'ancienne console pilote.</p>
+      <div class="field"><label for="c-code">Code d'accès du cabinet</label><input id="c-code" type="password" autocomplete="off"></div>
+      <button class="btn" type="submit">Entrer</button>
+      <p class="status" id="code-status" role="status" aria-live="polite"></p>
+    </form>
+
     <button type="button" class="link-btn" id="first-link">Première configuration du cabinet</button>
     <form id="first-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
       <h2 style="font-size:17px;margin:0">Créer le compte du propriétaire</h2>
@@ -64,7 +72,10 @@
     OWNER_SETTINGS_NOT_CONFIGURED: 'Le code propriétaire n’est pas encore défini sur le serveur.',
     ACCOUNTS_ALREADY_EXIST: 'Des comptes existent déjà : connectez-vous, ou demandez un compte au propriétaire.',
     EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.',
-    INVALID_NAME: 'Indiquez votre nom.'
+    INVALID_NAME: 'Indiquez votre nom.',
+    LOGIN_UNAVAILABLE: 'La connexion par e-mail n\u2019est pas encore activée sur le serveur (table des comptes à créer dans Supabase). Utilisez le code d\u2019accès ci-dessous.',
+    BOOTSTRAP_UNAVAILABLE: 'Création impossible : la table des comptes n\u2019existe pas encore dans Supabase (fichier db/app-users.sql à appliquer).',
+    SUPABASE_SERVER_CONFIG_MISSING: 'Configuration Supabase manquante sur le serveur.'
   };
   function say(id, text, isError) { $(id).textContent = text; $(id).className = 'status' + (isError ? ' error' : ''); }
   function next() {
@@ -95,6 +106,21 @@
     post('login', { email: email, password: password }).then(enter)
       .catch(function (err) { say('login-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); $('password').value = ''; $('password').focus(); })
       .then(function () { $('login-btn').disabled = false; });
+  });
+
+  $('code-link').addEventListener('click', function () { $('code-form').hidden = !$('code-form').hidden; if (!$('code-form').hidden) $('c-code').focus(); });
+  $('code-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = $('c-code').value.trim();
+    if (!code) { say('code-status', 'Entrez le code d\u2019accès.', true); return; }
+    say('code-status', 'Vérification…');
+    // The code is checked by reading the firm branding with it.
+    fetch('/api/app?route=branding', { headers: { 'x-office-manager-token': code } }).then(function (r) {
+      if (r.status === 401) throw new Error('BAD_CODE');
+      enter({ pilot_token: code, refresh_token: null, owner_token: null, user: { display_name: 'Accès par code', role: 'collaborator', email: '' } });
+    }).catch(function (err) {
+      say('code-status', err.message === 'BAD_CODE' ? 'Code d\u2019accès incorrect.' : 'Serveur injoignable pour le moment.', true);
+    });
   });
 
   $('first-link').addEventListener('click', function () { $('first-form').hidden = !$('first-form').hidden; });
