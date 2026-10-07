@@ -233,3 +233,12 @@ test('clean Drive: one copy of each agent file, moved into 00_OFFICE_MANAGER; ol
   assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapOld')), 'the older copy goes to the bin');
   assert.ok(!calls.some(c => (new URL(c[1]).searchParams.get('q') || '').match(/^name = '[^']+' and trashed/)), 'never a Drive-wide search');
 });
+
+test('primary memory: an existing « TATY_AI_office manager » folder of the drive is used, not a new folder', async () => {
+  const { findPrimaryMemory } = await import('../lib/google-connection.js');
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ files: [
+    { id: 'x1', name: 'Archives office manager 2019', parents: ['DEEP'] },
+    { id: 'm1', name: 'TATY_AI_office manager', parents: ['0ASHARE'] }] }) });
+  const f = await findPrimaryMemory('0ASHARE', { headers: {} }, fetchImpl);
+  assert.equal(f.id, 'm1');
+});
