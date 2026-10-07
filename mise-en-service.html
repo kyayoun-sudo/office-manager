@@ -186,8 +186,24 @@
   function mappingPass() {
     say('Lancement du passage de cartographie…');
     OM.api('/api/app?route=readiness', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'mapping-pass' }) })
-      .then(function (r) { say(r.message); }).catch(function (e) { say(msg(e)); });
+      .then(function (r) { say(r.message); watchScan(); }).catch(function (e) { say(msg(e)); });
   }
+  // Live progress of the Drive walk, then of the Orpailleur's mapping pass.
+  var scanTimer = null;
+  function watchScan() {
+    clearTimeout(scanTimer);
+    OM.api('/api/app?route=mapping-scan', { headers: ownerHeaders() }).then(function (s) {
+      if (!s) return;
+      var t = s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
+        : s.status === 'mapping' ? 'Parcours terminé (' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers). L’Orpailleur écrit sa cartographie…'
+        : s.status === 'done' ? 'Cartographie terminée : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers. Ses questions apparaissent ci-dessous.'
+        : s.status === 'failed' ? 'La cartographie a échoué : ' + ((s.errors || []).map(function (e) { return e.path + ' — ' + e.error; }).pop() || 'cause inconnue') + '.' : '';
+      if (s.errors && s.errors.length && s.status !== 'failed') t += ' ' + s.errors.length + ' dossier(s) illisible(s).';
+      say(t);
+      if (s.status === 'walking' || s.status === 'mapping') scanTimer = setTimeout(watchScan, 5000); else load();
+    }).catch(function () {});
+  }
+  watchScan();
 
   function load() {
     return OM.api('/api/app?route=readiness', { headers: { 'x-office-manager-owner-token': OM.getOwnerToken() } })

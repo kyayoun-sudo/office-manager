@@ -21,6 +21,7 @@ import { assertIsolatedOrg } from '../lib/test-mode.js';
 import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
 import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
+import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -163,7 +164,8 @@ export const ROUTES = Object.freeze({
   readiness: {
     GET: owner((orgId) => checkReadiness(orgId)),
     POST: owner((orgId, req) => {
-      if (req.body?.action === 'mapping-pass') return launchMappingPass(req);
+      // Whole-Drive mapping in short resumable steps (a single agent call hit the 300 s limit).
+      if (req.body?.action === 'mapping-pass') return startScan(orgId, req).then(r => ({ ...r, message: r.already_running ? 'Cartographie déjà en cours : elle continue.' : 'Cartographie lancée : l’Orpailleur parcourt votre Drive. Suivez l’avancement ici.' }));
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'READINESS_UNAVAILABLE'
@@ -198,7 +200,7 @@ export const ROUTES = Object.freeze({
       if (req.body?.action === 'disconnect') return disconnectGoogle(orgId);
       if (req.body?.action === 'set-drive') return setFirmDrive(orgId, req).then(async (r) => {
         // The agents start on the Drive right away: first the mapping (cartographie) by the Orpailleur.
-        const m = await launchMappingPass(req).catch(() => ({ started: false }));
+        const m = await startScan(orgId, req).catch(() => ({ started: false }));
         return { ...r, mapping_started: Boolean(m.started) };
       });
       throw fail('UNKNOWN_ACTION', 400);
@@ -208,6 +210,9 @@ export const ROUTES = Object.freeze({
   // "Autoriser les agents": Drive listing, reading of chosen documents, AI — granted by the owner
   //   GET  /api/app?route=agent-permissions        granted or not (any account)
   //   POST /api/app?route=agent-permissions        grant (owner / partner, personal session)
+  // Drive mapping progress (owner) and its background step (pilot token, chained by itself).
+  'mapping-scan': { GET: owner(() => scanStatus()), unavailable: 'MAPPING_UNAVAILABLE' },
+  'mapping-step': { POST: (orgId, req) => scanStep(orgId, req), unavailable: 'MAPPING_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
