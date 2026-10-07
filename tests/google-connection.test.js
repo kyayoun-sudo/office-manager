@@ -166,3 +166,10 @@ test('a firm connected in the app comes first; the old relay connection does not
   assert.equal(firmConnected(), false, 'legacy relay connection');
   resetGoogleConnectionCache();
 });
+
+test('the refresh token can be sealed with OAUTH_STATE_SECRET when no dedicated key is set', () => {
+  const env = { OAUTH_STATE_SECRET: 'state-only' };
+  const sealed = encryptToken('1//abc', env);
+  assert.equal(decryptToken(sealed, env), '1//abc');
+  assert.throws(() => encryptToken('x', {}), /TOKEN_ENCRYPTION_KEY_MISSING/);
+});
