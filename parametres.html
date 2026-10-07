@@ -74,7 +74,8 @@
           </div>
           <div class="field" style="max-width:640px"><label for="g-drive">Drive du cabinet — collez le lien du Drive partagé (ou d'un de ses dossiers)</label>
             <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="g-drive" type="text" class="mono" style="flex:1;min-width:240px" placeholder="https://drive.google.com/drive/folders/0A…">
-            <button class="btn ghost" id="g-drive-save" type="button">Utiliser ce Drive</button></div>
+            <button class="btn ghost" id="g-drive-save" type="button">Utiliser ce Drive</button>
+            <button class="btn" type="button" id="g-drive-save-all">Tout mon Google Drive</button></div>
             <span class="hint" id="g-drive-now"></span></div>
           <div class="stack" style="gap:6px">
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost" id="g-allow" type="button">Autoriser les agents</button>
@@ -377,7 +378,7 @@
         box.appendChild(gLine(false, g.env_access ? 'Accès technique configuré dans Vercel (compte de service). Vous pouvez aussi connecter le compte Google du cabinet.' : 'Aucun compte Google connecté : les agents ne peuvent ni ranger le Drive ni envoyer d’e-mail.'));
       }
       $('g-drive-now').textContent = g.firm_drive ? 'Les agents travaillent sur : ' + (g.firm_drive.name || g.firm_drive.id) : 'Aucun Drive choisi : connectez Google, puis collez le lien du Drive.';
-      $('g-drive-save').disabled = !g.connected;
+      $('g-drive-save').disabled = !g.connected; $('g-drive-save-all').disabled = !g.connected;
       $('g-disconnect').hidden = !g.connected;
       $('g-connect').textContent = g.connected ? 'Reconnecter Google' : 'Connecter Google';
       $('g-status').textContent = window.__googleReturn || '';
@@ -406,6 +407,12 @@
     var b = this; b.disabled = true; $('g-status').textContent = 'Vérification du Drive auprès de Google…';
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', link: $('g-drive').value, by: OM.getUserName() || null }) })
       .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus' + (r.mapping_started ? ' : la cartographie a démarré (quelques minutes, voir Mise en service).' : '.'); $('g-drive').value = ''; return loadGoogle(); })
+      .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
+  });
+  $('g-drive-save-all').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('g-status').textContent = 'Les agents vont lire tout votre Google Drive (Mon Drive et les Drive partagés)…';
+    ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', all: true, by: OM.getUserName() || null }) })
+      .then(function (r) { $('g-status').textContent = 'C’est fait : les agents lisent tout votre Google Drive. Leurs fichiers de travail vont dans « Office Manager - mémoire des agents » (Mon Drive)' + (r.mapping_started ? '. La cartographie a démarré.' : '.'); return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { loadAllow(); return loadGoogle(); }); })
       .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
   });
   $('g-disconnect').addEventListener('click', function () {

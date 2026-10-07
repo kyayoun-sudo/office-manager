@@ -187,3 +187,27 @@ test('« Mon Drive » folder as the firm’s Drive: a target is accepted only if
   assert.equal(await insideFolder('x', 'root', meta), false);
   assert.equal(await insideFolder('root', 'root', meta), true);
 });
+
+test('« Tout mon Google Drive »: memory folder found or created in Mon Drive, kind "all"', async () => {
+  resetGoogleConnectionCache();
+  const firm = [];
+  const fetchRows = async (path, o = {}) => {
+    if (path.startsWith('office_google_connections')) return [{ google_email: 'p@x.com', refresh_token_enc: encryptToken('1//r', ENV), scopes: [SCOPES.drive] }];
+    if (path.startsWith('office_firm_drive')) { if (o.method === 'POST') { firm.splice(0, 1, JSON.parse(o.body)[0]); return []; } return firm; }
+    return [];
+  };
+  let created = null;
+  const fetchImpl = async (url, o = {}) => {
+    if (url.includes('oauth2.googleapis.com/token')) return { ok: true, json: async () => ({ access_token: 't', expires_in: 3600 }) };
+    if (url.startsWith('https://www.googleapis.com/drive/v3/files?') && o.method === 'POST') { created = JSON.parse(o.body); return { ok: true, json: async () => ({ id: 'mem1', name: created.name }) }; }
+    if (url.startsWith('https://www.googleapis.com/drive/v3/files?')) return { ok: true, json: async () => ({ files: [] }) };
+    return { ok: false, json: async () => ({}) };
+  };
+  await loadGoogleConnection('org-1', { env: ENV, fetchRows });
+  const r = await setFirmDrive('org-1', { body: { all: true } }, { env: ENV, fetchRows, fetchImpl });
+  assert.deepEqual(r, { drive_id: 'mem1', drive_name: 'Tout le Google Drive', kind: 'all' });
+  assert.deepEqual(created.parents, ['root']);
+  assert.equal(firm[0].drive_id, 'all:mem1');
+  assert.equal(firmDriveKind(), 'all'); assert.equal(firmDriveId(), 'mem1');
+  resetGoogleConnectionCache();
+});

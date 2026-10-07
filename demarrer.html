@@ -53,9 +53,10 @@ body{background:var(--bg,#F4F5F3)}
 
   <section class="step off" id="st3">
     <h2><span class="num">3</span> L'adresse de votre Drive</h2>
-    <p class="small">Ouvrez votre Drive partagé du cabinet dans Google Drive, copiez l'adresse en haut du navigateur et collez-la ici.</p>
+    <p class="small">Collez l’adresse d’un Drive partagé ou d’un dossier (copiée en haut du navigateur), ou choisissez « Tout mon Google Drive ».</p>
     <div class="field"><label for="drive">Adresse du Drive</label><input id="drive" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/…"></div>
     <button class="btn" type="button" id="s3-save">Utiliser ce Drive</button>
+            <button class="btn" type="button" id="s3-save-all">Tout mon Google Drive</button>
     <p class="small" id="s3-msg" role="status" aria-live="polite"></p>
   </section>
 
@@ -117,6 +118,14 @@ body{background:var(--bg,#F4F5F3)}
     $('s2-msg').textContent = 'Ouverture de Google…';
     OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'connect', return_to: '/demarrer.html', by: OM.getUserName() || null }) })
       .then(function (r) { location.assign(r.url); }).catch(function (e) { $('s2-msg').textContent = msg(e); });
+  });
+  $('s3-save-all').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('s3-msg').textContent = 'Les agents vont lire tout votre Google Drive…';
+    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', all: true, by: OM.getUserName() || null }) })
+      .then(function (r) { window.__mapping = r && r.mapping_started;
+        return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(refresh); })
+      .then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Google Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } })
+      .catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
   $('s3-save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('s3-msg').textContent = 'Vérification auprès de Google…'; $('s3-msg').className = 'small';
