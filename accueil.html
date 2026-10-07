@@ -20,6 +20,7 @@
     <a href="/validations.html">À valider <span class="badge" id="nav-count" hidden></span></a>
     <a href="/assistant.html">Assistant</a>
     <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
     <a href="/parametres.html">Paramètres</a>
     <div class="who"><span data-user-name>Utilisateur</span></div>
   </nav>
@@ -35,6 +36,12 @@
       <h1 id="hello">Bonjour</h1>
       <p class="lead">Vue d'ensemble du cabinet : ce qui attend votre décision, les missions et les dernières demandes aux agents.</p>
     </header>
+
+    <a class="callout" id="setup" href="/mise-en-service.html" hidden>
+      <span class="callout-label">Mise en service</span>
+      <span class="callout-num" id="setup-num"></span>
+      <span class="callout-text" id="setup-text"></span>
+    </a>
 
     <form id="search" role="search" class="searchbox" action="/recherche.html">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--brand)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
@@ -163,7 +170,18 @@
     var name = OM.getUserName();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
     OM.loadBranding().catch(function () {});
-    loadMissions(); loadRuns(); loadPending(); loadPasses();
+    loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup();
+  }
+
+  // Owner: reminder of what is still missing for everything to work together.
+  function loadSetup() {
+    if (!OM.isOwner()) return;
+    OM.api('/api/app?route=readiness', { headers: { 'x-office-manager-owner-token': OM.getOwnerToken() } }).then(function (d) {
+      if (d.ready) return;
+      $('setup').hidden = false;
+      $('setup-num').textContent = d.remaining + ' étape' + (d.remaining > 1 ? 's' : '') + ' restante' + (d.remaining > 1 ? 's' : '');
+      $('setup-text').textContent = d.next ? 'Prochaine : ' + d.next.label + '.' : '';
+    }).catch(function () { /* page still works */ });
   }
   UI.requireLogin(start);
 })();

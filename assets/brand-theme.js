@@ -107,7 +107,7 @@
       var name = OM.getUserName() || 'Utilisateur';
       document.querySelectorAll('[data-user-name]').forEach(function (el) { el.textContent = name; });
       // Settings are visible to the owner and managing partners only.
-      if (!OM.isOwner()) document.querySelectorAll('.nav a[href="/parametres.html"]').forEach(function (a) { a.hidden = true; });
+      if (!OM.isOwner()) document.querySelectorAll('.nav a[href="/parametres.html"], .nav a[href="/mise-en-service.html"]').forEach(function (a) { a.hidden = true; });
       // The training page needs a personal session (e-mail + password).
       if (!OM.hasPersonalSession()) document.querySelectorAll('.nav a[href="/entrainement.html"]').forEach(function (a) { a.hidden = true; });
     },

@@ -166,6 +166,31 @@ Détail complet : **`docs/ENTRAINEMENT.md`**. En bref :
 - Les missions fictives ne sont **jamais** écrites dans `office_missions` /
   `office_action_queue` : les indicateurs de l'équipe restent propres.
 
+### 3 sexies. Mise en service — que tout marche ensemble — ✅ construit
+Demande de Paul (7/10) : « créer les conditions pour que tout marche ensemble ».
+- `lib/readiness.js` + route `readiness` (propriétaire) + page **`mise-en-service.html`**
+  (menu « Mise en service », propriétaire seulement) + bandeau sur l'accueil tant que ce
+  n'est pas fini. Vérifie toute la chaîne et dit **quoi faire** pour chaque maillon :
+  1. réglages Vercel (présence seulement, jamais les valeurs) ;
+  2. tables de l'application (13 tables) ;
+  3. compte propriétaire ;
+  4. Drive (connexion ; accès direct pour déplacer / mettre à la corbeille) ;
+  5. **cartographie de l'Orpailleur** : complète puis **validée** par le propriétaire
+     (c'est la porte `mappingGate()` de toutes les écritures Drive) ;
+  6. horaires activés et planificateur qui tourne vraiment (dernier passage < 26 h).
+- Boutons : « Lancer un passage de cartographie complet » (demande à l'Orpailleur
+  `run_mapping_pass` DRIVE_WALK, max_reads 30, via `/api/agent`) ; réponses aux questions
+  de l'Orpailleur (« C'est celui-ci » → `/api/owner` `approve_role`, signé) ; « Valider la
+  cartographie » (`/api/owner` `mark_mapping_reviewed`, signé). **Avant, aucun écran
+  n'utilisait `/api/owner`** : la cartographie ne pouvait pas être validée depuis l'app.
+- **`db/INSTALL_TOUT.sql`** : toutes les tables de l'application en un seul fichier, à
+  coller une fois dans Supabase (relançable sans danger). Généré par
+  `scripts/build-install-sql.mjs` ; `tests/verify-install-sql.mjs` vérifie qu'il est à jour
+  et qu'il crée les 13 tables contrôlées par la Mise en service.
+- Remarque : des copies de fichiers traînent à la racine du dépôt (`agent-tools.js`,
+  `orchestrator.js`, `index.ts`, `missions.js`…), restes d'envois manuels. Le code utilisé
+  est celui de `lib/`, `api/`, `supabase/functions/` ; ne pas modifier les copies.
+
 ### 4. Recherche, missions, décisions
 - `lib/global-search.js` — recherche en lecture seule (inventaire Drive,
   missions, annuaire ; jamais les profils RH).
@@ -217,17 +242,18 @@ depuis ; `runMappingPass` : refus `LISTING_EMPTY_REFUSED` d'une liste vide, aver
 | `training` | GET (campagne, missions, notes, rapport) · POST `action` start, stop, cleanup | GET : session personnelle ; POST : **propriétaire** |
 | `training-confirm` | POST (l'équipe confirme / corrige l'agent sur une vraie mission) | session personnelle |
 | `training-step` | POST (unité de travail suivante, chaîne d'arrière-plan) | code pilote |
+| `readiness` | GET (Mise en service : toute la chaîne vérifiée) · POST `mapping-pass` | **propriétaire** |
 
 ## Tables Supabase ajoutées (à appliquer, rien n'est appliqué)
 `db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`,
-`db/agent-schedule.sql`, `db/access-log.sql`, `db/training.sql`, puis `db/scheduler-cron.sql` (après avoir remplacé l'adresse et le secret).
+**Le plus simple : `db/INSTALL_TOUT.sql` (tout en une fois).** Sinon un par un : `db/org-branding.sql`, `db/action-decisions.sql`, `db/agent-persona.sql`, `db/app-users.sql`, `db/tidy.sql`, `db/agent-schedule.sql`, `db/access-log.sql`, `db/training.sql`, puis `db/scheduler-cron.sql` (après avoir remplacé l'adresse et le secret).
 Toutes : RLS activé, aucun accès anon/authenticated, pas de DELETE.
 Vérifications PGlite : `tests/verify-branding-sql.mjs`,
 `tests/verify-action-decisions-sql.mjs`, `tests/verify-agent-persona-sql.mjs`,
 `tests/verify-app-users-sql.mjs`, `tests/verify-tidy-sql.mjs`, `tests/verify-training-sql.mjs`.
 
 ## État des tests
-181 tests : 181 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
+188 tests : 188 OK (dont `tests/training.test.js` : 5 jours simulés avec Drive, agent et examinateur factices). Le seul échec, `tests/browser-response.test.js`, **existait
 avant ces ajouts** (SyntaxError dans le script extrait de `index.html`).
 
 ## Ce qui n'est PAS fait — prochaines étapes

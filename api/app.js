@@ -12,6 +12,7 @@ import { getSchedule, saveSchedule } from '../lib/schedule.js';
 import { tick, runNow, listPasses } from '../lib/agent-passes.js';
 import { requireRole, logAccess } from '../lib/user-auth.js';
 import { teamKpis, coordination, myKpis } from '../lib/kpi.js';
+import { checkReadiness, launchMappingPass } from '../lib/readiness.js';
 import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase, step as trainingStep } from '../lib/training.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -44,6 +45,8 @@ import { getTraining, startCampaign, stopCampaign, cleanupCampaign, confirmCase,
 //   POST /api/app?route=training {action}          start | stop | cleanup (remove the training missions) — OWNER ONLY
 //   POST /api/app?route=training-confirm           the team confirms / corrects the agent on a real mission (personal session)
 //   POST /api/app?route=training-step              next unit of training work (background chain)
+//   GET  /api/app?route=readiness                  "Mise en service": every link of the chain checked — OWNER ONLY
+//   POST /api/app?route=readiness {action}         mapping-pass (full Drive mapping by the Orpailleur) — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
 // also need the owner token (x-office-manager-owner-token), as in api/owner.js.
 
@@ -121,6 +124,14 @@ export const ROUTES = Object.freeze({
   },
   'training-confirm': { POST: users(ALL_ROLES, (orgId, req) => confirmCase(orgId, req)), unavailable: 'TRAINING_UNAVAILABLE' },
   'training-step': { POST: (orgId, req) => trainingStep(orgId, req), unavailable: 'TRAINING_UNAVAILABLE' },
+  readiness: {
+    GET: owner((orgId) => checkReadiness(orgId)),
+    POST: owner((orgId, req) => {
+      if (req.body?.action === 'mapping-pass') return launchMappingPass(req);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'READINESS_UNAVAILABLE'
+  },
   users: {
     GET: owner((orgId) => listAccounts(orgId)),
     POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),

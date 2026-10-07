@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mise en service</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+.progress{height:10px;background:#E3E7E5;border-radius:5px;overflow:hidden}
+.progress span{display:block;height:10px;background:var(--brand)}
+.step{display:flex;flex-direction:column;gap:8px}
+.step h3{margin:6px 0 0;font-size:15px}
+.chk{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;align-items:start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.chk .ico{font-family:var(--mono);font-size:15px;line-height:22px;text-align:center;border-radius:6px}
+.chk.ok .ico{color:#0B4A43;background:#E3F1EE}
+.chk.todo .ico{color:#8A2E0B;background:#FBE4D8}
+.chk.warn .ico{color:#8A5A0B;background:#FBF0D8}
+.chk .lbl{font-weight:500;font-size:14px;overflow-wrap:anywhere}
+.chk .fix{grid-column:2;font-size:13px;color:var(--muted);margin:0;line-height:1.5;overflow-wrap:anywhere}
+.chk .act{grid-column:2}
+.next{border-left:4px solid var(--brand)}
+.q{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.cand{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.cand code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+.small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html" aria-current="page">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Mise en service</h1>
+      <p class="lead">Tout ce qu'il faut pour que l'application, le Drive et les agents travaillent ensemble. Chaque ligne dit ce qui manque et comment le régler ; la page se met à jour à chaque visite.</p>
+    </header>
+
+    <div class="callout" id="not-owner" hidden style="text-decoration:none">
+      <span class="callout-label">Réservé au propriétaire</span>
+      <span class="callout-text">La mise en service est réservée au propriétaire et aux associés-gérants.</span>
+    </div>
+
+    <div id="area" class="stack" style="gap:20px" hidden>
+      <section class="card" aria-labelledby="h-sum">
+        <h2 id="h-sum">État <span class="meta" id="sum-meta"></span></h2>
+        <div class="progress" aria-hidden="true"><span id="bar" style="width:0"></span></div>
+        <p class="small" id="sum-text"></p>
+        <div id="next"></div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-steps">
+        <h2 id="h-steps">Les étapes</h2>
+        <div id="steps" class="stack" style="gap:14px"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-map" id="map-card">
+        <h2 id="h-map">Cartographie du Drive <span class="meta" id="map-state"></span></h2>
+        <p class="small">L'Orpailleur parcourt le Drive et apprend où se trouve chaque chose (missions, modèles, procédures…). Tant que la cartographie n'est pas complète <strong>et</strong> validée par vous, aucun agent ne range, ne renomme ni ne crée de fichier dans le Drive.</p>
+        <div class="kpis" id="map-kpis"></div>
+        <p class="small" id="map-warning" style="color:#8A2E0B" hidden></p>
+        <div class="btn-row">
+          <button class="btn ghost" id="map-pass" type="button">Lancer un passage de cartographie complet</button>
+          <button class="btn" id="map-review" type="button" hidden>Valider la cartographie</button>
+        </div>
+        <h3 style="margin:8px 0 0;font-size:15px">Questions de l'Orpailleur</h3>
+        <div id="questions" class="stack" style="gap:8px"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var STATE = { NO_DRIVE: 'Drive non connecté', NO_MAP: 'pas encore commencée', UNREADABLE: 'illisible', FIRST_MAPPING: 'incomplète',
+    MAPPING_PENDING_REVIEW: 'complète, à valider', MAPPING_REVIEWED: 'validée ✓' };
+  var ROLE = { SOP_LIBRARY: 'Bibliothèque des procédures (SOP)', WORKING_PAPER_TEMPLATE_LIBRARY: 'Modèles de feuilles de travail',
+    PBC_MASTER: 'Liste PBC de référence', HR_CV_LIBRARY: 'CV et profils de l’équipe' };
+  var ICO = { ok: '✓', todo: '○', warn: '!' };
+  var ERR = { OWNER_ONLY: 'Réservé au propriétaire.', OWNER_UNAUTHORIZED: 'Code propriétaire refusé : reconnectez-vous.',
+    OFFICE_MANAGER_OWNER_TOKEN_MISSING: 'OFFICE_MANAGER_OWNER_TOKEN manque dans Vercel.', OWNER_APPROVAL_SECRET_MISSING: 'OWNER_APPROVAL_SECRET manque dans Vercel.',
+    FIRST_MAPPING_NOT_COMPLETE: 'La cartographie n’est pas encore complète.' };
+  var msg = function (e) { var m = String(e && e.message || e); return ERR[m] || m; };
+  function say(t) { $('status').textContent = t || ''; }
+  function ownerHeaders() { return { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }; }
+  // /api/owner is the signed owner endpoint of the Orpailleur memory (same owner code).
+  function ownerEndpoint(body) {
+    return fetch('/api/owner', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'HTTP_' + r.status); return d; }); });
+  }
+
+  function checkRow(c, isNext) {
+    var row = el('div', null, 'chk ' + c.status + (isNext ? ' next' : ''));
+    row.appendChild(el('span', ICO[c.status], 'ico'));
+    row.appendChild(el('span', c.label, 'lbl'));
+    if (c.fix) row.appendChild(el('p', c.fix, 'fix'));
+    if (c.status !== 'ok' && c.action === 'mapping-pass') { var a = el('div', null, 'act'); var b = el('button', 'Lancer le passage', 'btn ghost'); b.type = 'button'; b.addEventListener('click', mappingPass); a.appendChild(b); row.appendChild(a); }
+    if (c.status !== 'ok' && c.action === 'mapping-review') { var a2 = el('div', null, 'act'); var b2 = el('button', 'Voir la cartographie', 'btn ghost'); b2.type = 'button'; b2.addEventListener('click', function () { $('map-card').scrollIntoView({ behavior: 'smooth' }); }); a2.appendChild(b2); row.appendChild(a2); }
+    return row;
+  }
+
+  function render(d) {
+    $('area').hidden = false;
+    var total = d.checks.length, ok = d.checks.filter(function (c) { return c.status === 'ok'; }).length;
+    $('bar').style.width = Math.round(100 * ok / total) + '%';
+    $('sum-meta').textContent = '· ' + ok + ' / ' + total;
+    $('sum-text').textContent = d.ready ? 'Tout est en place : l’application, le Drive et les agents peuvent travailler ensemble.'
+      : d.remaining + ' étape' + (d.remaining > 1 ? 's' : '') + ' à faire. Les lignes « ! » sont conseillées mais pas bloquantes. Vérifié le ' + UI.dateTime(d.checked_at) + '.';
+    var nx = $('next'); nx.textContent = '';
+    if (d.next) { nx.appendChild(el('h3', 'Prochaine étape', 'meta')); nx.appendChild(checkRow(d.next, true)); }
+
+    var steps = $('steps'); steps.textContent = '';
+    var groups = [];
+    d.checks.forEach(function (c) { var g = groups.find(function (x) { return x.name === c.step; }); if (!g) { g = { name: c.step, items: [] }; groups.push(g); } g.items.push(c); });
+    groups.forEach(function (g) {
+      var s = el('div', null, 'step');
+      var done = g.items.every(function (c) { return c.status !== 'todo'; });
+      s.appendChild(el('h3', (done ? '✓ ' : '') + g.name));
+      g.items.forEach(function (c) { s.appendChild(checkRow(c, false)); });
+      steps.appendChild(s);
+    });
+    renderMapping(d.mapping);
+  }
+
+  function kpi(label, value) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', String(value))); return k; }
+
+  function renderMapping(m) {
+    m = m || { mapping_state: 'NO_DRIVE' };
+    $('map-state').textContent = '· ' + (STATE[m.mapping_state] || m.mapping_state);
+    var k = $('map-kpis'); k.textContent = '';
+    if (m.objects) {
+      [['Objets connus', m.objects.present], ['Dossiers', m.objects.folders], ['Compris', m.objects.understood],
+       ['À lire', m.objects.pending_read + m.objects.needs_understanding], ['Passages', m.scan_count]].forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
+    }
+    $('map-warning').hidden = !m.warning && !m.error; $('map-warning').textContent = m.warning || m.error || '';
+    $('map-pass').disabled = m.mapping_state === 'NO_DRIVE';
+    $('map-review').hidden = m.mapping_state !== 'MAPPING_PENDING_REVIEW';
+
+    var qs = $('questions'); qs.textContent = '';
+    var questions = m.owner_questions || [];
+    if (!questions.length) { qs.appendChild(el('p', m.mapping_state === 'MAPPING_REVIEWED' ? 'Aucune question en attente.' : 'Aucune question pour l’instant : elles apparaissent quand l’Orpailleur a compris le Drive.', 'empty')); return; }
+    questions.forEach(function (q) {
+      var box = el('div', null, 'q');
+      box.appendChild(el('strong', (ROLE[q.semantic_role] || q.semantic_role) + (q.question === 'WHICH_ONE_IS_CANONICAL' ? ' — lequel est le bon ?' : q.question === 'REVIEW_REQUIRED' ? ' — à revoir' : ' — est-ce bien celui-ci ?')));
+      (q.candidates || []).forEach(function (c) {
+        var line = el('div', null, 'cand');
+        line.appendChild(el('code', (c.target_path || c.target_name || c.target_file_id)));
+        if (c.confidence) line.appendChild(el('span', 'confiance ' + Math.round(Number(c.confidence) * 100) + ' %', 'meta'));
+        var yes = el('button', 'C’est celui-ci', 'btn ghost'); yes.type = 'button';
+        yes.addEventListener('click', function () {
+          yes.disabled = true;
+          ownerEndpoint({ action: 'approve_role', semantic_role: q.semantic_role, target_file_id: c.target_file_id, approved_by: OM.getUserName() })
+            .then(function () { say('Enregistré et signé : ' + (ROLE[q.semantic_role] || q.semantic_role) + '.'); return load(); })
+            .catch(function (e) { say(msg(e)); yes.disabled = false; });
+        });
+        line.appendChild(yes); box.appendChild(line);
+      });
+      qs.appendChild(box);
+    });
+  }
+
+  function mappingPass() {
+    say('Lancement du passage de cartographie…');
+    OM.api('/api/app?route=readiness', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'mapping-pass' }) })
+      .then(function (r) { say(r.message); }).catch(function (e) { say(msg(e)); });
+  }
+
+  function load() {
+    return OM.api('/api/app?route=readiness', { headers: { 'x-office-manager-owner-token': OM.getOwnerToken() } })
+      .then(render).catch(function (e) { $('area').hidden = false; say(msg(e)); });
+  }
+
+  $('map-pass').addEventListener('click', mappingPass);
+  $('map-review').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    ownerEndpoint({ action: 'mark_mapping_reviewed', approved_by: OM.getUserName() })
+      .then(function () { say('Cartographie validée et signée. Le Rangement et les agents peuvent maintenant travailler dans le Drive.'); return load(); })
+      .catch(function (e) { say(msg(e)); }).then(function () { b.disabled = false; });
+  });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    if (!OM.isOwner()) { $('not-owner').hidden = false; return; }
+    load();
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>
