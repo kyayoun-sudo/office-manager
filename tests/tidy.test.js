@@ -159,3 +159,30 @@ test('rangement page is part of the app and injects no HTML', () => {
   assert.match(src, /\/assets\/brand-theme\.js/);
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src));
 });
+
+// ---- Names contradicted by their content (real BLE TRANSIT names, 2026-10-07) ----
+import { nameContradiction, monthsInName, monthsInContent, buildAiRequest as buildReq } from '../lib/tidy-planner.js';
+
+test('contradiction: an August statement named "décembre N et janvier N+1" is flagged; correct names are not', () => {
+  const aug = { name: 'PBC-03-02_Relevés bancaires de décembre N et janvier N+1 (tous comptes)_AOUT_2025_SGCI.pdf',
+    excerpt: 'SOCIETE GENERALE CI - RELEVE DE COMPTE - Période du 01/08/2025 au 31/08/2025 - BLE TRANSIT' };
+  const c = nameContradiction(aug);
+  assert.deepEqual(c.extra.sort(), [1, 12]);
+  assert.deepEqual(c.content, [8]);
+  assert.match(c.message, /mentionne janvier, décembre, le document porte sur août/);
+  assert.match(nameContradiction({ name: 'PBC-03-03_États de rapprochement bancaire au 31-12 (tous comptes), visés_AOUT_2025_SGCI.xlsx', excerpt: 'Etat de rapprochement au 31/08/2025' }).message, /décembre/);
+  assert.equal(nameContradiction({ name: 'PBC-00-01_Balance générale définitive_2025_V01.xlsx', excerpt: 'Balance générale au 31/12/2025' }), null);
+  assert.equal(nameContradiction({ name: 'Relevé SGCI août 2025.pdf', excerpt: 'Période du 01/08/2025 au 31/08/2025' }), null);
+  assert.equal(nameContradiction({ name: aug.name, excerpt: null }), null, 'never from the name alone');
+  assert.deepEqual([...monthsInName('PBC-03-02_x.pdf')], [], 'PBC codes are not dates');
+  assert.deepEqual([...monthsInContent('Période du 01/11/2025 au 31/01/2026')].sort((a, b) => a - b), [1, 11, 12], 'periods across the year end');
+});
+
+test('contradiction: the renaming is only PROPOSED, and the AI is told what is wrong', () => {
+  const file = { file_id: 'f', name: 'PBC-03-02_Relevés de décembre_AOUT_2025.pdf', parent_id: 'p', excerpt: 'Période du 01/08/2025 au 31/08/2025' };
+  file.contradiction = nameContradiction(file);
+  assert.equal(decideMode(file, { dest_folder_id: 'p', new_name: 'PBC-03-02_Relevé bancaire_AOUT_2025.pdf', confidence: 0.99 }, { gateAllowed: true }), 'proposal');
+  const req = buildReq([file], [], '');
+  assert.match(req.input, /ATTENTION : Nom contredit par le contenu/);
+  assert.match(req.instructions, /CONTREDIT par le contenu/);
+});
