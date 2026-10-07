@@ -87,3 +87,15 @@ test('test mode: no silent fallback to the real firm files, and only a TEST mail
   assert.match(inboxQuery({ VERCEL_ENV: 'preview', AGENT_MAIL_INBOX_LABEL: 'PBC-TEST' }), /PBC-TEST/);
   assert.match(inboxQuery({ VERCEL_ENV: 'production', AGENT_MAIL_INBOX_LABEL: 'PBC' }), /label:"PBC"/);
 });
+
+import { applyTestOverrides } from '../lib/test-mode.js';
+
+test('TEST__ overrides: applied in test mode only (preview), never in production', () => {
+  const prev = { VERCEL_ENV: 'preview', DEFAULT_ORG_ID: 'real', TEST__DEFAULT_ORG_ID: 'test-org', AGENT_MAIL_MAILBOX: 'x@taty.info', TEST__AGENT_MAIL_MAILBOX: '__UNSET__' };
+  assert.deepEqual(applyTestOverrides(prev).sort(), ['AGENT_MAIL_MAILBOX', 'DEFAULT_ORG_ID']);
+  assert.equal(prev.DEFAULT_ORG_ID, 'test-org');
+  assert.equal('AGENT_MAIL_MAILBOX' in prev, false);
+  const prod = { VERCEL_ENV: 'production', DEFAULT_ORG_ID: 'real', TEST__DEFAULT_ORG_ID: 'test-org', OFFICE_MANAGER_TEST_RUN: 'on' };
+  assert.deepEqual(applyTestOverrides(prod), []);
+  assert.equal(prod.DEFAULT_ORG_ID, 'real');
+});
