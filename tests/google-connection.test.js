@@ -121,13 +121,13 @@ test('Drive du cabinet: pasted link checked with Google, saved for the firm, the
     await finishConnect('org-1', { ...REQ, query: { code: 'c', state } }, { env: ENV, fetchRows, fetchImpl });
     await loadGoogleConnection('org-1', { env: ENV, fetchRows });
     const r = await setFirmDrive('org-1', { body: { link: 'https://drive.google.com/drive/folders/1folder0000' }, account: { display_name: 'Paul' } }, { env: ENV, fetchRows, fetchImpl });
-    assert.deepEqual(r, { drive_id: '0ATEST0000', drive_name: 'TATY share drive', kind: 'drive' }, 'a folder link gives its shared drive');
+    assert.deepEqual({ drive_id: r.drive_id, drive_name: r.drive_name, kind: r.kind }, { drive_id: '0ATEST0000', drive_name: 'TATY share drive', kind: 'drive' }, 'a folder link gives its shared drive');
     assert.equal(firmDriveId(), '0ATEST0000');
     assert.equal(configuredDriveId(), '0ATEST0000', 'the agents now work on the chosen Drive');
     const my = await setFirmDrive('org-1', { body: { link: 'https://drive.google.com/drive/u/0/folders/1mydrive000' }, account: { display_name: 'Paul' } }, { env: ENV, fetchRows, fetchImpl });
-    assert.deepEqual(my, { drive_id: '1mydrive000', drive_name: 'Cabinet Paul', kind: 'folder' }, 'a « Mon Drive » folder becomes the firm’s Drive');
+    assert.deepEqual({ drive_id: my.drive_id, drive_name: my.drive_name, kind: my.kind }, { drive_id: '1mydrive000', drive_name: 'Cabinet Paul', kind: 'folder' }, 'a « Mon Drive » folder becomes the firm’s Drive');
     assert.equal(firmDriveId(), '1mydrive000'); assert.equal(firmDriveKind(), 'folder');
-    assert.equal(firm[0].drive_id, 'folder:1mydrive000');
+    assert.match(firm[0].drive_id, /^folder:1mydrive000/);
     await assert.rejects(setFirmDrive('org-1', { body: { link: '0AREAL0000' } }, { env: { ...ENV, VERCEL_ENV: 'preview', TEST_SOURCE_DRIVE_ID: '0AREAL0000' }, fetchRows, fetchImpl }), /TEST_MODE_REAL_DRIVE_REFUSED/);
   } finally {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
@@ -212,4 +212,24 @@ test('« Tout mon Google Drive »: memory folder 00_OFFICE_MANAGER found or crea
   assert.equal(firm[0].drive_id, 'all:mem1'); assert.match(firm[0].drive_name, /TATY share drive \/ 00_OFFICE_MANAGER/);
   assert.equal(firmDriveKind(), 'all'); assert.equal(firmDriveId(), 'mem1');
   resetGoogleConnectionCache();
+});
+
+test('clean Drive: one copy of each agent file, moved into 00_OFFICE_MANAGER; older copies binned; nothing searched outside the firm\'s own places', async () => {
+  const { consolidateMemory } = await import('../lib/google-connection.js');
+  const calls = [];
+  const files = { MEM: [], ROOT: [{ id: 'mapOld', name: 'OFFICE_MANAGER_MAP.xlsx', modifiedTime: '2026-10-01' }], OLDMY: [{ id: 'mapNew', name: 'OFFICE_MANAGER_MAP.xlsx', modifiedTime: '2026-10-07' }] };
+  const fetchImpl = async (url, o = {}) => {
+    calls.push([o.method || 'GET', url]);
+    const u = new URL(url); const qq = u.searchParams.get('q') || '';
+    if (qq.includes("Office Manager - mémoire des agents")) return { ok: true, json: async () => ({ files: [{ id: 'OLDMY' }] }) };
+    const m = qq.match(/name = '([^']+)' and '([^']+)' in parents/);
+    if (m) return { ok: true, json: async () => ({ files: (files[m[2]] || []).filter(f => f.name === m[1]) }) };
+    if (qq.includes("'OLDMY' in parents")) return { ok: true, json: async () => ({ files: [] }) };
+    return { ok: true, json: async () => ({}) };
+  };
+  const r = await consolidateMemory('MEM', ['ROOT'], { headers: {} }, fetchImpl);
+  assert.deepEqual(r, { moved: ['OFFICE_MANAGER_MAP.xlsx'], binned: ['OFFICE_MANAGER_MAP.xlsx'] });
+  assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapNew') && c[1].includes('addParents=MEM')), 'the newest copy is moved into the memory folder');
+  assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapOld')), 'the older copy goes to the bin');
+  assert.ok(!calls.some(c => (new URL(c[1]).searchParams.get('q') || '').match(/^name = '[^']+' and trashed/)), 'never a Drive-wide search');
 });

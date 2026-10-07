@@ -443,14 +443,18 @@
   $('g-drive-save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('g-status').textContent = 'Vérification du Drive auprès de Google…';
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', link: $('g-drive').value, by: OM.getUserName() || null }) })
-      .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus' + (r.mapping_started ? ' : la cartographie a démarré (quelques minutes, voir Mise en service).' : '.'); $('g-drive').value = ''; return loadGoogle(); })
+      .then(function (r) { $('g-status').textContent = 'Drive enregistré : ' + (r.drive_name || r.drive_id) + '. Les agents travaillent désormais dessus ; tout ce qu’ils utilisent est dans son dossier 00_OFFICE_MANAGER' + cleanedText(r.cleaned) + (r.mapping_started ? '. Le premier scan a démarré (Mise en service).' : '.'); $('g-drive').value = ''; return loadGoogle(); })
       .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
   });
+  function cleanedText(c) {
+    if (!c || (!c.moved.length && !c.binned.length)) return '';
+    return ' (rangement de la mémoire : ' + c.moved.length + ' fichier(s) regroupé(s), ' + c.binned.length + ' doublon(s) mis à la corbeille)';
+  }
   $('g-drive-save-all').addEventListener('click', function () {
     var b = this; b.disabled = true; $('g-status').textContent = 'Les agents vont lire tout votre Google Drive (Mon Drive et les Drive partagés)…';
     if (!$('g-home').value) { $('g-status').textContent = 'Choisissez d’abord le Drive partagé qui gardera la mémoire des agents.'; b.disabled = false; return; }
     ownerApi('google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set-drive', all: true, home: $('g-home').value, by: OM.getUserName() || null }) })
-      .then(function (r) { $('g-status').textContent = 'C’est fait : les agents lisent tout votre Google Drive. Leur mémoire est dans ' + ((r.home && r.home.name) || 'le Drive partagé') + ' / 00_OFFICE_MANAGER' + (r.mapping_started ? '. Le premier scan a démarré (Mise en service).' : '.'); return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { loadAllow(); return loadGoogle(); }); })
+      .then(function (r) { $('g-status').textContent = 'C’est fait : les agents lisent tout votre Google Drive. Leur mémoire est dans ' + ((r.home && r.home.name) || 'le Drive partagé') + ' / 00_OFFICE_MANAGER' + cleanedText(r.cleaned) + (r.mapping_started ? '. Le premier scan a démarré (Mise en service).' : '.'); return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(function () { loadAllow(); return loadGoogle(); }); })
       .catch(function (err) { $('g-status').textContent = explain(err); }).then(function () { b.disabled = false; });
   });
   $('g-disconnect').addEventListener('click', function () {
