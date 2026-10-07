@@ -87,3 +87,17 @@ test('review fixes: two decisions at once never act twice; a failed proposal lea
   await assert.rejects(executeDecision('org', reminder, 'approve', 'Paul', { fetchRows: w.fetchRows, getPersona: async () => PERSONA, proposeMessage: async () => { throw new Error('INTERNAL_DOMAINS_NOT_CONFIGURED'); } }), /INTERNAL_DOMAINS/);
   assert.equal(w.patches.length, 0, 'still pending, nothing lost');
 });
+
+test('FILE_MOVE: the file is moved / renamed only when a manager approves, never before', async () => {
+  const patches = [];
+  const fetchRows = async (path, o = {}) => { if (o.method === 'PATCH') { patches.push(JSON.parse(o.body)); return [{ id: 'a1' }]; } return []; };
+  const moved = [];
+  const tidy = { move: async (...args) => { moved.push(args); return { id: args[0] }; } };
+  const action = { id: 'a1', action_type: 'FILE_MOVE', payload: { file_id: 'f1', from_parent: 'p0', to_parent: 'p1', to_name: 'CAC 2026', new_name: 'LM_CAC_2026.pdf' } };
+  const r = await executeDecision('org', action, 'approve', 'Paul', { fetchRows, tidyDrive: tidy });
+  assert.deepEqual(moved, [['f1', 'p0', 'p1', 'LM_CAC_2026.pdf']]);
+  assert.match(r.effect, /Rangé dans « CAC 2026 » sous le nom « LM_CAC_2026.pdf »/);
+  moved.length = 0;
+  await executeDecision('org', action, 'reject', 'Paul', { fetchRows, tidyDrive: tidy });
+  assert.equal(moved.length, 0);
+});
