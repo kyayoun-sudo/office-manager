@@ -13,10 +13,13 @@
   },
   "dependencies": {
     "@openai/agents": "0.18.0",
+    "@vercel/functions": "^3.9.11",
     "exceljs": "4.4.0",
     "mammoth": "1.13.0",
     "pdfkit": "0.17.2",
     "zod": "4.6.5"
   },
-  "devDependencies": { "@electric-sql/pglite": "0.3.14" }
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
+  }
 }
