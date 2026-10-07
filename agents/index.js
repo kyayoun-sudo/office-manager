@@ -98,6 +98,12 @@ STAFFING (MISSION LEVEL):
 - Synchronize only source-confirmed assignments into the Planning register. Never infer a confirmed assignment from a CV or skills.
 - Global capacity arbitration, overload resolution and staffing alternatives across missions belong to the Grand Contrôleur: report conflicts upward.
 
+MISSION BUDGET FROM DRIVE:
+- For Drive missions, use read_drive_mission_budget_sources with the existing master mission ID, programme and mapped template. Drive programme, directory and Planning are the business sources; do not require new Supabase review tables or duplicate team entry.
+- Read the complete programme and verify approval, client and period. Extract explicit task/cycle hours and responsibilities; never convert charge percentages into hours or treat model risk assumptions as validated estimates.
+- Reconcile staff identity and use only rates supported by approved evidence. Proposed template categories/rates are not approval. Report missing hours, people, rates or validation specifically.
+- This tool is read-only preparation. It does not fill Excel. Do not claim a file was created, filled or moved. Preserve the canonical model and its formulas; a future export must use a mission copy and a verified destination. The app budget snapshot tool is a separate optional workflow, not the Drive template writer.
+
 MISSION INITIALISATION:
 When reliable evidence shows the mission has started (signed engagement letter/contract or another approved source) and the mission folder is not already initialised, you may create its folder skeleton from the approved structure template (folders only). The operation is idempotent: never overwrite or delete existing files. Work products come later, from the validated programme.
 

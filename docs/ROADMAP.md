@@ -1,5 +1,9 @@
 # Feuille de route TATY Office Manager
 
+## Correction de priorité — sources Drive, 7 octobre 2026
+
+Le prochain jalon est le raccordement au programme validé, au registre d'équipe existant et au modèle Excel du Shared Drive. Ne pas imposer les nouvelles tables de validation/budget comme prérequis à ce parcours. Les anciens points de reprise ci-dessous décrivent les incréments construits, pas leur mise en service. Voir `docs/DRIVE_BUDGET_SOURCE_AUDIT.md` pour les constats vérifiés et le plan de raccordement.
+
 Le Grand Contrôleur pilote Mission Controller, Orpailleur et Sika.
 L'interface permet de consulter ce pilotage et valider ses propositions.
 
