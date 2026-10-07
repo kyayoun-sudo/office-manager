@@ -5,8 +5,8 @@ import {
   SPECIALIST_KEYS
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
-import {
 import { assertIsolatedOrg } from "../lib/test-mode.js";
+import {
   getAgentSetting,
   getPermissions
 } from "../lib/supabase.js";

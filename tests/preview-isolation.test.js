@@ -66,3 +66,24 @@ test('every route refuses the real firm in test mode, and a test mode without th
     Object.assign(process.env, saved);
   }
 });
+
+import { configuredDriveId, masterSheetId } from '../lib/google-drive.js';
+import { inboxQuery } from '../lib/agent-mailbox.js';
+
+test('test mode: no silent fallback to the real firm files, and only a TEST mail label is read', () => {
+  const saved = { ...process.env };
+  try {
+    Object.assign(process.env, { VERCEL_ENV: 'preview' });
+    delete process.env.TATY_SHARED_DRIVE_ID; delete process.env.TATY_MASTER_SHEET_ID;
+    assert.throws(() => configuredDriveId(), /TEST_MODE_DRIVE_ID_NOT_SET/);
+    assert.throws(() => masterSheetId(), /TEST_MODE_DRIVE_ID_NOT_SET/);
+    process.env.TATY_SHARED_DRIVE_ID = 'TESTDRIVE';
+    assert.equal(configuredDriveId(), 'TESTDRIVE');
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+    Object.assign(process.env, saved);
+  }
+  assert.equal(inboxQuery({ VERCEL_ENV: 'preview', AGENT_MAIL_INBOX_LABEL: 'PBC' }), null);
+  assert.match(inboxQuery({ VERCEL_ENV: 'preview', AGENT_MAIL_INBOX_LABEL: 'PBC-TEST' }), /PBC-TEST/);
+  assert.match(inboxQuery({ VERCEL_ENV: 'production', AGENT_MAIL_INBOX_LABEL: 'PBC' }), /label:"PBC"/);
+});
