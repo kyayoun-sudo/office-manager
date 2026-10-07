@@ -14,6 +14,10 @@
 .login-brand strong{font-size:20px;display:block}
 .login-brand small{font-size:13px;color:var(--muted)}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:400}
+.status:empty{display:none}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:#E3E7E5}
+.more summary{font-size:13px;color:var(--muted);cursor:pointer}
 .link-btn{font:inherit;font-size:13px;background:none;border:0;color:var(--brand);text-decoration:underline;cursor:pointer;padding:8px 0;align-self:flex-start;min-height:36px}
 </style>
 </head>
@@ -25,51 +29,25 @@
       <div><strong data-firm-name>Office Manager</strong><small>Espace du cabinet</small></div>
     </div>
 
+    <h1 style="font-size:22px;margin:0">Connexion</h1>
     <a class="btn" id="start-new" href="/demarrer.html" hidden style="text-align:center">Nouveau cabinet ? Démarrer ici</a>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn" type="button" id="google-btn" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1F2933;border:1px solid #C9D0CC">
+    <button class="btn" type="button" id="google-btn" hidden style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1F2933;border:1px solid #C9D0CC">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
         Continuer avec Google</button>
-      <p class="status" id="google-status" role="status" aria-live="polite"></p>
-      <p style="margin:0;font-size:13px;color:var(--muted);text-align:center">ou avec votre e-mail et votre mot de passe</p>
-    </div>
+    <p class="status" id="google-status" role="status" aria-live="polite"></p>
+    <div class="or" id="or-line" hidden><span>ou</span></div>
     <form id="login-form" style="display:flex;flex-direction:column;gap:14px" novalidate>
-      <h1 style="font-size:22px">Connexion</h1>
       <div class="field"><label for="email">Adresse e-mail</label><input id="email" type="text" inputmode="email" autocomplete="username" maxlength="254" required></div>
       <div class="field"><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" maxlength="128" required></div>
       <label class="check"><input type="checkbox" id="show-pw"> Afficher le mot de passe</label>
       <button class="btn" type="submit" id="login-btn">Se connecter</button>
       <p class="status" id="login-status" role="status" aria-live="polite"></p>
-      <p class="hint" style="margin:0;font-size:12px;color:var(--muted)">Vous restez connecté sur cet ordinateur jusqu'à ce que vous cliquiez sur « Se déconnecter ». Mot de passe oublié : demandez au propriétaire du cabinet de le réinitialiser.</p>
     </form>
+    <p style="margin:0;font-size:14px;text-align:center">Pas encore de compte ? <a href="/demarrer.html">Créer un compte</a></p>
 
-    <button type="button" class="link-btn" id="code-link">Se connecter avec le code d'accès du cabinet</button>
-    <form id="code-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
-      <p style="margin:0;font-size:13px;color:var(--muted)">Solution provisoire, tant que les comptes ne sont pas créés : le même code que l'ancienne console pilote.</p>
-      <div class="field"><label for="c-code">Code d'accès du cabinet</label><input id="c-code" type="password" autocomplete="off"></div>
-      <button class="btn" type="submit">Entrer</button>
-      <p class="status" id="code-status" role="status" aria-live="polite"></p>
-    </form>
-
-    <button type="button" class="link-btn" id="diag-link">Vérifier mon code</button>
-    <form id="diag-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
-      <p style="margin:0;font-size:13px;color:var(--muted)">Tapez un code : l'application vous dit si c'est le code d'accès, le code propriétaire, ou aucun des deux, et ce qui manque sur le serveur. Aucun secret n'est affiché.</p>
-      <div class="field"><label for="d-code">Code à vérifier</label><input id="d-code" type="password" autocomplete="off"></div>
-      <button class="btn ghost" type="submit">Vérifier</button>
-      <div id="diag-out" role="status" aria-live="polite" style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:6px"></div>
-    </form>
-
-    <button type="button" class="link-btn" id="signup-link">Créer mon compte</button>
-    <form id="signup-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
-      <h2 style="font-size:17px;margin:0">Créer mon compte</h2>
-      <p style="margin:0;font-size:13px;color:var(--muted)">Votre compte sera actif dès que le propriétaire du cabinet vous aura donné un rôle. Si vous êtes le propriétaire, créez votre compte puis cliquez sur « Je suis le propriétaire du cabinet ».</p>
-      <div class="field"><label for="s-name">Votre nom</label><input id="s-name" type="text" maxlength="120" autocomplete="name"></div>
-      <div class="field"><label for="s-email">Votre adresse e-mail</label><input id="s-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
-      <div class="field"><label for="s-pw">Choisissez un mot de passe (10 caractères minimum, avec lettres et chiffres)</label><input id="s-pw" type="password" maxlength="128" autocomplete="new-password"></div>
-      <button class="btn" type="submit">Créer mon compte</button>
-      <p class="status" id="signup-status" role="status" aria-live="polite"></p>
-    </form>
-
+    <details class="more">
+      <summary>Autres options</summary>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
     <button type="button" class="link-btn" id="claim-link">Je suis le propriétaire du cabinet</button>
     <form id="claim-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
       <h2 style="font-size:17px;margin:0">Je suis le propriétaire du cabinet</h2>
@@ -80,6 +58,32 @@
       <button class="btn" type="submit">Devenir propriétaire et entrer</button>
       <p class="status" id="claim-status" role="status" aria-live="polite"></p>
     </form>
+    <button type="button" class="link-btn" id="signup-link">Créer mon compte</button>
+    <form id="signup-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <h2 style="font-size:17px;margin:0">Créer mon compte</h2>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Votre compte sera actif dès que le propriétaire du cabinet vous aura donné un rôle. Si vous êtes le propriétaire, créez votre compte puis cliquez sur « Je suis le propriétaire du cabinet ».</p>
+      <div class="field"><label for="s-name">Votre nom</label><input id="s-name" type="text" maxlength="120" autocomplete="name"></div>
+      <div class="field"><label for="s-email">Votre adresse e-mail</label><input id="s-email" type="text" inputmode="email" maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="s-pw">Choisissez un mot de passe (10 caractères minimum, avec lettres et chiffres)</label><input id="s-pw" type="password" maxlength="128" autocomplete="new-password"></div>
+      <button class="btn" type="submit">Créer mon compte</button>
+      <p class="status" id="signup-status" role="status" aria-live="polite"></p>
+    </form>
+    <button type="button" class="link-btn" id="code-link">Se connecter avec le code d'accès du cabinet</button>
+    <form id="code-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Solution provisoire, tant que les comptes ne sont pas créés : le même code que l'ancienne console pilote.</p>
+      <div class="field"><label for="c-code">Code d'accès du cabinet</label><input id="c-code" type="password" autocomplete="off"></div>
+      <button class="btn" type="submit">Entrer</button>
+      <p class="status" id="code-status" role="status" aria-live="polite"></p>
+    </form>
+    <button type="button" class="link-btn" id="diag-link">Vérifier mon code</button>
+    <form id="diag-form" style="display:flex;flex-direction:column;gap:12px" hidden novalidate>
+      <p style="margin:0;font-size:13px;color:var(--muted)">Tapez un code : l'application vous dit si c'est le code d'accès, le code propriétaire, ou aucun des deux, et ce qui manque sur le serveur. Aucun secret n'est affiché.</p>
+      <div class="field"><label for="d-code">Code à vérifier</label><input id="d-code" type="password" autocomplete="off"></div>
+      <button class="btn ghost" type="submit">Vérifier</button>
+      <div id="diag-out" role="status" aria-live="polite" style="font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:6px"></div>
+    </form>
+      </div>
+    </details>
   </main>
 </div>
 
@@ -127,7 +131,7 @@
 
   if (OM.getSession()) { location.replace(next()); return; }
 
-  fetch('/api/app?route=setup-state').then(function (r) { return r.json(); }).then(function (d) { if (d && d.has_accounts === false) $('start-new').hidden = false; }).catch(function () {});
+  fetch('/api/app?route=setup-state').then(function (r) { return r.json(); }).then(function (d) { if (d && d.has_accounts === false) $('start-new').hidden = false; if (d && d.google_login) { $('google-btn').hidden = false; $('or-line').hidden = false; } }).catch(function () {});
 
   // ---- "Continuer avec Google" ----
   $('google-btn').addEventListener('click', function () {
