@@ -33,7 +33,8 @@ test('first-scan tidy-up: the AI decides; moves/renames go to « À valider », 
       { file_id: 'okf', action: 'ok' }] }) }; },
     fetchRows: async (path, o = {}) => { if (o.method === 'POST') actions.push(JSON.parse(o.body)[0]); return []; },
     proposeMessage: async (org, m) => { messages.push(m); return { id: 'm1' }; },
-    getMeta: async () => ({ lastModifyingUser: { emailAddress: 'Yao@taty.info' } }) };
+    getMeta: async () => ({ lastModifyingUser: { emailAddress: 'Yao@taty.info' } }),
+    askDeps: { members: [{ full_name: 'Yao', email: 'yao@taty.info' }], reviewFolderId: null, tidyDrive: { canWrite: () => false } } };
   await startTidyPlan('org', {}, d);
   const st = await tidyPlanStep('org', {}, d);
   assert.match(input, /RÉPONSES DU PROPRIÉTAIRE : \[\{"question":"q","answer":"a"/);
