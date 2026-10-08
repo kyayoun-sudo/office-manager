@@ -43,6 +43,9 @@
     <p class="note card-note">Réservée au propriétaire, aux associés et aux managers ; chaque ouverture est journalisée. La carte s'appuie sur des faits (CV, missions, indicateurs du travail, observations validées) et chaque point d'analyse cite sa preuve. Les préférences de travail déclarées ne sont qu'un repère : aucune décision RH n'en découle seule (R011). Les profils ne sont révisés que sur des observations documentées et validées (R012).</p>
 
     <div class="mc-grid">
+      <section class="card" id="questions" aria-labelledby="h-q" hidden><h2 id="h-q">Question du Firm Manager</h2>
+        <p class="note">Une situation réelle de son travail. Votre réponse devient une observation (validée) de la carte.</p>
+        <div id="q-list" class="stack"></div></section>
       <section class="card" aria-labelledby="h-analysis"><h2 id="h-analysis">Analyse</h2><div id="analysis"></div></section>
       <section class="card" aria-labelledby="h-skills"><h2 id="h-skills">Expérience et compétences</h2><div id="skills"></div></section>
       <section class="card" aria-labelledby="h-prefs"><h2 id="h-prefs">Motivation, autonomie, structure, reconnaissance</h2><div id="prefs"></div></section>
@@ -79,7 +82,7 @@
     if (n) box.appendChild(dl); else box.appendChild(el('p', 'Pas encore d’information.', 'empty'));
   }
   function withEvidence(list) { return (list || []).map(function (x) { return x.point || x.type || x.training ? (x.point || x.type || x.training) + ((x.evidence || x.why) ? ' — ' + (x.evidence ? 'preuve : ' + x.evidence : x.why) : '') : String(x); }); }
-  function score(v) { return v == null ? null : v + ' / 5'; }
+  function score(v) { return v == null || v === '' ? null : typeof v === 'number' || /^\d+(\.\d+)?$/.test(String(v)) ? v + ' / 5' : String(v); }
 
   function render(c) {
     $('name').textContent = c.person.name; document.title = c.person.name + ' · Management Card';
@@ -137,7 +140,26 @@
       .then(function () { $('o-status').textContent = 'Observation enregistrée (validée).'; $('o-text').value = ''; load(); })
       .catch(function (e) { $('o-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); });
   });
-  function start() { OM.loadBranding().catch(function () {}); if (!staffId) { location.href = '/equipe.html'; return; } load(); }
+  function loadQuestions() {
+    OM.api('/api/app?route=people-questions').then(function (r) {
+      var mine = (r.questions || []).filter(function (x) { return x.staff_id === staffId; });
+      var box = $('q-list'); box.textContent = ''; $('questions').hidden = !mine.length;
+      mine.forEach(function (x) {
+        var it = el('div', null, 'item'); it.style.display = 'grid'; it.style.gap = '8px';
+        it.appendChild(el('strong', x.situation)); it.appendChild(el('p', x.question));
+        var ta = el('textarea'); ta.rows = 3; ta.maxLength = 1500; ta.setAttribute('aria-label', 'Votre réponse');
+        var row = el('div', null, 'btn-row'), ok = el('button', 'Répondre', 'btn'), skip = el('button', 'Passer', 'btn ghost'), st = el('span', null, 'status');
+        ok.type = skip.type = 'button';
+        function send(body) { OM.api('/api/app?route=people-questions', { method: 'POST', body: JSON.stringify(body) }).then(function (r2) { st.textContent = r2.notice || (body.skip ? 'Question passée.' : 'Merci : réponse ajoutée à la carte.'); load(); setTimeout(loadQuestions, 800); }).catch(function (e) { st.textContent = e.message; }); }
+        ok.addEventListener('click', function () { if (ta.value.trim().length < 3) { st.textContent = 'Écrivez votre réponse.'; return; } send({ key: x.key, answer: ta.value }); });
+        skip.addEventListener('click', function () { send({ key: x.key, skip: true }); });
+        row.appendChild(ok); row.appendChild(skip); row.appendChild(st);
+        it.appendChild(ta); it.appendChild(row); box.appendChild(it);
+      });
+      if (mine.length && location.hash === '#questions') $('questions').scrollIntoView();
+    }).catch(function () {});
+  }
+  function start() { OM.loadBranding().catch(function () {}); if (!staffId) { location.href = '/equipe.html'; return; } load(); loadQuestions(); }
   UI.requireLogin(start);
 })();
 </script>

@@ -127,6 +127,12 @@ export const ROUTES = Object.freeze({
   },
   // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
   // « rangement automatique » switch.
+  // One question about a real situation, for the Management Cards (managers answer).
+  'people-questions': {
+    GET: users(MANAGERS, async () => ({ questions: await (await import('../lib/people-questions.js')).openQuestions() })),
+    POST: users(MANAGERS, async (orgId, req) => (await import('../lib/people-questions.js')).answerQuestion(orgId, req.body || {}, who(req))),
+    unavailable: 'PEOPLE_UNAVAILABLE'
+  },
   'agent-names': {
     GET: users(ALL_ROLES, async orgId => (await import('../lib/agent-persona.js')).agentSettings(orgId)),
     POST: owner(async (orgId, req) => (await import('../lib/agent-persona.js')).saveAgentSettings(orgId, req.body || {}, who(req))),
