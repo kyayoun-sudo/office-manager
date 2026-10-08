@@ -137,7 +137,8 @@ test('client memory: one permanent file per client, a new mission is added to it
     'OFFICE_MANAGER_ENHANCED_AUDITOR.json': { reviews: { m1: { status: 'done', summary: '1 non couvert', coverage: cov }, m2: { status: 'done', coverage: cov } } } };
   const d = { fetchRows, drive, folder: 'om', central, tidyDrive: tidy, folders: [] };
   const r = await mm.writeMissionMemory('org', { id: 'm1', name: 'Audit BLE TRANSIT 2025', status: 'completed', client_folder_id: 'CF', planned_start: '2025-01-05' }, d);
-  assert.equal(r.status, 'written'); assert.equal(r.permanent.id, 'DP'); assert.equal(r.folder.id, 'DP/00_OFFICE_MANAGER');
+  assert.equal(r.status, 'written'); assert.equal(r.permanent.id, 'DP'); assert.equal(r.folder.id, 'om/CLIENTS'); // kept in the agents' Atelier mémoire, the client's folders untouched
+  assert.ok([...drive.files.values()].some(f => f.parent === 'om/CLIENTS' && /mémoire client\.json$/.test(f.name)));
   const mem = r.memory;
   assert.equal(mem.mission.status, 'closed'); assert.equal(mem.mission.client, 'BLE TRANSIT');
   assert.equal(mem.tables.team.rows[0][0], 'Awa K.');
@@ -447,4 +448,63 @@ test('notifications: one per event, from what is recorded', async () => {
   assert.deepEqual(types, ['critical_risk', 'deadline', 'important_email', 'new_document', 'pbc_late']);
   assert.equal(new Set(list.map(x => x.key)).size, list.length);
   assert.equal(n.buildNotifications(c, {}, Date.parse('2026-10-08T10:00:00Z')).find(x => x.type === 'pbc_late').key, list.find(x => x.type === 'pbc_late').key);
+});
+
+// A tiny Drive REST in memory, for the agents' home (memory-home.js).
+function fakeRest(files) {
+  let n = 0;
+  const json = body => ({ ok: true, status: 200, json: async () => body });
+  return async (url, init = {}) => {
+    const u = new URL(url);
+    const id = decodeURIComponent((u.pathname.match(/\/files\/([^/]+)$/) || [])[1] || '');
+    if (init.method === 'POST') { const b = JSON.parse(init.body); const f = { id: 'new' + (++n), name: b.name, mimeType: b.mimeType, parents: b.parents, modifiedTime: '2026-10-08' }; files.push(f); return json(f); }
+    if (init.method === 'PATCH') {
+      const f = files.find(x => x.id === id); if (!f) return { ok: false, status: 404, json: async () => ({}) };
+      const add = u.searchParams.get('addParents'), rm = u.searchParams.get('removeParents');
+      if (add) f.parents = [...(f.parents || []).filter(p => p !== rm), add];
+      Object.assign(f, JSON.parse(init.body || '{}')); return json({ id });
+    }
+    if (id) { const f = files.find(x => x.id === id); return f ? json(f) : { ok: false, status: 404, json: async () => ({}) }; }
+    const qy = u.searchParams.get('q');
+    let list = files.filter(f => !f.trashed);
+    const par = /'([^']+)' in parents/.exec(qy); if (par) list = list.filter(f => (f.parents || []).includes(par[1]));
+    const con = /name contains '([^']+)'/.exec(qy); if (con) list = list.filter(f => f.name.toLowerCase().includes(con[1].toLowerCase()));
+    const eq = /name = '([^']+)'/.exec(qy); if (eq) list = list.filter(f => f.name === eq[1]);
+    if (/mimeType = 'application\/vnd.google-apps.folder'/.test(qy)) list = list.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+    return json({ files: list.map(f => ({ ...f })) });
+  };
+}
+
+test('agents home: « … AI MANAGER / Atelier mémoire » found, scattered agent files brought in, emptied old folders binned', async () => {
+  const { findAtelier, gatherInto } = await import('../lib/memory-home.js');
+  const F = 'application/vnd.google-apps.folder';
+  const files = [
+    { id: 'aim', name: '00 TATY AI MANAGER', mimeType: F, parents: ['D'] },
+    { id: 'at', name: 'Atelier mémoire', mimeType: F, parents: ['aim'] },
+    { id: 'old', name: '00_OFFICE_MANAGER', mimeType: F, parents: ['D'] },
+    { id: 's1', name: 'OFFICE_MANAGER_TIDY_STATE.json', mimeType: 'application/json', parents: ['old'], modifiedTime: '2026-10-08T10:00:00Z' },
+    { id: 's2', name: 'OFFICE_MANAGER_TIDY_STATE.json', mimeType: 'application/json', parents: ['at'], modifiedTime: '2026-10-01T10:00:00Z' },
+    { id: 'r1', name: 'OFFICE_MANAGER_SCAN_STATE.json', mimeType: 'application/json', parents: ['D'], modifiedTime: '2026-10-05' },
+    { id: 'cl', name: 'BLE TRANSIT', mimeType: F, parents: ['D'] },
+    { id: 'dp', name: 'Dossier permanent', mimeType: F, parents: ['cl'] },
+    { id: 'o2', name: '00_OFFICE_MANAGER', mimeType: F, parents: ['dp'] },
+    { id: 'cm', name: 'CLIENT_MEMORY.json', mimeType: 'application/json', parents: ['o2'], modifiedTime: '2026-10-08' },
+    { id: 'gl', name: 'Grand livre 2025.xlsx', mimeType: 'x', parents: ['dp'] }
+  ];
+  const fetchImpl = fakeRest(files), H = { headers: {} };
+  const at = await findAtelier(H, { kind: 'drive', driveId: 'D', fetchImpl });
+  assert.equal(at.id, 'at'); assert.equal(at.created, false);
+  const r = await gatherInto(at.id, H, { kind: 'drive', driveId: 'D', oldMemory: 'old', fetchImpl });
+  const byId = id => files.find(f => f.id === id);
+  assert.deepEqual(byId('s1').parents, ['at']); assert.equal(byId('s2').trashed, true);   // the most recent copy stays
+  assert.deepEqual(byId('r1').parents, ['at']);
+  assert.equal(byId('old').trashed, true); assert.equal(byId('o2').trashed, true);
+  const clients = files.find(f => f.name === 'CLIENTS');
+  assert.deepEqual(byId('cm').parents, [clients.id]); assert.equal(byId('cm').name, 'BLE TRANSIT — mémoire client.json');
+  assert.deepEqual(byId('gl').parents, ['dp']); assert.ok(!byId('gl').trashed);               // the firm's files are never touched
+  assert.deepEqual(r.clients, ['BLE TRANSIT']);
+  // No « Atelier » yet: created inside the AI MANAGER folder, once.
+  const files2 = [{ id: 'aim', name: 'TATY_AI_office manager', mimeType: F, parents: ['D'] }];
+  const at2 = await findAtelier(H, { kind: 'drive', driveId: 'D', fetchImpl: fakeRest(files2) });
+  assert.equal(at2.created, true); assert.equal(files2.find(f => f.id === at2.id).parents[0], 'aim');
 });

@@ -476,6 +476,7 @@ export const ROUTES = Object.freeze({
         return proposeStatusChange(orgId, m, String(b.status || ''), String(b.why || '').slice(0, 300) + ' (demandé par ' + who(req) + ')');
       }
       if (req.account?.role !== 'owner') throw fail('ROLE_NOT_ALLOWED', 403);
+      if (b.action === 'home') return (await import('../lib/memory-home.js')).ensureMemoryHome(orgId, { force: true });
       if (b.action === 'rebuild') return rebuildAgentMemory(orgId, String(b.agent || ''), who(req), { fetchRows: rest });
       if (b.action === 'refresh_missions') return refreshMissionMemories(orgId, { limit: Math.min(10, Number(b.limit) || 5) });
       throw fail('UNKNOWN_ACTION', 400);
