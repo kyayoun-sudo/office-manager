@@ -228,7 +228,7 @@
         message: 'Mission ' + (m.name || '') + ' (UUID ' + m.id + ') : ' + q,
         agent: 'mission-controller', provider: 'auto', risk: 'normal'
       })
-    }).then(function (data) { $('answer').textContent = (data && data.answer) || 'Réponse vide.'; })
+    }).then(function (data) { UI.richText($('answer'), (data && data.answer) || 'Réponse vide.'); })
       .catch(function (err) { $('answer').textContent = 'Erreur : ' + err.message; })
       .then(function () { $('ask').disabled = false; });
   });

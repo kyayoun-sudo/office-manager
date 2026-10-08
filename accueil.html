@@ -119,7 +119,7 @@
       runs.slice(0, 5).forEach(function (r) {
         var item = UI.el('div', null, 'item');
         var t = UI.el('div', null, 't');
-        t.appendChild(UI.el('span', (r.summary || 'Demande').slice(0, 140)));
+        t.appendChild(UI.el('span', UI.plain(r.summary || 'Demande').slice(0, 140)));
         t.appendChild(UI.el('span', [r.agent, UI.dateTime(r.started_at)].filter(Boolean).join(' · '), 'meta'));
         item.appendChild(t);
         item.appendChild(UI.el('span', r.label, r.status === 'verified' ? 'tag' : 'tag warn'));

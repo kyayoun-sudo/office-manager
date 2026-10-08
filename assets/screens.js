@@ -22,6 +22,58 @@
       if (!a && !b) return 'Dates à renseigner';
       return (UI.date(a) || '?') + ' → ' + (UI.date(b) || '?');
     },
+    // Agents' answers, written in Markdown, shown as a formatted document (Paul, 2026-10-07: « les
+    // réponses ne sont pas belles… gras, souligné, mais pas ces étoiles partout »): titles,
+    // paragraphs, bold, underline, italics, lists, tables, links. Built element by element (no HTML
+    // is injected); stray asterisks are removed.
+    richText: function (box, md) {
+      box.textContent = ''; box.classList.add('rich');
+      var lines = String(md || '').replace(/\r\n?/g, '\n').split('\n');
+      var i = 0, list = null, para = [];
+      function inline(parent, text) {
+        var re = /(\*\*|__)(.+?)\1|\+\+(.+?)\+\+|<u>(.+?)<\/u>|(\*|_)([^*_\s][^*_]*?)\5|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+        var last = 0, m;
+        while ((m = re.exec(text))) {
+          if (m.index > last) parent.appendChild(document.createTextNode(clean(text.slice(last, m.index))));
+          if (m[2] != null) { var b = document.createElement('strong'); inline(b, m[2]); parent.appendChild(b); }
+          else if (m[3] != null || m[4] != null) { var u = document.createElement('u'); inline(u, m[3] != null ? m[3] : m[4]); parent.appendChild(u); }
+          else if (m[6] != null) { var e = document.createElement('em'); inline(e, m[6]); parent.appendChild(e); }
+          else if (m[7] != null) parent.appendChild(UI.el('code', m[7]));
+          else if (m[8] != null) { var a = UI.el('a', m[8]); a.href = m[9]; a.target = '_blank'; a.rel = 'noopener'; parent.appendChild(a); }
+          last = re.lastIndex;
+        }
+        if (last < text.length) parent.appendChild(document.createTextNode(clean(text.slice(last))));
+      }
+      function clean(t) { return t.replace(/\*{1,3}/g, ''); }
+      function flushPara() { if (!para.length) return; var p = document.createElement('p'); inline(p, para.join(' ')); box.appendChild(p); para = []; }
+      function closeList() { list = null; }
+      var cells = function (l) { return l.trim().replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); }); };
+      while (i < lines.length) {
+        var line = lines[i], t = line.trim(), h, li;
+        if (!t) { flushPara(); closeList(); i++; continue; }
+        if ((h = /^(#{1,4})\s+(.*)$/.exec(t))) { flushPara(); closeList(); var hn = document.createElement('h' + Math.min(6, h[1].length + 2)); inline(hn, h[2].replace(/[#*]+$/, '').trim()); box.appendChild(hn); i++; continue; }
+        if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) { flushPara(); closeList(); box.appendChild(document.createElement('hr')); i++; continue; }
+        if (/^\|.*\|$/.test(t) && i + 1 < lines.length && /^\|?\s*:?-{2,}/.test(lines[i + 1].trim())) {
+          flushPara(); closeList();
+          var wrap = UI.el('div', null, 'rich-table'), table = document.createElement('table'), thead = document.createElement('thead'), tr = document.createElement('tr');
+          cells(t).forEach(function (c) { var th = document.createElement('th'); inline(th, c); tr.appendChild(th); });
+          thead.appendChild(tr); table.appendChild(thead); var tb = document.createElement('tbody'); i += 2;
+          while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())) { var r = document.createElement('tr'); cells(lines[i]).forEach(function (c) { var td = document.createElement('td'); inline(td, c); r.appendChild(td); }); tb.appendChild(r); i++; }
+          table.appendChild(tb); wrap.appendChild(table); box.appendChild(wrap); continue;
+        }
+        if ((li = /^(\s*)([-*•]|\d+[.)])\s+(.*)$/.exec(line))) {
+          flushPara();
+          var ordered = /\d/.test(li[2]);
+          if (!list || list.ordered !== ordered) { list = { el: document.createElement(ordered ? 'ol' : 'ul'), ordered: ordered }; box.appendChild(list.el); }
+          var item = document.createElement('li'); inline(item, li[3]); list.el.appendChild(item); i++; continue;
+        }
+        if (/^>\s?/.test(t)) { flushPara(); closeList(); var q = document.createElement('blockquote'); inline(q, t.replace(/^>\s?/, '')); box.appendChild(q); i++; continue; }
+        closeList(); para.push(t); i++;
+      }
+      flushPara();
+    },
+    // One line of text without Markdown signs (lists, previews).
+    plain: function (md) { return String(md || '').replace(/\*\*|__|\+\+|`|^#+\s*/gm, '').replace(/(^|\s)[*_]([^*_]+)[*_]/g, '$1$2').replace(/\*/g, ''); },
     fail: function (box, err) {
       box.textContent = '';
       box.appendChild(UI.el('p', 'Indisponible : ' + (err && err.message ? err.message : 'erreur'), 'empty'));

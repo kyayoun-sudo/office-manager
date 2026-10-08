@@ -179,7 +179,7 @@ details.card[open] summary{margin-bottom:6px}
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: message, agent: agent, provider: $('provider').value, risk: 'normal' })
     }).then(function (data) {
-      $('answer').textContent = data.answer || 'Réponse vide.';
+      UI.richText($('answer'), data.answer || 'Réponse vide.');
       $('meta').textContent = [data.agentName, data.provider, data.reviewed ? 'relu' : ''].filter(Boolean).join(' · ');
       if (replyMission && opened && opened.mission.id === replyMission) {
         lastReply = { missionId: replyMission, text: data.answer };
@@ -333,7 +333,7 @@ details.card[open] summary{margin-bottom:6px}
       runs.forEach(function (r) {
         var item = el('div', null, 'item');
         var t = el('div', null, 't');
-        t.appendChild(el('span', r.summary || 'Sans résumé'));
+        t.appendChild(el('span', UI.plain(r.summary || 'Sans résumé')));
         t.appendChild(el('span', [r.agent, UI.dateTime(r.started_at), 'réf. ' + r.id].filter(Boolean).join(' · '), 'meta'));
         if (r.warning) t.appendChild(el('span', r.warning, 'meta'));
         item.appendChild(t);

@@ -267,7 +267,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         if (g.comment) det.appendChild(el('p', 'Claude : ' + g.comment, 'small'));
         if (c.lesson) det.appendChild(el('p', 'Leçon : ' + c.lesson, 'small'));
       }
-      if (c.answer) det.appendChild(el('div', c.answer, 'answer'));
+      if (c.answer) { var ans = el('div', null, 'answer'); UI.richText(ans, c.answer); det.appendChild(ans); }
       it.appendChild(det);
     }
     if (c.feedback) it.appendChild(el('p', (c.feedback.verdict === 'juste' ? '✓ Confirmé juste' : '✎ Corrigé') + (c.feedback.by ? ' par ' + c.feedback.by : '') + (c.feedback.note ? ' : ' + c.feedback.note : ''), 'small'));

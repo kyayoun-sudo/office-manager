@@ -37,3 +37,27 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .btn.danger{background:var(--surface);color:var(--danger-ink);border:1px solid var(--line)}
 .btn-row{display:flex;flex-wrap:wrap;gap:8px}
 .blockers{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5}
+
+/* Agents' answers: a professional document (titles, bold, underline, lists, tables). */
+.rich{white-space:normal !important;font-size:15px;line-height:1.65;color:var(--ink)}
+.rich > :first-child{margin-top:0}
+.rich > :last-child{margin-bottom:0}
+.rich p{margin:0 0 12px;max-width:78ch}
+.rich h3,.rich h4,.rich h5,.rich h6{margin:20px 0 8px;line-height:1.3;letter-spacing:-.01em}
+.rich h3{font-size:19px;font-weight:800;padding-bottom:6px;border-bottom:2px solid var(--brand)}
+.rich h4{font-size:16.5px;font-weight:700;color:var(--brand-ink)}
+.rich h5,.rich h6{font-size:15px;font-weight:700}
+.rich strong{font-weight:700;color:var(--ink)}
+.rich u{text-decoration-color:var(--brass);text-decoration-thickness:2px;text-underline-offset:3px}
+.rich em{font-style:italic}
+.rich ul,.rich ol{margin:0 0 12px;padding-left:22px;max-width:78ch}
+.rich li{margin:4px 0;padding-left:2px}
+.rich ul li::marker{color:var(--brand)}
+.rich ol li::marker{color:var(--brand);font-weight:700}
+.rich hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.rich blockquote{margin:0 0 12px;padding:8px 14px;border-left:3px solid var(--brass);background:var(--brass-soft);border-radius:0 8px 8px 0}
+.rich code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.rich-table{overflow-x:auto;margin:0 0 14px;border:1px solid var(--line);border-radius:10px}
+.rich table{border-collapse:collapse;width:100%;font-size:14px}
+.rich th{text-align:left;background:var(--surface);font-weight:700;color:var(--ink);padding:9px 12px;border-bottom:1px solid var(--line)}
+.rich td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
