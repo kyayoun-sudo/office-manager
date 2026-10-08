@@ -72,6 +72,36 @@
       }
       flushPara();
     },
+    // Follows a background job (engagement preparation, review…) until it is done or failed.
+    poll: function (url, onData, every) {
+      var stop = false, timer = null;
+      function tick() {
+        OM.api(url).then(function (d) {
+          if (stop) return; onData(d);
+          if (d && d.status === 'running' || d && d.status === 'reading') timer = setTimeout(tick, every || 4000);
+        }).catch(function (e) { if (!stop) onData({ status: 'error', error: e.message }); });
+      }
+      tick();
+      return function () { stop = true; clearTimeout(timer); };
+    },
+    // Drive file ids from pasted links or ids (one per line, or separated by spaces).
+    driveIds: function (text) {
+      var out = [];
+      String(text || '').split(/[\s,;]+/).forEach(function (t) {
+        var m = t.match(/\/d\/([-\w]{20,})/) || t.match(/[?&]id=([-\w]{20,})/) || t.match(/^([-\w]{25,})$/);
+        if (m && out.indexOf(m[1]) < 0) out.push(m[1]);
+      });
+      return out;
+    },
+    // A small table from rows of cells (strings or elements).
+    table: function (head, rows) {
+      var box = UI.el('div', null, 'table-box'), t = document.createElement('table'), tr = document.createElement('tr');
+      head.forEach(function (h) { tr.appendChild(UI.el('th', h)); });
+      var th = document.createElement('thead'); th.appendChild(tr); t.appendChild(th);
+      var tb = document.createElement('tbody');
+      rows.forEach(function (r) { var row = document.createElement('tr'); r.forEach(function (c) { var td = document.createElement('td'); if (c && c.nodeType) td.appendChild(c); else td.textContent = c == null || c === '' ? '–' : String(c); row.appendChild(td); }); tb.appendChild(row); });
+      t.appendChild(tb); box.appendChild(t); return box;
+    },
     // One line of text without Markdown signs (lists, previews).
     plain: function (md) { return String(md || '').replace(/\*\*|__|\+\+|`|^#+\s*/gm, '').replace(/(^|\s)[*_]([^*_]+)[*_]/g, '$1$2').replace(/\*/g, ''); },
     fail: function (box, err) {

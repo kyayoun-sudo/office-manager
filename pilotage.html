@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tableau des associés</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main">
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Tableau des associés</h1>
+      <p class="lead">L'amélioration du cabinet en un endroit : les compétences disponibles et celles qui manquent, la performance des soumissions et les revues d'audit. Tout vient des documents et des e-mails du cabinet, avec les preuves ; les recommandations sont des propositions.</p>
+    </header>
+    <p class="status error" id="err" hidden></p>
+
+    <section class="card" aria-labelledby="h-gaps">
+      <h2 id="h-gaps">Manques de compétences</h2>
+      <p class="lead">Chaque préparation de mission compare les compétences demandées à celles de l'équipe. Un manque qui revient sur plusieurs missions devient un manque stratégique.</p>
+      <div id="recurring"></div>
+      <div><button class="btn ghost" id="reco-btn" type="button">Préparer les recommandations</button> <span class="status" id="reco-say"></span></div>
+      <div id="reco" class="stack"></div>
+      <h3 style="margin:6px 0 0;font-size:15px">Derniers manques relevés</h3>
+      <div id="recent"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-cap">
+      <h2 id="h-cap">Compétences du cabinet</h2>
+      <p class="lead" id="cap-lead"></p>
+      <div class="links"><button class="btn" id="cap-refresh" type="button">Relire les CV et dossiers RH</button><button class="btn ghost" id="cap-report" type="button">Exporter la matrice (Google Doc)</button></div>
+      <p class="status" id="cap-say" role="status"></p>
+      <div id="cap-index" class="chips"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-sub">
+      <h2 id="h-sub">Soumissions</h2>
+      <p class="lead">Les e-mails des appels d'offres et propositions : date de réception, date limite, heure de dépôt, marge et jalons. Les retards sont attribués à l'étape où ils se sont produits, sur preuves, jamais par défaut à la personne qui a préparé.</p>
+      <div class="links"><button class="btn" id="sub-run" type="button">Analyser les 12 derniers mois</button><span id="sub-doc"></span></div>
+      <p class="status" id="sub-say" role="status"></p>
+      <div class="kpis" id="sub-kpis"></div>
+      <div id="sub-process"></div>
+      <div id="sub-list"></div>
+      <div id="sub-reco" class="reply" hidden></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-rev">
+      <h2 id="h-rev">Revues d'audit</h2>
+      <p class="lead">Les revues de l'Enhanced Auditor : risques couverts, partiellement couverts ou non couverts, mission par mission.</p>
+      <div id="reviews" class="stack"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-ai">
+      <h2 id="h-ai">Modèles d'IA</h2>
+      <p class="lead">Les agents utilisent Claude, ChatGPT et Gemini selon ce qui est configuré : recherche approfondie sur le web, lecture des images et des scans, avis indépendants de plusieurs modèles. Les clés se mettent dans Vercel (ANTHROPIC_API_KEY et ANTHROPIC_MODEL, OPENAI_API_KEY, GEMINI_API_KEY) ; elles ne sont jamais affichées.</p>
+      <div class="prov" id="providers"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var ERR = { USER_SESSION_REQUIRED: 'Connectez-vous avec Google ou votre e-mail.', ROLE_NOT_ALLOWED: 'Réservé au propriétaire et aux associés.', GMAIL_READ_NOT_CONNECTED: 'Gmail n’est pas connecté en lecture : Paramètres → Accès Google → reconnecter.', AGENTS_FOLDER_NOT_SET: 'Le dossier des agents dans le Drive n’est pas encore choisi (Paramètres → Accès Google).' };
+  var post = function (route, body) { return OM.api('/api/app?route=' + route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); };
+  var say = function (id, t, bad) { $(id).textContent = t; $(id).className = 'status' + (bad ? ' error' : ''); };
+  var stopSub = null, stopCap = null;
+
+  function load() {
+    OM.api('/api/app?route=partner-dashboard').then(render).catch(function (e) { $('err').hidden = false; $('err').textContent = ERR[e.message] || e.message; });
+  }
+
+  function render(d) {
+    var cap = d.capabilities || {};
+    // Gaps
+    var rb = $('recurring'); rb.textContent = '';
+    var rec = cap.recurring || [];
+    if (!rec.length) rb.appendChild(el('p', 'Aucun manque relevé pour l’instant : ils apparaissent quand Mission Controller prépare une mission.', 'empty'));
+    else rb.appendChild(UI.table(['Compétence manquante', 'Fois', 'Missions', 'Stratégique'], rec.map(function (r) { return [r.category, r.count, r.missions.join(', '), el('span', r.strategic ? 'Oui' : 'Non', r.strategic ? 'gapcell' : '')]; })));
+    var rk = $('reco'); rk.textContent = '';
+    ((cap.recommendations && cap.recommendations.items) || []).forEach(function (r) {
+      var box = el('div', null, 'reply');
+      UI.richText(box, '**' + r.category + '** — ' + r.recommendation + ' (priorité ' + r.priority + ')\n\n' + r.detail + (r.candidate_to_develop ? '\n\nÀ développer : **' + r.candidate_to_develop + '**' : ''));
+      rk.appendChild(box);
+    });
+    var rc = $('recent'); rc.textContent = '';
+    var recent = cap.recent || [];
+    rc.appendChild(recent.length ? UI.table(['Mission', 'Compétence', 'Catégorie', 'Spécialistes externes suggérés', 'Date'], recent.map(function (g) { return [g.mission, g.capability, g.category, (g.external_suggestions || []).join(', '), UI.date(g.at)]; })) : el('p', 'Rien pour l’instant.', 'empty'));
+    // Capability database
+    var db = cap.database || {};
+    $('cap-lead').textContent = db.people ? db.people + ' profils lus dans les CV, Management Cards et dossiers RH' + (db.updated_at ? ', mis à jour le ' + UI.dateTime(db.updated_at) : '') + '.' : 'La base des compétences n’a pas encore été construite : cliquez sur « Relire les CV et dossiers RH ».';
+    if (db.status === 'reading') { say('cap-say', 'Lecture en cours : ' + db.done + ' / ' + db.total + ' documents.'); followCap(); }
+    var ix = $('cap-index'); ix.textContent = '';
+    (db.index || []).slice(0, 60).forEach(function (c) { var s = el('span', c.capability + ' · ' + c.people.length, 'chip'); s.title = c.people.join(', '); ix.appendChild(s); });
+    // Submissions
+    renderSub(d.submissions || {});
+    // Reviews
+    var rv = $('reviews'); rv.textContent = '';
+    if (!(d.reviews || []).length) rv.appendChild(el('p', 'Aucune revue pour l’instant.', 'empty'));
+    (d.reviews || []).forEach(function (r) {
+      var it = el('div', null, 'item'), t = el('div', null, 't');
+      t.appendChild(el('span', r.mission || 'Mission')); t.appendChild(el('span', (r.summary || r.status) + (r.finished_at ? ' — ' + UI.dateTime(r.finished_at) : ''), 'meta'));
+      it.appendChild(t); if (r.report && r.report.url) it.appendChild(UI.safeLink(r.report.url, 'Rapport'));
+      var a = el('a', 'Ouvrir', 'btn ghost'); a.href = '/auditeur.html'; it.appendChild(a); rv.appendChild(it);
+    });
+    // Providers
+    var p = d.providers || {}, pv = $('providers'); pv.textContent = '';
+    [['anthropic', 'Claude'], ['openai', 'ChatGPT'], ['gemini', 'Gemini']].forEach(function (x) { pv.appendChild(el('span', x[1] + (p[x[0]] ? ' : prêt' + (p.models && p.models[x[0]] ? ' (' + p.models[x[0]] + ')' : '') : ' : clé à ajouter'), p[x[0]] ? 'on' : '')); });
+  }
+
+  function renderSub(s) {
+    var k = s.kpi, kb = $('sub-kpis'); kb.textContent = '';
+    $('sub-doc').textContent = ''; if (s.report && s.report.url) $('sub-doc').appendChild(UI.safeLink(s.report.url, 'Rapport complet'));
+    if (s.status === 'running') { say('sub-say', 'Analyse en cours (' + (s.stage || '') + (s.done != null && s.stage === 'extract' ? ' ' + s.done : '') + ')…'); followSub(); }
+    else if (s.status === 'failed') say('sub-say', 'Arrêt : ' + (s.error || ''), true);
+    else if (s.status === 'done') say('sub-say', 'Analyse du ' + UI.dateTime(s.finished_at) + '.');
+    else say('sub-say', 'Pas encore d’analyse.');
+    if (!k) return;
+    var f = k.firm, pr = k.process;
+    [['Soumissions', f.submissions], ['Marge moyenne (jours)', f.avg_margin_days == null ? '–' : f.avg_margin_days], ['À temps', f.on_time_pct == null ? '–' : f.on_time_pct + ' %'], ['Plus de 48 h avant', f.over_48h_pct == null ? '–' : f.over_48h_pct + ' %'], ['En retard', f.late]]
+      .forEach(function (x) { var c = el('div', null, 'kpi'); c.appendChild(el('span', x[0])); c.appendChild(el('strong', String(x[1]))); kb.appendChild(c); });
+    var pb = $('sub-process'); pb.textContent = '';
+    pb.appendChild(UI.table(['Étape du processus', 'Délai moyen'], [['TDR → affectation', pr.avg_to_assignment_days == null ? '–' : pr.avg_to_assignment_days + ' j'], ['TDR → premier jet', pr.avg_to_first_draft_days == null ? '–' : pr.avg_to_first_draft_days + ' j'], ['Collecte des CV', pr.avg_cv_delay_days == null ? '–' : pr.avg_cv_delay_days + ' j'], ['Revue de l’associé', pr.avg_partner_review_days == null ? '–' : pr.avg_partner_review_days + ' j'], ['Revues dans les 12 dernières heures', pr.partner_review_last_12h]]));
+    var lb = $('sub-list'); lb.textContent = '';
+    lb.appendChild(UI.table(['Opportunité', 'Reçue', 'Date limite', 'Déposée', 'Marge', 'Statut'], (s.submissions || []).map(function (x) {
+      return [x.opportunity, (x.received_at || '').slice(0, 10), (x.deadline || '').slice(0, 16).replace('T', ' '), (x.submitted_at || '').slice(0, 16).replace('T', ' '), x.margin_days == null ? '–' : x.margin_days + ' j', el('span', x.timing, 'verdict ' + (x.timing === 'en avance' ? 'ok' : x.timing === 'en retard' ? 'no' : 'part'))];
+    })));
+    var md = [];
+    if ((s.attributions || []).length) md.push('### Où le temps a été perdu', s.attributions.map(function (a) { return '- **' + a.opportunity + '** : ' + a.where + ' — cause : ' + a.cause + (a.who ? ' (' + a.who + ')' : '') + '. ' + (a.evidence || '') + ((a.not_attributable_to || []).length ? ' Non imputable à : ' + a.not_attributable_to.join(', ') + '.' : ''); }).join('\n'));
+    if ((s.recommendations || []).length) md.push('### Recommandations', s.recommendations.map(function (r, i) { return (i + 1) + '. **' + r.title + '** — ' + r.detail + (r.based_on ? ' (' + r.based_on + ')' : ''); }).join('\n'));
+    $('sub-reco').hidden = !md.length; if (md.length) UI.richText($('sub-reco'), md.join('\n\n'));
+  }
+
+  function followSub() { if (stopSub) stopSub(); stopSub = UI.poll('/api/app?route=submissions', function (s) { renderSub(s); if (s.status !== 'running') stopSub && stopSub(); }, 6000); }
+  function followCap() { if (stopCap) stopCap(); stopCap = UI.poll('/api/app?route=capabilities', function (c) { var db = c.database || {}; if (db.status === 'reading') say('cap-say', 'Lecture en cours : ' + db.done + ' / ' + db.total + ' documents.'); else { say('cap-say', 'Base des compétences à jour.'); load(); } }, 6000); }
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    load();
+    $('cap-refresh').addEventListener('click', function () { say('cap-say', 'Lancement…'); post('capabilities', { action: 'refresh' }).then(function (r) { say('cap-say', r.started ? 'Lecture de ' + r.files + ' documents RH / CV…' : 'Aucun dossier RH / CV dans la carte du Drive : lancez d’abord le premier scan.'); if (r.started) followCap(); }).catch(function (e) { say('cap-say', ERR[e.message] || e.message, true); }); });
+    $('cap-report').addEventListener('click', function () { say('cap-say', 'Export…'); post('capabilities', { action: 'report' }).then(function (r) { $('cap-say').textContent = ''; if (r.url) $('cap-say').appendChild(UI.safeLink(r.url, 'Matrice enregistrée dans le Drive : ouvrir')); }).catch(function (e) { say('cap-say', ERR[e.message] || e.message, true); }); });
+    $('reco-btn').addEventListener('click', function () { say('reco-say', 'Le Grand Contrôleur prépare les recommandations…'); post('capabilities', { action: 'insights' }).then(function () { say('reco-say', ''); load(); }).catch(function (e) { say('reco-say', ERR[e.message] || e.message, true); }); });
+    $('sub-run').addEventListener('click', function () { say('sub-say', 'Lancement…'); post('submissions', { months: 12 }).then(function () { followSub(); }).catch(function (e) { say('sub-say', ERR[e.message] || e.message, true); }); });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

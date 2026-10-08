@@ -32,8 +32,9 @@ import {
 
 const runtime = { orgId: "test-org", runId: null };
 
-test("specialists are exactly Mission Controller, Orpailleur, Sika", () => {
-  assert.deepEqual(SPECIALIST_KEYS, ["mission-controller", "orpailleur", "sika"]);
+test("specialists are Mission Controller, Orpailleur, Sika and (2026-10-08) Enhanced Auditor", () => {
+  assert.deepEqual(SPECIALIST_KEYS, ["mission-controller", "orpailleur", "sika", "enhanced-auditor"]);
+  assert.equal(AGENTS["enhanced-auditor"].name, "Enhanced Auditor");
   assert.equal(AGENTS["mission-controller"].name, "Mission Controller");
   assert.equal(AGENTS["grand-controleur"], undefined);
   assert.throws(() => getAgent("grand-controleur"), /UNKNOWN_AGENT/);

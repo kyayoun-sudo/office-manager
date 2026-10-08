@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Préparer une mission</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Préparer une mission</h1>
+      <p class="lead">Mission Controller lit le TDR, fait une recherche approfondie sur le client et son secteur, vérifie que le cabinet a vraiment les compétences demandées, propose une équipe et, s'il manque une compétence, des spécialistes externes. Le Grand Contrôleur écrit le briefing des risques du secteur dans l'évaluation des risques.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-start" id="start-card">
+      <h2 id="h-start">Lancer la préparation</h2>
+      <div class="field"><label for="mission">Mission (actives et pas encore commencées)</label><select id="mission"><option value="">Chargement…</option></select></div>
+      <div class="field"><span class="label" id="l-tdr" style="font-size:13px;font-weight:600;color:var(--muted)">TDR, appel d'offres ou contrat trouvés dans le Drive</span>
+        <div class="picks" id="tdr-list" aria-labelledby="l-tdr"><p class="empty">Choisissez d'abord une mission.</p></div></div>
+      <div class="field"><label for="tdr-links">Ou collez les liens Drive des documents (un par ligne)</label><textarea id="tdr-links" style="min-height:70px" placeholder="https://drive.google.com/file/d/…"></textarea></div>
+      <div class="field"><label for="notes">Précisions pour Mission Controller (facultatif)</label><textarea id="notes" style="min-height:70px" placeholder="Exemple : le client est une filiale d'un groupe minier ; la mission couvre aussi l'évaluation des actifs."></textarea></div>
+      <div><button class="btn" id="go" type="button">Préparer l'engagement</button></div>
+      <p class="status" id="say" role="status"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-progress" id="progress-card" hidden>
+      <h2 id="h-progress">Avancement</h2>
+      <div class="progress"><span id="bar" style="width:5%"></span></div>
+      <ul class="joblog" id="log"></ul>
+    </section>
+
+    <section class="card" aria-labelledby="h-cap" id="cap-card" hidden>
+      <h2 id="h-cap">Vérification des capacités</h2>
+      <p class="lead" id="cap-lead"></p>
+      <div id="matrix"></div>
+      <div id="gaps" class="stack"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-team" id="team-card" hidden>
+      <h2 id="h-team">Équipe proposée</h2>
+      <div id="team"></div>
+      <p class="meta">Proposition : compétences et disponibilité d'abord (R009). Un responsable valide avant toute affectation.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-risk" id="risk-card" hidden>
+      <h2 id="h-risk">Risques du secteur</h2>
+      <div class="links" id="docs"></div>
+      <div id="risk" class="reply"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-tdr" id="tdr-card" hidden>
+      <h2 id="h-tdr">Ce que dit le TDR</h2>
+      <div id="tdr"></div>
+      <h3 style="margin:8px 0 0;font-size:15px">Recherche approfondie</h3>
+      <div id="research" class="reply"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var STAGES = { read_tdr: 15, research: 35, match: 60, externals: 78, brief: 90, done: 100 };
+  var ERR = { TDR_REQUIRED: 'Cochez ou collez au moins un document (TDR, appel d’offres, contrat).', MISSION_NOT_ACTIVE_OR_UPCOMING: 'Cette mission n’est ni active ni à venir.', USER_SESSION_REQUIRED: 'Connectez-vous avec Google ou votre e-mail.', ROLE_NOT_ALLOWED: 'Réservé aux associés et managers.' };
+  var stopPoll = null;
+
+  function loadMissions() {
+    OM.api('/api/app?route=engagement').then(function (d) {
+      var sel = $('mission'); sel.textContent = '';
+      sel.appendChild(new Option(d.missions.length ? 'Choisir une mission' : 'Aucune mission active ou à venir', ''));
+      [['not_started', 'Pas encore commencées'], ['active', 'En cours']].forEach(function (g) {
+        var list = d.missions.filter(function (m) { return m.phase === g[0]; }); if (!list.length) return;
+        var og = document.createElement('optgroup'); og.label = g[1];
+        list.forEach(function (m) { og.appendChild(new Option(m.name + (m.planned_start ? ' — début ' + UI.date(m.planned_start) : ''), m.id)); });
+        sel.appendChild(og);
+      });
+      var pre = new URLSearchParams(location.search).get('mission_id'); if (pre) { sel.value = pre; pick(); }
+    }).catch(function (e) { $('say').textContent = ERR[e.message] || e.message; $('say').className = 'status error'; });
+  }
+
+  function pick() {
+    var id = $('mission').value; var box = $('tdr-list'); box.textContent = '';
+    if (stopPoll) stopPoll();
+    ['progress-card', 'cap-card', 'team-card', 'risk-card', 'tdr-card'].forEach(function (x) { $(x).hidden = true; });
+    if (!id) { box.appendChild(el('p', 'Choisissez d’abord une mission.', 'empty')); return; }
+    box.appendChild(el('p', 'Recherche des documents…', 'empty'));
+    OM.api('/api/app?route=engagement&candidates=1&mission_id=' + encodeURIComponent(id)).then(function (d) {
+      box.textContent = '';
+      if (!d.candidates.length) { box.appendChild(el('p', 'Aucun TDR reconnu dans la carte du Drive pour cette mission : collez le lien ci-dessous.', 'empty')); }
+      d.candidates.forEach(function (c, i) {
+        var lab = el('label'); var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c.id; cb.checked = i === 0;
+        var t = el('span', c.name); t.appendChild(el('small', c.path)); lab.appendChild(cb); lab.appendChild(t); box.appendChild(lab);
+      });
+    }).catch(function () { box.textContent = ''; box.appendChild(el('p', 'Carte du Drive indisponible : collez les liens.', 'empty')); });
+    follow(id);
+  }
+
+  function follow(id) {
+    if (stopPoll) stopPoll();
+    stopPoll = UI.poll('/api/app?route=engagement&mission_id=' + encodeURIComponent(id), render);
+  }
+
+  function render(st) {
+    if (!st || st.status === 'none') return;
+    $('progress-card').hidden = false;
+    $('bar').style.width = (st.status === 'done' ? 100 : STAGES[st.stage] || 8) + '%';
+    var log = $('log'); log.textContent = '';
+    (st.log || []).forEach(function (l) { var li = el('li'); li.appendChild(el('time', new Date(l.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))); li.appendChild(el('span', l.m)); log.appendChild(li); });
+    if (st.status === 'running') log.appendChild(el('li', 'En cours…', 'meta'));
+    if (st.status === 'failed') { var f = el('li', 'Arrêt : ' + (st.error || ''), 'status error'); log.appendChild(f); }
+    if (st.tdr) {
+      $('tdr-card').hidden = false; var t = st.tdr, md = [];
+      md.push('- **Client :** ' + (t.client || '–') + ' — ' + [t.country, t.industry, t.sub_industry].filter(Boolean).join(', '));
+      md.push('- **Type :** ' + (t.engagement_type || '–') + (t.reporting_framework ? ' (' + t.reporting_framework + ')' : ''));
+      md.push('- **Périmètre :** ' + (t.scope || '–'));
+      if ((t.deliverables || []).length) md.push('- **Livrables :** ' + t.deliverables.map(function (x) { return x.name + (x.due ? ' (' + x.due + ')' : ''); }).join(' ; '));
+      if ((t.key_experts || []).length) md.push('- **Experts clés demandés :** ' + t.key_experts.map(function (x) { return x.role + (x.qualifications ? ' — ' + x.qualifications : '') + (x.years ? ', ' + x.years + ' ans' : ''); }).join(' ; '));
+      if ((t.open_questions || []).length) md.push('', '### Questions à clarifier', t.open_questions.map(function (x) { return '- ' + x; }).join('\n'));
+      UI.richText($('tdr'), md.join('\n'));
+      var r = st.research || {};
+      UI.richText($('research'), r.web ? r.text + (r.sources && r.sources.length ? '\n\n### Sources\n' + r.sources.slice(0, 15).map(function (s) { return '- [' + (s.title || s.url).slice(0, 90) + '](' + s.url + ')'; }).join('\n') : '') : (r.error ? 'Recherche web indisponible : ' + r.error + '. Ajoutez une clé Claude, ChatGPT ou Gemini dans Vercel.' : 'Recherche en cours…'));
+    }
+    var m = st.match;
+    if (m) {
+      $('cap-card').hidden = false;
+      var req = m.requirements || [], gaps = req.filter(function (x) { return x.gap; });
+      $('cap-lead').textContent = req.length + ' capacités requises, ' + gaps.length + ' manque' + (gaps.length > 1 ? 's' : '') + '. ' + (m.team_ready === false ? 'L’équipe ne peut pas être finalisée tant que les manques bloquants ne sont pas couverts.' : 'Les capacités requises sont couvertes en interne (disponibilités à confirmer).');
+      var box = $('matrix'); box.textContent = '';
+      box.appendChild(UI.table(['Capacité requise', 'Source', 'Disponible en interne', 'Personne(s) disponible(s)', 'Manque'], req.map(function (x) {
+        var g = el('span', x.gap ? 'Oui' : 'Non', x.gap ? 'gapcell' : '');
+        return [x.capability + (x.level ? ' (' + x.level + ')' : ''), x.source === 'TDR' ? 'TDR' : 'Recherche', x.internal, (x.people || []).map(function (p) { return p.name + (p.available && p.available !== 'oui' ? ' (dispo : ' + p.available + ')' : ''); }).join(', '), g];
+      })));
+      var gb = $('gaps'); gb.textContent = '';
+      gaps.forEach(function (g) {
+        var md = '### ' + g.capability + '\nCapacité interne : non disponible' + (g.gap_category ? ' — catégorie **' + g.gap_category + '** (transmise au Grand Contrôleur)' : '') + '.\n';
+        var ex = g.external_specialists || [];
+        md += ex.length ? ex.map(function (s) { return '- **' + s.name + '** : ' + (s.why || '') + (s.engagement ? ' — ' + s.engagement : '') + (s.source ? ' [source](' + s.source + ')' : '') + ' (à vérifier)'; }).join('\n') : (st.stage === 'externals' ? '- Recherche de spécialistes externes en cours…' : '- Aucun spécialiste externe trouvé de façon fiable : à chercher dans le réseau du cabinet.');
+        var d = el('div', null, 'reply'); UI.richText(d, md); gb.appendChild(d);
+      });
+      $('team-card').hidden = false;
+      $('team').textContent = '';
+      $('team').appendChild(UI.table(['Personne', 'Rôle', 'Pourquoi', 'Charge actuelle'], (m.proposed_team || []).map(function (p) { return [p.name, p.role, p.why, p.load_pct == null ? '–' : p.load_pct + ' %']; })));
+    }
+    if (st.risk_brief || st.risk_doc || st.report_doc) {
+      $('risk-card').hidden = false;
+      var docs = $('docs'); docs.textContent = '';
+      if (st.risk_doc && st.risk_doc.url) docs.appendChild(UI.safeLink(st.risk_doc.url, 'Briefing des risques (évaluation des risques)'));
+      if (st.report_doc && st.report_doc.url) docs.appendChild(UI.safeLink(st.report_doc.url, 'Préparation complète (Google Doc)'));
+      if (st.risk_brief) UI.richText($('risk'), st.risk_brief.text || '');
+    }
+  }
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    loadMissions();
+    $('mission').addEventListener('change', pick);
+    $('go').addEventListener('click', function () {
+      var id = $('mission').value; if (!id) { $('say').textContent = 'Choisissez une mission.'; return; }
+      var ids = Array.prototype.map.call(document.querySelectorAll('#tdr-list input:checked'), function (c) { return c.value; }).concat(UI.driveIds($('tdr-links').value));
+      var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = 'Lancement…';
+      OM.api('/api/app?route=engagement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mission_id: id, tdr_file_ids: ids, notes: $('notes').value }) })
+        .then(function () { $('say').textContent = 'Préparation lancée : lecture du TDR, recherche, vérification des capacités. Cela prend quelques minutes ; vous pouvez quitter la page.'; follow(id); })
+        .catch(function (e) { $('say').className = 'status error'; $('say').textContent = ERR[e.message] || e.message; })
+        .then(function () { b.disabled = false; });
+    });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

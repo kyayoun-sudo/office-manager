@@ -110,6 +110,7 @@
       document.querySelectorAll('[data-user-name]').forEach(function (el) { el.textContent = name; });
       // Settings are visible to the owner and managing partners only.
       if (!OM.isOwner()) document.querySelectorAll('.nav a[href="/parametres.html"], .nav a[href="/mise-en-service.html"]').forEach(function (a) { a.hidden = true; });
+      if (!OM.isOwner()) document.querySelectorAll('.nav a[data-partners-only]').forEach(function (a) { a.hidden = true; });
       // The training page needs a personal session (e-mail + password).
       if (!OM.hasPersonalSession()) document.querySelectorAll('.nav a[href="/entrainement.html"]').forEach(function (a) { a.hidden = true; });
     },
@@ -317,6 +318,9 @@
     '/messagerie.html': 'M4 5h16v11H8l-4 4z',
     '/assistant.html': 'M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z',
     '/entrainement.html': 'M4 19V9l8-5 8 5v10M9 19v-6h6v6',
+    '/preparation.html': 'M9 4h6l1 2h3v14H5V6h3zM9 11h6M9 15h4',
+    '/auditeur.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5M8 11l2 2 4-4',
+    '/pilotage.html': 'M4 20V10M10 20V4M16 20v-7M22 20H2',
     '/mise-en-service.html': 'M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6l3 3M18 6l-3 3M9 15l-3 3',
     '/parametres.html': 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6l1.4 1.4m0-11.4l-1.4 1.4m-8.6 8.6l-1.4 1.4'
   };
@@ -326,6 +330,15 @@
     nav.dataset.decorated = '1';
     // Setup and settings live in the settings wheel at the bottom of the menu.
     nav.querySelectorAll('a[href="/parametres.html"], a[href="/mise-en-service.html"]').forEach(function (a) { if (a.getAttribute('aria-current') !== 'page') a.remove(); else a.classList.add('in-wheel'); });
+    // Pages added on 2026-10-08, placed in every page's menu from here (one place to maintain).
+    var after = nav.querySelector('a[href="/assistant.html"]');
+    [['/preparation.html', 'Préparer une mission'], ['/auditeur.html', 'Enhanced Auditor'], ['/pilotage.html', 'Tableau des associés', true]].forEach(function (x) {
+      if (nav.querySelector('a[href="' + x[0] + '"]') || !after) return;
+      var link = document.createElement('a'); link.href = x[0]; link.textContent = x[1];
+      if (location.pathname === x[0]) link.setAttribute('aria-current', 'page');
+      if (x[2]) link.setAttribute('data-partners-only', '');
+      after.parentNode.insertBefore(link, after.nextSibling); after = link;
+    });
     nav.querySelectorAll('a[href]').forEach(function (a) {
       var d = ICONS[a.getAttribute('href')]; if (!d || a.querySelector('svg')) return;
       var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -344,7 +357,7 @@
   // A page with many sections shows them as tabs instead of one long scroll.
   function autoTabs() {
     var main = document.querySelector('.main');
-    if (!main || main.dataset.tabs) return;
+    if (!main || main.dataset.tabs || main.hasAttribute('data-no-tabs')) return;
     var groups = new Map();
     main.querySelectorAll('section.card').forEach(function (sec) {
       if (sec.id === 'login' || !sec.querySelector('h2')) return;

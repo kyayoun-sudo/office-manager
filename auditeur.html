@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Enhanced Auditor</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Enhanced Auditor</h1>
+      <p class="lead">L'agent de revue d'audit. Il reprend l'évaluation des risques du Grand Contrôleur et celle de l'auditeur, relit les fichiers de travail et les pièces (photos et scans compris), repère les motifs dans les classeurs, signale les procédures manquantes, évalue les éléments probants et dit si chaque risque est couvert. Plusieurs modèles d'IA répondent séparément ; le verdict le plus prudent est retenu.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-start">
+      <h2 id="h-start">Lancer une revue</h2>
+      <div class="field"><label for="mission">Mission</label><select id="mission"><option value="">Chargement…</option></select></div>
+      <p class="meta" id="gc-state"></p>
+      <div class="field"><label for="risk-files">Évaluation des risques de l'auditeur (liens Drive, un par ligne)</label><textarea id="risk-files" style="min-height:60px" placeholder="https://docs.google.com/spreadsheets/d/…"></textarea></div>
+      <div class="field"><label for="work-files">Programme de travail et fichiers de travail (liens Drive, un par ligne)</label><textarea id="work-files" style="min-height:80px" placeholder="Feuilles de travail Excel, programme, mémos…"></textarea></div>
+      <div class="field"><label for="evidence-files">Pièces justificatives : photos, scans, PDF (liens Drive, un par ligne)</label><textarea id="evidence-files" style="min-height:70px" placeholder="Photos d'inventaire, relevés scannés, factures, états de dépréciation…"></textarea></div>
+      <div class="field"><label for="focus">Point d'attention (facultatif)</label><input type="text" id="focus" placeholder="Exemple : dépréciation des stocks et des créances"></div>
+      <div><button class="btn" id="go" type="button">Lancer la revue</button></div>
+      <p class="status" id="say" role="status"></p>
+      <div class="prov" id="providers"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-progress" id="progress-card" hidden>
+      <h2 id="h-progress">Avancement</h2>
+      <div class="progress"><span id="bar" style="width:5%"></span></div>
+      <ul class="joblog" id="log"></ul>
+    </section>
+
+    <section class="card" aria-labelledby="h-cov" id="cov-card" hidden>
+      <h2 id="h-cov">Couverture des risques</h2>
+      <p class="lead" id="summary"></p>
+      <div class="links" id="docs"></div>
+      <div id="coverage"></div>
+      <div id="details" class="stack"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-more" id="more-card" hidden>
+      <h2 id="h-more">Motifs, pièces et actions</h2>
+      <div id="more" class="reply"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-past">
+      <h2 id="h-past">Revues précédentes</h2>
+      <div id="past" class="stack"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var STAGES = { collect: 15, risks: 35, pictures: 55, coverage: 80, report: 95, done: 100 };
+  var VCLASS = { 'couvert': 'ok', 'partiellement couvert': 'part', 'non couvert': 'no' };
+  var ERR = { FILES_REQUIRED: 'Donnez au moins un fichier : évaluation des risques, fichiers de travail ou pièces.', VALID_MISSION_ID_REQUIRED: 'Choisissez une mission.', NO_MODEL_ANSWERED: 'Aucun modèle d’IA n’a répondu : vérifiez les clés dans Vercel.', USER_SESSION_REQUIRED: 'Connectez-vous avec Google ou votre e-mail.', ROLE_NOT_ALLOWED: 'Réservé aux associés et managers.' };
+  var stopPoll = null;
+
+  function loadMissions() {
+    OM.api('/api/app?route=engagement').then(function (d) {
+      var sel = $('mission'); sel.textContent = '';
+      sel.appendChild(new Option(d.missions.length ? 'Choisir une mission' : 'Aucune mission active ou à venir', ''));
+      d.missions.forEach(function (m) { sel.appendChild(new Option(m.name + (m.phase === 'not_started' ? ' (pas encore commencée)' : ''), m.id)); });
+    }).catch(function (e) { $('say').className = 'status error'; $('say').textContent = ERR[e.message] || e.message; });
+    OM.api('/api/app?route=ai-providers').then(function (p) {
+      var box = $('providers'); box.textContent = '';
+      [['anthropic', 'Claude'], ['openai', 'ChatGPT'], ['gemini', 'Gemini (images)']].forEach(function (x) { box.appendChild(el('span', x[1] + (p[x[0]] ? ' : prêt' : ' : clé à ajouter'), p[x[0]] ? 'on' : '')); });
+    }).catch(function () {});
+    loadPast();
+  }
+
+  function loadPast() {
+    OM.api('/api/app?route=auditor').then(function (d) {
+      var box = $('past'); box.textContent = '';
+      if (!d.reviews.length) { box.appendChild(el('p', 'Aucune revue pour l’instant.', 'empty')); return; }
+      d.reviews.forEach(function (r) {
+        var it = el('div', null, 'item'), t = el('div', null, 't');
+        t.appendChild(el('span', r.mission || 'Mission')); t.appendChild(el('span', (r.summary || r.status) + (r.finished_at ? ' — ' + UI.dateTime(r.finished_at) : ''), 'meta'));
+        it.appendChild(t);
+        if (r.report && r.report.url) it.appendChild(UI.safeLink(r.report.url, 'Rapport'));
+        var b = el('button', 'Afficher', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { $('mission').value = r.mission_id; follow(r.mission_id); window.scrollTo(0, 0); });
+        it.appendChild(b); box.appendChild(it);
+      });
+    }).catch(function () {});
+  }
+
+  function pick() {
+    var id = $('mission').value; $('gc-state').textContent = '';
+    if (!id) return;
+    OM.api('/api/app?route=engagement&mission_id=' + encodeURIComponent(id)).then(function (e) {
+      $('gc-state').textContent = e.status === 'done' ? 'L’évaluation des risques du Grand Contrôleur (briefing du secteur) sera reprise.' : 'Pas encore de briefing des risques du Grand Contrôleur pour cette mission : lancez d’abord « Préparer une mission » pour l’inclure.';
+    }).catch(function () {});
+    follow(id);
+  }
+
+  function follow(id) { if (stopPoll) stopPoll(); stopPoll = UI.poll('/api/app?route=auditor&mission_id=' + encodeURIComponent(id), render); }
+
+  function render(st) {
+    ['progress-card', 'cov-card', 'more-card'].forEach(function (x) { $(x).hidden = true; });
+    if (!st || st.status === 'none') return;
+    $('progress-card').hidden = false;
+    $('bar').style.width = (st.status === 'done' ? 100 : STAGES[st.stage] || 8) + '%';
+    var log = $('log'); log.textContent = '';
+    (st.log || []).forEach(function (l) { var li = el('li'); li.appendChild(el('time', new Date(l.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))); li.appendChild(el('span', l.m)); log.appendChild(li); });
+    if (st.status === 'running') log.appendChild(el('li', 'En cours…', 'meta'));
+    if (st.status === 'failed') log.appendChild(el('li', 'Arrêt : ' + (st.error || ''), 'status error'));
+    if (!st.coverage) return;
+    $('cov-card').hidden = false;
+    $('summary').textContent = st.summary || '';
+    var docs = $('docs'); docs.textContent = '';
+    if (st.report && st.report.url) docs.appendChild(UI.safeLink(st.report.url, 'Rapport de revue (Google Doc)'));
+    if (st.matrix && st.matrix.url) docs.appendChild(UI.safeLink(st.matrix.url, 'Matrice de couverture (Excel)'));
+    var box = $('coverage'); box.textContent = '';
+    box.appendChild(UI.table(['Risque', 'Niveau', 'Source', 'Verdict', 'Procédures manquantes'], st.coverage.map(function (c) {
+      return [c.risk_id + ' — ' + c.risk, c.level, c.source, el('span', c.verdict + (c.disagreement ? ' *' : ''), 'verdict ' + (VCLASS[c.verdict] || 'no')), (c.missing_procedures || []).join(' ; ')];
+    })));
+    if (st.coverage.some(function (c) { return c.disagreement; })) box.appendChild(el('p', '* Les modèles ne sont pas d’accord : le verdict le plus prudent est affiché, le détail est ci-dessous.', 'meta'));
+    var det = $('details'); det.textContent = '';
+    st.coverage.filter(function (c) { return c.verdict !== 'couvert'; }).forEach(function (c) {
+      var md = '### ' + c.risk_id + ' — ' + c.risk + '\n' + (c.why || '') + '\n' +
+        (c.missing_procedures || []).map(function (p) { return '- Procédure à ajouter : ' + p; }).join('\n') + '\n' +
+        (c.evidence_comment ? '\n**Éléments probants :** ' + c.evidence_comment + '\n' : '') +
+        (c.attention || []).map(function (a) { return '- Attention : ' + a; }).join('\n') +
+        (c.disagreement ? '\n\n++Avis divergents++ : ' + c.disagreement : '');
+      var d = el('div', null, 'reply'); UI.richText(d, md); det.appendChild(d);
+    });
+    var more = [];
+    if ((st.auditor_assessment_gaps || []).length) more.push('### Risques du secteur absents de l’évaluation de l’auditeur', st.auditor_assessment_gaps.map(function (g) { return '- ' + g; }).join('\n'));
+    if ((st.patterns_reading || []).length) more.push('### Motifs relevés dans les fichiers de travail', st.patterns_reading.map(function (g) { return '- ' + g; }).join('\n'));
+    if ((st.pictures || []).length) more.push('### Pièces lues', st.pictures.map(function (p) { return '- **' + p.name + '** : ' + (p.summary || p.document_type || '') + ((p.anomalies || []).length ? ' — anomalies : ' + p.anomalies.join(' ; ') : '') + (p.excel && p.excel.url ? ' [tableau Excel](' + p.excel.url + ')' : ''); }).join('\n'));
+    if ((st.priority_actions || []).length) more.push('### Actions prioritaires', st.priority_actions.map(function (a, i) { return (i + 1) + '. ' + a; }).join('\n'));
+    if (more.length) { $('more-card').hidden = false; UI.richText($('more'), more.join('\n\n')); }
+    if (st.status === 'done') loadPast();
+  }
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    loadMissions();
+    $('mission').addEventListener('change', pick);
+    $('go').addEventListener('click', function () {
+      var id = $('mission').value; if (!id) { $('say').textContent = 'Choisissez une mission.'; return; }
+      var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = 'Lancement…';
+      OM.api('/api/app?route=auditor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mission_id: id,
+        auditor_risk_files: UI.driveIds($('risk-files').value), work_files: UI.driveIds($('work-files').value), evidence_files: UI.driveIds($('evidence-files').value), focus: $('focus').value }) })
+        .then(function () { $('say').textContent = 'Revue lancée. Cela prend quelques minutes ; vous pouvez quitter la page, le résultat est gardé.'; follow(id); })
+        .catch(function (e) { $('say').className = 'status error'; $('say').textContent = ERR[e.message] || e.message; })
+        .then(function () { b.disabled = false; });
+    });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

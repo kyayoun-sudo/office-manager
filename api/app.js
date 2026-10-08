@@ -7,6 +7,11 @@ import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
 import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount } from '../lib/accounts.js';
 import { translateTexts } from '../lib/translate-ui.js';
+import { providersStatus } from '../lib/ai-plus.js';
+import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityReport, capabilityContext } from '../lib/capabilities.js';
+import { engagementMissions, tdrCandidates, engagementState, startEngagementPrep, engagementStep } from '../lib/engagement-prep.js';
+import { submissionState, startSubmissionReview, submissionStep } from '../lib/submissions.js';
+import { auditorState, auditorReviews, startAuditorReview, auditorStep } from '../lib/enhanced-auditor.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -76,6 +81,10 @@ const MANAGERS = ['owner', 'partner', 'manager'];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
 const lastAiDedupe = new Map();
 const ALL_ROLES = ['owner', 'partner', 'manager', 'collaborator'];
+const PARTNERS = ['owner', 'partner'];
+const who = req => req.account?.display_name || req.account?.email || null;
+// Results kept in Drive JSON without the heavy working data (raw mail, read files).
+const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
   branding: {
@@ -248,6 +257,57 @@ export const ROUTES = Object.freeze({
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
   'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
   translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
+  // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----
+  // Which AI providers are configured (keys in Vercel; nothing secret returned).
+  'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), unavailable: 'AI_UNAVAILABLE' },
+  // The firm's capability database (Grand Contrôleur): read from the HR / CV folders.
+  capabilities: {
+    GET: users(MANAGERS, async (orgId, req) => req.query?.people ? capabilityContext(orgId) : capabilityInsights(orgId)),
+    POST: users(PARTNERS, (orgId, req) => {
+      const a = req.body?.action;
+      if (a === 'refresh') return startCapabilityRefresh(orgId, req);
+      if (a === 'insights') return capabilityInsights(orgId, { refresh: true });
+      if (a === 'report') return capabilityReport(orgId);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'CAPABILITIES_UNAVAILABLE'
+  },
+  'capabilities-step': { POST: (orgId, req) => capabilityStep(orgId, req), unavailable: 'CAPABILITIES_UNAVAILABLE' },
+  // Engagement preparation (Mission Controller): active and not-yet-started missions only.
+  engagement: {
+    GET: users(MANAGERS, async (orgId, req) => {
+      const id = req.query?.mission_id || null;
+      if (!id) return { missions: await engagementMissions(orgId) };
+      if (req.query?.candidates) return { candidates: await tdrCandidates(orgId, id) };
+      return light(await engagementState(id));
+    }),
+    POST: users(MANAGERS, (orgId, req) => startEngagementPrep(orgId, req, { ...(req.body || {}), requested_by: who(req) })),
+    unavailable: 'ENGAGEMENT_UNAVAILABLE'
+  },
+  'engagement-step': { POST: (orgId, req) => engagementStep(orgId, req, req.body || {}), unavailable: 'ENGAGEMENT_UNAVAILABLE' },
+  // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
+  submissions: {
+    GET: users(MANAGERS, async () => light(await submissionState())),
+    POST: users(PARTNERS, (orgId, req) => startSubmissionReview(orgId, req, req.body || {})),
+    unavailable: 'SUBMISSIONS_UNAVAILABLE'
+  },
+  'submissions-step': { POST: (orgId, req) => submissionStep(orgId, req), unavailable: 'SUBMISSIONS_UNAVAILABLE' },
+  // Enhanced Auditor reviews.
+  auditor: {
+    GET: users(MANAGERS, async (orgId, req) => req.query?.mission_id ? light(await auditorState(req.query.mission_id)) : { reviews: await auditorReviews() }),
+    POST: users(MANAGERS, (orgId, req) => startAuditorReview(orgId, req, { ...(req.body || {}), requested_by: who(req) })),
+    unavailable: 'AUDITOR_UNAVAILABLE'
+  },
+  'auditor-step': { POST: (orgId, req) => auditorStep(orgId, req, req.body || {}), unavailable: 'AUDITOR_UNAVAILABLE' },
+  // Partner Dashboard: firm improvement in one place (owner / partners).
+  'partner-dashboard': {
+    GET: users(PARTNERS, async (orgId, req) => {
+      await logAccess(orgId, req.account, 'view_partner_dashboard');
+      const [cap, sub, rev] = await Promise.all([capabilityInsights(orgId).catch(e => ({ error: e.message })), submissionState().catch(e => ({ error: e.message })), auditorReviews().catch(() => [])]);
+      return { capabilities: cap, submissions: light(sub), reviews: rev, providers: providersStatus() };
+    }),
+    unavailable: 'DASHBOARD_UNAVAILABLE'
+  },
   'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
