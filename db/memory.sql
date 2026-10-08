@@ -122,6 +122,20 @@ alter table public.office_chat_messages enable row level security;
 revoke all on public.office_chat_messages from public, anon, authenticated, service_role;
 grant select, insert, update on public.office_chat_messages to service_role;
 
+-- 5b. Group discussions (2026-10-08): a name and its members; only members read and write.
+create table if not exists public.office_chat_groups (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  name text not null check (length(name) between 1 and 80),
+  members text[] not null check (cardinality(members) between 2 and 60),
+  created_by text not null check (length(created_by) <= 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_chat_groups_idx on public.office_chat_groups (org_id, created_at desc);
+alter table public.office_chat_groups enable row level security;
+revoke all on public.office_chat_groups from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_chat_groups to service_role;
+
 -- 6. Sign-off of working papers (2026-10-08), APPEND-ONLY: each step on the REAL Drive file and its
 --    version (modifiedTime): opened, prepared, reviewed, comment, correction requested, corrected, signed off.
 create table if not exists public.office_workpaper_signoffs (

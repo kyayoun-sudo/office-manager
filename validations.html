@@ -181,7 +181,7 @@
     ROLE_NOT_ALLOWED: 'Validation réservée au propriétaire, aux associés et aux managers.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail.', COMMENT_REQUIRED: 'Indiquez pourquoi vous refusez.',
     RECIPIENT_NOT_CLIENT_CONTACT: 'Ce destinataire n’est pas le contact client enregistré sur la mission.', CLIENT_CONTACT_NOT_REGISTERED: 'Aucun contact client enregistré sur la mission.',
     MAIL_SANDBOX_RECIPIENT_REFUSED: 'Mode test : cette adresse n’est pas dans la liste autorisée.', RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', TOPIC_REQUIRED: 'Indiquez le sujet du message.' };
-  function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || m; }
+  function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || OM.explain(m); }
   function msay(t) { $('mail-status').textContent = t || ''; }
   function mailApi(body) { return OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
 
@@ -205,7 +205,7 @@
       body.style.cssText = 'font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5';
       var why = el('input'); why.type = 'text'; why.maxLength = 1000; why.placeholder = 'Pourquoi refuser (obligatoire pour refuser)'; why.setAttribute('aria-label', 'Motif du refus');
       why.style.cssText = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px';
-      if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || m.error), 'hint'));
+      if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || OM.explain(m.error)), 'hint'));
       c.appendChild(subj); c.appendChild(body); c.appendChild(why);
       var row = el('div', null, 'btn-row');
       var ok = el('button', client ? 'Valider et envoyer au client' : 'Valider et envoyer', 'btn'); ok.type = 'button';
@@ -227,7 +227,7 @@
       c.appendChild(el('strong', m.subject));
       var pre = el('div', m.body, 'hint'); pre.style.whiteSpace = 'pre-wrap'; c.appendChild(pre);
       if (m.decision_comment) c.appendChild(el('p', 'Commentaire : ' + m.decision_comment, 'hint'));
-      if (m.status === 'failed' && m.error) c.appendChild(el('p', MERR[m.error] || m.error, 'hint'));
+      if (m.status === 'failed' && m.error) c.appendChild(el('p', MERR[m.error] || OM.explain(m.error), 'hint'));
     }
     return c;
   }

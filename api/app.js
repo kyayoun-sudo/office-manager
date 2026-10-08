@@ -45,7 +45,7 @@ import { cockpit } from '../lib/cockpit.js';
 import { notifications } from '../lib/notifications.js';
 import { getMissionFull } from '../lib/mission-full.js';
 import { assignAction } from '../lib/action-executor.js';
-import { chatState, sendChat } from '../lib/chat.js';
+import { chatState, sendChat, createGroup } from '../lib/chat.js';
 import { integratePlan } from '../lib/plan-integration.js';
 import { searchSpecialists, draftOutreach } from '../lib/external-specialists.js';
 import { workState, eveningPoint, eveningStep, startWpReview, wpStep, updateReviewPoint, retrospective, signoffEvents, signoffStatus, signoffAction, partnerView } from '../lib/auditor-plus.js';
@@ -412,7 +412,7 @@ export const ROUTES = Object.freeze({
   // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
   chat: {
     GET: users(ALL_ROLES, (orgId, req) => chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),
-    POST: users(ALL_ROLES, (orgId, req) => sendChat(orgId, req.account, req.body || {})),
+    POST: users(ALL_ROLES, (orgId, req) => req.body?.action === 'group' ? createGroup(orgId, req.account, req.body) : sendChat(orgId, req.account, req.body || {})),
     unavailable: 'CHAT_UNAVAILABLE'
   },
   // Give an action to a person (« Sans responsable », or right after validating it).
@@ -580,6 +580,10 @@ export async function handleApp(req) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  // A JSON body sent without « Content-Type: application/json » arrives as text: read it anyway
+  // (2026-10-08: the chat said « INVALID_BODY », several buttons did nothing).
+  if (typeof req.body === 'string' && req.body.trim().startsWith('{')) { try { req.body = JSON.parse(req.body); } catch { /* left as is */ } }
+  if (Buffer.isBuffer(req.body)) { try { req.body = JSON.parse(req.body.toString('utf8')); } catch { /* left as is */ } }
   try {
     const out = await handleApp(req);
     // Only the Google callback redirects, and only to a page of this app.

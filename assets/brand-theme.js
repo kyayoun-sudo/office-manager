@@ -47,6 +47,27 @@
     },
     setUserName: function (n) { safeSet(window.localStorage, USER_KEY, String(n || '').trim().slice(0, 80)); },
 
+    // Error codes in words a person can act on (2026-10-08).
+    explain: function (code) {
+      var c = String(code || '');
+      var E = {
+        MIGRATION_MISSING_DB_MEMORY_SQL: 'Base pas encore à jour : exécutez db/memory.sql dans Supabase (SQL Editor).',
+        MAIL_NOT_CONFIGURED: 'Envoi non branché : connectez Google avec l’autorisation d’envoyer des e-mails (Paramètres → Google).',
+        MAIL_SENDER_NOT_CONNECTED_ACCOUNT: 'L’adresse d’envoi de l’agent n’est pas le compte Google connecté : connectez Google avec la boîte de l’agent, ou indiquez sa vraie boîte (alias).',
+        MAIL_DELEGATION_MISSING: 'Google refuse l’envoi : le super administrateur Google Workspace doit autoriser l’envoi au nom de l’agent.',
+        MAIL_AUTH_FAILED: 'Google refuse la connexion de la boîte de l’agent : reconnectez Google.',
+        ROLE_NOT_ALLOWED: 'Action réservée à un autre rôle (propriétaire, associé ou manager).',
+        INVALID_BODY: 'Message vide ou trop long.'
+      };
+      if (E[c]) return E[c];
+      if (/^GMAIL_SEND_\d+_API_DISABLED/.test(c)) return 'Gmail refuse l’envoi : l’API Gmail n’est pas activée dans le projet Google Cloud du cabinet (console.cloud.google.com → API et services → Gmail API → Activer).';
+      if (/^GMAIL_SEND_\d+_SCOPE_MISSING/.test(c)) return 'Gmail refuse l’envoi : la connexion Google n’a pas l’autorisation d’envoyer. Reconnectez Google (Paramètres) et acceptez « Envoyer des e-mails ».';
+      if (/^GMAIL_SEND_\d+_FROM_NOT_ALLOWED/.test(c)) return 'Gmail refuse l’adresse d’expédition : ajoutez l’adresse de l’agent comme alias « Envoyer en tant que » dans la boîte Gmail connectée.';
+      if (/^GMAIL_SEND_\d+_NO_GMAIL/.test(c)) return 'Gmail refuse l’envoi : la boîte de l’agent n’a pas Gmail activé (licence Google Workspace).';
+      if (/^GMAIL_SEND_403/.test(c)) return 'Gmail refuse l’envoi (403) : vérifiez que l’API Gmail est activée dans Google Cloud et reconnectez Google en acceptant l’envoi d’e-mails.';
+      return c;
+    },
+
     api: function (path, options, retried) {
       options = options || {};
       var s = readSession();
@@ -55,6 +76,8 @@
       // Personal token: lets the server check who you are on sensitive routes.
       if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
       var headers = Object.assign(base, options.headers || {});
+      // A JSON body always says so (the server reads it as JSON).
+      if (typeof options.body === 'string' && !Object.keys(headers).some(function (k) { return k.toLowerCase() === 'content-type'; })) headers['Content-Type'] = 'application/json';
       return fetch(path, Object.assign({}, options, { headers: headers })).then(function (r) {
         return r.text().then(function (raw) {
           var data = null;
@@ -70,7 +93,8 @@
             }
             // Wrong or changed access code: back to the login page.
             if (r.status === 401 && (code === 'UNAUTHORIZED' || code === 'SESSION_EXPIRED') && !onLoginPage()) OM.forget(true);
-            var err = new Error(data && data.detail ? code + ' (' + data.detail + ')' : code); err.status = r.status; err.code = code; throw err;
+            var known = OM.explain(code);
+            var err = new Error(known !== code ? known : (data && data.detail ? code + ' (' + data.detail + ')' : code)); err.status = r.status; err.code = code; throw err;
           }
           return data;
         });

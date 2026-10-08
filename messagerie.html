@@ -44,6 +44,12 @@
 .bubble.out .meta{color:var(--on-brand)}
 .bubble.old{opacity:.7}
 .linkish{font:inherit;background:none;border:0;padding:0;color:var(--brand-ink);text-decoration:underline;cursor:pointer}
+  .emojis{display:flex;flex-wrap:wrap;gap:4px;padding:6px 0}
+  .emojis button{font-size:20px;line-height:1;background:none;border:1px solid var(--line,#ddd);border-radius:8px;padding:4px 6px;cursor:pointer}
+  .emojis button:hover,.emojis button:focus-visible{background:var(--surface-2,rgba(127,127,127,.12))}
+  .group-form{display:grid;gap:8px;padding:12px;border-bottom:1px solid var(--line,#ddd)}
+  .group-members{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 12px;max-height:180px;overflow:auto}
+  .group-members label{display:flex;gap:6px;align-items:center;font-weight:400}
 </style>
 </head>
 <body>
@@ -80,12 +86,19 @@
         <div class="conv-list" id="chat-convs"></div>
       </div>
       <div class="thread">
+        <form class="group-form" id="group-form" hidden>
+          <label for="group-name">Nom du groupe</label>
+          <input id="group-name" maxlength="80" placeholder="ex. Équipe BLE TRANSIT 2025" required>
+          <fieldset><legend>Membres</legend><div id="group-members" class="group-members"></div></fieldset>
+          <div class="row2"><button class="btn" type="submit">Créer le groupe</button><button class="btn ghost" type="button" id="group-cancel">Annuler</button><span class="status" id="group-status" role="status"></span></div>
+        </form>
         <div class="thread-head"><strong id="chat-title">Tout le cabinet</strong><span class="meta" id="chat-meta">Visible 24 h, puis archivé · <button type="button" class="linkish" id="chat-archive">Voir l'archive</button></span></div>
         <div class="bubbles" id="chat-bubbles" aria-live="polite"></div>
         <form class="composer" id="chat-form">
           <label for="chat-text" class="sr">Votre message</label>
           <textarea id="chat-text" maxlength="4000" rows="2" placeholder="Écrivez… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"></textarea>
-          <div class="row2"><button class="btn" type="submit">Envoyer</button><span class="status" id="chat-status" role="status" aria-live="polite"></span></div>
+          <div class="emojis" id="emojis" hidden aria-label="Émojis"></div>
+          <div class="row2"><button class="btn" type="submit">Envoyer</button><button class="btn ghost" type="button" id="emoji-btn" aria-expanded="false" aria-controls="emojis" title="Émojis">😊</button><span class="status" id="chat-status" role="status" aria-live="polite"></span></div>
         </form>
       </div>
     </section>
@@ -139,6 +152,8 @@
       var sel = $('chat-new');
       if (sel.options.length <= 1) {
         var g1 = document.createElement('optgroup'); g1.label = 'Personnes'; d.users.forEach(function (u) { var o = el('option', u.name); o.value = 'to:' + u.email; g1.appendChild(o); }); sel.appendChild(g1);
+        var g0 = document.createElement('optgroup'); g0.label = 'Groupes'; var on = el('option', '＋ Nouveau groupe…'); on.value = 'new-group'; g0.appendChild(on); sel.appendChild(g0);
+        chat.users = d.users;
         var g2 = document.createElement('optgroup'); g2.label = 'Missions'; d.missions.forEach(function (m) { var o = el('option', m.name); o.value = m.key; g2.appendChild(o); }); sel.appendChild(g2);
       }
       var sig = d.messages.map(function (m) { return m.id; }).join(',') + chat.key + chat.archive;
@@ -158,12 +173,32 @@
   }
   $('chat-new').addEventListener('change', function () {
     var v = this.value; this.value = ''; if (!v) return;
+    if (v === 'new-group') { openGroupForm(); return; }
     if (v.indexOf('to:') === 0) chat.pendingTo = v.slice(3);
     else { chat.pendingTo = null; chat.key = v; }
     chat.archive = false;
     if (chat.pendingTo) { $('chat-title').textContent = 'Nouvelle discussion avec ' + chat.pendingTo; $('chat-bubbles').textContent = ''; $('chat-bubbles').appendChild(el('p', 'Écrivez votre premier message.', 'empty-pane')); $('chat-text').focus(); return; }
     chatLoad(true);
   });
+  function openGroupForm() {
+    var box = $('group-members'); box.textContent = '';
+    (chat.users || []).forEach(function (u) { var l = document.createElement('label'); var c = document.createElement('input'); c.type = 'checkbox'; c.value = u.email; l.appendChild(c); l.appendChild(document.createTextNode(u.name)); box.appendChild(l); });
+    $('group-form').hidden = false; $('group-name').focus();
+  }
+  $('group-cancel').addEventListener('click', function () { $('group-form').hidden = true; });
+  $('group-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var members = Array.prototype.map.call($('group-members').querySelectorAll('input:checked'), function (c) { return c.value; });
+    if (!members.length) { $('group-status').textContent = 'Choisissez au moins une personne.'; return; }
+    OM.api('/api/app?route=chat', { method: 'POST', body: JSON.stringify({ action: 'group', name: $('group-name').value, members: members }) })
+      .then(function (g) { $('group-form').hidden = true; $('group-name').value = ''; chat.key = g.key; chat.pendingTo = null; chat.archive = false; chatLoad(true); })
+      .catch(function (err) { $('group-status').textContent = err.message; });
+  });
+  var EMO = ['😊','😂','🙂','😉','😍','🤔','😅','😮','😢','😡','👍','👎','👏','🙏','💪','🎉','✅','❌','⚠️','📎','📄','📊','⏰','🔥','❤️','👀','🚀','☕'];
+  EMO.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.setAttribute('aria-label', 'Insérer ' + x);
+    b.addEventListener('click', function () { var t = $('chat-text'), i = t.selectionStart || t.value.length; t.value = t.value.slice(0, i) + x + t.value.slice(t.selectionEnd || i); t.focus(); t.selectionStart = t.selectionEnd = i + x.length; });
+    $('emojis').appendChild(b); });
+  $('emoji-btn').addEventListener('click', function () { var open = $('emojis').hidden; $('emojis').hidden = !open; this.setAttribute('aria-expanded', String(open)); });
   $('chat-archive').addEventListener('click', function () { chat.archive = !chat.archive; this.textContent = chat.archive ? 'Revenir aux 24 h' : 'Voir l’archive'; chatLoad(true); });
   $('chat-form').addEventListener('submit', function (e) {
     e.preventDefault();
