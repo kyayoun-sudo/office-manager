@@ -128,6 +128,27 @@ export const ROUTES = Object.freeze({
   // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
   // « rangement automatique » switch.
   // One question about a real situation, for the Management Cards (managers answer).
+  // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
+  shadow: {
+    GET: owner(async () => (await import('../lib/shadow.js')).labView()),
+    POST: owner(async (orgId, req) => {
+      const s = await import('../lib/shadow.js'); const b = req.body || {};
+      if (b.action === 'run') return s.shadowPass(orgId, { force: true });
+      if (b.action === 'decide') return s.decide(orgId, b, who(req));
+      if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
+      if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
+      if (b.action === 'tests') return s.generateTests(orgId, String(b.agent || ''));
+      if (b.action === 'experiment') return s.runExperiment(orgId, String(b.agent || ''));
+      if (b.action === 'source') { const m = String(b.link || '').match(/[-\w]{25,}/); return s.addSource(orgId, { file_id: m ? m[0] : b.link }, who(req)); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'SHADOW_UNAVAILABLE'
+  },
+  'shadow-survey': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
+    POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).answerSurvey(req.body || {}, req.account)),
+    unavailable: 'SHADOW_UNAVAILABLE'
+  },
   'people-questions': {
     GET: users(MANAGERS, async () => ({ questions: await (await import('../lib/people-questions.js')).openQuestions() })),
     POST: users(MANAGERS, async (orgId, req) => (await import('../lib/people-questions.js')).answerQuestion(orgId, req.body || {}, who(req))),

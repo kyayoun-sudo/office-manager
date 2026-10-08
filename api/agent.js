@@ -241,6 +241,12 @@ export default async function handler(req, res) {
       const { names } = await agentSettings(orgId);
       const line = "NOMS DANS CE CABINET (utilise-les pour te présenter et pour parler des autres agents) : agent central = " + names["grand-controleur"] + ", documents et Drive = " + names.orpailleur + ", facturation et administratif = " + names.sika + ", préparation des missions = " + names["mission-controller"] + ", revue d'audit = " + names["enhanced-auditor"] + ".";
       rootContext = { ...rootContext, agent_names: line };
+      // What each agent has really learnt (Shadow: lessons confirmed by facts or approved by the owner).
+      try {
+        const { activeLessons } = await import("../lib/shadow.js");
+        const own = await activeLessons(requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent);
+        if (own.length) { const t = "LEÇONS APPRISES (applique-les) :\n- " + own.join("\n- "); if (requestedAgent === ROOT_ROUTE) rootContext = { ...rootContext, learned_lessons: t }; else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], learned_lessons: t }; }
+      } catch { /* no lesson yet */ }
       for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], agent_names: line };
     } catch { /* default names */ }
 

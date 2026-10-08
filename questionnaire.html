@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Questionnaire des agents</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Firm Manager</span><small>Firm Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+  <main class="main" data-no-tabs>
+    <header class="page-head">
+      <h1>Aidez les agents à s'améliorer</h1>
+      <p class="meta">Quatre questions, une minute, une fois par semaine. Vos réponses orientent les entraînements de Shadow ; elles ne servent à juger personne.</p>
+    </header>
+    <section class="card" aria-labelledby="h-q">
+      <h2 id="h-q">Cette semaine</h2>
+      <form id="f" class="stack"></form>
+      <p class="status" id="st" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  function start() {
+    OM.loadBranding().catch(function () {});
+    OM.api('/api/app?route=shadow-survey').then(function (r) {
+      var f = $('f'); f.textContent = '';
+      if (!r.survey) { f.appendChild(el('p', 'Pas de questionnaire en cours. Merci !', 'empty')); return; }
+      if (r.survey.answered) { f.appendChild(el('p', 'Vous avez déjà répondu cette semaine. Merci !', 'empty')); return; }
+      r.survey.questions.forEach(function (q) {
+        var l = el('label', q.text); l.htmlFor = 'q-' + q.id; l.style.fontWeight = '500';
+        var t = q.id === 'trust' ? el('select') : el('textarea'); t.id = 'q-' + q.id;
+        if (q.id === 'trust') ['', '1', '2', '3', '4', '5'].forEach(function (v) { var o = el('option', v || '—'); o.value = v; t.appendChild(o); }); else { t.rows = 3; t.maxLength = 1000; }
+        f.appendChild(l); f.appendChild(t);
+      });
+      var b = el('button', 'Envoyer mes réponses', 'btn'); b.type = 'submit'; f.appendChild(b);
+      f.onsubmit = function (e) { e.preventDefault(); var answers = {}; r.survey.questions.forEach(function (q) { answers[q.id] = $('q-' + q.id).value; });
+        OM.api('/api/app?route=shadow-survey', { method: 'POST', body: JSON.stringify({ survey_id: r.survey.id, answers: answers }) }).then(function () { f.textContent = ''; $('st').textContent = 'Merci ! Vos réponses sont transmises à Shadow.'; }).catch(function (err) { $('st').textContent = err.message; }); };
+    }).catch(function (e) { $('st').textContent = e.message; });
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

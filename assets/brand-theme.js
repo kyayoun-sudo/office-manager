@@ -95,6 +95,9 @@
       if (OM.getLang && OM.getLang() === 'en') base['x-om-lang'] = 'en';
       // Personal token: lets the server check who you are on sensitive routes.
       if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
+      // The owner's code (session, or typed in Paramètres) goes with every call: owner-only actions work from any page.
+      var ot = OM.getOwnerToken(); if (!ot) { try { ot = window.sessionStorage.getItem('officeManagerOwnerToken') || ''; } catch (e) { ot = ''; } }
+      if (ot) base['x-office-manager-owner-token'] = ot;
       var headers = Object.assign(base, options.headers || {});
       // A JSON body always says so (the server reads it as JSON).
       if (typeof options.body === 'string' && !Object.keys(headers).some(function (k) { return k.toLowerCase() === 'content-type'; })) headers['Content-Type'] = 'application/json';
