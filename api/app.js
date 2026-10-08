@@ -508,7 +508,13 @@ export const ROUTES = Object.freeze({
   'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   // The firm's people-management policy, kept in the agents' Drive memory (owner).
   // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
-  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => dropFile(orgId, req.body || {}, req.account)), unavailable: 'DROP_UNAVAILABLE' },
+  // Small files through the app; large ones straight from the browser to Google (start / finish).
+  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], async (orgId, req) => {
+    const a = req.body?.action;
+    if (a === 'start_upload') return (await import('../lib/drop-box.js')).startLargeUpload(orgId, req.body || {}, req.account, req);
+    if (a === 'finish_upload') return (await import('../lib/drop-box.js')).finishLargeUpload(orgId, req.body || {}, req.account);
+    return dropFile(orgId, req.body || {}, req.account);
+  }), unavailable: 'DROP_UNAVAILABLE' },
   // « Équipe et briefing » with the firm's people-management policy (AI) — managers.
   'people-brief': { POST: users(MANAGERS, (orgId, req) => peopleBrief(orgId, req.body?.mission_id)), unavailable: 'PEOPLE_BRIEF_UNAVAILABLE' },
   // Messagerie: the Gmail conversation of a sent message (replies of the colleagues) — managers.

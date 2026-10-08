@@ -68,6 +68,26 @@
       return c;
     },
 
+    // One file to the Drive (2026-10-08): small files through the app, large ones straight to Google.
+    // extra: { rel_path, deposit_label, wish, send_to }. Resolves { file_id, url, ... }.
+    uploadFile: function (file, extra) {
+      extra = extra || {};
+      var meta = { name: file.name, mime: file.type || 'application/octet-stream', rel_path: extra.rel_path || file.webkitRelativePath || file.name, deposit_label: extra.deposit_label || null, wish: extra.wish || null, send_to: extra.send_to || null };
+      if (file.size <= 2.5 * 1024 * 1024) {
+        return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1]); }; r.onerror = rej; r.readAsDataURL(file); })
+          .then(function (b64) { return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ base64: b64 }, meta)) }); });
+      }
+      return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ action: 'start_upload', size: file.size }, meta)) })
+        .then(function (s) {
+          return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) {
+            if (!r.ok) throw new Error('Envoi vers Google refusé (' + r.status + ')');
+            return r.json();
+          }).then(function (g) {
+            return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ action: 'finish_upload', file_id: g.id }, meta)) });
+          });
+        });
+    },
+
     api: function (path, options, retried) {
       options = options || {};
       var s = readSession();

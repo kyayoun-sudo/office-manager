@@ -64,6 +64,9 @@
       <div class="field"><label for="risk-files">Évaluation des risques de l'auditeur (liens Drive, un par ligne)</label><textarea id="risk-files" style="min-height:60px" placeholder="https://docs.google.com/spreadsheets/d/…"></textarea></div>
       <div class="field"><label for="work-files">Programme de travail et fichiers de travail (liens Drive, un par ligne)</label><textarea id="work-files" style="min-height:80px" placeholder="Feuilles de travail Excel, programme, mémos…"></textarea></div>
       <div class="field"><label for="evidence-files">Pièces justificatives : photos, scans, PDF (liens Drive, un par ligne)</label><textarea id="evidence-files" style="min-height:70px" placeholder="Photos d'inventaire, relevés scannés, factures, états de dépréciation…"></textarea></div>
+      <div class="dropzone" id="rv-drop" tabindex="0" role="button" aria-label="Déposer des fichiers pour la revue">Ou glissez ici les fichiers de la mission (évaluation des risques, programme, working papers, pièces), ou <label class="linkish" for="rv-files">choisissez des fichiers</label> / <label class="linkish" for="rv-folder">un dossier</label>
+        <input type="file" id="rv-files" multiple hidden><input type="file" id="rv-folder" webkitdirectory multiple hidden></div>
+      <p class="meta">Sans fichier, la revue part des documents déjà rattachés à la mission et de l'évaluation des risques du Firm Manager.</p>
       <div class="field"><label for="focus">Point d'attention (facultatif)</label><input type="text" id="focus" placeholder="Exemple : dépréciation des stocks et des créances"></div>
       <div><button class="btn" id="go" type="button">Lancer la revue</button></div>
       <p class="status" id="say" role="status"></p>
@@ -252,6 +255,25 @@
     });
   }
 
+  // Files dropped for a mission review: uploaded, then sorted by their name into the three lists.
+  function rvUpload(list) {
+    var arr = Array.prototype.slice.call(list).slice(0, 40), i = 0;
+    function next() {
+      if (i >= arr.length) { $('say').textContent = arr.length + ' fichier(s) ajouté(s) à la revue : cliquez sur « Lancer la revue ».'; return; }
+      var f = arr[i++], path = f.webkitRelativePath || f.name; $('say').textContent = 'Dépôt de « ' + path + ' » (' + i + '/' + arr.length + ')…';
+      OM.uploadFile(f, { rel_path: path, deposit_label: 'REVUE_' + new Date().toISOString().slice(0, 10), wish: 'Revue Enhanced Auditor de la mission' }).then(function (r) {
+        var box = /risque|risk/i.test(f.name) ? 'risk-files' : /\.(jpe?g|png|webp|gif|heic)$|scan|facture|releve|relevé|piece|pièce|justif/i.test(f.name) ? 'evidence-files' : 'work-files';
+        $(box).value = ($(box).value ? $(box).value + '\n' : '') + (r.url || r.file_id);
+      }).catch(function (e) { $('say').textContent = path + ' : non déposé (' + e.message + ')'; }).then(next);
+    }
+    next();
+  }
+  $('rv-files').addEventListener('change', function () { rvUpload(this.files); });
+  $('rv-folder').addEventListener('change', function () { rvUpload(this.files); });
+  $('rv-drop').addEventListener('dragover', function (e) { e.preventDefault(); this.classList.add('over'); });
+  $('rv-drop').addEventListener('dragleave', function () { this.classList.remove('over'); });
+  $('rv-drop').addEventListener('drop', function (e) { e.preventDefault(); this.classList.remove('over'); rvUpload(e.dataTransfer.files); });
+
   // ---- Sections (2026-10-08) ----
   Array.prototype.forEach.call($('ea-tabs').children, function (b) {
     b.addEventListener('click', function () {
@@ -351,9 +373,10 @@
   function upload(list) {
     var arr = Array.prototype.slice.call(list).slice(0, 40); var i = 0;
     function next() {
-      if (i >= arr.length) { $('wp-status').textContent = wpUploaded.length + ' fichier(s) déposé(s) : cliquez sur « Lancer la revue ».'; return; }
+      // Dropped = reviewed (2026-10-08: « déposer le working paper directement pour review »).
+      if (i >= arr.length) { if (wpUploaded.length) { $('wp-status').textContent = wpUploaded.length + ' fichier(s) déposé(s) : la revue démarre…'; $('wp-start').click(); } return; }
       var f = arr[i++]; var path = f.webkitRelativePath || f.name; $('wp-status').textContent = 'Dépôt de « ' + path + ' » (' + i + '/' + arr.length + ')…';
-      b64(f).then(function (data) { return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify({ name: f.name, mime: f.type || 'application/octet-stream', base64: data, rel_path: path, deposit_label: 'REVUE_' + new Date().toISOString().slice(0, 10), wish: 'Revue Enhanced Auditor' }) }); })
+      OM.uploadFile(f, { rel_path: path, deposit_label: 'REVUE_' + new Date().toISOString().slice(0, 10), wish: 'Revue Enhanced Auditor' })
         .then(function (r) { wpUploaded.push(r.file_id); }).catch(function (e) { $('wp-status').textContent = path + ' : non déposé (' + e.message + ')'; }).then(next);
     }
     next();
