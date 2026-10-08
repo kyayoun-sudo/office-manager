@@ -42,6 +42,7 @@ import { readMissionMemory, refreshMissionMemories, listLearnings, confirmLearni
 import { listAuditEvents } from '../lib/audit-log.js';
 import { rest } from '../lib/supabase.js';
 import { cockpit } from '../lib/cockpit.js';
+import { notifications } from '../lib/notifications.js';
 import { getMissionFull } from '../lib/mission-full.js';
 import { assignAction } from '../lib/action-executor.js';
 import { chatState, sendChat } from '../lib/chat.js';
@@ -339,6 +340,8 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'DASHBOARD_UNAVAILABLE'
   },
+  // The global bell: notifications computed from what is recorded, one per event.
+  notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {

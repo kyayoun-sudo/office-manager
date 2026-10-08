@@ -434,3 +434,17 @@ test('enhanced auditor: evening point, sign-off on the real file version, partne
   const pv = await ea.partnerView({ drive: { findFilesByExactName: async () => [{ id: 'w' }], downloadBuffer: async () => Buffer.from(JSON.stringify(work)) }, folder: 'om' });
   assert.equal(pv.items[0].category, 'fraude');
 });
+
+test('notifications: one per event, from what is recorded', async () => {
+  const n = await import('../lib/notifications.js');
+  const c = { kpis: [
+    { key: 'pbc_missing', items: [{ label: 'Grand livre', meta: 'BLE · attendue le 2026-10-01', href: '/m' }, { label: 'Balance', meta: 'BLE · attendue le 2026-12-01' }] },
+    { key: 'deadlines', items: [{ label: 'Fin', meta: 'x', at: '2026-10-09' }, { label: 'Loin', at: '2026-11-30' }] },
+    { key: 'risks', items: [{ label: 'Revenu', meta: 'BLE · niveau élevé · partiellement couvert' }] },
+    { key: 'mails', items: [{ label: 'GL', meta: 'cfo · haute' }, { label: 'News', meta: 'x · basse' }] }] };
+  const list = n.buildNotifications(c, { documents: [{ id: 'd1', title: '2 documents' }, { id: 'd1', title: '2 documents' }] }, Date.parse('2026-10-08T10:00:00Z'));
+  const types = list.map(x => x.type).sort();
+  assert.deepEqual(types, ['critical_risk', 'deadline', 'important_email', 'new_document', 'pbc_late']);
+  assert.equal(new Set(list.map(x => x.key)).size, list.length);
+  assert.equal(n.buildNotifications(c, {}, Date.parse('2026-10-08T10:00:00Z')).find(x => x.type === 'pbc_late').key, list.find(x => x.type === 'pbc_late').key);
+});

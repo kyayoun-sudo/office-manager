@@ -172,6 +172,7 @@
     b.appendChild(svgIcon(ICONS['/parametres.html']));
     me.appendChild(b);
     who.textContent = ''; who.appendChild(me);
+    addBell(me);
     var menu = node('div', null, 'gear-menu'); menu.hidden = true; menu.id = 'gear-menu';
     who.appendChild(menu);
     function build() {
@@ -199,6 +200,41 @@
     b.addEventListener('click', function (e) { e.stopPropagation(); toggle(menu.hidden); });
     document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { toggle(false); b.focus(); } });
+  }
+  // The global bell (2026-10-08): one notification per event, « lu » remembered on this device.
+  function addBell(me) {
+    if (document.getElementById('bell-btn') || /\/excel\//.test(location.pathname)) return;
+    var KEY = 'om_seen_notifications';
+    var seen = {}; try { seen = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { seen = {}; }
+    var save = function () { try { var keys = Object.keys(seen); if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(function (k) { delete seen[k]; }); localStorage.setItem(KEY, JSON.stringify(seen)); } catch (e) {} };
+    var bell = node('button', null, 'gear bell'); bell.type = 'button'; bell.id = 'bell-btn';
+    bell.setAttribute('aria-label', 'Notifications'); bell.setAttribute('aria-haspopup', 'true'); bell.setAttribute('aria-expanded', 'false');
+    bell.appendChild(svgIcon('M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'));
+    var badge = node('span', '', 'bell-badge'); badge.hidden = true; bell.appendChild(badge);
+    me.insertBefore(bell, me.lastChild);
+    var panel = node('div', null, 'bell-panel'); panel.hidden = true; panel.id = 'bell-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Notifications');
+    document.body.appendChild(panel);   // outside the navigation: its link styles do not apply
+    var list = [];
+    function count() { var n = list.filter(function (x) { return !seen[x.key]; }).length; badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n); bell.setAttribute('aria-label', 'Notifications' + (n ? ' (' + n + ' non lues)' : '')); }
+    function draw() {
+      panel.textContent = '';
+      var head = node('div', null, 'bell-head'); head.appendChild(node('strong', 'Notifications'));
+      var all = node('button', 'Tout marquer comme lu', 'linkish'); all.type = 'button'; all.addEventListener('click', function () { list.forEach(function (x) { seen[x.key] = 1; }); save(); count(); draw(); });
+      head.appendChild(all); panel.appendChild(head);
+      if (!list.length) { panel.appendChild(node('p', 'Rien de nouveau.', 'bell-empty')); return; }
+      list.slice(0, 40).forEach(function (x) {
+        var a = node(x.href ? 'a' : 'div', null, 'bell-item' + (seen[x.key] ? ' read' : '')); if (x.href) a.href = x.href;
+        a.appendChild(node('span', x.label, 'bell-type')); a.appendChild(node('span', x.title, 'bell-title')); if (x.meta) a.appendChild(node('span', x.meta, 'bell-meta'));
+        a.addEventListener('click', function () { seen[x.key] = 1; save(); count(); });
+        panel.appendChild(a);
+      });
+    }
+    function load() { if (!OM.getToken || !OM.getToken()) return; OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {}); }
+    function toggle(open) { if (open) draw(); panel.hidden = !open; bell.setAttribute('aria-expanded', String(open)); }
+    bell.addEventListener('click', function (e) { e.stopPropagation(); toggle(panel.hidden); });
+    document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && e.target !== bell) toggle(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { toggle(false); bell.focus(); } });
+    setTimeout(load, 1500); setInterval(function () { if (!document.hidden) load(); }, 120000);
   }
   function openClose() {
     var s = readSession() || {}, email = (s.user && s.user.email) || '';
