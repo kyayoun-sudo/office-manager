@@ -235,6 +235,14 @@ export default async function handler(req, res) {
         else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], agent_memory: summary };
       }
     } catch { /* memory unavailable: the agent works as before */ }
+    // The names the firm gave its agents (Paramètres → Noms des agents): each agent uses them.
+    try {
+      const { agentSettings } = await import("../lib/agent-persona.js");
+      const { names } = await agentSettings(orgId);
+      const line = "NOMS DANS CE CABINET (utilise-les pour te présenter et pour parler des autres agents) : agent central = " + names["grand-controleur"] + ", documents et Drive = " + names.orpailleur + ", facturation et administratif = " + names.sika + ", préparation des missions = " + names["mission-controller"] + ", revue d'audit = " + names["enhanced-auditor"] + ".";
+      rootContext = { ...rootContext, agent_names: line };
+      for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], agent_names: line };
+    } catch { /* default names */ }
 
     const orchestration =
       requestedAgent === ROOT_ROUTE ? "manager" : "direct-specialist";

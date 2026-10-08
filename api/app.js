@@ -125,6 +125,13 @@ export const ROUTES = Object.freeze({
     GET: (orgId, req) => getMissionView(orgId, req.query?.mission_id),
     unavailable: 'MISSION_VIEW_UNAVAILABLE'
   },
+  // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
+  // « rangement automatique » switch.
+  'agent-names': {
+    GET: users(ALL_ROLES, async orgId => (await import('../lib/agent-persona.js')).agentSettings(orgId)),
+    POST: owner(async (orgId, req) => (await import('../lib/agent-persona.js')).saveAgentSettings(orgId, req.body || {}, who(req))),
+    unavailable: 'PERSONA_UNAVAILABLE'
+  },
   'agent-persona': {
     GET: owner((orgId) => getPersona(orgId)),
     POST: owner((orgId, req) => savePersona(orgId, req.body || {}, req.body?.updated_by)),

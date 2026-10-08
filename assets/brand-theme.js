@@ -465,6 +465,67 @@
     sync(); if (!fromHash()) select(Math.min(saved, best.length - 1));
   }
 
+
+  // Agents' names chosen by the firm (2026-10-08: « Firm Manager au lieu d'Office Manager,
+  // Orpailleur clandestin… et la possibilité de les renommer »). The page keeps its texts; the
+  // names are replaced on screen, everywhere, from the firm's choice (Paramètres → Noms des agents).
+  var NAMES_KEY = 'om_agent_names';
+  var DEFAULT_LABELS = [
+    ['grand-controleur', ['Grand Contrôleur / Office Manager AI', 'Office Manager AI', 'Office Manager', 'Grand Contrôleur', 'Grand Controleur', 'Firm Manager']],
+    ['orpailleur', ['Orpailleur']],
+    ['sika', ['Sika']],
+    ['mission-controller', ['Mission Controller']],
+    ['enhanced-auditor', ['Enhanced Auditor']]
+  ];
+  var renameRe = null, renameMap = {};
+  function escRe(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function buildRename(names) {
+    var alts = [];
+    renameMap = {};
+    DEFAULT_LABELS.forEach(function (d) {
+      var to = names && names[d[0]]; if (!to) return;
+      d[1].forEach(function (from) {
+        if (from === to) return;
+        renameMap[from.toLowerCase()] = to;
+        // « Orpailleur » → « Orpailleur clandestin »: never twice.
+        var tail = to.indexOf(from) === 0 ? to.slice(from.length) : '';
+        alts.push(escRe(from) + (tail ? '(?!' + escRe(tail) + ')' : ''));
+      });
+    });
+    alts.sort(function (a, b) { return b.length - a.length; });
+    renameRe = alts.length ? new RegExp('(^|[^\\p{L}])(' + alts.join('|') + ')(?![\\p{L}])', 'gu') : null;
+  }
+  function renameText(t) {
+    if (!renameRe || !t) return t;
+    return t.replace(renameRe, function (m, pre, word) { return pre + (renameMap[word.toLowerCase()] || word); });
+  }
+  function renameIn(root) {
+    if (!renameRe || !root) return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) {
+      var p = n.parentElement; if (!p) return NodeFilter.FILTER_REJECT;
+      if (/^(SCRIPT|STYLE|TEXTAREA|INPUT|CODE|PRE)$/.test(p.tagName) || p.closest('[data-no-rename],[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT; } });
+    var n, list = [];
+    while ((n = w.nextNode())) list.push(n);
+    list.forEach(function (x) { var v = renameText(x.nodeValue); if (v !== x.nodeValue) x.nodeValue = v; });
+    if (root.querySelectorAll) Array.prototype.forEach.call(root.querySelectorAll('[title],[placeholder],[aria-label]'), function (el) {
+      if (el.closest('[data-no-rename]')) return;
+      ['title', 'placeholder', 'aria-label'].forEach(function (a) { var v = el.getAttribute(a); if (v) { var r = renameText(v); if (r !== v) el.setAttribute(a, r); } });
+    });
+    var t = renameText(document.title); if (t !== document.title) document.title = t;
+  }
+  OM.agentNames = function () { try { return JSON.parse(window.localStorage.getItem(NAMES_KEY) || 'null'); } catch (e) { return null; } };
+  OM.setAgentNames = function (names) { try { window.localStorage.setItem(NAMES_KEY, JSON.stringify(names || {})); } catch (e) { /* private mode */ } buildRename(names); renameIn(document.body); };
+  OM.agentName = function (key) { var n = OM.agentNames(); return (n && n[key]) || ({ 'grand-controleur': 'Firm Manager', orpailleur: 'Orpailleur clandestin', sika: 'Silkoundêfouê', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', shadow: 'Shadow' })[key] || key; };
+  function startRename() {
+    var cached = OM.agentNames() || { 'grand-controleur': 'Firm Manager', orpailleur: 'Orpailleur clandestin', sika: 'Silkoundêfouê' };
+    buildRename(cached); renameIn(document.body);
+    var pendingR = false;
+    new MutationObserver(function () { if (pendingR) return; pendingR = true; setTimeout(function () { pendingR = false; renameIn(document.body); }, 50); })
+      .observe(document.body, { childList: true, subtree: true, characterData: true });
+    if (!onLoginPage() && readSession()) OM.api('/api/app?route=agent-names').then(function (s) { if (s && s.names) OM.setAgentNames(s.names); }).catch(function () {});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startRename); else startRename();
   var i18nReady = function () { startI18n(); if (onLoginPage()) loginLangSwitch(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', i18nReady); else i18nReady();
   function loginLangSwitch() {

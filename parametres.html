@@ -118,6 +118,14 @@
           <p class="status" id="contrast" aria-live="polite"></p>
         </section>
 
+        <section class="card" aria-labelledby="h-names" id="agent-names-card">
+          <h2 id="h-names">Noms des agents</h2>
+          <p class="hint" style="margin:0">Vous pouvez donner à chaque agent le nom que vous voulez. Le nouveau nom s'affiche partout dans l'application et l'agent se présente ainsi.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px" id="names-grid"></div>
+          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="checkbox" id="auto-filing" style="margin-top:3px"> <span><strong>Rangement automatique</strong> : quand l'Orpailleur est sûr (client, mission et année lus dans le document, destination conforme à la structure du cabinet), il range tout de suite. Sinon, sa proposition attend dans « À valider ». Chaque rangement est journalisé et réversible.</span></label>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="names-save" type="button">Enregistrer les noms</button><span class="status" id="names-status" role="status" aria-live="polite"></span></div>
+        </section>
+
         <section class="card" aria-labelledby="h-mail">
           <h2 id="h-mail">E-mail de l'agent</h2>
           <div class="field"><label for="agent-name">Nom de l'agent (affiché dans les e-mails)</label><input id="agent-name" type="text" maxlength="80" placeholder="Ex. Office Manager TATY"></div>
@@ -662,6 +670,33 @@
 
   $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
   if (!OM.getToken()) { $('login').hidden = false; render(); } else { start(); }
+})();
+</script>
+
+<script>
+(function () {
+  var OM = window.OfficeManager, $ = function (id) { return document.getElementById(id); };
+  var LABELS = { 'grand-controleur': 'Agent central (Firm Manager)', orpailleur: 'Orpailleur (documents, Drive)', sika: 'Facturation et administratif', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', shadow: 'Shadow (entraînement)' };
+  function load() {
+    OM.api('/api/app?route=agent-names').then(function (s) {
+      var g = $('names-grid'); g.textContent = '';
+      Object.keys(LABELS).forEach(function (k) {
+        var f = document.createElement('div'); f.className = 'field';
+        var l = document.createElement('label'); l.htmlFor = 'name-' + k; l.textContent = LABELS[k];
+        var i = document.createElement('input'); i.type = 'text'; i.maxLength = 60; i.id = 'name-' + k; i.value = (s.names || {})[k] || ''; i.setAttribute('data-no-rename', '');
+        f.appendChild(l); f.appendChild(i); g.appendChild(f);
+      });
+      $('auto-filing').checked = s.auto_filing !== false;
+    }).catch(function (e) { $('names-status').textContent = e.message; });
+  }
+  $('names-save').addEventListener('click', function () {
+    var names = {}; Object.keys(LABELS).forEach(function (k) { var i = $('name-' + k); if (i) names[k] = i.value; });
+    $('names-status').textContent = 'Enregistrement…';
+    OM.api('/api/app?route=agent-names', { method: 'POST', body: JSON.stringify({ names: names, auto_filing: $('auto-filing').checked }) })
+      .then(function (s) { if (OM.setAgentNames) OM.setAgentNames(s.names); $('names-status').textContent = 'Noms enregistrés.'; })
+      .catch(function (e) { $('names-status').textContent = e.message; });
+  });
+  load();
 })();
 </script>
 </body>
