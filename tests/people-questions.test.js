@@ -32,13 +32,42 @@ test('Firm Manager asks one question about a real situation; the answer becomes 
   await assert.rejects(() => pq.answerQuestion('org', { key, answer: 'encore' }, 'Paul', { updateJsonFile }), /QUESTION_NOT_OPEN/);
 });
 
-test('a member of the firm found in the HR documents is added to Équipe; consultants are not', async () => {
+test('a member of the firm found in the HR documents is added to Équipe; consultants and people of a proposal are not', async () => {
   const { applyCapabilities, mergePerson } = await import('../lib/capabilities.js');
   const posted = [];
   const fetchRows = async (path, o = {}) => { if (o.method === 'POST') { const row = JSON.parse(o.body)[0]; posted.push(row); return [{ id: 'new', ...row }]; } return []; };
-  const r = await applyCapabilities('org', [{ full_name: 'Awa Koné', kind: 'employee', email: 'awa@taty.info', current_title: 'Senior', technical_skills: ['Audit'] }, { full_name: 'Expert Externe', kind: 'consultant' }], { fetchRows });
+  const firmMembers = async () => ({ members: [{ full_name: 'Awa Koné', email: 'awa@taty.info' }] });
+  const r = await applyCapabilities('org', [{ full_name: 'Awa Koné', kind: 'employee', email: 'awa@taty.info', current_title: 'Senior', technical_skills: ['Audit'] }, { full_name: 'Expert Externe', kind: 'consultant' },
+    { full_name: 'Serhii Kovchenko', kind: 'employee', current_title: 'Expert (offre IMPLUS)' }], { fetchRows, firmMembers });
   assert.equal(r.staff_added, 1); assert.equal(posted[0].full_name, 'Awa Koné'); assert.equal(posted[0].profile_status, 'needs_review');
   const list = [{ full_name: 'Awa Koné', work_preferences: { autonomy: 'élevée' } }];
   mergePerson(list, { full_name: 'Awa Koné', work_preferences: { motivation: 'apprendre', autonomy: '' } });
   assert.deepEqual(list[0].work_preferences, { autonomy: 'élevée', motivation: 'apprendre' });
+});
+
+test('who is in the firm: team sheet ∪ users of the app ∪ confirmed; others leave Équipe (deactivated) only if the sheet was read', async () => {
+  const fm = await import('../lib/firm-members.js');
+  const staff = [
+    { id: 's1', full_name: 'Yann Kouadio', email: null, active: true, profile_status: 'needs_review' },
+    { id: 's2', full_name: 'Serhii Kovchenko', active: true, profile_status: 'needs_review' },
+    { id: 's3', full_name: 'Walid', active: true, profile_status: 'needs_review' },
+    { id: 's4', full_name: 'Awa Koné', email: 'awa@taty.info', active: true, profile_status: 'validated' },
+    { id: 's5', full_name: '[ENTRAINEMENT] Chef fictif', active: true, profile_status: 'needs_review' }
+  ];
+  const patched = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'PATCH') { patched.push(/id=eq\.([^&]+)/.exec(path.split('&').slice(1).join('&'))?.[1] || path); return []; }
+    if (path.startsWith('office_app_users')) return [{ email: 'paul@taty.info', display_name: 'Paul Taty', role: 'owner' }];
+    if (path.startsWith('office_staff_profiles')) return staff;
+    return [];
+  };
+  const teamSheetMembers = async () => ({ members: [{ full_name: 'Yann Kouadio', email: 'yann@taty.info', role: 'Senior' }], source: 'TATY_EQUIPE_RESPONSABLES' });
+  const f = await fm.firmMembers('org', { fetchRows, teamSheetMembers });
+  assert.deepEqual(f.members.map(m => m.full_name).sort(), ['Awa Koné', 'Paul Taty', 'Yann Kouadio']);
+  const r = await fm.cleanTeam('org', { fetchRows, teamSheetMembers });
+  assert.deepEqual(r.cleaned.sort(), ['Serhii Kovchenko', 'Walid', '[ENTRAINEMENT] Chef fictif'].sort());
+  // Without the team sheet read, nobody is taken out.
+  const none = await fm.cleanTeam('org', { fetchRows, teamSheetMembers: async () => ({ members: [], reason: 'TEAM_SHEET_NOT_FOUND' }) });
+  assert.deepEqual(none.cleaned, []);
+  assert.equal(fm.isMember(f.members, { full_name: 'Yann' }), false);   // one first name alone is not enough
 });

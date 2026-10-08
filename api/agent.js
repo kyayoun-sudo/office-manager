@@ -240,6 +240,10 @@ export default async function handler(req, res) {
       const { agentSettings } = await import("../lib/agent-persona.js");
       const { names } = await agentSettings(orgId);
       const line = "NOMS DANS CE CABINET (utilise-les pour te présenter et pour parler des autres agents) : agent central = " + names["grand-controleur"] + ", documents et Drive = " + names.orpailleur + ", facturation et administratif = " + names.sika + ", préparation des missions = " + names["mission-controller"] + ", revue d'audit = " + names["enhanced-auditor"] + ".";
+      // Who the firm's people are (team sheet, users, confirmed profiles): every agent knows them.
+      let members = null;
+      try { members = await Promise.race([(await import("../lib/firm-members.js")).membersLine(orgId), new Promise(r => setTimeout(() => r(null), 5000))]); } catch { members = null; }
+      if (members) { rootContext = { ...rootContext, firm_members: members }; for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], firm_members: members }; }
       rootContext = { ...rootContext, agent_names: line };
       // What each agent has really learnt (Shadow: lessons confirmed by facts or approved by the owner).
       try {
