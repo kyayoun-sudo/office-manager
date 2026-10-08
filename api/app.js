@@ -12,6 +12,7 @@ import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityR
 import { engagementMissions, tdrCandidates, engagementState, startEngagementPrep, engagementStep } from '../lib/engagement-prep.js';
 import { submissionState, startSubmissionReview, submissionStep } from '../lib/submissions.js';
 import { auditorState, auditorReviews, startAuditorReview, auditorStep } from '../lib/enhanced-auditor.js';
+import { startDepositAnalysis, depositStep, depositState, listDeposits } from '../lib/deposit-analysis.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -299,6 +300,18 @@ export const ROUTES = Object.freeze({
     unavailable: 'AUDITOR_UNAVAILABLE'
   },
   'auditor-step': { POST: (orgId, req) => auditorStep(orgId, req, req.body || {}), unavailable: 'AUDITOR_UNAVAILABLE' },
+  // Documents and folders dropped on Rangement: understood by the agents, then analysed by the
+  // agent chosen (Grand Contrôleur, Mission Controller, Enhanced Auditor). Filing stays as before.
+  deposit: {
+    GET: users(ALL_ROLES, async (orgId, req) => req.query?.id ? depositState(req.query.id) : { deposits: (await listDeposits()).slice(0, 30) }),
+    POST: users(ALL_ROLES, (orgId, req) => {
+      const p = req.body?.purpose;
+      if ((p === 'mission' || p === 'auditor') && !MANAGERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403);
+      return startDepositAnalysis(orgId, req, { ...(req.body || {}), by: who(req) });
+    }),
+    unavailable: 'DEPOSIT_UNAVAILABLE'
+  },
+  'deposit-step': { POST: (orgId, req) => depositStep(orgId, req, req.body || {}), unavailable: 'DEPOSIT_UNAVAILABLE' },
   // Partner Dashboard: firm improvement in one place (owner / partners).
   'partner-dashboard': {
     GET: users(PARTNERS, async (orgId, req) => {

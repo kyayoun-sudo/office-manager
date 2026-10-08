@@ -17,6 +17,12 @@
 .why{font-size:13px;color:var(--muted);margin:0;line-height:1.45}
 .bar{height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden}.bar span{display:block;height:8px;background:var(--brand)}
 .warn-box{background:var(--warn-bg);border:1px solid #EBD3A6;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.5;color:var(--warn-ink)}
+.dropzone{border:2px dashed var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;background:var(--surface-2);transition:border-color .15s,background .15s}
+.dropzone.over{border-color:var(--brand);background:var(--soft)}
+.purpose{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0;display:flex;flex-direction:column;gap:4px}
+.purpose legend{font-size:13px;font-weight:600;color:var(--muted);padding:0 6px}
+.purpose label{display:flex;gap:10px;align-items:flex-start;padding:6px 4px;font-weight:500;color:var(--ink);cursor:pointer}
+.purpose small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -50,18 +56,35 @@
     </header>
 
     <section class="card" aria-labelledby="h-drop">
-      <h2 id="h-drop">Déposer des documents</h2>
-      <p class="lead" style="margin:0">Jusqu'à 40 documents (3 Mo chacun). L'Orpailleur les lit, leur donne un nom clair et propose leur place dans le Drive ; vous pouvez aussi les faire envoyer à quelqu'un du cabinet. Tout attend la validation dans « À valider ».</p>
-      <div class="field"><label for="drop-files">Documents</label><input id="drop-files" type="file" multiple></div>
-      <div class="field"><label for="drop-wish">Où les mettre ou quoi en faire (facultatif)</label>
+      <h2 id="h-drop">Déposer des documents ou des dossiers</h2>
+      <p class="lead" style="margin:0">Fichiers ou dossiers entiers (150 documents, 3 Mo chacun). Comme avant, l'Orpailleur les lit, leur donne un nom clair et propose leur place dans le Drive (dans « À valider »). En plus, chaque document est compris par les agents et gardé dans leur mémoire : le Grand Contrôleur, Mission Controller, l'Enhanced Auditor et les autres s'en servent ensuite.</p>
+      <div class="dropzone" id="dropzone" tabindex="0" role="group" aria-label="Zone de dépôt">
+        <p style="margin:0;font-weight:600">Glissez ici des fichiers ou des dossiers</p>
+        <div class="btn-row" style="justify-content:center"><button class="btn ghost" id="pick-files" type="button">Choisir des fichiers</button><button class="btn ghost" id="pick-folder" type="button">Choisir un dossier</button></div>
+        <input id="drop-files" type="file" multiple hidden><input id="drop-folder" type="file" webkitdirectory multiple hidden>
+        <p class="meta" id="drop-list" style="margin:0"></p>
+      </div>
+      <fieldset class="purpose">
+        <legend>Que doivent en faire les agents ?</legend>
+        <label><input type="radio" name="purpose" value="understand" checked> <span><b>Ranger et faire comprendre à tous les agents</b><small>Lus, compris, gardés dans leur mémoire ; rangement proposé comme avant.</small></span></label>
+        <label><input type="radio" name="purpose" value="controller"> <span><b>Poser une question au Grand Contrôleur</b><small>Il lit tout et répond ; l'analyse est enregistrée dans le Drive.</small></span></label>
+        <label><input type="radio" name="purpose" value="mission"> <span><b>Préparer une mission (Mission Controller)</b><small>TDR, contrat… : compétences requises, équipe, manques, risques du secteur.</small></span></label>
+        <label><input type="radio" name="purpose" value="auditor"> <span><b>Revue par l'Enhanced Auditor</b><small>Évaluation des risques, fichiers de travail et pièces : chaque document est classé selon ce qu'il est.</small></span></label>
+      </fieldset>
+      <div class="field" id="mission-field" hidden><label for="drop-mission">Mission</label><select id="drop-mission"><option value="">Chargement…</option></select></div>
+      <div class="field" id="question-field" hidden><label for="drop-question">Votre question ou consigne</label><textarea id="drop-question" maxlength="3000" style="min-height:70px" placeholder="Ex. Ces relevés couvrent-ils toute l'année ? Quels risques vois-tu sur les stocks ?"></textarea></div>
+      <div class="field"><label for="drop-wish">Où les ranger (facultatif)</label>
         <input id="drop-wish" type="text" maxlength="500" placeholder="Ex. pièces PBC de Ivoire Logistique, CAC 2026"></div>
       <div class="field" style="max-width:520px"><label for="drop-to">Envoyer aussi à (facultatif)</label>
         <input id="drop-to" type="text" list="drop-people" maxlength="254" placeholder="adresse d'un collègue"><datalist id="drop-people"></datalist></div>
       <div class="btn-row" style="align-items:center">
-        <button class="btn" id="drop-send" type="button">Déposer et ranger</button>
+        <button class="btn" id="drop-send" type="button">Déposer</button>
         <span class="status" id="drop-status" role="status" aria-live="polite"></span>
       </div>
-      <div id="drop-results" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="progress" id="drop-progress" hidden><span id="drop-bar" style="width:0"></span></div>
+      <div id="drop-results" class="stack"></div>
+      <div id="drop-analysis" class="stack"></div>
+      <details id="deposits-box"><summary>Ce que les agents ont compris des derniers dépôts</summary><div id="deposits" class="stack" style="margin-top:10px"></div></details>
     </section>
 
     <section class="card" aria-labelledby="h-new">
@@ -233,35 +256,139 @@
   $('stop').addEventListener('click', function () { if (current && window.confirm('Arrêter ce rangement ? Les fichiers déjà rangés restent où ils sont.')) act({ action: 'stop', request_id: current }); });
   $('refresh').addEventListener('click', function () { loadList(current); });
 
-  // ---- Drop documents (40 max): read, named, placed — all waiting in « À valider » ----
+  // ---- Drop documents and folders: filed as before (À valider) AND understood by the agents ----
+  var MAX_FILES = 150, MAX_SIZE = 3 * 1024 * 1024;
+  var picked = [];   // [{ file, path }]
   function b64(file) {
     return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); });
   }
   OM.api('/api/app?route=mission-contacts').then(function (c) {
     var dl = $('drop-people'); (c.all || []).forEach(function (p) { var o = document.createElement('option'); o.value = p.email; o.label = p.name; dl.appendChild(o); });
   }).catch(function () {});
+  function showPicked() {
+    var big = picked.filter(function (x) { return x.file.size > MAX_SIZE; });
+    var folders = {}; picked.forEach(function (x) { if (x.path.indexOf('/') > 0) folders[x.path.split('/')[0]] = 1; });
+    var names = Object.keys(folders);
+    $('drop-list').textContent = picked.length ? picked.length + ' document(s)' + (names.length ? ' dans ' + names.join(', ') : '') + (big.length ? ' — trop lourds (plus de 3 Mo), ils seront laissés de côté : ' + big.map(function (x) { return x.file.name; }).slice(0, 5).join(', ') + (big.length > 5 ? '…' : '') : '') + (picked.length > MAX_FILES ? ' — ' + MAX_FILES + ' au plus par dépôt.' : '') : '';
+  }
+  function addFiles(list) {
+    Array.prototype.forEach.call(list, function (f) { picked.push({ file: f, path: f.webkitRelativePath || f.name }); });
+    showPicked();
+  }
+  $('pick-files').addEventListener('click', function () { $('drop-files').click(); });
+  $('pick-folder').addEventListener('click', function () { $('drop-folder').click(); });
+  $('drop-files').addEventListener('change', function () { addFiles(this.files); this.value = ''; });
+  $('drop-folder').addEventListener('change', function () { addFiles(this.files); this.value = ''; });
+  // Folders dragged in: their content is walked (every sub-folder), the tree is kept.
+  function walk(entry, prefix) {
+    return new Promise(function (res) {
+      if (entry.isFile) { entry.file(function (f) { picked.push({ file: f, path: prefix + f.name }); res(); }, function () { res(); }); return; }
+      if (!entry.isDirectory) { res(); return; }
+      var reader = entry.createReader(), all = [];
+      (function more() {
+        reader.readEntries(function (batch) {
+          if (!batch.length) { Promise.all(all.map(function (e) { return walk(e, prefix + entry.name + '/'); })).then(res); return; }
+          all = all.concat(Array.prototype.slice.call(batch)); more();
+        }, function () { res(); });
+      })();
+    });
+  }
+  var zone = $('dropzone');
+  ['dragenter', 'dragover'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { zone.addEventListener(ev, function () { zone.classList.remove('over'); }); });
+  zone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var items = e.dataTransfer.items, entries = [];
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry(); if (en) entries.push(en); }
+      Promise.all(entries.map(function (en) { return walk(en, ''); })).then(showPicked);
+    } else addFiles(e.dataTransfer.files);
+  });
+
+  function purpose() { var c = document.querySelector('input[name="purpose"]:checked'); return c ? c.value : 'understand'; }
+  var missionsLoaded = false;
+  function syncPurpose() {
+    var p = purpose();
+    $('mission-field').hidden = !(p === 'mission' || p === 'auditor');
+    $('question-field').hidden = p === 'understand';
+    if (!$('mission-field').hidden && !missionsLoaded) {
+      missionsLoaded = true;
+      OM.api('/api/app?route=engagement').then(function (d) {
+        var sel = $('drop-mission'); sel.textContent = '';
+        sel.appendChild(new Option(d.missions.length ? 'Choisir une mission' : 'Aucune mission active ou à venir', ''));
+        d.missions.forEach(function (m) { sel.appendChild(new Option(m.name + (m.phase === 'not_started' ? ' (pas encore commencée)' : ''), m.id)); });
+      }).catch(function (e) { $('drop-mission').textContent = ''; $('drop-mission').appendChild(new Option(e.message === 'ROLE_NOT_ALLOWED' ? 'Réservé aux associés et managers' : 'Indisponible', '')); });
+    }
+  }
+  document.querySelectorAll('input[name="purpose"]').forEach(function (r) { r.addEventListener('change', syncPurpose); });
+
+  var stopDeposit = null;
+  function followDeposit(id) {
+    if (stopDeposit) stopDeposit();
+    stopDeposit = UI.poll('/api/app?route=deposit&id=' + encodeURIComponent(id), function (st) {
+      var box = $('drop-analysis'); box.textContent = '';
+      if (!st || st.status === 'none') return;
+      var log = el('ul', null, 'joblog');
+      (st.log || []).forEach(function (l) { var li = el('li'); li.appendChild(el('time', new Date(l.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))); li.appendChild(el('span', l.m)); log.appendChild(li); });
+      if (st.status === 'running') log.appendChild(el('li', st.stage === 'read' ? 'Lecture par les agents : ' + (st.done || 0) + ' / ' + (st.files || []).length + '…' : 'Analyse en cours…', 'meta'));
+      if (st.status === 'failed') log.appendChild(el('li', 'Arrêt : ' + (st.error || ''), 'status error'));
+      box.appendChild(log);
+      if (st.answer) { var a = el('div', null, 'reply'); UI.richText(a, st.answer.text); box.appendChild(a); }
+      var links = el('div', null, 'links');
+      if (st.report && st.report.url) links.appendChild(UI.safeLink(st.report.url, 'Analyse enregistrée (Google Doc)'));
+      if (st.handed_to) { var go = el('a', 'Suivre dans « ' + (st.handed_to.agent === 'Enhanced Auditor' ? 'Enhanced Auditor' : 'Préparer une mission') + ' »'); go.href = st.handed_to.page; links.appendChild(go); }
+      if (links.childNodes.length) box.appendChild(links);
+      if (st.status === 'done' && st.purpose === 'understand') box.appendChild(el('p', 'Compris et gardé dans la mémoire des agents : vous pouvez leur poser des questions dans l’Assistant.', 'meta'));
+      if (st.status !== 'running') loadDeposits();
+    });
+  }
+
+  function loadDeposits() {
+    OM.api('/api/app?route=deposit').then(function (d) {
+      var box = $('deposits'); box.textContent = '';
+      if (!d.deposits.length) { box.appendChild(el('p', 'Aucun dépôt pour l’instant.', 'empty')); return; }
+      d.deposits.slice(0, 10).forEach(function (x) {
+        var md = '**' + x.label + '** — ' + x.files + ' document(s)' + (x.by ? ', déposé(s) par ' + x.by : '') + ', le ' + UI.dateTime(x.started_at) + '\n' +
+          x.documents.slice(0, 12).map(function (u) { return '- ' + (u.url ? '[' + (u.path || u.name) + '](' + u.url + ')' : (u.path || u.name)) + ' : ' + [u.type, u.client, u.period].filter(Boolean).join(', ') + (u.summary ? ' — ' + u.summary : ''); }).join('\n');
+        var r = el('div', null, 'reply'); UI.richText(r, md); box.appendChild(r);
+      });
+    }).catch(function () {});
+  }
+
   $('drop-send').addEventListener('click', function () {
-    var files = Array.prototype.slice.call($('drop-files').files || []);
-    if (!files.length) { $('drop-status').textContent = 'Choisissez au moins un document.'; return; }
-    if (files.length > 40) { $('drop-status').textContent = '40 documents au plus à la fois.'; return; }
-    var big = files.filter(function (f) { return f.size > 3 * 1024 * 1024; });
-    if (big.length) { $('drop-status').textContent = 'Trop lourd (3 Mo au plus) : ' + big.map(function (f) { return f.name; }).join(', '); return; }
-    var btn = this; btn.disabled = true; var box = $('drop-results'); box.textContent = '';
-    var done = 0;
+    var p = purpose(), missionId = $('drop-mission').value;
+    var ok = picked.filter(function (x) { return x.file.size <= MAX_SIZE && x.file.size > 0; }).slice(0, MAX_FILES);
+    if (!ok.length) { $('drop-status').textContent = 'Choisissez ou glissez au moins un document (3 Mo au plus).'; return; }
+    if ((p === 'mission' || p === 'auditor') && !missionId) { $('drop-status').textContent = 'Choisissez la mission.'; return; }
+    var btn = this; btn.disabled = true; var box = $('drop-results'); box.textContent = ''; $('drop-analysis').textContent = '';
+    $('drop-progress').hidden = false;
+    var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    var uploaded = [];
     var next = function (i) {
-      if (i >= files.length) { $('drop-status').textContent = done + ' document(s) déposé(s) : propositions dans « À valider ».'; btn.disabled = false; return; }
-      var f = files[i]; $('drop-status').textContent = 'Lecture de « ' + f.name + ' » (' + (i + 1) + '/' + files.length + ')…';
-      b64(f).then(function (data) {
+      $('drop-bar').style.width = Math.round(100 * i / ok.length) + '%';
+      if (i >= ok.length) {
+        $('drop-status').textContent = uploaded.length + ' document(s) déposé(s) : rangement proposé dans « À valider ». Les agents les lisent maintenant.';
+        var folder = ok[0].path.indexOf('/') > 0 ? ok[0].path.split('/')[0] : '';
+        OM.api('/api/app?route=deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purpose: p, mission_id: missionId || null, question: $('drop-question').value.trim(), label: folder || (uploaded.length === 1 ? uploaded[0].name : uploaded.length + ' documents'), files: uploaded }) })
+          .then(function (r) { followDeposit(r.id); })
+          .catch(function (e) { $('drop-status').className = 'status error'; $('drop-status').textContent = 'Déposés et rangés, mais l’analyse n’a pas pu partir : ' + e.message; })
+          .then(function () { btn.disabled = false; picked = []; showPicked(); });
+        return;
+      }
+      var x = ok[i], folder = x.path.indexOf('/') > 0 ? x.path.split('/')[0] : '';
+      $('drop-status').className = 'status'; $('drop-status').textContent = 'Dépôt de « ' + x.path + ' » (' + (i + 1) + '/' + ok.length + ')…';
+      b64(x.file).then(function (data) {
         return OM.api('/api/app?route=drop', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: f.name, mime: f.type || 'application/octet-stream', base64: data, wish: $('drop-wish').value.trim(), send_to: $('drop-to').value.trim() }) });
+          body: JSON.stringify({ name: x.file.name, mime: x.file.type || 'application/octet-stream', base64: data, rel_path: x.path, deposit_label: folder ? stamp + '_' + folder : '', wish: $('drop-wish').value.trim(), send_to: $('drop-to').value.trim() }) });
       }).then(function (r) {
-        done++;
-        box.appendChild(el('div', '✓ ' + f.name + ' → « ' + r.proposed_name + ' »' + (r.destination ? ' dans ' + r.destination : ' (place à choisir)') + (r.message ? ' — ' + r.message : ''), 'item'));
-      }).catch(function (e) { box.appendChild(el('div', '✗ ' + f.name + ' : ' + e.message, 'item')); })
+        uploaded.push({ id: r.file_id, name: x.file.name, path: x.path, url: r.url || null });
+        box.appendChild(el('div', x.path + ' → « ' + r.proposed_name + ' »' + (r.destination ? ' dans ' + r.destination : ' (place à choisir)') + (r.message ? ' — ' + r.message : ''), 'item'));
+      }).catch(function (e) { box.appendChild(el('div', x.path + ' : non déposé (' + e.message + ')', 'item')); })
         .then(function () { next(i + 1); });
     };
     next(0);
   });
+  loadDeposits();
 
   function start() {
     OM.loadBranding().catch(function () {});

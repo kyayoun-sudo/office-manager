@@ -145,3 +145,25 @@ test('architecture: the Grand Contrôleur consults the Enhanced Auditor', () => 
   const manager = buildManagerAgent({ 'mission-controller': {}, orpailleur: {}, sika: {}, 'enhanced-auditor': {} }, { orgId: 'o', runId: null }, {});
   assert.ok(manager.tools.map(t => t.name).includes('consult_enhanced_auditor'));
 });
+
+test('deposits: every document understood and kept for all agents; Enhanced Auditor gets each one by its role', async () => {
+  const { startDepositAnalysis, depositStep, depositState, listDeposits } = await import('../lib/deposit-analysis.js');
+  const drive = memDrive(); let handed = null;
+  const d = { drive, folder: 'MEM', fire: async () => true,
+    fileForAI: async id => id === 'img' ? { id, name: 'inventaire.jpg', visual: true, mimeType: 'image/jpeg', base64: 'AA' } : { id, name: id + '.xlsx', text: 'contenu ' + id, visual: false },
+    ai: async (order, { files }) => ({ provider: files.length ? 'gemini' : 'anthropic', text: JSON.stringify({ documents: [
+      { file_id: 'risk', type: 'Évaluation des risques', role: 'evaluation_des_risques', client: 'Mines du Sud', summary: 'Risques significatifs' },
+      { file_id: 'wp', type: 'Feuille de travail stocks', role: 'feuille_de_travail', summary: 'Test des stocks' },
+      { file_id: 'img', type: 'Fiche de comptage', role: 'piece_justificative', summary: 'Comptage du stock d’or' }] }) }),
+    startAuditorReview: async (org, req, b) => { handed = b; return { started: true }; } };
+  await assert.rejects(startDepositAnalysis('org', {}, { purpose: 'auditor', files: [{ id: 'x' }] }, d), /VALID_MISSION_ID_REQUIRED/);
+  const { id } = await startDepositAnalysis('org', {}, { purpose: 'auditor', mission_id: 'm1', question: 'stocks', files: [{ id: 'risk', path: 'Dossier/risques.xlsx' }, { id: 'wp', path: 'Dossier/WP/stocks.xlsx' }, { id: 'img', path: 'Dossier/Pièces/inventaire.jpg' }] }, d);
+  for (let i = 0; i < 4; i++) { const st = await depositStep('org', {}, { id }, d); if (st.status !== 'running') break; }
+  const st = await depositState(id, d);
+  assert.equal(st.status, 'done', st.error);
+  assert.deepEqual([handed.auditor_risk_files, handed.work_files, handed.evidence_files], [['risk'], ['wp'], ['img']]);
+  assert.equal(handed.focus, 'stocks');
+  const list = await listDeposits(d);
+  assert.equal(list[0].label, 'Dossier');
+  assert.equal(list[0].documents.find(x => x.path === 'Dossier/Pièces/inventaire.jpg').summary, 'Comptage du stock d’or');
+});
