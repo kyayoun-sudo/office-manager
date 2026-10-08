@@ -319,3 +319,41 @@ test('search: « grand livre BLE TRANSIT » finds the ledger of that client, by 
   assert.match(out.results.documents[0].folder_url, /folders\/P/);
   assert.deepEqual(out.understood.document, ['grand livre']);
 });
+
+test('missions: phase, planned time, automatic status proposals', async () => {
+  const f = await import('../lib/mission-full.js');
+  assert.equal(f.phaseOf({ status: 'proposal' }).key, 'waiting');
+  assert.equal(f.phaseOf({ status: 'won' }).key, 'won');
+  assert.equal(f.phaseOf({ status: 'active', planned_start: '2999-01-01' }, '2026-10-08').key, 'won');
+  assert.equal(f.phaseOf({ status: 'active', planned_start: '2026-01-01' }, '2026-10-08').key, 'running');
+  assert.equal(f.workingDays('2026-10-05', '2026-10-11'), 5);
+  const tb = f.timeBudget({ planned_start: '2026-10-05', planned_end: '2026-10-16' }, [{ full_name: 'A', allocation_pct: 50 }, { full_name: 'B', allocation_pct: 100, planned_start: '2026-10-05', planned_end: '2026-10-09' }], { budget_or_days: '12 jours-homme' });
+  assert.equal(tb.planned_days, 10); assert.equal(tb.budget_days, 12); assert.equal(tb.gap_days, -2);
+  const mm = await import('../lib/mission-memory.js');
+  assert.equal(mm.autoStatusFor({ status: 'proposal' }, [{ role: 'lettre_de_mission', name: 'LM.pdf' }]).to, 'acceptance');
+  assert.equal(mm.autoStatusFor({ status: 'planned', planned_start: '2026-10-01' }, [], '2026-10-08').to, 'fieldwork');
+  assert.equal(mm.autoStatusFor({ status: 'active', planned_start: '2026-10-01' }, [], '2026-10-08'), null);
+});
+
+test('mission contacts and writing to the client: proposed contacts, suggested recipients', async () => {
+  const w = await import('../lib/mission-write.js');
+  const contacts = [{ email: 'cfo@c.ci', role_key: 'cfo', status: 'validé', name: 'Jean' }, { email: 'achats@c.ci', role_key: 'achats', status: 'validé', name: 'Fatou' }, { email: 'x@c.ci', role_key: 'ventes', status: 'proposé' }];
+  const s = w.suggestRecipients({ purpose: 'pbc', cycle: 'achats' }, contacts, [{ email: 'awa@f.ci', name: 'Awa', role: 'Chef de mission' }], { sender_email: 'agent@f.ci', agent_display_name: 'Office Manager' });
+  assert.deepEqual(s.to.map(x => x.email), ['achats@c.ci']);
+  assert.deepEqual(s.cc.map(x => x.email), ['cfo@c.ci', 'awa@f.ci', 'agent@f.ci']);
+  const v = w.suggestRecipients({ purpose: 'ventes', cycle: 'ventes' }, contacts, [], null);
+  assert.deepEqual(v.to.map(x => x.email), ['cfo@c.ci']);      // a proposed contact is never used: the CFO is the fallback
+  assert.match(w.meetingLink('BLE TRANSIT — Audit'), /^https:\/\/meet\.jit\.si\/OM-ble-transit-audit-[0-9a-f]{8}$/);
+  const md = await import('../lib/mission-data.js');
+  let file = null;
+  const upd = async (n, f) => { const r = f(file ? structuredClone(file) : null); if (r) file = r; return {}; };
+  const M = 'aaaaaaaa-1111-4111-8111-111111111111';
+  await md.addContacts('org', M, [{ name: 'Jean K', role: 'Directeur financier', email: 'CFO@c.ci', source: 'TDR' }, { name: 'Ama', role: 'responsable des achats' }], 'Mission Controller', { updateJsonFile: upd });
+  assert.equal(file.missions[M].contacts[0].role_key, 'cfo'); assert.equal(file.missions[M].contacts[0].status, 'proposé'); assert.equal(file.missions[M].contacts[0].email, 'cfo@c.ci');
+  assert.equal(file.missions[M].contacts[1].role_key, 'achats');
+  const patched = [];
+  await md.decideContact('org', M, file.missions[M].contacts[0].id, 'validate', 'Paul', { updateJsonFile: upd, fetchRows: async (p, o = {}) => { if (o.method) { patched.push(JSON.parse(o.body)); return []; } return [{ id: M, client_contact_emails: [] }]; } });
+  assert.equal(file.missions[M].contacts[0].status, 'validé'); assert.deepEqual(patched[0].client_contact_emails, ['cfo@c.ci']);
+  const fact = await md.addFact(M, { kind: 'risque', label: 'Litige fiscal', value: 'Redressement 2024 en cours', agent: 'enhanced-auditor' }, { updateJsonFile: upd });
+  assert.equal(file.missions[M].facts[0].agent, 'enhanced-auditor'); assert.equal(fact.kind, 'risque');
+});

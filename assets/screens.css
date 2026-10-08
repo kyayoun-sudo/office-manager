@@ -135,3 +135,27 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .doc-sum{margin:2px 0;font-size:14px;line-height:1.5}
 .doc-tools{display:flex;gap:8px;flex-wrap:wrap}
 @media (max-width:600px){.filter select{min-width:0;width:100%}.filter{width:100%}}
+/* Mission file (2026-10-08) */
+.status-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.status-move{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+.status-move select,.form-grid input,.form-grid select,.form-grid textarea,#sec-messages input,#sec-messages textarea,#sec-messages select{font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);box-sizing:border-box;max-width:100%}
+.mission-sections{display:flex;flex-direction:column;gap:16px}
+.mission-sections .sub{font-size:15px;margin:16px 0 8px}
+.mission-sections .sub:first-of-type{margin-top:4px}
+.facts{display:grid;grid-template-columns:minmax(140px,210px) 1fr;gap:8px 16px;margin:0 0 12px;font-size:14.5px}
+.facts dt{font-weight:600;color:var(--muted)}
+.facts dd{margin:0;line-height:1.55}
+.facts ul{margin:0;padding-left:18px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;margin:8px 0}
+.form-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
+.form-grid .wide{grid-column:1/-1}
+#sec-messages .ask{margin-bottom:18px;display:flex;flex-direction:column;gap:6px}
+#sec-messages .ask input,#sec-messages .ask textarea{width:100%}
+.contact{flex-wrap:wrap}
+.contact .btn-row{flex-basis:100%}
+@media (max-width:600px){.facts{grid-template-columns:1fr}}
+.status-move select{width:auto;min-width:0;padding:7px 10px}
+.status-move .btn{min-height:36px;padding:7px 14px}
+.page-head .status-line + .note:empty{display:none}
+.ask label,.ask .form-grid label{color:#C9D6D1;font-size:13px;font-weight:600}
+.ask .note{color:#B7C6C0}

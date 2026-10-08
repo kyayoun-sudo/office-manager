@@ -42,6 +42,9 @@ import { readMissionMemory, refreshMissionMemories, listLearnings, confirmLearni
 import { listAuditEvents } from '../lib/audit-log.js';
 import { rest } from '../lib/supabase.js';
 import { cockpit } from '../lib/cockpit.js';
+import { getMissionFull } from '../lib/mission-full.js';
+import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
+import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
 import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
@@ -339,6 +342,32 @@ export const ROUTES = Object.freeze({
       return c;
     }),
     unavailable: 'COCKPIT_UNAVAILABLE'
+  },
+  // The mission file (2026-10-08): everything the agents and the team know about one mission.
+  'mission-file': { GET: users(ALL_ROLES, (orgId, req) => getMissionFull(orgId, String(req.query?.mission_id || ''))), unavailable: 'MISSION_UNAVAILABLE' },
+  // Client contacts of a mission: found by the agents (proposed), validated by a manager.
+  'mission-client-contacts': {
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {}, mid = String(b.mission_id || '');
+      if (b.action === 'add') return addContacts(orgId, mid, [b.contact || {}], who(req), { validated: true });
+      if (b.action === 'validate') return decideContact(orgId, mid, String(b.id || ''), b.role ? { role: b.role } : 'validate', who(req));
+      if (b.action === 'remove') return decideContact(orgId, mid, String(b.id || ''), 'remove', who(req));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MISSION_UNAVAILABLE'
+  },
+  // Information added to a mission by a person (agents use their tool).
+  'mission-fact': { POST: users(ALL_ROLES, (orgId, req) => addFact(String(req.body?.mission_id || ''), { ...(req.body || {}), agent: who(req) })), unavailable: 'MISSION_UNAVAILABLE' },
+  // Writing to the client from a mission: purpose, suggested recipients, AI draft, validation.
+  'mission-write': {
+    POST: users(ALL_ROLES, (orgId, req) => {
+      const b = req.body || {}, mid = String(b.mission_id || '');
+      if (b.action === 'suggest') return writeSuggest(orgId, mid, b);
+      if (b.action === 'draft') return writeDraft(orgId, mid, b, req.account);
+      if (b.action === 'submit') return writeSubmit(orgId, mid, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MISSION_UNAVAILABLE'
   },
   // Important e-mails of the firm's authorised mailbox: list, refresh, AI reply, send / propose.
   'mail-triage': {

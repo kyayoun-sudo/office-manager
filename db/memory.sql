@@ -17,6 +17,8 @@ alter table public.office_missions add column if not exists client_folder_id tex
 alter table public.office_missions add column if not exists status_changed_at timestamptz;
 alter table public.office_missions add column if not exists closed_at timestamptz;
 alter table public.office_missions add column if not exists archived_at timestamptz;
+-- Copies of a message (client e-mails: CFO, mission manager, the agent's alias in Cc).
+alter table public.office_agent_messages add column if not exists cc text[];
 create index if not exists office_missions_client_idx on public.office_missions (org_id, client_name);
 
 -- 2. Audit log, APPEND-ONLY (insert and select only: no update, no delete, for anyone).
