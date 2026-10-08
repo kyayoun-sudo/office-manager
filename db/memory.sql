@@ -157,4 +157,11 @@ alter table public.office_workpaper_signoffs enable row level security;
 revoke all on public.office_workpaper_signoffs from public, anon, authenticated, service_role;
 grant select, insert on public.office_workpaper_signoffs to service_role;
 
+-- 7. Agents' names chosen by the firm and the « rangement automatique » switch (2026-10-08).
+--    Office Manager becomes Firm Manager (only where the old default name was still in place).
+alter table public.office_agent_persona add column if not exists agent_names jsonb not null default '{}'::jsonb check (jsonb_typeof(agent_names) = 'object');
+alter table public.office_agent_persona add column if not exists auto_filing boolean not null default true;
+alter table public.office_agent_persona alter column agent_display_name set default 'Firm Manager';
+update public.office_agent_persona set agent_display_name = 'Firm Manager' where agent_display_name = 'Office Manager';
+
 commit;
