@@ -322,9 +322,10 @@
   }
   document.querySelectorAll('input[name="purpose"]').forEach(function (r) { r.addEventListener('change', syncPurpose); });
 
-  var stopDeposit = null;
+  var stopDeposit = null, currentDeposit = null;
   function followDeposit(id) {
     if (stopDeposit) stopDeposit();
+    currentDeposit = id;
     stopDeposit = UI.poll('/api/app?route=deposit&id=' + encodeURIComponent(id), function (st) {
       var box = $('drop-analysis'); box.textContent = '';
       if (!st || st.status === 'none') return;
@@ -333,6 +334,13 @@
       if (st.status === 'running') log.appendChild(el('li', st.stage === 'read' ? 'Lecture par les agents : ' + (st.done || 0) + ' / ' + (st.files || []).length + '…' : 'Analyse en cours…', 'meta'));
       if (st.status === 'failed') log.appendChild(el('li', 'Arrêt : ' + (st.error || ''), 'status error'));
       box.appendChild(log);
+      if ((st.missions_updated || []).length) {
+        var mu = el('div', null, 'links');
+        st.missions_updated.forEach(function (m) { var l = el('a', 'Mission mise à jour : ' + m.name); l.href = '/mission.html?id=' + encodeURIComponent(m.id); mu.appendChild(l); });
+        box.appendChild(mu);
+        if ((st.mission_proposals || []).length) box.appendChild(el('p', (st.mission_proposals.length) + ' changement(s) de mission proposé(s) dans « À valider ».', 'meta'));
+      }
+      if ((st.to_attach || []).length && st.status !== 'running') box.appendChild(attachList(st));
       if (st.answer) { var a = el('div', null, 'reply'); UI.richText(a, st.answer.text); box.appendChild(a); }
       var links = el('div', null, 'links');
       if (st.report && st.report.url) links.appendChild(UI.safeLink(st.report.url, 'Analyse enregistrée (Google Doc)'));
@@ -341,6 +349,32 @@
       if (st.status === 'done' && st.purpose === 'understand') box.appendChild(el('p', 'Compris et gardé dans la mémoire des agents : vous pouvez leur poser des questions dans l’Assistant.', 'meta'));
       if (st.status !== 'running') loadDeposits();
     });
+  }
+
+  // Documents the agents could not attach with certainty: the person chooses the mission.
+  var attachMissions = null;
+  function attachList(st) {
+    var wrap = el('div', null, 'stack');
+    wrap.appendChild(el('p', 'Documents sans mission certaine : choisissez la mission en cours à laquelle ils appartiennent (ou laissez-les hors mission).', 'meta'));
+    st.to_attach.forEach(function (x) {
+      var row = el('div', null, 'item'), t = el('div', null, 't');
+      t.appendChild(el('span', x.path || x.name)); if (x.why) t.appendChild(el('span', x.why, 'meta')); row.appendChild(t);
+      var sel = document.createElement('select'); sel.style.maxWidth = '320px'; sel.setAttribute('aria-label', 'Mission de ' + (x.name || 'ce document'));
+      sel.appendChild(new Option('Choisir la mission', ''));
+      (x.candidates || []).forEach(function (m) { sel.appendChild(new Option('Probable : ' + m.name, m.id)); });
+      var fill = function (list) { list.forEach(function (m) { if (!(x.candidates || []).some(function (c) { return c.id === m.id; })) sel.appendChild(new Option(m.name, m.id)); }); };
+      if (attachMissions) fill(attachMissions); else OM.api('/api/app?route=engagement').then(function (d) { attachMissions = d.missions; fill(d.missions); }).catch(function () {});
+      var go = el('button', 'Rattacher', 'btn ghost'); go.type = 'button';
+      go.addEventListener('click', function () {
+        if (!sel.value) return;
+        go.disabled = true;
+        OM.api('/api/app?route=deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'attach', id: st.id || currentDeposit, file_id: x.id, mission_id: sel.value }) })
+          .then(function (r) { row.textContent = ''; row.appendChild(el('span', '« ' + (x.name || x.path) + ' » rattaché à « ' + r.mission + ' »' + (r.proposals ? ' — ' + r.proposals + ' changement(s) proposé(s) dans « À valider ».' : '.'), 'meta')); })
+          .catch(function (e) { go.disabled = false; row.appendChild(el('span', e.message, 'status error')); });
+      });
+      row.appendChild(sel); row.appendChild(go); wrap.appendChild(row);
+    });
+    return wrap;
   }
 
   function loadDeposits() {

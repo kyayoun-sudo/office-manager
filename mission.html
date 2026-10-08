@@ -199,10 +199,11 @@
     fillList('docs', d.documents || [], function (doc) {
       var item = el('div', null, 'item');
       var t = el('div', null, 't');
-      t.appendChild(el('span', doc.name || 'Sans nom'));
-      t.appendChild(el('span', doc.document_type || '', 'meta'));
+      t.appendChild(doc.web_url ? UI.safeLink(doc.web_url, doc.name || 'Sans nom') : el('span', doc.name || 'Sans nom'));
+      t.appendChild(el('span', [doc.document_type, doc.deposited ? 'déposé' + (doc.deposited_by ? ' par ' + doc.deposited_by : '') + (doc.deposited_at ? ' le ' + UI.date(doc.deposited_at) : '') : ''].filter(Boolean).join(' · '), 'meta'));
+      if (doc.summary) t.appendChild(el('span', doc.summary, 'meta'));
       item.appendChild(t);
-      item.appendChild(el('span', doc.content_verified_at ? 'Contenu vérifié' : 'À vérifier', doc.content_verified_at ? 'tag' : 'tag warn'));
+      item.appendChild(el('span', doc.deposited ? 'Lu par les agents' : doc.content_verified_at ? 'Contenu vérifié' : 'À vérifier', doc.deposited || doc.content_verified_at ? 'tag' : 'tag warn'));
       return item;
     }, 'Aucun document relié à cette mission.');
 

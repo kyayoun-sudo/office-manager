@@ -167,3 +167,49 @@ test('deposits: every document understood and kept for all agents; Enhanced Audi
   assert.equal(list[0].label, 'Dossier');
   assert.equal(list[0].documents.find(x => x.path === 'Dossier/Pièces/inventaire.jpg').summary, 'Comptage du stock d’or');
 });
+
+test('a document for a mission in progress updates it: facts directly, changes proposed in « À valider »', async () => {
+  const { linkToMissions, applyMissionUpdates, missionDocuments } = await import('../lib/mission-files.js');
+  const drive = memDrive();
+  const M = { id: 'm1', name: 'Mines du Sud — Audit 2026', planned_start: '2026-11-03', planned_end: '2027-03-31' };
+  const docs = [
+    { id: 'lm', name: 'LM signée.pdf', path: 'LM signée.pdf', role: 'lettre_de_mission', summary: 'Lettre de mission signée' },
+    { id: 'pg', name: 'Programme.xlsx', path: 'Programme.xlsx', role: 'programme_de_travail' },
+    { id: 'rb', name: 'releve.jpg', path: 'releve.jpg', role: 'piece_justificative', visual: true },
+    { id: 'fa', name: 'Facture 12.pdf', path: 'Facture 12.pdf', role: 'facture' },
+    { id: 'xx', name: 'divers.pdf', path: 'divers.pdf', role: 'autre' }];
+  const r = await linkToMissions('org', docs, [M, { id: 'm2', name: 'Mines du Nord — Audit 2026' }], { ai: async () => ({ text: JSON.stringify({ links: [
+    { file_id: 'lm', mission_id: 'm1', confidence: 'haute', dates: { start: '2026-11-10', end: '2027-03-31' } }, { file_id: 'pg', mission_id: 'm1', confidence: 'haute' },
+    { file_id: 'rb', mission_id: 'm1', confidence: 'haute' }, { file_id: 'fa', mission_id: 'm1', confidence: 'haute' },
+    { file_id: 'xx', mission_id: 'm1', confidence: 'moyenne', candidates: ['m1', 'm2'], why: 'deux missions possibles' }] }) }) });
+  assert.equal(r.linked.length, 4);
+  assert.deepEqual(r.to_attach[0].candidates.map(c => c.id), ['m1', 'm2']);
+  const rows = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { rows.push({ path, row: JSON.parse(o.body)[0] }); return []; }
+    if (path.startsWith('office_staff_profiles')) return [{ id: 's1', full_name: 'Awa Koné' }];
+    return [];
+  };
+  const out = await applyMissionUpdates('org', r.linked, { by: 'Yao' }, { drive, folder: 'MEM', fetchRows,
+    fileForAI: async id => ({ id, text: 'Équipe : Awa Koné, chef de mission', visual: false }),
+    ai: async () => ({ text: JSON.stringify({ team: [{ person: 'Awa Koné', role: 'Chef de mission' }, { person: 'Inconnu', role: 'x' }] }) }) });
+  assert.equal(out.attached, 4);
+  const types = rows.filter(x => x.path.startsWith('office_action_queue')).map(x => x.row.action_type + ':' + x.row.agent_key);
+  assert.deepEqual(types, ['MISSION_UPDATE:grand-controleur', 'MISSION_DOCUMENT_REVIEW:grand-controleur', 'MISSION_DOCUMENT_REVIEW:sika']);
+  const upd = rows.find(x => x.row.action_type === 'MISSION_UPDATE').row;
+  assert.equal(upd.payload.planned_start, '2026-11-10'); assert.equal(upd.status, 'proposed');
+  const team = rows.filter(x => x.path === 'office_mission_assignments');
+  assert.equal(team.length, 1); assert.equal(team[0].row.status, 'proposed'); assert.equal(team[0].row.staff_profile_id, 's1');
+  const attached = await missionDocuments('m1', { drive, folder: 'MEM' });
+  assert.equal(attached.length, 4); assert.equal(attached.find(x => x.id === 'lm').by, 'Yao');
+});
+
+test('executor: a validated MISSION_UPDATE changes only the mission dates', async () => {
+  const { executeDecision } = await import('../lib/action-executor.js');
+  const calls = [];
+  const fetchRows = async (path, o = {}) => { calls.push({ path, body: o.body ? JSON.parse(o.body) : null }); return path.includes('status=in.') ? [{ id: 'a1' }] : []; };
+  const r = await executeDecision('org', { id: 'a1', action_type: 'MISSION_UPDATE', office_mission_id: 'm1', payload: { mission_id: 'm1', planned_start: '2026-11-10', planned_end: 'pas une date', status: 'cancelled' } }, 'approve', 'Paul', { fetchRows });
+  assert.equal(r.executed, true);
+  const m = calls.find(c => c.path.startsWith('office_missions'));
+  assert.deepEqual(m.body, { planned_start: '2026-11-10' });
+});

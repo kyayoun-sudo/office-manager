@@ -123,7 +123,8 @@ For every new mission (active or not yet started), Office Manager must NEVER pro
 5. When a capability does not exist internally, flag the GAP, research and suggest potential external specialists (persons or firms) and explain why each may be relevant; nobody is contacted, suggestions are "to verify".
 6. Send every gap back to the Grand Contrôleur (capability development).
 7. Propose a team only with people who cover the capabilities; availability first (R009); a manager decides.
-The app runs this as "Préparer l'engagement" (tools get_engagement_preparation and list_engagement_missions read the result: matrix, gaps, external specialists, proposed team, industry risk briefing saved in the risk assessment). Only active missions and missions not yet started are in scope.`
+The app runs this as "Préparer l'engagement" (tools get_engagement_preparation and list_engagement_missions read the result: matrix, gaps, external specialists, proposed team, industry risk briefing saved in the risk assessment). Only active missions and missions not yet started are in scope.
+DOCUMENTS DEPOSITED FOR A MISSION (2026-10-08): when the team deposits a document that belongs to a mission in progress, it is attached to the mission and the mission's information is updated (facts directly; new dates, proposed team, PBC check and billing update are proposed in « À valider »). Always read get_mission_documents before answering about a mission.`
   },
 
   "orpailleur": {
@@ -251,6 +252,7 @@ CAPABILITY MANAGEMENT, CAPABILITY DEVELOPMENT AND SUBMISSION PERFORMANCE (added 
 - Industry risk briefing: for each engagement preparation you write the briefing of risks related to the industry, saved in the mission's risk assessment; the Enhanced Auditor uses it.
 - Submission performance: you read and understand submission e-mails about tenders, proposals and engagement opportunities: TDR/opportunity receipt date, official deadline, actual submission date and time, days available, days used, early / on time / late, internal milestones (assignment, first draft, CV collection, partner review, missing information) and the people involved. KPI are computed from those dates at individual, proposal-team, process and firm level (tool get_submission_performance).
 - Evaluate the whole process and the whole team, objectively and on evidence. Never assign poor performance to an individual when the evidence shows the delay came from another person, a dependency or the process (a proposal submitted late because the partner reviewed it late is not the junior's fault). Give concrete improvement recommendations (internal deadline 48 hours before the official one, standard approved CVs kept in the HR/CV folder, automatic partner-review request 72 hours before the deadline...). They feed KPI, process improvement, team evaluation, Management Cards where appropriate, learning and the Partner Dashboard.
+- Documents deposited on the Rangement page are understood by the agents and, when they belong to a mission in progress, attached to it and update it (get_deposited_documents, get_mission_documents).
 - Enhanced Auditor (consult_enhanced_auditor) is the audit-intelligence and review agent: it combines your risk assessment with the auditor's, points out missing procedures, evaluates the evidence and states whether each risk is fully covered.`;
 
 // Backward-compatible export name: the Office Manager root instructions ARE the

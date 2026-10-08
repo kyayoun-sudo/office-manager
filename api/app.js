@@ -12,7 +12,7 @@ import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityR
 import { engagementMissions, tdrCandidates, engagementState, startEngagementPrep, engagementStep } from '../lib/engagement-prep.js';
 import { submissionState, startSubmissionReview, submissionStep } from '../lib/submissions.js';
 import { auditorState, auditorReviews, startAuditorReview, auditorStep } from '../lib/enhanced-auditor.js';
-import { startDepositAnalysis, depositStep, depositState, listDeposits } from '../lib/deposit-analysis.js';
+import { startDepositAnalysis, depositStep, depositState, listDeposits, attachDeposit } from '../lib/deposit-analysis.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -305,6 +305,7 @@ export const ROUTES = Object.freeze({
   deposit: {
     GET: users(ALL_ROLES, async (orgId, req) => req.query?.id ? depositState(req.query.id) : { deposits: (await listDeposits()).slice(0, 30) }),
     POST: users(ALL_ROLES, (orgId, req) => {
+      if (req.body?.action === 'attach') return attachDeposit(orgId, { ...req.body, by: who(req) });
       const p = req.body?.purpose;
       if ((p === 'mission' || p === 'auditor') && !MANAGERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403);
       return startDepositAnalysis(orgId, req, { ...(req.body || {}), by: who(req) });
