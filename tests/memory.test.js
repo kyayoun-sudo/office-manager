@@ -277,3 +277,18 @@ test('passes: the memory hooks see the start and the failure; the Orpailleur res
     createRequest: async (org, b) => { since = b.since; return { id: 't1' }; }, startDriveScan: async () => false, fireInternal: async () => true });
   assert.equal(since, '2026-10-07T20:00:00Z');
 });
+
+test('cockpit: each KPI says what, how, sources and lists its elements', async () => {
+  const { cockpitFrom } = await import('../lib/cockpit.js');
+  const now = Date.parse('2026-10-08T10:00:00Z');
+  const c = cockpitFrom({ missions: [{ id: 'm1', name: 'A', status: 'active', planned_start: '2026-01-01', planned_end: '2026-09-01' }, { id: 'm2', name: 'B', status: 'proposal' }, { id: 'm3', name: 'C', status: 'active', planned_start: '2026-12-01' }, { id: 'm4', name: 'D', status: 'cancelled' }],
+    staff: [{ id: 's', full_name: 'Awa' }], assignments: [{ staff_profile_id: 's', office_mission_id: 'm1', allocation_pct: 80, planned_start: '2026-10-01', planned_end: '2026-12-01' }, { staff_profile_id: 's', office_mission_id: 'm2', allocation_pct: 50, planned_start: '2026-11-01', planned_end: '2026-12-31' }],
+    actions: [{ id: 'a', action_type: 'PBC_EXTERNAL_REMINDER', summary: 'PBC', status: 'proposed', office_mission_id: 'm1', due_at: '2026-10-01' }],
+    reviews: { m1: { coverage: [{ risk: 'Revenu', level: 'élevé', verdict: 'partiellement couvert' }, { risk: 'Stocks', level: 'élevé', verdict: 'couvert' }] } },
+    mails: [{ id: 'g', subject: 'x', importance: 'haute', deadline: '2026-10-10' }] }, now);
+  const k = Object.fromEntries(c.kpis.map(x => [x.key, x]));
+  assert.equal(k.missions_running.value, 1); assert.equal(k.missions_waiting.value, 1); assert.equal(k.missions_won.value, 1);
+  assert.equal(k.risks.value, 1); assert.equal(k.pbc_missing.value, 1); assert.equal(k.conflicts.value, 1);
+  assert.equal(k.delays.value, 2); assert.equal(k.mails.value, 1);
+  for (const x of c.kpis) { assert.ok(x.measured && x.method && x.sources.length, x.key); assert.ok(Array.isArray(x.items)); }
+});

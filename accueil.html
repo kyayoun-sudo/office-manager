@@ -26,7 +26,7 @@
     <div class="who"><span data-user-name>Utilisateur</span></div>
   </nav>
 
-  <main class="main">
+  <main class="main" data-no-tabs>
     <section class="card" id="login" aria-labelledby="h-login" hidden>
       <h2 id="h-login">Connexion</h2>
       <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
@@ -35,7 +35,7 @@
 
     <header class="page-head">
       <h1 id="hello">Bonjour</h1>
-      <p class="lead">Vue d'ensemble du cabinet : ce qui attend votre décision, les missions et les dernières demandes aux agents.</p>
+      <p class="lead">Le cockpit du cabinet : les indicateurs clés, les e-mails qui demandent une action, puis les missions et les agents. Cliquez sur un indicateur pour voir ce qu'il mesure, comment il est calculé et ce qui le compose.</p>
     </header>
 
     <a class="callout" id="setup" href="/mise-en-service.html" hidden>
@@ -52,6 +52,30 @@
     </form>
     <p class="status" id="search-status" role="status" aria-live="polite"></p>
     <div id="search-results" class="stack"></div>
+
+    <section aria-labelledby="h-cockpit" class="cockpit">
+      <div class="card-head"><h2 id="h-cockpit">Indicateurs clés</h2><span class="meta" id="cockpit-at"></span></div>
+      <div id="cockpit" class="kpis cockpit-grid"><p class="empty">Chargement…</p></div>
+    </section>
+
+    <section class="card" id="mails" aria-labelledby="h-mails" hidden>
+      <div class="card-head"><h2 id="h-mails">E-mails qui demandent une action</h2><button class="btn ghost" id="mails-refresh" type="button">Relire la boîte</button></div>
+      <p class="status" id="mails-status" role="status" aria-live="polite"></p>
+      <div id="mails-list" class="stack"></div>
+    </section>
+
+    <dialog class="om-dialog kpi-dialog" id="kpi-dialog" aria-labelledby="kd-title">
+      <h2 id="kd-title"></h2>
+      <p class="kd-value" id="kd-value"></p>
+      <dl class="kd-facts">
+        <dt>Ce qui est mesuré</dt><dd id="kd-measured"></dd>
+        <dt>Comment c'est calculé</dt><dd id="kd-method"></dd>
+        <dt>Données et sources</dt><dd id="kd-sources"></dd>
+      </dl>
+      <h3 class="kd-sub">Ce qui compose le chiffre</h3>
+      <div id="kd-items" class="stack kd-items"></div>
+      <div class="kd-actions"><a id="kd-open" class="btn ghost" hidden>Ouvrir la rubrique</a><button class="btn" type="button" id="kd-close">Fermer</button></div>
+    </dialog>
 
     <div class="row">
       <div class="grow">
@@ -93,6 +117,9 @@
   var OM = window.OfficeManager, UI = window.OMScreens;
   var $ = function (id) { return document.getElementById(id); };
 
+  // Statuses shown in French (same mapping as lib/mission-status.js).
+  var STATUS_FR = { active: 'En cours', fieldwork: 'Terrain', review: 'Revue', partner_review: 'Revue associé', report_issued: 'Rapport émis', planned: 'Planifiée', planning: 'Planification',
+    acceptance: 'Gagnée', won: 'Gagnée', proposal: 'Proposition soumise', opportunity: 'Proposition soumise', tender: 'Proposition soumise', completed: 'Clôturée', closed: 'Clôturée', archived: 'Archivée', cancelled: 'Annulée' };
   function loadMissions() {
     OM.api('/api/missions').then(function (data) {
       var box = $('missions'); box.textContent = '';
@@ -105,7 +132,7 @@
         t.appendChild(UI.el('span', m.name || m.mission_code || 'Mission'));
         t.appendChild(UI.el('span', [m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta'));
         a.appendChild(t);
-        if (m.status) a.appendChild(UI.el('span', m.status, 'tag'));
+        if (m.status) a.appendChild(UI.el('span', STATUS_FR[String(m.status).toLowerCase()] || m.status, 'tag'));
         box.appendChild(a);
       });
     }).catch(function (e) { UI.fail($('missions'), e); });
@@ -167,11 +194,121 @@
     }).catch(function (e) { UI.fail($('passes'), e); });
   }
 
+
+  // ---- Cockpit ----
+  var cockpitData = null;
+  function loadCockpit() {
+    OM.api('/api/app?route=cockpit').then(function (d) {
+      cockpitData = d;
+      var box = $('cockpit'); box.textContent = '';
+      $('cockpit-at').textContent = 'Calculé le ' + UI.dateTime(d.generated_at);
+      (d.kpis || []).forEach(function (k, i) {
+        var b = UI.el('button', null, 'kpi kpi-tile tone-' + (k.tone || 'neutral'));
+        b.type = 'button';
+        b.appendChild(UI.el('span', k.label));
+        b.appendChild(UI.el('strong', String(k.value)));
+        if (k.detail) b.appendChild(UI.el('small', k.detail));
+        b.setAttribute('aria-label', k.label + ' : ' + k.value + (k.detail ? ' (' + k.detail + ')' : '') + '. Voir le détail');
+        b.addEventListener('click', function () { openKpi(i); });
+        box.appendChild(b);
+      });
+      if (!(d.kpis || []).length) box.appendChild(UI.el('p', 'Aucun indicateur disponible.', 'empty'));
+    }).catch(function (e) { UI.fail($('cockpit'), e); });
+  }
+  function openKpi(i) {
+    var k = cockpitData.kpis[i];
+    $('kd-title').textContent = k.label;
+    $('kd-value').textContent = String(k.value) + (k.detail ? ' — ' + k.detail : '');
+    $('kd-measured').textContent = k.measured || '–';
+    $('kd-method').textContent = k.method || '–';
+    $('kd-sources').textContent = (k.sources || []).join(' ; ') || '–';
+    var box = $('kd-items'); box.textContent = '';
+    if (!(k.items || []).length) box.appendChild(UI.el('p', 'Aucun élément : rien à signaler.', 'empty'));
+    (k.items || []).forEach(function (it) {
+      var row = UI.el(it.href ? 'a' : 'div', null, 'item' + (it.href ? ' link-item' : ''));
+      if (it.href) row.href = it.href;
+      if (it.href === '#mails') row.addEventListener('click', function () { $('kpi-dialog').close(); });
+      var t = UI.el('div', null, 't'); t.appendChild(UI.el('span', it.label)); if (it.meta) t.appendChild(UI.el('span', it.meta, 'meta'));
+      row.appendChild(t); box.appendChild(row);
+    });
+    if (k.total_items > (k.items || []).length) box.appendChild(UI.el('p', '… et ' + (k.total_items - k.items.length) + ' autre(s).', 'meta'));
+    var open = $('kd-open'); if (k.href && k.href !== '#mails') { open.hidden = false; open.href = k.href; } else open.hidden = true;
+    $('kpi-dialog').showModal();
+  }
+  $('kd-close').addEventListener('click', function () { $('kpi-dialog').close(); });
+
+  // ---- Important e-mails (managers) ----
+  function loadMails() {
+    if (!OM.isManager()) return;
+    $('mails').hidden = false;
+    OM.api('/api/app?route=mail-triage').then(function (d) {
+      var box = $('mails-list'); box.textContent = '';
+      $('mails-status').textContent = d.updated_at ? 'Boîte lue le ' + UI.dateTime(d.updated_at) + ' · ' + d.total + ' e-mail(s) à traiter.' : 'La boîte n\'a pas encore été lue. Cliquez sur « Relire la boîte » (la boîte Gmail du cabinet doit être autorisée dans Paramètres).';
+      (d.items || []).forEach(function (m) { box.appendChild(mailCard(m)); });
+      if (d.updated_at && !(d.items || []).length) box.appendChild(UI.el('p', 'Aucun e-mail en attente d\'action.', 'empty'));
+    }).catch(function (e) { if (/ROLE|403/.test(e.message)) { $('mails').hidden = true; return; } UI.fail($('mails-list'), e); });
+  }
+  function mailCard(m) {
+    var card = UI.el('article', null, 'item mail-item imp-' + m.importance);
+    var t = UI.el('div', null, 't');
+    t.appendChild(UI.el('span', m.subject || '(sans objet)'));
+    t.appendChild(UI.el('span', [m.from, UI.dateTime(m.date), m.importance === 'haute' ? 'importance haute' : null].filter(Boolean).join(' · '), 'meta'));
+    t.appendChild(UI.el('p', m.summary, 'mail-sum'));
+    if (m.suggested_action) t.appendChild(UI.el('p', 'Action suggérée : ' + m.suggested_action, 'mail-act'));
+    if (m.mission_id) { var a = UI.el('a', 'Voir la mission'); a.href = '/mission.html?id=' + encodeURIComponent(m.mission_id); t.appendChild(a); }
+    card.appendChild(t);
+    var tools = UI.el('div', null, 'mail-tools');
+    var reply = UI.el('button', 'Répondre', 'btn'); reply.type = 'button';
+    var done = UI.el('button', 'Traité', 'btn ghost'); done.type = 'button';
+    tools.appendChild(reply); tools.appendChild(done); card.appendChild(tools);
+    var zone = UI.el('div', null, 'mail-reply'); zone.hidden = true; card.appendChild(zone);
+    done.addEventListener('click', function () {
+      done.disabled = true;
+      OM.api('/api/app?route=mail-triage', { method: 'POST', body: JSON.stringify({ action: 'done', id: m.id }) }).then(function () { card.remove(); loadCockpit(); }).catch(function (e) { done.disabled = false; alertIn(zone, e.message); });
+    });
+    reply.addEventListener('click', function () { zone.hidden = !zone.hidden; if (!zone.firstChild) buildReply(zone, m, card); });
+    return card;
+  }
+  function alertIn(zone, text) { zone.hidden = false; var p = UI.el('p', text, 'status error'); zone.appendChild(p); }
+  var ERR = { CONTACT_NOT_REGISTERED_ON_MISSION: 'Cette personne n\'est pas un contact client enregistré sur la mission : ajoutez-la d\'abord aux contacts de la mission.', GMAIL_READ_NOT_CONNECTED: 'La lecture Gmail n\'est pas autorisée : reconnectez Google dans Paramètres.' };
+  function buildReply(zone, m, card) {
+    var lab = UI.el('label', 'Ce que vous voulez répondre (quelques mots suffisent)'); var ins = document.createElement('textarea'); ins.rows = 3; ins.maxLength = 2000;
+    var id = 'ri-' + m.id; ins.id = id; lab.htmlFor = id;
+    var draft = UI.el('button', 'Rédiger la réponse', 'btn'); draft.type = 'button';
+    var st = UI.el('p', '', 'status'); st.setAttribute('role', 'status');
+    var subj = document.createElement('input'); subj.type = 'text'; subj.maxLength = 200; subj.hidden = true; subj.setAttribute('aria-label', 'Objet');
+    var body = document.createElement('textarea'); body.rows = 9; body.hidden = true; body.setAttribute('aria-label', 'Message');
+    var send = UI.el('button', 'Envoyer', 'btn'); send.type = 'button'; send.hidden = true;
+    zone.appendChild(lab); zone.appendChild(ins); zone.appendChild(draft); zone.appendChild(st); zone.appendChild(subj); zone.appendChild(body); zone.appendChild(send);
+    draft.addEventListener('click', function () {
+      if (ins.value.trim().length < 2) { st.textContent = 'Dites en quelques mots ce que vous voulez répondre.'; return; }
+      draft.disabled = true; st.textContent = 'Rédaction…';
+      OM.api('/api/app?route=mail-triage', { method: 'POST', body: JSON.stringify({ action: 'draft', id: m.id, instruction: ins.value }) }).then(function (d) {
+        subj.value = d.subject; body.value = d.body; subj.hidden = body.hidden = send.hidden = false;
+        st.textContent = 'Relisez et modifiez si besoin. À : ' + d.to + '. Rien ne part avant votre clic sur « Envoyer ».';
+      }).catch(function (e) { st.textContent = ERR[e.code || e.message] || ('Rédaction impossible : ' + e.message); }).then(function () { draft.disabled = false; });
+    });
+    send.addEventListener('click', function () {
+      send.disabled = true; st.textContent = 'Envoi…';
+      OM.api('/api/app?route=mail-triage', { method: 'POST', body: JSON.stringify({ action: 'send', id: m.id, subject: subj.value, body: body.value, mission_id: m.mission_id }) }).then(function (r) {
+        st.textContent = r.sent ? 'Réponse envoyée.' : 'Réponse enregistrée : elle attend une validation dans « Messagerie ».';
+        setTimeout(function () { card.remove(); loadCockpit(); }, 1500);
+      }).catch(function (e) { send.disabled = false; st.textContent = ERR[e.code || e.message] || ('Envoi impossible : ' + e.message); });
+    });
+  }
+  $('mails-refresh').addEventListener('click', function () {
+    var b = $('mails-refresh'); b.disabled = true; $('mails-status').textContent = 'Lecture de la boîte…';
+    OM.api('/api/app?route=mail-triage', { method: 'POST', body: JSON.stringify({ action: 'refresh' }) }).then(function (r) {
+      if (r.reason) $('mails-status').textContent = ERR[r.reason] || r.reason;
+      else { loadMails(); loadCockpit(); }
+    }).catch(function (e) { $('mails-status').textContent = ERR[e.code || e.message] || ('Lecture impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+
   function start() {
     var name = OM.getUserName();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
     OM.loadBranding().catch(function () {});
-    loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup();
+    loadCockpit(); loadMails(); loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup();
   }
 
   // Owner: reminder of what is still missing for everything to work together.

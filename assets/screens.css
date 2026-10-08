@@ -86,3 +86,34 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .table-box table{border-collapse:collapse;width:100%;font-size:14px}
 .table-box th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:9px 8px;border-bottom:1px solid var(--line)}
 .table-box td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+/* Home cockpit (2026-10-08) */
+.cockpit{display:flex;flex-direction:column;gap:10px;margin:8px 0 18px}
+.cockpit .card-head h2{margin:0}
+.cockpit-grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+.kpi-tile{font:inherit;text-align:left;color:var(--ink);cursor:pointer;border-left:4px solid var(--line);min-height:104px;justify-content:flex-start}
+.kpi-tile:hover{border-color:var(--brand)}
+.kpi-tile:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.kpi-tile small{font-size:12px;color:var(--muted)}
+.kpi-tile.tone-ok{border-left-color:var(--brand)}
+.kpi-tile.tone-warn{border-left-color:var(--warn-ink)}
+.kpi-tile.tone-bad{border-left-color:var(--danger)}
+.kpi-tile.tone-bad strong{color:var(--danger-ink)}
+.kpi-dialog{max-width:680px}
+.kpi-dialog .kd-value{font-size:22px;font-weight:700;color:var(--ink)}
+.kd-facts{display:grid;grid-template-columns:minmax(120px,170px) 1fr;gap:8px 14px;margin:0;font-size:14px}
+.kd-facts dt{font-weight:600;color:var(--muted)}
+.kd-facts dd{margin:0;line-height:1.5}
+.kd-sub{margin:6px 0 0;font-size:15px}
+.kd-items{max-height:42vh;overflow:auto}
+.kd-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.mail-item{flex-wrap:wrap;align-items:flex-start;border-left:4px solid var(--line)}
+.mail-item.imp-haute{border-left-color:var(--danger)}
+.mail-item.imp-moyenne{border-left-color:var(--warn-ink)}
+.mail-item .t{flex:1 1 320px}
+.mail-sum,.mail-act{margin:4px 0 0;font-size:14px;line-height:1.5}
+.mail-act{font-weight:600;color:var(--brand-ink)}
+.mail-tools{display:flex;gap:8px;align-items:flex-start}
+.mail-reply{flex-basis:100%;display:flex;flex-direction:column;gap:8px;padding-top:8px}
+.mail-reply textarea,.mail-reply input{font:inherit;padding:10px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink)}
+@media (max-width:600px){.kd-facts{grid-template-columns:1fr}}
+#search-status:empty,#search-results:empty{display:none}

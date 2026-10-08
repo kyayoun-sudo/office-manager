@@ -40,6 +40,8 @@ import { AGENT_FILES, loadAgentMemory, rebuildAgentMemory } from '../lib/agent-m
 import { readMissionMemory, refreshMissionMemories, listLearnings, confirmLearning, proposeStatusChange } from '../lib/mission-memory.js';
 import { listAuditEvents } from '../lib/audit-log.js';
 import { rest } from '../lib/supabase.js';
+import { cockpit } from '../lib/cockpit.js';
+import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -325,6 +327,29 @@ export const ROUTES = Object.freeze({
       return { capabilities: cap, submissions: light(sub), reviews: rev, providers: providersStatus() };
     }),
     unavailable: 'DASHBOARD_UNAVAILABLE'
+  },
+  // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
+  cockpit: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const c = await cockpit(orgId);
+      // Collaborators: the firm's work, not the people indicators nor the firm's mailbox.
+      if (!MANAGERS.includes(req.account?.role)) c.kpis = c.kpis.filter(k => !['capacity', 'conflicts', 'quality', 'mails', 'ethics', 'training'].includes(k.key));
+      return c;
+    }),
+    unavailable: 'COCKPIT_UNAVAILABLE'
+  },
+  // Important e-mails of the firm's authorised mailbox: list, refresh, AI reply, send / propose.
+  'mail-triage': {
+    GET: users(MANAGERS, () => importantMails()),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'refresh') return triageInbox(orgId);
+      if (b.action === 'draft') return draftReply(orgId, String(b.id || ''), String(b.instruction || ''), req.account);
+      if (b.action === 'send') return sendReply(orgId, { id: b.id, subject: b.subject, body: b.body, mission_id: b.mission_id || null, send: b.send !== false }, req.account);
+      if (b.action === 'done') return markMailDone(String(b.id || ''), req.account, b.how || 'traité');
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MAIL_UNAVAILABLE'
   },
   // Memories (2026-10-08): agents' memories, missions' memories, learnings, audit log.
   memory: {
