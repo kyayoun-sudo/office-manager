@@ -214,7 +214,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'COORDINATION_UNAVAILABLE'
   },
   'team-kpi': {
-    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); return teamKpis(orgId); }),
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null); return teamKpis(orgId); }),
     unavailable: 'KPI_UNAVAILABLE'
   },
   'my-kpi': {
@@ -540,7 +540,8 @@ export const ROUTES = Object.freeze({
   'people-brief': { POST: users(MANAGERS, (orgId, req) => peopleBrief(orgId, req.body?.mission_id)), unavailable: 'PEOPLE_BRIEF_UNAVAILABLE' },
   // Messagerie: the Gmail conversation of a sent message (replies of the colleagues) — managers.
   'mail-thread': { GET: users(MANAGERS, (orgId, req) => messageThread(orgId, req.query?.id)), unavailable: 'MAIL_THREAD_UNAVAILABLE' },
-  'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner((orgId, req) => savePeoplePolicy(req.body || {})), unavailable: 'POLICY_UNAVAILABLE' },
+  // Saved → read at once by the agents (team, preferences, questionnaire answers → Équipe and Management Cards).
+  'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner(async (orgId, req) => { const r = await savePeoplePolicy(req.body || {}); const read = await (await import('../lib/capabilities.js')).startCapabilityRefresh(orgId, req).catch(e => ({ error: String(e.message || e) })); return { ...r, reading: read }; }), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),

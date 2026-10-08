@@ -57,14 +57,18 @@ test('Drive JSON: the modifiedTime read with the content is the one checked; upd
   assert.deepEqual((await loadJsonFile('X.json', drive, 'root')).state, { v: 99, other: true, mine: true });
 });
 
-test('agent memory: in MEMORY/AGENTS, one writer, checkpoint moves only on success', async () => {
+test('agent memory: in MEMORY/AGENTS (Orpailleur: inside TIDY_STATE), one writer, checkpoint moves only on success', async () => {
   const m = await import('../lib/agent-memory.js');
   m.resetAgentMemoryFolderCache();
   const drive = fakeDrive(), d = { drive, folder: 'om', tidyDrive: fakeTidy() };
   await m.beginPass('orpailleur', { ref: 'pass:1' }, d);
   let { memory } = await m.loadAgentMemory('orpailleur', d);
   assert.equal(memory.status, 'running');
-  assert.ok([...drive.files.values()].some(f => f.parent === 'om/MEMORY/AGENTS' && f.name === 'ORPAILLEUR_MEMORY.json'));
+  // No extra file for the Orpailleur: its follow-up is inside its own TIDY_STATE, which keeps its content.
+  assert.ok(![...drive.files.values()].some(f => /ORPAILLEUR_MEMORY/.test(f.name)));
+  assert.ok([...drive.files.values()].some(f => f.parent === 'om' && f.name === 'OFFICE_MANAGER_TIDY_STATE.json'));
+  await m.beginPass('sika', {}, d);
+  assert.ok([...drive.files.values()].some(f => f.parent === 'om/AGENTS' && f.name === 'SIKA_MEMORY.json'));
   assert.ok(memory.sources.some(s => s.file === 'OFFICE_MANAGER_TIDY_STATE.json'));
   await m.endPass('orpailleur', { ok: true, checkpoint: { last_pass_at: 'T1' } }, d);
   await m.endPass('orpailleur', { ok: false, error: 'boom', checkpoint: { last_pass_at: 'T2' } }, d);
@@ -507,4 +511,33 @@ test('agents home: « … AI MANAGER / Atelier mémoire » found, scattered agen
   const files2 = [{ id: 'aim', name: 'TATY_AI_office manager', mimeType: F, parents: ['D'] }];
   const at2 = await findAtelier(H, { kind: 'drive', driveId: 'D', fetchImpl: fakeRest(files2) });
   assert.equal(at2.created, true); assert.equal(files2.find(f => f.id === at2.id).parents[0], 'aim');
+});
+
+test('agents home on the real layout: 00_TATY_AI_MANAGER / MEMORY; root folders of the agents brought home', async () => {
+  const { findAtelier, gatherInto } = await import('../lib/memory-home.js');
+  const F = 'application/vnd.google-apps.folder';
+  const files = [
+    { id: 'aim', name: '00_TATY_AI_MANAGER', mimeType: F, parents: ['D'] },
+    { id: 'kb', name: '00_OFFICE_MANAGER_KNOWLEDGE_BASE', mimeType: F, parents: ['aim'] },
+    { id: 'map', name: 'OFFICE_MANAGER_MAP.xlsx', mimeType: 'x', parents: ['aim'], modifiedTime: '2026-10-07' },
+    { id: 'ar', name: 'A_RANGER', mimeType: F, parents: ['D'] },
+    { id: 'cap', name: 'CAPACITES_DU_CABINET', mimeType: F, parents: ['D'] },
+    { id: 'tr', name: 'ENTRAINEMENT_AUDIT_OFFICE_MANAGER — 2026-10-07', mimeType: F, parents: ['D'] },
+    { id: 'oldmem', name: 'MEMORY', mimeType: F, parents: ['D'] },
+    { id: 'ag', name: 'AGENTS', mimeType: F, parents: ['oldmem'] },
+    { id: 'om', name: 'ORPAILLEUR_MEMORY.json', mimeType: 'application/json', parents: ['ag'] },
+    { id: 'cl', name: '01_CLIENTS_ET_MISSIONS', mimeType: F, parents: ['D'] }
+  ];
+  const fetchImpl = fakeRest(files), H = { headers: {} };
+  const at = await findAtelier(H, { kind: 'drive', driveId: 'D', fetchImpl });
+  assert.equal(at.manager.id, 'aim'); assert.equal(at.created, true);
+  const mem = files.find(f => f.id === at.id); assert.equal(mem.name, 'MEMORY'); assert.deepEqual(mem.parents, ['aim']);
+  await gatherInto(at.id, H, { kind: 'drive', driveId: 'D', oldMemory: 'D', homeId: 'aim', fetchImpl });
+  const by = id => files.find(f => f.id === id);
+  assert.deepEqual(by('ar').parents, ['aim']); assert.deepEqual(by('cap').parents, ['aim']);
+  const tr = files.find(f => f.name === 'ENTRAINEMENT'); assert.deepEqual(by('tr').parents, [tr.id]);
+  assert.deepEqual(by('map').parents, [at.id]);                 // MAP into MEMORY
+  assert.deepEqual(by('ag').parents, [at.id]);                  // old MEMORY/AGENTS merged into the new MEMORY
+  assert.equal(by('oldmem').trashed, true); assert.equal(by('om').trashed, true);
+  assert.deepEqual(by('cl').parents, ['D']); assert.ok(!by('cl').trashed); assert.deepEqual(by('kb').parents, ['aim']);
 });
