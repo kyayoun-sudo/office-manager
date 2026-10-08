@@ -143,6 +143,24 @@
       });
       if (data.query) { var more = UI.el('a', 'Voir tous les résultats et filtrer'); more.href = '/recherche.html?q=' + encodeURIComponent(data.query); box.appendChild(more); }
     },
+    // « À qui la confier ? » — a person picker that gives an action to someone (managers).
+    assignPicker: function (actionId, onDone) {
+      var box = UI.el('div', null, 'assign');
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Personne à qui confier cette action');
+      sel.appendChild(UI.el('option', 'À qui la confier ?')); sel.firstChild.value = '';
+      var b = UI.el('button', 'Confier', 'btn ghost'); b.type = 'button';
+      var st = UI.el('span', '', 'meta');
+      box.appendChild(sel); box.appendChild(b); box.appendChild(st);
+      OM.api('/api/app?route=mission-contacts').then(function (c) { (c.all || []).forEach(function (p) { var o = UI.el('option', p.name + (p.role ? ' — ' + p.role : '')); o.value = p.email; sel.appendChild(o); }); }).catch(function () {});
+      b.addEventListener('click', function () {
+        if (!sel.value) { st.textContent = 'Choisissez une personne.'; return; }
+        b.disabled = true;
+        OM.api('/api/app?route=assign-action', { method: 'POST', body: JSON.stringify({ id: actionId, staff_profile_id: sel.value }) })
+          .then(function (r) { st.textContent = 'Confiée à ' + r.assigned_to + '.'; if (onDone) onDone(r); })
+          .catch(function (e) { b.disabled = false; st.textContent = 'Impossible : ' + e.message; });
+      });
+      return box;
+    },
     // Shows the login card when no token is stored, then calls start().
     requireLogin: function (start) {
       var login = document.getElementById('login');

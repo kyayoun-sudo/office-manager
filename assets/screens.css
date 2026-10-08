@@ -159,3 +159,6 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .page-head .status-line + .note:empty{display:none}
 .ask label,.ask .form-grid label{color:#C9D6D1;font-size:13px;font-weight:600}
 .ask .note{color:#B7C6C0}
+.assign{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;flex-basis:100%}
+.assign select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);max-width:100%}
+.assign .btn{min-height:34px;padding:6px 12px}

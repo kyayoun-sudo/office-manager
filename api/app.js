@@ -43,6 +43,7 @@ import { listAuditEvents } from '../lib/audit-log.js';
 import { rest } from '../lib/supabase.js';
 import { cockpit } from '../lib/cockpit.js';
 import { getMissionFull } from '../lib/mission-full.js';
+import { assignAction } from '../lib/action-executor.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
 import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
@@ -343,6 +344,8 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'COCKPIT_UNAVAILABLE'
   },
+  // Give an action to a person (« Sans responsable », or right after validating it).
+  'assign-action': { POST: users(MANAGERS, (orgId, req) => assignAction(orgId, String(req.body?.id || ''), String(req.body?.staff_profile_id || ''), who(req))), unavailable: 'ACTIONS_UNAVAILABLE' },
   // The mission file (2026-10-08): everything the agents and the team know about one mission.
   'mission-file': { GET: users(ALL_ROLES, (orgId, req) => getMissionFull(orgId, String(req.query?.mission_id || ''))), unavailable: 'MISSION_UNAVAILABLE' },
   // Client contacts of a mission: found by the agents (proposed), validated by a manager.

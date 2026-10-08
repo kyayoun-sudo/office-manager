@@ -87,6 +87,7 @@
       show('Décision enregistrée : ' + LABELS[decision] + '.' + (r && r.effect ? ' ' + r.effect : ''));
       if (r && r.message_id) loadMail();
       render();
+      if (r && r.needs_assignee && OM.isManager()) { var st = $('status'); st.appendChild(document.createTextNode(' ')); st.appendChild(UI.assignPicker(action.id, function () { show('Action validée et confiée.'); })); }
     }).catch(function (err) {
       show('Échec : ' + err.message, true);
       Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
