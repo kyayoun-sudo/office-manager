@@ -331,7 +331,13 @@
     // TDR briefing
     var bx = $('brief'); bx.textContent = '';
     var b = d.briefing;
-    if (!b) { bx.appendChild(el('p', 'Le TDR n’a pas encore été lu. Lancez « Préparer une mission » pour que Mission Controller le lise, fasse la recherche et propose l’équipe.', 'empty')); var go = el('a', 'Préparer cette mission', 'btn ghost'); go.href = '/preparation.html?mission=' + encodeURIComponent(m.id); bx.appendChild(go); }
+    var pb = d.plan_briefing;
+    if (!b && pb) {
+      bx.appendChild(el('p', 'D’après le plan enregistré dans l’Assistant (' + (pb.by || '') + ', ' + UI.dateTime(pb.at) + '). Le TDR n’a pas encore été lu par Mission Controller.', 'note'));
+      facts(bx, [['Objectifs', (pb.briefing || {}).objectives], ['Périmètre (scope)', (pb.briefing || {}).scope], ['Livrables', ((pb.briefing || {}).deliverables || []).map(function (x) { return x.name + (x.due ? ' — ' + x.due : ''); })],
+        ['Planning', (pb.planning || []).map(function (p) { return p.phase + (p.start || p.end ? ' (' + [p.start, p.end].filter(Boolean).join(' → ') + ')' : ''); })], ['Compétences nécessaires', (pb.skills || []).map(function (k) { return k.capability + (k.level ? ' — ' + k.level : ''); })]]);
+    }
+    if (!b && !pb) { bx.appendChild(el('p', 'Le TDR n’a pas encore été lu. Lancez « Préparer une mission » pour que Mission Controller le lise, fasse la recherche et propose l’équipe.', 'empty')); var go = el('a', 'Préparer cette mission', 'btn ghost'); go.href = '/preparation.html?mission=' + encodeURIComponent(m.id); bx.appendChild(go); }
     else {
       facts(bx, [['Client', b.client], ['Pays', b.country], ['Secteur', b.industry], ['Type de mission', b.engagement_type], ['Bailleur / financement', b.funder], ['Référentiel', b.framework],
         ['Objectifs', b.objectives], ['Périmètre (scope)', b.scope], ['Livrables', (b.deliverables || []).map(function (x) { return x.name + (x.due ? ' — ' + x.due : ''); })],

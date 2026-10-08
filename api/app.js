@@ -45,6 +45,8 @@ import { cockpit } from '../lib/cockpit.js';
 import { getMissionFull } from '../lib/mission-full.js';
 import { assignAction } from '../lib/action-executor.js';
 import { chatState, sendChat } from '../lib/chat.js';
+import { integratePlan } from '../lib/plan-integration.js';
+import { searchSpecialists, draftOutreach } from '../lib/external-specialists.js';
 import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
@@ -366,6 +368,13 @@ export const ROUTES = Object.freeze({
       return recommendTeam(orgId, String(b.mission_id || ''), who(req));
     }),
     unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  // A saved plan feeds the mission's structured data (Assistant « Enregistrer »).
+  'plan-integrate': { POST: users(ALL_ROLES, (orgId, req) => integratePlan(orgId, String(req.body?.mission_id || ''), req.body || {}, who(req))), unavailable: 'MISSION_UNAVAILABLE' },
+  // External specialists for a missing capability: proposed, chosen by a person, message prepared (never sent by the app).
+  'external-specialists': {
+    POST: users(MANAGERS, (orgId, req) => req.body?.action === 'draft' ? draftOutreach(orgId, req.body || {}, req.account) : searchSpecialists(orgId, req.body || {})),
+    unavailable: 'SPECIALISTS_UNAVAILABLE'
   },
   // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
   chat: {

@@ -386,3 +386,21 @@ test('chat: no validation, direct conversations readable only by the two people,
   const missing = await c.chatState('org', paul, {}, { fetchRows: async p => { if (p.startsWith('office_chat_messages')) throw new Error('relation "office_chat_messages" does not exist'); return []; } });
   assert.equal(missing.available, false);
 });
+
+test('assistant: a saved plan feeds the mission, external specialists are proposed then chosen', async () => {
+  const { integratePlan } = await import('../lib/plan-integration.js');
+  const M = 'aaaaaaaa-1111-4111-8111-111111111111';
+  const facts = [], posts = []; let structured = null;
+  const r = await integratePlan('org', M, { content: 'Plan' }, 'Paul', {
+    fetchRows: async (p, o = {}) => { if (o.method === 'POST') { posts.push(JSON.parse(o.body)[0]); return []; } if (p.startsWith('office_missions')) return [{ id: M, name: 'BLE', planned_start: '2026-11-01', planned_end: '2027-01-31' }]; if (p.startsWith('office_staff_profiles')) return [{ id: 's1', full_name: 'Awa Koné' }]; return []; },
+    ai: async () => ({ provider: 'anthropic', text: JSON.stringify({ briefing: { objectives: ['Certifier'], scope: 'Comptes 2026' }, risks: [{ risk: 'Revenu', level: 'élevé' }], skills: [{ capability: 'IFRS 16' }], deadlines: [{ what: 'Rapport', due: '2027-02-15' }, { what: 'sans date', due: 'bientôt' }], documents_needed: [{ document: 'Grand livre', cycle: 'Achats' }], team: [{ person: 'Awa Koné', role: 'Chef de mission' }, { person: 'Inconnu', role: 'x' }] }) }),
+    addFact: async (id, f) => { facts.push(f); return f; }, mergeStructured: async (id, x) => { structured = x; return {}; } });
+  assert.equal(r.risks, 1); assert.equal(r.deadlines, 1); assert.equal(r.documents, 1); assert.equal(r.team_proposed, 1); assert.equal(r.briefing, true);
+  assert.ok(facts.every(f => /Assistant/.test(f.agent)));
+  assert.equal(posts[0].status, 'proposed'); assert.equal(structured.skills[0].capability, 'IFRS 16');
+  const ex = await import('../lib/external-specialists.js');
+  const found = await ex.searchSpecialists('org', { gap: 'Audit IT' }, { research: async () => ({ web: true, provider: 'openai', text: JSON.stringify({ specialists: [{ name: 'Cabinet X', speciality: 'Audit SI', country: 'CI', source: 'https://x.ci', contact: 'contact@x.ci', why: 'références' }, { name: '' }] }) }) });
+  assert.equal(found.specialists.length, 1); assert.equal(found.specialists[0].status, 'proposé');
+  const msg = await ex.draftOutreach('org', { specialist: found.specialists[0], gap: 'Audit IT' }, { display_name: 'Paul' }, { ai: async () => ({ text: '{"subject":"Collaboration","body":"Bonjour"}' }) });
+  assert.equal(msg.to, 'contact@x.ci'); assert.match(msg.mailto, /^mailto:contact%40x\.ci\?subject=Collaboration/);
+});

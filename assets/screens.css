@@ -171,3 +171,5 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .reco{flex-wrap:wrap}
 .reco .t{flex:1 1 360px}
 .warn-text{color:var(--warn-ink) !important}
+.ex-item{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.ex-item input{margin-top:4px;width:18px;height:18px}
