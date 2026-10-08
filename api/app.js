@@ -36,6 +36,10 @@ import { dropFile } from '../lib/drop-box.js';
 import { peopleBrief } from '../lib/people-brief.js';
 import { dedupeMissions } from '../lib/mission-dedupe.js';
 import { fireInternal } from '../lib/agent-passes.js';
+import { AGENT_FILES, loadAgentMemory, rebuildAgentMemory } from '../lib/agent-memory.js';
+import { readMissionMemory, refreshMissionMemories, listLearnings, confirmLearning, proposeStatusChange } from '../lib/mission-memory.js';
+import { listAuditEvents } from '../lib/audit-log.js';
+import { rest } from '../lib/supabase.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -322,6 +326,38 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'DASHBOARD_UNAVAILABLE'
   },
+  // Memories (2026-10-08): agents' memories, missions' memories, learnings, audit log.
+  memory: {
+    GET: users(MANAGERS, async (orgId, req) => {
+      if (req.query?.mission_id) return readMissionMemory(orgId, String(req.query.mission_id));
+      if (req.query?.agent) return (await loadAgentMemory(String(req.query.agent))).memory;
+      const agents = {};
+      for (const a of Object.keys(AGENT_FILES)) {
+        try { const m = (await loadAgentMemory(a)).memory; agents[a] = { status: m.status, last_successful_at: m.last_successful_at, last_attempted_at: m.last_attempted_at, last_error: m.last_error, retry_count: m.retry_count, pending: (m.pending || []).length, recovered_at: m.recovered_at || null }; }
+        catch (e) { agents[a] = { error: String(e.message || e).slice(0, 120) }; }
+      }
+      return { agents };
+    }),
+    POST: users(MANAGERS, async (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'propose_status') {
+        const m = (await rest('office_missions?org_id=eq.' + encodeURIComponent(orgId) + '&id=eq.' + encodeURIComponent(String(b.mission_id || '')) + '&select=id,name,status&limit=1'))?.[0];
+        if (!m) throw fail('MISSION_NOT_FOUND', 404);
+        return proposeStatusChange(orgId, m, String(b.status || ''), String(b.why || '').slice(0, 300) + ' (demandé par ' + who(req) + ')');
+      }
+      if (req.account?.role !== 'owner') throw fail('ROLE_NOT_ALLOWED', 403);
+      if (b.action === 'rebuild') return rebuildAgentMemory(orgId, String(b.agent || ''), who(req), { fetchRows: rest });
+      if (b.action === 'refresh_missions') return refreshMissionMemories(orgId, { limit: Math.min(10, Number(b.limit) || 5) });
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MEMORY_UNAVAILABLE'
+  },
+  learnings: {
+    GET: users(MANAGERS, (orgId, req) => listLearnings(orgId, { category: req.query?.category || null, status: req.query?.status || null })),
+    POST: users(PARTNERS, (orgId, req) => confirmLearning(orgId, req.body?.id, who(req), req.body?.decision || 'confirmed')),
+    unavailable: 'MEMORY_UNAVAILABLE'
+  },
+  'audit-log': { GET: users(PARTNERS, (orgId, req) => listAuditEvents(orgId, { missionId: req.query?.mission_id || null, agent: req.query?.agent || null, limit: req.query?.limit })), unavailable: 'MEMORY_UNAVAILABLE' },
   'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.

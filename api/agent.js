@@ -223,6 +223,19 @@ export default async function handler(req, res) {
       runAgentKey = resolved.storageKey;
     }
 
+    // Added 2026-10-08: the agent's own memory (MEMORY/AGENTS) — where it stopped, what is
+    // pending, where its detailed memories are. Short text; never blocks the answer (4 s max).
+    try {
+      const memAgent = requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent;
+      const { AGENT_FILES, loadAgentMemory, memorySummary } = await import("../lib/agent-memory.js");
+      if (AGENT_FILES[memAgent]) {
+        const loaded = await Promise.race([loadAgentMemory(memAgent), new Promise(r => setTimeout(() => r(null), 4000))]).catch(() => null);
+        const summary = memorySummary(memAgent, loaded?.memory || null);
+        if (requestedAgent === ROOT_ROUTE) rootContext = { ...rootContext, agent_memory: summary };
+        else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], agent_memory: summary };
+      }
+    } catch { /* memory unavailable: the agent works as before */ }
+
     const orchestration =
       requestedAgent === ROOT_ROUTE ? "manager" : "direct-specialist";
     const logicalAgentKey =
