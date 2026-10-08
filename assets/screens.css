@@ -173,3 +173,18 @@ td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .warn-text{color:var(--warn-ink) !important}
 .ex-item{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
 .ex-item input{margin-top:4px;width:18px;height:18px}
+/* Enhanced Auditor sections (2026-10-08) */
+.ea-tabs{margin:0 0 16px}
+.ea-panel{display:flex;flex-direction:column;gap:16px}
+.ea-panel[hidden]{display:none}
+.ev-card{flex-direction:column;align-items:stretch}
+.ev-card h4{margin:12px 0 4px;font-size:14px}
+.ev-card ul{margin:0;padding-left:20px;line-height:1.55}
+.ev-title{font-weight:700;font-size:16px}
+.vig li{color:var(--warn-ink)}
+.partner li{color:var(--danger-ink)}
+.rp{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rp select,.ev-card input,#ev-mission{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink)}
+.dropzone{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted);margin:10px 0}
+.dropzone.over{border-color:var(--brand);background:var(--soft)}
+.so-hist{margin:6px 0;padding-left:20px;font-size:13.5px;color:var(--muted)}

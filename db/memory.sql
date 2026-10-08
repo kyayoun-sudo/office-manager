@@ -122,4 +122,25 @@ alter table public.office_chat_messages enable row level security;
 revoke all on public.office_chat_messages from public, anon, authenticated, service_role;
 grant select, insert, update on public.office_chat_messages to service_role;
 
+-- 6. Sign-off of working papers (2026-10-08), APPEND-ONLY: each step on the REAL Drive file and its
+--    version (modifiedTime): opened, prepared, reviewed, comment, correction requested, corrected, signed off.
+create table if not exists public.office_workpaper_signoffs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  office_mission_id uuid,
+  file_id text not null check (length(file_id) between 5 and 200),
+  file_name text check (file_name is null or length(file_name) <= 250),
+  file_url text check (file_url is null or length(file_url) <= 500),
+  version text check (version is null or length(version) <= 60),
+  step text not null check (step in ('opened', 'prepared', 'reviewed', 'comment', 'correction_requested', 'corrected', 'signed_off')),
+  by_name text check (by_name is null or length(by_name) <= 120),
+  by_email text check (by_email is null or length(by_email) <= 200),
+  comment text check (comment is null or length(comment) <= 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_workpaper_signoffs_idx on public.office_workpaper_signoffs (org_id, file_id, created_at);
+alter table public.office_workpaper_signoffs enable row level security;
+revoke all on public.office_workpaper_signoffs from public, anon, authenticated, service_role;
+grant select, insert on public.office_workpaper_signoffs to service_role;
+
 commit;

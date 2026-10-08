@@ -47,6 +47,7 @@ import { assignAction } from '../lib/action-executor.js';
 import { chatState, sendChat } from '../lib/chat.js';
 import { integratePlan } from '../lib/plan-integration.js';
 import { searchSpecialists, draftOutreach } from '../lib/external-specialists.js';
+import { workState, eveningPoint, eveningStep, startWpReview, wpStep, updateReviewPoint, retrospective, signoffEvents, signoffStatus, signoffAction, partnerView } from '../lib/auditor-plus.js';
 import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
@@ -376,6 +377,35 @@ export const ROUTES = Object.freeze({
     POST: users(MANAGERS, (orgId, req) => req.body?.action === 'draft' ? draftOutreach(orgId, req.body || {}, req.account) : searchSpecialists(orgId, req.body || {})),
     unavailable: 'SPECIALISTS_UNAVAILABLE'
   },
+  // Enhanced Auditor, its own section: evening points, former missions, working-paper review, partner view.
+  'auditor-work': {
+    GET: users(MANAGERS, async (orgId, req) => {
+      const st = await workState();
+      const mid = req.query?.mission_id || null;
+      const evening = Object.fromEntries(Object.entries(st.evening || {}).filter(([k]) => !mid || k === mid).map(([k, v]) => [k, mid ? v : v.slice(0, 1)]));
+      const wp = Object.values(st.wp_reviews || {}).filter(r => !mid || r.mission_id === mid).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 60);
+      return { evening, evening_run: st.evening_run || null, retrospectives: Object.values(st.retrospectives || {}).filter(r => !mid || r.mission?.id === mid), wp_reviews: wp, wp_jobs: Object.values(st.wp_jobs || {}).slice(-10).map(j => ({ id: j.id, status: j.status, left: (j.queue || []).length, done: (j.done || []).length, started_at: j.started_at })) };
+    }),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'evening') return eveningPoint(orgId, String(b.mission_id || ''));
+      if (b.action === 'retro') return retrospective(orgId, b, who(req));
+      if (b.action === 'wp_review') return startWpReview(orgId, req, b, who(req));
+      if (b.action === 'point') return updateReviewPoint(String(b.file_id || ''), String(b.point_id || ''), String(b.status || ''), who(req));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'AUDITOR_UNAVAILABLE'
+  },
+  'auditor-evening-step': { POST: (orgId, req) => eveningStep(orgId, req), unavailable: 'AUDITOR_UNAVAILABLE' },
+  'auditor-wp-step': { POST: (orgId, req) => wpStep(orgId, req, req.body || {}), unavailable: 'AUDITOR_UNAVAILABLE' },
+  // Sign-off linked to the real working file and its version (the reviewer opens it before signing).
+  signoff: {
+    GET: users(ALL_ROLES, async (orgId, req) => { const r = await signoffEvents(orgId, { file_id: req.query?.file_id || null, mission_id: req.query?.mission_id || null }); return { ...r, files: signoffStatus(r.events) }; }),
+    POST: users(ALL_ROLES, (orgId, req) => signoffAction(orgId, req.body || {}, req.account)),
+    unavailable: 'SIGNOFF_UNAVAILABLE'
+  },
+  // Partner view: only what a partner must see.
+  'partner-view': { GET: users(PARTNERS, () => partnerView()), unavailable: 'AUDITOR_UNAVAILABLE' },
   // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
   chat: {
     GET: users(ALL_ROLES, (orgId, req) => chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),

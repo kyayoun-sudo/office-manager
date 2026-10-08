@@ -404,3 +404,33 @@ test('assistant: a saved plan feeds the mission, external specialists are propos
   const msg = await ex.draftOutreach('org', { specialist: found.specialists[0], gap: 'Audit IT' }, { display_name: 'Paul' }, { ai: async () => ({ text: '{"subject":"Collaboration","body":"Bonjour"}' }) });
   assert.equal(msg.to, 'contact@x.ci'); assert.match(msg.mailto, /^mailto:contact%40x\.ci\?subject=Collaboration/);
 });
+
+test('enhanced auditor: evening point, sign-off on the real file version, partner view', async () => {
+  const ea = await import('../lib/auditor-plus.js');
+  let work = {};
+  const upd = async (n, f) => { const r = f(structuredClone(work)); if (r) work = r; return {}; };
+  const drive = { findFilesByExactName: async () => [], downloadBuffer: async () => Buffer.from('{}') };
+  const M = 'aaaaaaaa-1111-4111-8111-111111111111';
+  const p = await ea.eveningPoint('org', M, { updateJsonFile: upd, drive, folder: 'om', audit: async () => ({}),
+    getMissionFull: async () => ({ mission: { id: M, name: 'BLE' }, risks: [{ risk: 'Revenu' }], documents: [], actions: [], facts: [], assignments: [] }),
+    ai: async () => ({ provider: 'anthropic', text: JSON.stringify({ summary: 'ok', risk_comparison: [{ risk: 'Revenu', auditor: true, mission_controller: true, work_documented: 'non' }], partner_items: [{ category: 'fraude', point: 'Écritures manuelles de fin d’année' }, { category: 'inventé', point: 'x' }] }) }) });
+  assert.equal(p.partner_items.length, 1); assert.equal(p.partner_items[0].label, 'Fraude');
+  assert.equal(work.evening[M][0].summary, 'ok');
+  // Sign-off: the reviewer must open THIS version; the preparer cannot sign.
+  const events = [];
+  const fetchRows = async (path, o = {}) => { if (o.method === 'POST') { events.push({ ...JSON.parse(o.body)[0], created_at: new Date(Date.now() + events.length * 1000).toISOString() }); return []; } return events.filter(e => !path.includes('file_id=eq.') || path.includes('file_id=eq.F1')); };
+  const getMeta = async () => ({ id: 'F1', name: 'WP_stocks.xlsx', mimeType: 'application/vnd.ms-excel', modifiedTime: 'v2', webViewLink: 'https://drive/F1' });
+  const yao = { email: 'yao@f.ci', display_name: 'Yao', role: 'collaborator' }, awa = { email: 'awa@f.ci', display_name: 'Awa', role: 'manager' };
+  await ea.signoffAction('org', { file_id: 'F1', step: 'prepared' }, yao, { fetchRows, getMeta, audit: async () => ({}) });
+  await assert.rejects(() => ea.signoffAction('org', { file_id: 'F1', step: 'signed_off' }, awa, { fetchRows, getMeta, audit: async () => ({}) }), /OPEN_THE_FILE_FIRST/);
+  await assert.rejects(() => ea.signoffAction('org', { file_id: 'F1', step: 'signed_off' }, yao, { fetchRows, getMeta }), /ROLE_NOT_ALLOWED/);
+  await ea.signoffAction('org', { file_id: 'F1', step: 'opened' }, awa, { fetchRows, getMeta });
+  await ea.signoffAction('org', { file_id: 'F1', step: 'signed_off', comment: 'OK' }, awa, { fetchRows, getMeta, audit: async () => ({}) });
+  const st = ea.signoffStatus(events);
+  assert.equal(st[0].status, 'signé'); assert.equal(st[0].preparer, 'Yao'); assert.equal(st[0].reviewer, 'Awa'); assert.equal(st[0].version, 'v2');
+  // A new version of the file: opening the old one is not enough.
+  const getMeta3 = async () => ({ id: 'F1', name: 'WP_stocks.xlsx', mimeType: 'x', modifiedTime: 'v3' });
+  await assert.rejects(() => ea.signoffAction('org', { file_id: 'F1', step: 'signed_off' }, awa, { fetchRows, getMeta: getMeta3 }), /OPEN_THE_FILE_FIRST/);
+  const pv = await ea.partnerView({ drive: { findFilesByExactName: async () => [{ id: 'w' }], downloadBuffer: async () => Buffer.from(JSON.stringify(work)) }, folder: 'om' });
+  assert.equal(pv.items[0].category, 'fraude');
+});
