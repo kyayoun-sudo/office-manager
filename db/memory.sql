@@ -12,6 +12,8 @@ begin;
 alter table public.office_missions add column if not exists client_name text check (client_name is null or length(client_name) <= 200);
 alter table public.office_missions add column if not exists drive_folder_id text check (drive_folder_id is null or length(drive_folder_id) <= 200);
 alter table public.office_missions add column if not exists memory_file_id text check (memory_file_id is null or length(memory_file_id) <= 200);
+-- The client's folder (its permanent file holds 00_OFFICE_MANAGER/CLIENT_MEMORY.json, shared by all its missions).
+alter table public.office_missions add column if not exists client_folder_id text check (client_folder_id is null or length(client_folder_id) <= 200);
 alter table public.office_missions add column if not exists status_changed_at timestamptz;
 alter table public.office_missions add column if not exists closed_at timestamptz;
 alter table public.office_missions add column if not exists archived_at timestamptz;

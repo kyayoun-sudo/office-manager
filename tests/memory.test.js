@@ -92,28 +92,37 @@ test('audit log: references and hashes only; works without the migration', async
   assert.equal(ok.db, true); assert.equal(ok.drive, true); assert.equal(rows[0][1], 'sika');
 });
 
-test('mission folder: created only when sure, else a proposal', async () => {
+test('client folder: found from the client name or the mission folder; a proposal when unsure', async () => {
   const mm = await import('../lib/mission-memory.js');
+  assert.deepEqual(mm.clientTokens({ name: 'Audit légal BLE TRANSIT 2025' }), ['ble', 'transit']);
+  assert.deepEqual(mm.clientTokens({ name: 'x', client_name: 'Mines du Sud SA' }), ['mines', 'sud']);
   const f = [{ id: 'r', name: 'Clients', parent: null, path: '/Clients' }, { id: 'c', name: 'BLE TRANSIT', parent: 'r', path: '/Clients/BLE TRANSIT' },
-    { id: 'y', name: '2025', parent: 'c', path: '/Clients/BLE TRANSIT/2025' }, { id: 'a', name: 'Audit', parent: 'y', path: '/Clients/BLE TRANSIT/2025/Audit' },
-    { id: 'a2', name: 'Audit BLE TRANSIT 2025 (copie)', parent: 'r', path: '/Clients/Audit BLE TRANSIT 2025 (copie)' }];
-  assert.equal(mm.matchMissionFolder({ name: 'Audit BLE TRANSIT 2025' }, f.slice(0, 4)).folder.id, 'a');
-  const two = mm.matchMissionFolder({ name: 'Audit BLE TRANSIT 2025' }, f);
-  assert.equal(two.certain, false); assert.equal(two.candidates.length, 2);
-  assert.equal(mm.matchMissionFolder({ name: 'Audit BLE TRANSIT 2025' }, f, ['a']).folder.id, 'a');
+    { id: 'p', name: '01 Dossier permanent', parent: 'c', path: '/Clients/BLE TRANSIT/01 Dossier permanent' },
+    { id: 'y', name: '2025', parent: 'c', path: '/Clients/BLE TRANSIT/2025' }, { id: 'a', name: 'Audit', parent: 'y', path: '/Clients/BLE TRANSIT/2025/Audit' }];
+  const want = mm.clientTokens({ name: 'Audit BLE TRANSIT 2025' });
+  assert.equal(mm.matchClientFolder(want, f).folder.id, 'c');
+  const twin = [...f, { id: 'c2', name: 'BLE TRANSIT', parent: 'z', path: '/Archives/BLE TRANSIT' }];
+  assert.equal(mm.matchClientFolder(want, twin).certain, false);
+  assert.equal(mm.matchClientFolder(want, twin, 'a').folder.id, 'c');      // the mission's folder decides
+  assert.equal((await mm.permanentFolder(f[1], f)).id, 'p');
+  assert.equal((await mm.permanentFolder({ id: 'y', name: '2025' }, f, { drive: { listChildren: async () => [] } })).id, 'y');
+  // The mission folder matching keeps working as before.
+  assert.equal(mm.matchMissionFolder({ name: 'Audit BLE TRANSIT 2025' }, f).folder.id, 'a');
   const calls = [];
-  const fetchRows = async (path, o = {}) => { calls.push({ path, body: o.body ? JSON.parse(o.body) : null }); return path.startsWith('orpailleur_inventory') && path.includes('is_folder=eq.true') ? f.map(x => ({ file_id: x.id, name: x.name, folder_path: x.path, parent_id: x.parent })) : []; };
-  const r = await mm.writeMissionMemory('org', { id: 'm1', name: 'Audit BLE TRANSIT 2025', status: 'active' }, { fetchRows, drive: fakeDrive(), folder: 'om' });
+  const fetchRows = async (path, o = {}) => { calls.push({ path, body: o.body ? JSON.parse(o.body) : null }); return path.startsWith('orpailleur_inventory') && path.includes('is_folder=eq.true') ? twin.map(x => ({ file_id: x.id, name: x.name, folder_path: x.path, parent_id: x.parent })).filter(x => x.file_id !== 'a') : []; };
+  const r = await mm.writeMissionMemory('org', { id: 'm1', name: 'Revue BLE TRANSIT 2026', status: 'planned' }, { fetchRows, drive: fakeDrive(), folder: 'om', central: {} });
   assert.equal(r.status, 'folder_unknown');
-  const p = calls.find(c => c.path.startsWith('office_action_queue'));
-  assert.equal(p.body[0].action_type, 'MISSION_FOLDER_LINK');
+  const p = calls.find(c => c.path.startsWith('office_action_queue') && c.body);
+  assert.equal(p.body[0].action_type, 'MISSION_FOLDER_LINK'); assert.equal(p.body[0].payload.kind, 'client');
   await assert.rejects(() => mm.writeMissionMemory('org', { id: 'm1', name: 'x' }, { writer: 'sika' }), /SINGLE_WRITER/);
 });
 
-test('mission memory: written in the mission folder from the sources, Excel-shaped, indexed', async () => {
+test('client memory: one permanent file per client, a new mission is added to it', async () => {
   const mm = await import('../lib/mission-memory.js');
   const drive = fakeDrive();
-  drive.listChildren = async () => [{ id: 'sys', name: '00 OFFICE MANAGER', mimeType: 'application/vnd.google-apps.folder' }];
+  const children = { CF: [{ id: 'DP', name: 'Dossier permanent', mimeType: 'application/vnd.google-apps.folder' }], DP: [] };
+  drive.listChildren = async id => children[id] || [];
+  const tidy = { async findOrCreateFolder(parent, name) { const f = { id: parent + '/' + name, name, mimeType: 'application/vnd.google-apps.folder' }; (children[parent] ||= []).push(f); return f; } };
   const patches = [];
   const fetchRows = async (path, o = {}) => {
     if (o.method === 'PATCH') { patches.push(JSON.parse(o.body)); return []; }
@@ -122,23 +131,37 @@ test('mission memory: written in the mission folder from the sources, Excel-shap
     if (path.startsWith('office_action_queue')) return [{ id: 'q1', agent_key: 'grand-controleur', action_type: 'PBC_EXTERNAL_REMINDER', summary: 'Relance PBC', status: 'proposed' }];
     return [];
   };
+  const cov = [{ risk_id: 'R1', risk: 'Reconnaissance du revenu', level: 'élevé', verdict: 'non couvert', missing_procedures: ['cut-off'] }];
   const central = { 'OFFICE_MANAGER_MISSION_FILES.json': { missions: { m1: { documents: [{ name: 'Lettre.pdf', role: 'lettre_de_mission', summary: 's' }] } } },
     'OFFICE_MANAGER_ENGAGEMENTS.json': { engagements: { m1: { status: 'done', tdr: { client: 'BLE TRANSIT', industry: 'Transport', engagement_type: 'Audit légal' }, match: { requirements: [{ capability: 'IFRS 16', internal: 'non', gap: true }] } } } },
-    'OFFICE_MANAGER_ENHANCED_AUDITOR.json': { reviews: { m1: { status: 'done', summary: '1 non couvert', coverage: [{ risk_id: 'R1', risk: 'Reconnaissance du revenu', level: 'élevé', verdict: 'non couvert', missing_procedures: ['cut-off'] }] } } } };
-  const r = await mm.writeMissionMemory('org', { id: 'm1', name: 'Audit BLE TRANSIT 2025', status: 'active', drive_folder_id: 'MF' }, { fetchRows, drive, folder: 'om', central });
-  assert.equal(r.status, 'written'); assert.equal(r.folder.id, 'sys'); assert.equal(r.folder.reused, true);
+    'OFFICE_MANAGER_ENHANCED_AUDITOR.json': { reviews: { m1: { status: 'done', summary: '1 non couvert', coverage: cov }, m2: { status: 'done', coverage: cov } } } };
+  const d = { fetchRows, drive, folder: 'om', central, tidyDrive: tidy, folders: [] };
+  const r = await mm.writeMissionMemory('org', { id: 'm1', name: 'Audit BLE TRANSIT 2025', status: 'completed', client_folder_id: 'CF', planned_start: '2025-01-05' }, d);
+  assert.equal(r.status, 'written'); assert.equal(r.permanent.id, 'DP'); assert.equal(r.folder.id, 'DP/00_OFFICE_MANAGER');
   const mem = r.memory;
-  assert.equal(mem.mission.status, 'fieldwork'); assert.equal(mem.mission.client, 'BLE TRANSIT');
-  assert.deepEqual(mem.tables.team.columns.slice(0, 3), ['person', 'title', 'role']);
+  assert.equal(mem.mission.status, 'closed'); assert.equal(mem.mission.client, 'BLE TRANSIT');
   assert.equal(mem.tables.team.rows[0][0], 'Awa K.');
-  assert.equal(mem.tables.open_actions.rows.length, 1);
   assert.equal(mem.tables.risks.rows[0][4], 'non couvert');
   assert.ok(patches.some(p => p.memory_file_id && p.client_name === 'BLE TRANSIT'));
+  // Next year: SAME file, a second section, the permanent part updated (recurring risk).
+  const r2 = await mm.writeMissionMemory('org', { id: 'm2', name: 'Audit BLE TRANSIT 2026', status: 'planned', client_folder_id: 'CF', planned_start: '2026-01-05' }, d);
+  assert.equal(r2.file_id, r.file_id);
+  const file = r2.client_memory;
+  assert.deepEqual(Object.keys(file.missions).sort(), ['m1', 'm2']);
+  assert.equal(file.permanent.client, 'BLE TRANSIT');
+  assert.equal(file.permanent.missions_history.length, 2);
+  assert.equal(file.permanent.recurring_risks[0].missions, 2);
+  // Reading one mission gives its section with the client's permanent part.
+  const one = mm.missionSectionOf(file, 'm1');
+  assert.equal(one.mission.id, 'm1'); assert.equal(one.client_permanent.client, 'BLE TRANSIT');
+  assert.equal(mm.compactMemory(one).client_permanent.recurring_risks.length, 1);
+  // Prior year for the 2026 mission, read from the same file.
+  const prior = await mm.priorMissionMemories('org', { id: 'm2', name: 'Audit BLE TRANSIT 2026', client_name: 'BLE TRANSIT' },
+    { drive, fetchRows: async () => [{ id: 'm1', name: 'Audit BLE TRANSIT 2025', status: 'completed', client_name: 'BLE TRANSIT', memory_file_id: r.file_id }] });
+  assert.equal(prior.length, 1); assert.equal(prior[0].mission.id, 'm1');
   // Closed: learnings from the memory itself.
   const l = mm.learningsFrom({ ...mem, mission: { ...mem.mission, planned_end: '2026-02-20', closed_at: '2026-04-01T00:00:00Z' } });
   assert.ok(l.some(x => x.category === 'cycle_duration')); assert.ok(l.some(x => x.category === 'risk')); assert.ok(l.some(x => x.category === 'training_need'));
-  const c = mm.compactMemory(mem);
-  assert.deepEqual(c.gaps, ['IFRS 16']); assert.equal(c.uncovered_risks.length, 1);
 });
 
 test('learnings: observed once, confirmed at the second mission, rejected stays rejected', async () => {
