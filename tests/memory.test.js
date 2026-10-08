@@ -368,3 +368,21 @@ test('team recommendation: two independent judgements, agreement shown, nobody a
   assert.equal(c.risks[0].by, 'anthropic'); assert.equal(c.alternatives[0].by, 'openai');
   assert.equal(c.judgements.length, 2);
 });
+
+test('chat: no validation, direct conversations readable only by the two people, 24 h then archived', async () => {
+  const c = await import('../lib/chat.js');
+  const paul = { email: 'Paul@taty.ci', display_name: 'Paul' }, awa = { email: 'awa@taty.ci' }, yao = { email: 'yao@taty.ci' };
+  const k = c.directKey('awa@taty.ci', 'PAUL@taty.ci');
+  assert.equal(k, 'dm:awa@taty.ci|paul@taty.ci');
+  assert.equal(c.canUse(k, paul), true); assert.equal(c.canUse(k, awa), true); assert.equal(c.canUse(k, yao), false);
+  assert.equal(c.canUse('cabinet', yao), true);
+  const rows = [];
+  const fetchRows = async (path, o = {}) => { if (o.method === 'POST') { const r = JSON.parse(o.body)[0]; rows.push(r); return [r]; } if (o.method === 'PATCH') { rows.push({ patch: path, body: JSON.parse(o.body) }); return []; } return []; };
+  const sent = await c.sendChat('org', paul, { to: 'awa@taty.ci', body: 'Bonjour' }, { fetchRows });
+  assert.equal(sent.conversation, k); assert.equal(rows[0].sender_email, 'paul@taty.ci');
+  await assert.rejects(() => c.sendChat('org', yao, { conversation: k, body: 'x' }, { fetchRows }), /CONVERSATION_FORBIDDEN/);
+  await c.archiveOldChat('org', { fetchRows, now: () => Date.parse('2026-10-08T12:00:00Z') });
+  assert.match(rows.at(-1).patch, /created_at=lt\.2026-10-07T12%3A00/); assert.equal(rows.at(-1).body.archived, true);
+  const missing = await c.chatState('org', paul, {}, { fetchRows: async p => { if (p.startsWith('office_chat_messages')) throw new Error('relation "office_chat_messages" does not exist'); return []; } });
+  assert.equal(missing.available, false);
+});

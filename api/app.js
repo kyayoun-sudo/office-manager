@@ -44,6 +44,7 @@ import { rest } from '../lib/supabase.js';
 import { cockpit } from '../lib/cockpit.js';
 import { getMissionFull } from '../lib/mission-full.js';
 import { assignAction } from '../lib/action-executor.js';
+import { chatState, sendChat } from '../lib/chat.js';
 import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
@@ -365,6 +366,12 @@ export const ROUTES = Object.freeze({
       return recommendTeam(orgId, String(b.mission_id || ''), who(req));
     }),
     unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
+  chat: {
+    GET: users(ALL_ROLES, (orgId, req) => chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),
+    POST: users(ALL_ROLES, (orgId, req) => sendChat(orgId, req.account, req.body || {})),
+    unavailable: 'CHAT_UNAVAILABLE'
   },
   // Give an action to a person (« Sans responsable », or right after validating it).
   'assign-action': { POST: users(MANAGERS, (orgId, req) => assignAction(orgId, String(req.body?.id || ''), String(req.body?.staff_profile_id || ''), who(req))), unavailable: 'ACTIONS_UNAVAILABLE' },

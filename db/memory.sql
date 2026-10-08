@@ -104,4 +104,22 @@ alter table public.office_management_card_versions enable row level security;
 revoke all on public.office_management_card_versions from public, anon, authenticated, service_role;
 grant select, insert on public.office_management_card_versions to service_role;
 
+-- 5. Instant internal messaging (2026-10-08): between the people of the firm, no validation;
+--    visible about 24 h, then archived (kept). External e-mails stay in office_agent_messages.
+create table if not exists public.office_chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  conversation text not null check (length(conversation) between 3 and 300),
+  sender_email text not null check (length(sender_email) <= 200),
+  sender_name text check (sender_name is null or length(sender_name) <= 120),
+  body text not null check (length(body) between 1 and 4000),
+  archived boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists office_chat_messages_idx on public.office_chat_messages (org_id, archived, created_at desc);
+create index if not exists office_chat_messages_conv_idx on public.office_chat_messages (org_id, conversation, created_at desc);
+alter table public.office_chat_messages enable row level security;
+revoke all on public.office_chat_messages from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_chat_messages to service_role;
+
 commit;
