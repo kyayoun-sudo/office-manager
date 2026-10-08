@@ -70,4 +70,38 @@ alter table public.office_learnings enable row level security;
 revoke all on public.office_learnings from public, anon, authenticated, service_role;
 grant select, insert, update on public.office_learnings to service_role;
 
+-- 4. People (2026-10-08): documented observations on missions (R012: a manager validates) and the
+--    successive versions of each Management Card (evolution over time). Owner / managers only.
+create table if not exists public.office_people_observations (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  staff_profile_id uuid not null,
+  office_mission_id uuid,
+  kind text not null default 'comportement' check (kind in ('force', 'developpement', 'comportement', 'resultat')),
+  observation text not null check (length(observation) between 5 and 1500),
+  source text check (source is null or length(source) <= 300),
+  status text not null default 'proposed' check (status in ('proposed', 'validated', 'rejected')),
+  created_by text check (created_by is null or length(created_by) <= 120),
+  validated_by text check (validated_by is null or length(validated_by) <= 120),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_people_observations_idx on public.office_people_observations (org_id, staff_profile_id, created_at desc);
+alter table public.office_people_observations enable row level security;
+revoke all on public.office_people_observations from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_people_observations to service_role;
+
+create table if not exists public.office_management_card_versions (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  staff_profile_id uuid not null,
+  version integer not null check (version >= 1),
+  card jsonb not null check (jsonb_typeof(card) = 'object'),
+  created_by text check (created_by is null or length(created_by) <= 120),
+  created_at timestamptz not null default now(),
+  unique (org_id, staff_profile_id, version)
+);
+alter table public.office_management_card_versions enable row level security;
+revoke all on public.office_management_card_versions from public, anon, authenticated, service_role;
+grant select, insert on public.office_management_card_versions to service_role;
+
 commit;

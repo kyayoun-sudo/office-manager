@@ -44,6 +44,7 @@ import { rest } from '../lib/supabase.js';
 import { cockpit } from '../lib/cockpit.js';
 import { getMissionFull } from '../lib/mission-full.js';
 import { assignAction } from '../lib/action-executor.js';
+import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
 import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
@@ -343,6 +344,27 @@ export const ROUTES = Object.freeze({
       return c;
     }),
     unavailable: 'COCKPIT_UNAVAILABLE'
+  },
+  // Management Card (owner, partners, managers): opened from a person; each opening is journaled.
+  'management-card': {
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null); return managementCard(orgId, String(req.query?.staff_id || '')); }),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'refresh') return refreshCard(orgId, String(b.staff_id || ''), who(req));
+      if (b.action === 'observe') return addObservation(orgId, { ...b, staff_profile_id: b.staff_id }, who(req), true);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  // Team recommendation: two independent AI judgements; a manager retains people.
+  'team-recommendation': {
+    GET: users(MANAGERS, (orgId, req) => lastRecommendation(String(req.query?.mission_id || ''))),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'retain') return retainPerson(orgId, String(b.mission_id || ''), b, who(req));
+      return recommendTeam(orgId, String(b.mission_id || ''), who(req));
+    }),
+    unavailable: 'PEOPLE_UNAVAILABLE'
   },
   // Give an action to a person (« Sans responsable », or right after validating it).
   'assign-action': { POST: users(MANAGERS, (orgId, req) => assignAction(orgId, String(req.body?.id || ''), String(req.body?.staff_profile_id || ''), who(req))), unavailable: 'ACTIONS_UNAVAILABLE' },

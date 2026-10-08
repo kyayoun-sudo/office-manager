@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Management Card</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html" aria-current="page">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <a href="/equipe.html">← Équipe</a>
+      <h1 id="name">Management Card</h1>
+      <p class="meta" id="meta"></p>
+      <div class="btn-row"><a class="btn" id="msg" hidden>Envoyer un message</a><button class="btn ghost" id="refresh" type="button">Mettre à jour la carte (analyse IA)</button></div>
+      <p class="note" id="status" role="status" aria-live="polite"></p>
+    </header>
+    <p class="note card-note">Réservée au propriétaire, aux associés et aux managers ; chaque ouverture est journalisée. La carte s'appuie sur des faits (CV, missions, indicateurs du travail, observations validées) et chaque point d'analyse cite sa preuve. Les préférences de travail déclarées ne sont qu'un repère : aucune décision RH n'en découle seule (R011). Les profils ne sont révisés que sur des observations documentées et validées (R012).</p>
+
+    <div class="mc-grid">
+      <section class="card" aria-labelledby="h-analysis"><h2 id="h-analysis">Analyse</h2><div id="analysis"></div></section>
+      <section class="card" aria-labelledby="h-skills"><h2 id="h-skills">Expérience et compétences</h2><div id="skills"></div></section>
+      <section class="card" aria-labelledby="h-prefs"><h2 id="h-prefs">Motivation, autonomie, structure, reconnaissance</h2><div id="prefs"></div></section>
+      <section class="card" aria-labelledby="h-kpi"><h2 id="h-kpi">Résultats (indicateurs du travail)</h2><div id="kpi"></div></section>
+      <section class="card" aria-labelledby="h-missions"><h2 id="h-missions">Missions réalisées</h2><div id="missions" class="stack"></div></section>
+      <section class="card" aria-labelledby="h-obs"><h2 id="h-obs">Comportement observé</h2>
+        <div id="observations" class="stack"></div>
+        <h3 class="sub">Ajouter une observation documentée</h3>
+        <div class="form-grid">
+          <label>Type<select id="o-kind"><option value="comportement">Comportement</option><option value="force">Force</option><option value="developpement">Point de développement</option><option value="resultat">Résultat</option></select></label>
+          <label>Mission (facultatif)<select id="o-mission"><option value="">—</option></select></label>
+          <label class="wide">Observation (faits, pas de jugement)<textarea id="o-text" rows="3" maxlength="1500"></textarea></label>
+        </div>
+        <div class="btn-row"><button class="btn ghost" id="o-add" type="button">Enregistrer</button></div>
+        <p class="note" id="o-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" aria-labelledby="h-hist"><h2 id="h-hist">Évolution dans le temps</h2><div id="history" class="stack"></div></section>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var staffId = new URLSearchParams(location.search).get('staff');
+  var ERR = { ROLE_NOT_ALLOWED: 'Réservé au propriétaire, aux associés et aux managers.', MIGRATION_MISSING_DB_MEMORY_SQL: 'Les observations seront conservées dès que db/memory.sql aura été exécuté dans Supabase.' };
+  function facts(box, pairs) {
+    var dl = el('dl', null, 'facts'), n = 0;
+    pairs.forEach(function (p) { var v = p[1]; if (v == null || v === '' || (Array.isArray(v) && !v.length)) return; n++; dl.appendChild(el('dt', p[0])); var dd = el('dd');
+      if (Array.isArray(v)) { var ul = el('ul'); v.forEach(function (x) { ul.appendChild(el('li', typeof x === 'string' ? x : JSON.stringify(x))); }); dd.appendChild(ul); } else dd.textContent = String(v); dl.appendChild(dd); });
+    if (n) box.appendChild(dl); else box.appendChild(el('p', 'Pas encore d’information.', 'empty'));
+  }
+  function withEvidence(list) { return (list || []).map(function (x) { return x.point || x.type || x.training ? (x.point || x.type || x.training) + ((x.evidence || x.why) ? ' — ' + (x.evidence ? 'preuve : ' + x.evidence : x.why) : '') : String(x); }); }
+  function score(v) { return v == null ? null : v + ' / 5'; }
+
+  function render(c) {
+    $('name').textContent = c.person.name; document.title = c.person.name + ' · Management Card';
+    $('meta').textContent = [c.person.title, c.person.grade, c.person.department].filter(Boolean).join(' · ');
+    if (c.person.email) { $('msg').hidden = false; $('msg').href = '/messagerie.html?to=' + encodeURIComponent(c.person.email); }
+    var a = $('analysis'); a.textContent = '';
+    var an = c.analysis;
+    if (!an) a.appendChild(el('p', 'Pas encore d’analyse. Cliquez sur « Mettre à jour la carte » : l’IA lit les faits ci-dessous et cite ses preuves.', 'empty'));
+    else {
+      if (an.summary) a.appendChild(el('p', an.summary, 'lead-sm'));
+      facts(a, [['Forces', withEvidence(an.strengths)], ['Points de développement', withEvidence(an.development_points)], ['Missions adaptées', withEvidence(an.suitable_missions)],
+        ['Style de communication', an.communication_style && an.communication_style.text], ['Management recommandé', an.recommended_management && (an.recommended_management.style + ' — ' + an.recommended_management.text)],
+        ['Motivation', an.motivation && an.motivation.text], ['Besoin d’autonomie', an.needs && an.needs.autonomy], ['Besoin de structure', an.needs && an.needs.structure], ['Besoin de reconnaissance', an.needs && an.needs.recognition],
+        ['Comportement observé', withEvidence(an.observed_behaviour)], ['Formations recommandées', withEvidence(an.recommended_trainings)], ['Évolution', an.evolution], ['Informations manquantes', an.missing_information]]);
+      a.appendChild(el('p', 'Analyse du ' + UI.dateTime(an.at) + (an.by_model ? ' (' + an.by_model + ')' : ''), 'meta'));
+    }
+    var s = $('skills'); s.textContent = '';
+    facts(s, [['Années d’expérience', c.experience.years], ['Séniorité', c.experience.seniority], ['Secteurs', c.experience.industries], ['Compétences de spécialiste', c.skills.specialist], ['Compétences techniques', c.skills.technical],
+      ['Qualifications', c.skills.qualifications], ['Certifications', c.skills.certifications], ['Langues', c.skills.languages], ['Formations suivies', c.experience.trainings],
+      ['Missions passées (CV)', (c.experience.previous_engagements || []).map(function (x) { return typeof x === 'string' ? x : [x.client, x.role, x.year].filter(Boolean).join(' — '); })]]);
+    var p = $('prefs'); p.textContent = '';
+    var w = c.work_preferences;
+    if (!w) p.appendChild(el('p', 'Questionnaire de préférences de travail non renseigné.', 'empty'));
+    else { facts(p, [['Profil', w.label], ['Autonomie', score(w.autonomy)], ['Besoin de structure', score(w.structure)], ['Besoin de reconnaissance', score(w.recognition)], ['Ce qui motive', w.motivators], ['Ce qui démotive', w.demotivators],
+      ['Missions préférées', w.preferred_missions], ['Briefing attendu', w.briefing], ['Management suggéré', w.management_style], ['Communication', w.communication], ['Feedback', w.feedback], ['Axes de développement', w.development_focus]]);
+      p.appendChild(el('p', w.note, 'note')); }
+    var k = $('kpi'); k.textContent = ''; var x = c.kpi || {};
+    facts(k, [['Charge planifiée', x.load_pct != null ? x.load_pct + ' %' : null], ['Missions actives', x.missions_active], ['Actions en cours', x.actions_open], ['En retard', x.actions_overdue], ['Terminées (30 j)', x.actions_done],
+      ['Dans les délais', x.on_time_rate != null ? x.on_time_rate + ' %' : null], ['Délai moyen', x.avg_cycle_days != null ? x.avg_cycle_days + ' j' : null], ['Vérifiées', x.verified_rate != null ? x.verified_rate + ' %' : null]]);
+    var m = $('missions'); m.textContent = '';
+    if (!(c.missions || []).length) m.appendChild(el('p', 'Aucune mission enregistrée.', 'empty'));
+    (c.missions || []).forEach(function (r) { var a2 = el('a', null, 'item link-item'); a2.href = '/mission.html?id=' + encodeURIComponent(r.mission_id); var t = el('div', null, 't'); t.appendChild(el('span', r.mission || 'Mission')); t.appendChild(el('span', [UI.dateRange(r.start, r.end), r.allocation_pct != null ? r.allocation_pct + ' %' : null, r.status].filter(Boolean).join(' · '), 'meta')); a2.appendChild(t); m.appendChild(a2);
+      var o = el('option', r.mission || 'Mission'); o.value = r.mission_id; $('o-mission').appendChild(o); });
+    var ob = $('observations'); ob.textContent = '';
+    if (!c.observations_available) ob.appendChild(el('p', 'Les observations seront conservées dès que db/memory.sql aura été exécuté dans Supabase.', 'note'));
+    else if (!(c.observations || []).length) ob.appendChild(el('p', 'Aucune observation documentée pour l’instant.', 'empty'));
+    (c.observations || []).forEach(function (o) { var it = el('div', null, 'item'); var t = el('div', null, 't'); t.appendChild(el('span', o.observation)); t.appendChild(el('span', [o.kind, UI.dateTime(o.created_at), o.created_by, o.source].filter(Boolean).join(' · '), 'meta')); it.appendChild(t); it.appendChild(el('span', o.status === 'validated' ? 'validée' : 'proposée', o.status === 'validated' ? 'tag' : 'tag warn')); ob.appendChild(it); });
+    var h = $('history'); h.textContent = '';
+    if (!(c.history || []).length) h.appendChild(el('p', c.versions_available ? 'Une seule vue pour l’instant : chaque mise à jour de la carte est conservée ici.' : 'L’historique sera conservé dès que db/memory.sql aura été exécuté.', 'empty'));
+    (c.history || []).forEach(function (v) { var it = el('div', null, 'item'); var t = el('div', null, 't'); t.appendChild(el('span', 'Version ' + v.version + (v.summary ? ' — ' + v.summary : ''))); t.appendChild(el('span', [UI.dateTime(v.at), v.by].filter(Boolean).join(' · '), 'meta')); it.appendChild(t); h.appendChild(it); });
+  }
+  function load() {
+    return OM.api('/api/app?route=management-card&staff_id=' + encodeURIComponent(staffId)).then(render)
+      .catch(function (e) { $('status').textContent = ERR[e.code] || ('Carte indisponible : ' + e.message); });
+  }
+  $('refresh').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('status').textContent = 'L’IA analyse les faits…';
+    OM.api('/api/app?route=management-card', { method: 'POST', body: JSON.stringify({ action: 'refresh', staff_id: staffId }) })
+      .then(function (r) { $('status').textContent = r.notice || ('Carte mise à jour (version ' + r.version + ').'); return load(); })
+      .catch(function (e) { $('status').textContent = ERR[e.code] || ('Analyse impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+  $('o-add').addEventListener('click', function () {
+    var t = $('o-text').value.trim(); if (t.length < 5) { $('o-status').textContent = 'Décrivez les faits observés.'; return; }
+    OM.api('/api/app?route=management-card', { method: 'POST', body: JSON.stringify({ action: 'observe', staff_id: staffId, kind: $('o-kind').value, mission_id: $('o-mission').value || null, observation: t }) })
+      .then(function () { $('o-status').textContent = 'Observation enregistrée (validée).'; $('o-text').value = ''; load(); })
+      .catch(function (e) { $('o-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); });
+  });
+  function start() { OM.loadBranding().catch(function () {}); if (!staffId) { location.href = '/equipe.html'; return; } load(); }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

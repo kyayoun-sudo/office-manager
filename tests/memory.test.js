@@ -357,3 +357,14 @@ test('mission contacts and writing to the client: proposed contacts, suggested r
   const fact = await md.addFact(M, { kind: 'risque', label: 'Litige fiscal', value: 'Redressement 2024 en cours', agent: 'enhanced-auditor' }, { updateJsonFile: upd });
   assert.equal(file.missions[M].facts[0].agent, 'enhanced-auditor'); assert.equal(fact.kind, 'risque');
 });
+
+test('team recommendation: two independent judgements, agreement shown, nobody assigned', async () => {
+  const p = await import('../lib/people-cards.js');
+  const c = p.consolidateJudgements([
+    { provider: 'anthropic', team: [{ name: 'Awa Koné', role: 'Chef de mission', why: 'SYSCOHADA, secteur', risks: [] }, { name: 'Yao K', role: 'Assistant', why: 'disponible' }], risks: [{ type: 'charge', message: 'Awa à 90 %' }], confidence: 'haute' },
+    { provider: 'openai', team: [{ name: 'awa kone', role: 'Senior', why: 'expérience transport', risks: ['charge élevée'] }, { name: 'Marie D', role: 'Assistant', why: 'IT' }], alternatives: [{ name: 'Marie D', instead_of: 'Yao K', why: 'audit IT' }] }]);
+  assert.equal(c.team[0].agreement, 'les deux jugements'); assert.deepEqual(c.team[0].agreed_by, ['anthropic', 'openai']);
+  assert.equal(c.team.filter(t => t.agreement === 'un seul jugement').length, 2);
+  assert.equal(c.risks[0].by, 'anthropic'); assert.equal(c.alternatives[0].by, 'openai');
+  assert.equal(c.judgements.length, 2);
+});

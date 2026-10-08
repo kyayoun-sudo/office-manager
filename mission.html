@@ -100,6 +100,13 @@
             <thead><tr><th scope="col">Personne</th><th scope="col">Rôle sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
             <tbody id="team"></tbody>
           </table></div>
+          <div id="reco-box" hidden>
+            <h3 class="sub">Recommandation d'équipe (deux jugements IA indépendants)</h3>
+            <p class="note">Prend en compte CV, compétences, expérience, disponibilité, charge, performance passée et KPI, profil RH, questionnaire, Management Card, comportement observé, évolution récente et risques d'indépendance ou de conflit. L'IA propose et explique ; vous retenez.</p>
+            <div class="btn-row"><button class="btn" id="reco-run" type="button">Recommander une équipe</button></div>
+            <p class="note" id="reco-status" role="status" aria-live="polite"></p>
+            <div id="reco"></div>
+          </div>
           <h3 class="sub">Équipe proposée par Mission Controller</h3>
           <div id="team-proposed" class="stack"></div>
           <h3 class="sub">Compétences requises — équipe nécessaire</h3>
@@ -401,6 +408,32 @@
     fillList('history', d.history, function (h) { return row(h.what, [UI.dateTime(h.at), h.who].filter(Boolean).join(' · '), null); }, 'Pas encore d’historique.');
   }
 
+  // ---- Team recommendation (managers) ----
+  function drawReco(r) {
+    var box = $('reco'); box.textContent = '';
+    if (!r || !r.team) return;
+    $('reco-status').textContent = 'Recommandation du ' + UI.dateTime(r.at) + (r.independent ? ' — deux jugements indépendants : ' + r.judgements.map(function (j) { return j.provider; }).join(' et ') : ' — un seul modèle disponible') + '.';
+    r.team.forEach(function (p) {
+      var item = el('div', null, 'item reco'); var t = el('div', null, 't');
+      t.appendChild(el('span', p.name + (p.roles.length ? ' — ' + p.roles.join(' / ') : '')));
+      p.why.forEach(function (w) { t.appendChild(el('span', w, 'meta')); });
+      if (p.risks.length) t.appendChild(el('span', 'Risques : ' + p.risks.join(' ; '), 'meta warn-text'));
+      item.appendChild(t); item.appendChild(el('span', p.agreement, p.agreement === 'les deux jugements' ? 'tag' : 'tag warn'));
+      var keep = el('button', 'Retenir', 'btn ghost'); keep.type = 'button';
+      keep.addEventListener('click', function () { keep.disabled = true; OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ action: 'retain', mission_id: missionId, name: p.name, role: p.roles[0] || 'membre' }) })
+        .then(function (x) { keep.textContent = 'Retenu'; reload(); }).catch(function (e) { keep.disabled = false; $('reco-status').textContent = 'Impossible : ' + e.message; }); });
+      item.appendChild(keep); box.appendChild(item);
+    });
+    if ((r.risks || []).length) { box.appendChild(el('h4', 'Risques signalés')); var ul = el('ul'); r.risks.forEach(function (x) { ul.appendChild(el('li', '[' + x.type + '] ' + x.message + ' (' + x.by + ')')); }); box.appendChild(ul); }
+    if ((r.alternatives || []).length) { box.appendChild(el('h4', 'Alternatives')); var ul2 = el('ul'); r.alternatives.forEach(function (x) { ul2.appendChild(el('li', x.name + (x.instead_of ? ' à la place de ' + x.instead_of : '') + ' — ' + x.why + ' (' + x.by + ')')); }); box.appendChild(ul2); }
+    if ((r.gaps || []).length) box.appendChild(el('p', 'Manques : ' + r.gaps.join(', '), 'note'));
+  }
+  $('reco-run').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('reco-status').textContent = 'Deux IA analysent l’équipe indépendamment… (1 à 2 minutes)';
+    OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ mission_id: missionId }) }).then(drawReco)
+      .catch(function (e) { $('reco-status').textContent = 'Recommandation impossible : ' + e.message; }).then(function () { b.disabled = false; });
+  });
+
   // ---- Contacts ----
   function drawContacts(list) {
     var manager = OM.isManager();
@@ -535,6 +568,7 @@
     OM.loadBranding().catch(function () {});
     if (!missionId) { showList(); return; }
     loadContacts();
+    if (OM.isManager()) { $('reco-box').hidden = false; OM.api('/api/app?route=team-recommendation&mission_id=' + encodeURIComponent(missionId)).then(drawReco).catch(function () {}); }
     reload().then(suggestRecipients).catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });
   }
   UI.requireLogin(start);

@@ -141,6 +141,7 @@
     c.appendChild(st);
     (p.signals || []).forEach(function (s) { c.appendChild(el('p', (s.level === 'warn' ? '▲ ' : '● ') + s.text, 'sig ' + s.level)); });
     (p.coverage || []).forEach(function (s) { c.appendChild(el('p', s, 'cov')); });
+    if (!mine && p.id && OM.isManager()) { var mc = el('a', 'Ouvrir la Management Card', 'btn ghost'); mc.href = '/carte.html?staff=' + encodeURIComponent(p.id); c.appendChild(mc); }
     return c;
   }
 
