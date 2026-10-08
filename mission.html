@@ -79,6 +79,11 @@
             <h2 id="h-docs">Documents</h2>
             <div id="docs" class="stack"></div>
           </section>
+          <section class="card" aria-labelledby="h-remarks" id="remarks-card" hidden>
+            <h2 id="h-remarks">Remarques dans les fichiers de travail</h2>
+            <p class="meta" style="margin:0">Écrites dans les fichiers par le panneau Office Manager d'Excel (feuille « Revue IA ») et suivies ici.</p>
+            <div id="remarks" class="stack"></div>
+          </section>
         </div>
         <aside class="side">
           <section class="card" aria-labelledby="h-plan">
@@ -266,6 +271,20 @@
     OM.loadBranding().catch(function () {});
     if (missionId) loadContacts();
     if (!missionId) { showList(); return; }
+    OM.api('/api/app?route=workfile&mission_id=' + encodeURIComponent(missionId)).then(function (d) {
+      var list = d.remarks || []; if (!list.length) return;
+      $('remarks-card').hidden = false;
+      var box = $('remarks'); box.textContent = '';
+      var label = { open: 'Ouverte', answered: 'Répondue', closed: 'Soldée' }, sev = { high: 'élevée', medium: 'moyenne', low: 'faible' };
+      list.slice(0, 60).forEach(function (r) {
+        var it = el('div', null, 'item'), t = el('div', null, 't');
+        t.appendChild(el('span', r.remark));
+        t.appendChild(el('span', [r.file_name, (r.sheet || '') + (r.cell ? ' ! ' + r.cell : ''), 'gravité ' + (sev[r.severity] || r.severity), r.author].filter(Boolean).join(' · '), 'meta'));
+        if (r.reply) t.appendChild(el('span', 'Réponse de ' + (r.replied_by || '') + ' : ' + r.reply, 'meta'));
+        it.appendChild(t); it.appendChild(el('span', label[r.status] || r.status, r.status === 'open' ? 'tag warn' : 'tag'));
+        box.appendChild(it);
+      });
+    }).catch(function () {});
     OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId))
       .then(showDossier)
       .catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });

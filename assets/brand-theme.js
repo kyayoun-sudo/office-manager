@@ -21,6 +21,9 @@
   }
   // The setup page (Démarrer) is open without a session, like the login page.
   function onLoginPage() { return location.pathname === LOGIN_PAGE || location.pathname === '/demarrer.html'; }
+  // The Office Manager panel inside Excel (/excel/…): no redirect to the login page, no menu —
+  // the panel signs in through a small Office window.
+  function inExcel() { return location.pathname.indexOf('/excel/') === 0; }
 
   var OM = {
     getSession: readSession,
@@ -81,6 +84,7 @@
       safeRemove(window.localStorage, SESSION_KEY);
       safeRemove(window.sessionStorage, LEGACY_TOKEN_KEY);
       safeRemove(window.sessionStorage, 'officeManagerOwnerToken');
+      if (redirect && inExcel()) { location.reload(); return; }
       if (redirect) location.replace(LOGIN_PAGE + '?next=' + encodeURIComponent(location.pathname + location.search));
     },
 
@@ -151,7 +155,8 @@
   var SETTINGS = [
     ['Mise en service', '/mise-en-service.html', [['h-sum', 'État'], ['h-steps', 'Les étapes'], ['h-map', 'Cartographie du Drive'], ['h-know', 'Ce que l’Orpailleur a compris']]],
     ['Paramètres', '/parametres.html', [['h-google', 'Accès Google (Drive et Gmail)'], ['h-id', 'Identité'], ['h-logo', 'Logo'], ['h-col', 'Couleur principale'], ['h-mail', 'E-mail de l’agent'],
-      ['h-tone', 'Ton avec les collègues'], ['h-people', 'Gestion des personnes'], ['h-sched', 'Horaires des agents'], ['h-users', 'Comptes du cabinet'], ['h-try', 'Essayer']]]
+      ['h-tone', 'Ton avec les collègues'], ['h-people', 'Gestion des personnes'], ['h-sched', 'Horaires des agents'], ['h-users', 'Comptes du cabinet'], ['h-try', 'Essayer']],
+    ['Panneau Excel', '/excel/install.html', []]]
   ];
   function svgIcon(d) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -414,7 +419,7 @@
     var b = node('button', other[1], 'link-lang'); b.type = 'button'; b.addEventListener('click', function () { OM.setLang(other[0]); });
     p.appendChild(b); host.appendChild(p);
   }
-  if (!onLoginPage()) {
+  if (!onLoginPage() && !inExcel()) {
     if (!readSession()) { OM.forget(true); return; }
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion réussie</title>
+<link rel="stylesheet" href="/assets/app.css">
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+<main class="main" style="max-width:420px;margin:40px auto">
+  <h1 style="font-size:22px">Connexion réussie</h1>
+  <p class="lead" id="say">Retour dans Excel…</p>
+</main>
+<script>
+// End of the sign-in opened by the Excel panel: the session goes back to the panel.
+(function () {
+  var raw = null;
+  try { raw = localStorage.getItem('officeManagerSession'); } catch (e) {}
+  Office.onReady(function () {
+    if (!raw) { document.getElementById('say').textContent = 'La connexion n’a pas abouti : fermez cette fenêtre et réessayez depuis le panneau.'; return; }
+    Office.context.ui.messageParent(JSON.stringify({ session: JSON.parse(raw) }));
+  });
+})();
+</script>
+</body>
+</html>

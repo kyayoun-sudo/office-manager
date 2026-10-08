@@ -106,6 +106,12 @@
       <p class="method">Consultation réservée au propriétaire, aux associés-gérants et aux managers. Chaque consultation est enregistrée dans le journal de sécurité. Chacun peut voir ses propres indicateurs.</p>
     </section>
 
+    <section class="card" aria-labelledby="h-wf" id="wf-card" hidden>
+      <h2 id="h-wf">Fichiers de travail</h2>
+      <p class="method" id="wf-method"></p>
+      <div id="wf-body" class="stack"></div>
+    </section>
+
     <section class="card" aria-labelledby="h-me" id="me-card" hidden>
       <h2 id="h-me">Mes indicateurs <span class="meta" id="me-period"></span></h2>
       <div id="me"></div>
@@ -208,6 +214,26 @@
     });
   }
 
+  // Actual work in the files (Excel panel): time per person and mission, overlaps, planned vs actual.
+  function loadWorkfiles() {
+    OM.api('/api/app?route=workfile-kpi').then(function (d) {
+      $('wf-method').textContent = d.coverage + ' Période : ' + d.period_days + ' jours.';
+      var box = $('wf-body'); box.textContent = '';
+      var h3 = function (t) { box.appendChild(el('h3', t, null)); box.lastChild.style.cssText = 'margin:8px 0 0;font-size:15px'; };
+      if (!d.people.length) { box.appendChild(el('p', 'Aucun temps mesuré pour l’instant : le panneau Excel doit être installé et utilisé.', 'empty')); var a0 = el('a', 'Installer le panneau Excel'); a0.href = '/excel/install.html'; box.appendChild(a0); return; }
+      h3('Par personne'); box.appendChild(UI.table(['Personne', 'Heures actives', 'Fichiers', 'Missions', 'Jours'], d.people.map(function (p) { return [p.person, p.hours, p.files, p.missions, p.days]; })));
+      h3('Par mission'); box.appendChild(UI.table(['Mission', 'Heures actives', 'Personnes', 'Dernière activité'], d.missions.map(function (m) { return [m.mission, m.hours, m.people.join(', '), m.last_activity ? UI.dateTime(m.last_activity) : '–']; })));
+      if (d.overlaps.length) { h3('Chevauchements'); box.appendChild(UI.table(['Type', 'Jour', 'Qui / quoi'], d.overlaps.map(function (o) { return [o.type, UI.date(o.day), o.person ? o.person + ' : ' + o.missions.join(', ') : o.file + ' : ' + o.people.join(', ')]; }))); }
+      if (d.planned_without_work.length) { h3('Affecté, mais aucun travail constaté cette semaine'); box.appendChild(UI.table(['Personne', 'Mission', 'Rôle'], d.planned_without_work.map(function (x) { return [x.person, x.mission, x.role]; }))); }
+      if (d.work_without_assignment.length) { h3('Travail constaté sans affectation'); box.appendChild(UI.table(['Personne', 'Mission'], d.work_without_assignment.map(function (x) { return [x.person, x.mission]; }))); }
+      if (d.stalled_files.length) { h3('Fichiers qui n’avancent plus (7 jours)'); box.appendChild(UI.table(['Fichier', 'Mission', 'Dernière activité'], d.stalled_files.map(function (x) { return [x.file, x.mission, UI.dateTime(x.last)]; }))); }
+      h3('Fichiers les plus longs'); box.appendChild(UI.table(['Fichier', 'Mission', 'Heures', 'Personnes', 'Ouvertures'], d.files.slice(0, 15).map(function (f) { return [f.file, f.mission, f.hours, f.people.join(', '), f.sessions]; })));
+    }).catch(function (e) {
+      var box = $('wf-body'); box.textContent = '';
+      box.appendChild(el('p', e.message === 'WORKFILE_TABLES_MISSING' ? 'Les tables du panneau Excel ne sont pas encore créées (script db/workfiles.sql dans Supabase).' : 'Indisponible : ' + e.message, 'empty'));
+    });
+  }
+
   function loadTeam() {
     OM.api('/api/app?route=team-kpi').then(function (d) {
       $('team-period').textContent = '· ' + d.period_days + ' derniers jours';
@@ -229,7 +255,7 @@
     OM.loadBranding().catch(function () {});
     if (!OM.hasPersonalSession()) { $('need-login').hidden = false; return; }
     loadMine();
-    if (OM.isManager()) { ['coord-card', 'missions-card', 'team-card'].forEach(function (id) { $(id).hidden = false; }); loadCoordination(); loadTeam(); }
+    if (OM.isManager()) { ['coord-card', 'missions-card', 'team-card', 'wf-card'].forEach(function (id) { $(id).hidden = false; }); loadCoordination(); loadTeam(); loadWorkfiles(); }
     $('mfilter').addEventListener('input', renderMissions);
   }
   UI.requireLogin(start);

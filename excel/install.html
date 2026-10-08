@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panneau Excel</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+</head>
+<body>
+<main class="main" style="max-width:820px;margin:0 auto">
+  <header class="page-head">
+    <h1>Le panneau Office Manager dans Excel</h1>
+    <p class="lead">Les fichiers de travail s'ouvrent comme aujourd'hui depuis Google Drive sur l'ordinateur. Le panneau ajoute dans Excel : la revue par l'Enhanced Auditor écrite dans le fichier, les questions aux agents sur la sélection, le temps de travail par mission pour les indicateurs, et la fermeture propre d'un fichier oublié ouvert (après votre accord dans l'application).</p>
+  </header>
+
+  <section class="card" aria-labelledby="h-1">
+    <h2 id="h-1">1. Télécharger le fichier d'installation</h2>
+    <p class="lead">Il est préparé pour l'adresse de cette application : <b id="origin"></b>.</p>
+    <div><button class="btn" id="dl" type="button">Télécharger office-manager-excel.xml</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-2">
+    <h2 id="h-2">2. L'installer pour tout le cabinet (une fois)</h2>
+    <ol style="margin:0;padding-left:20px;line-height:1.7">
+      <li>Centre d'administration Microsoft 365 → Paramètres → Applications intégrées → Charger des applications personnalisées.</li>
+      <li>Choisir « Fournir le fichier manifeste » et donner le fichier téléchargé.</li>
+      <li>Choisir qui le reçoit (tout le cabinet ou un groupe), puis valider. Le bouton « Office Manager » apparaît dans l'onglet Accueil d'Excel (le délai de diffusion peut aller jusqu'à 24 heures).</li>
+    </ol>
+    <p class="meta">Pour un essai sur un seul ordinateur, sans l'administration : Excel → Insertion → Compléments → Mes compléments → Charger mon complément → choisir le fichier.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-3">
+    <h2 id="h-3">3. À faire une fois dans Supabase</h2>
+    <p class="lead">Créer les deux tables du panneau avec le script <b>db/workfiles.sql</b> (éditeur SQL de Supabase). Sans elles, le panneau s'ouvre mais ne peut ni enregistrer le temps ni garder les remarques.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-4">
+    <h2 id="h-4">Ce qu'il faut dire à l'équipe</h2>
+    <ul style="margin:0;padding-left:20px;line-height:1.7">
+      <li>Le panneau mesure le temps de travail actif sur chaque fichier de travail, pour suivre le budget des missions et les fichiers qui n'avancent plus. Ce n'est pas une surveillance minute par minute ; chacun voit son propre temps.</li>
+      <li>Un fichier laissé ouvert sans activité pendant 3 heures est signalé à son utilisateur, qui décide dans l'application s'il faut l'enregistrer et le fermer.</li>
+      <li>Les agents n'écrivent jamais dans les chiffres : seulement la feuille « Revue IA » et des commentaires.</li>
+      <li>Cocher « Ouvrir ce panneau avec ce fichier » dans le panneau l'ouvre automatiquement pour ce classeur.</li>
+    </ul>
+  </section>
+</main>
+<script>
+(function () {
+  var origin = location.origin;
+  document.getElementById('origin').textContent = origin;
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+  function manifest() {
+    var o = esc(origin);
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+'<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="TaskPaneApp">\n' +
+'  <Id>7c3f6c1e-2b8a-4f51-9b62-3f0e6a4d9c21</Id>\n  <Version>1.0.0.0</Version>\n  <ProviderName>Office Manager</ProviderName>\n  <DefaultLocale>fr-FR</DefaultLocale>\n' +
+'  <DisplayName DefaultValue="Office Manager"/>\n  <Description DefaultValue="Revue par l\'Enhanced Auditor, questions aux agents et suivi des fichiers de travail."/>\n' +
+'  <IconUrl DefaultValue="' + o + '/excel/icon-32.png"/>\n  <HighResolutionIconUrl DefaultValue="' + o + '/excel/icon-64.png"/>\n  <SupportUrl DefaultValue="' + o + '/excel/install.html"/>\n' +
+'  <AppDomains>\n    <AppDomain>' + o + '</AppDomain>\n    <AppDomain>https://accounts.google.com</AppDomain>\n  </AppDomains>\n' +
+'  <Hosts>\n    <Host Name="Workbook"/>\n  </Hosts>\n' +
+'  <Requirements>\n    <Sets DefaultMinVersion="1.1">\n      <Set Name="ExcelApi" MinVersion="1.7"/>\n    </Sets>\n  </Requirements>\n' +
+'  <DefaultSettings>\n    <SourceLocation DefaultValue="' + o + '/excel/taskpane.html"/>\n  </DefaultSettings>\n' +
+'  <Permissions>ReadWriteDocument</Permissions>\n' +
+'  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">\n' +
+'    <Hosts>\n      <Host xsi:type="Workbook">\n        <DesktopFormFactor>\n          <FunctionFile resid="Taskpane.Url"/>\n' +
+'          <ExtensionPoint xsi:type="PrimaryCommandSurface">\n            <OfficeTab id="TabHome">\n              <Group id="OM.Group">\n                <Label resid="Group.Label"/>\n' +
+'                <Icon>\n                  <bt:Image size="16" resid="Icon.16"/>\n                  <bt:Image size="32" resid="Icon.32"/>\n                  <bt:Image size="80" resid="Icon.80"/>\n                </Icon>\n' +
+'                <Control xsi:type="Button" id="OM.Open">\n                  <Label resid="Button.Label"/>\n                  <Supertip>\n                    <Title resid="Button.Label"/>\n                    <Description resid="Button.Tip"/>\n                  </Supertip>\n' +
+'                  <Icon>\n                    <bt:Image size="16" resid="Icon.16"/>\n                    <bt:Image size="32" resid="Icon.32"/>\n                    <bt:Image size="80" resid="Icon.80"/>\n                  </Icon>\n' +
+'                  <Action xsi:type="ShowTaskpane">\n                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>\n                    <SourceLocation resid="Taskpane.Url"/>\n                  </Action>\n                </Control>\n' +
+'              </Group>\n            </OfficeTab>\n          </ExtensionPoint>\n        </DesktopFormFactor>\n      </Host>\n    </Hosts>\n' +
+'    <Resources>\n      <bt:Images>\n        <bt:Image id="Icon.16" DefaultValue="' + o + '/excel/icon-16.png"/>\n        <bt:Image id="Icon.32" DefaultValue="' + o + '/excel/icon-32.png"/>\n        <bt:Image id="Icon.80" DefaultValue="' + o + '/excel/icon-80.png"/>\n      </bt:Images>\n' +
+'      <bt:Urls>\n        <bt:Url id="Taskpane.Url" DefaultValue="' + o + '/excel/taskpane.html"/>\n      </bt:Urls>\n' +
+'      <bt:ShortStrings>\n        <bt:String id="Group.Label" DefaultValue="Office Manager"/>\n        <bt:String id="Button.Label" DefaultValue="Office Manager"/>\n      </bt:ShortStrings>\n' +
+'      <bt:LongStrings>\n        <bt:String id="Button.Tip" DefaultValue="Revue par l\'Enhanced Auditor, questions aux agents, suivi du fichier de travail."/>\n      </bt:LongStrings>\n    </Resources>\n' +
+'  </VersionOverrides>\n</OfficeApp>\n';
+  }
+  document.getElementById('dl').addEventListener('click', function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([manifest()], { type: 'application/xml' }));
+    a.download = 'office-manager-excel.xml'; document.body.appendChild(a); a.click(); a.remove();
+  });
+})();
+</script>
+</body>
+</html>

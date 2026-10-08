@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Office Manager</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+body{background:var(--ground)}
+.pane{padding:14px 14px 40px;display:flex;flex-direction:column;gap:12px}
+.pane .card{padding:14px 16px;gap:10px}
+.pane h1{font-size:18px}
+.pane h2{font-size:15px}
+.file{font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.row2{display:flex;gap:8px;flex-wrap:wrap}
+.row2 .btn{flex:1 1 140px;font-size:13px;padding:8px 10px;min-height:38px}
+.remark{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.remark .where{font-size:12px;font-weight:700;color:var(--muted)}
+.remark.high{border-left:3px solid var(--danger)}
+.remark.medium{border-left:3px solid var(--brass)}
+.remark .acts{display:flex;gap:6px;flex-wrap:wrap}
+.remark .acts button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--surface-2);border-radius:7px;padding:5px 9px;cursor:pointer;color:var(--ink)}
+.remark textarea{min-height:54px;font-size:13px}
+.muted{font-size:12.5px;color:var(--muted);margin:0;line-height:1.45}
+</style>
+</head>
+<body>
+<div class="pane">
+  <header style="display:flex;align-items:center;gap:10px"><div class="logo" data-firm-logo style="width:30px;height:30px">C</div><div><h1 style="margin:0">Office Manager</h1><span class="muted" data-firm-name></span></div></header>
+
+  <section class="card" id="login-card" hidden>
+    <h2 style="margin:0">Connexion</h2>
+    <p class="muted">Connectez-vous avec le même compte que dans l'application.</p>
+    <button class="btn" id="login-btn" type="button">Se connecter</button>
+    <p class="status" id="login-say"></p>
+  </section>
+
+  <section class="card" id="file-card" hidden>
+    <span class="file" id="file-name"></span>
+    <span class="muted" id="file-where"></span>
+    <div class="field"><label for="mission">Mission</label><select id="mission"><option value="">Mission non reconnue</option></select></div>
+    <label class="muted" style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="autoshow"> Ouvrir ce panneau avec ce fichier</label>
+    <p class="muted" id="time"></p>
+  </section>
+
+  <section class="card" id="review-card" hidden>
+    <h2 style="margin:0">Revue par l'Enhanced Auditor</h2>
+    <div class="row2"><button class="btn" id="review-sheet" type="button">Relire cette feuille</button><button class="btn ghost" id="review-book" type="button">Relire tout le classeur</button></div>
+    <p class="status" id="review-say" role="status"></p>
+    <p class="muted" id="review-summary"></p>
+    <div id="remarks" class="stack"></div>
+  </section>
+
+  <section class="card" id="ask-card" hidden>
+    <h2 style="margin:0">Demander aux agents</h2>
+    <textarea id="question" placeholder="Ex. Ce calcul de dépréciation est-il cohérent avec le risque identifié ?"></textarea>
+    <label class="muted" style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" id="with-selection" checked> Joindre la sélection</label>
+    <button class="btn" id="ask" type="button">Demander</button>
+    <div id="answer" class="reply" hidden></div>
+  </section>
+
+  <p class="muted" id="measure">Ce panneau mesure le temps de travail actif sur ce fichier (pour les indicateurs de mission) et signale un fichier resté ouvert sans activité. Il n'écrit dans le fichier que la feuille « Revue IA » et des commentaires.</p>
+</div>
+
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  var REVIEW_SHEET = 'Revue IA', BEAT_MS = 120000, MAX_ROWS = 400, MAX_COLS = 60;
+  var ctx = { session: null, fileName: '', path: '', fileId: null, missionId: null, edits: 0, active: false };
+  var SEV = { high: 'Élevée', medium: 'Moyenne', low: 'Faible' };
+  var post = function (body) { return OM.api('/api/app?route=workfile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
+  var ERR = { WORKFILE_TABLES_MISSING: 'Les tables des fichiers de travail ne sont pas encore créées (db/workfiles.sql).', USER_SESSION_REQUIRED: 'Reconnectez-vous.', SHEETS_REQUIRED: 'Feuille vide.' };
+  var say = function (id, t, bad) { $(id).textContent = t || ''; $(id).className = 'status' + (bad ? ' error' : ''); };
+
+  // ---- Sign-in through a small Office window (the panel itself never leaves Excel) ----
+  function login() {
+    say('login-say', 'Ouverture de la fenêtre de connexion…');
+    Office.context.ui.displayDialogAsync(location.origin + '/login.html?next=' + encodeURIComponent('/excel/done.html'), { height: 70, width: 35, displayInIframe: false }, function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { say('login-say', 'Fenêtre bloquée : autorisez les fenêtres de ce complément puis réessayez.', true); return; }
+      var dialog = r.value;
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (m) {
+        try { var data = JSON.parse(m.message); OM.saveSession(data.session); dialog.close(); start(); } catch (e) { say('login-say', 'Connexion incomplète : réessayez.', true); }
+      });
+    });
+  }
+
+  // ---- The open file: which Drive file, which mission ----
+  function sessionId() {
+    var key = 'om_wf_session:' + (Office.context.document.url || ctx.fileName);
+    try { var s = sessionStorage.getItem(key); if (s) return s; } catch (e) {}
+    var id = 'wf-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    try { sessionStorage.setItem(key, id); } catch (e) {}
+    return id;
+  }
+
+  function identify() {
+    return Excel.run(function (c) { var wb = c.workbook; wb.load('name'); return c.sync().then(function () { return wb.name; }); }).then(function (name) {
+      ctx.fileName = name; ctx.path = Office.context.document.url || name; ctx.session = sessionId();
+      $('file-card').hidden = false; $('review-card').hidden = false; $('ask-card').hidden = false;
+      $('file-name').textContent = name;
+      return post({ action: 'start', session: ctx.session, file_name: name, path: ctx.path });
+    }).then(function (r) {
+      ctx.fileId = r.file_id; ctx.missionId = r.mission_id;
+      $('file-where').textContent = r.drive_path ? 'Drive : ' + r.drive_path : 'Fichier non retrouvé dans la carte du Drive (il sera suivi par son nom).';
+      var sel = $('mission'); sel.textContent = '';
+      sel.appendChild(new Option(r.mission_id ? 'Autre mission…' : 'Choisir la mission de ce fichier', ''));
+      (r.missions || []).forEach(function (m) { sel.appendChild(new Option(m.name, m.id)); });
+      if (r.mission_id) sel.value = r.mission_id;
+      loadRemarks();
+    }).catch(function (e) { say('review-say', ERR[e.message] || e.message, true); });
+  }
+
+  // ---- Activity and heartbeat (active time, files left open, save and close on request) ----
+  function track() {
+    Excel.run(function (c) {
+      try { c.workbook.worksheets.onChanged.add(function () { ctx.edits++; ctx.active = true; }); } catch (e) {}
+      try { c.workbook.onSelectionChanged.add(function () { ctx.active = true; }); } catch (e) {}
+      return c.sync();
+    }).catch(function () {});
+    ['keydown', 'mousedown', 'focus'].forEach(function (ev) { window.addEventListener(ev, function () { ctx.active = true; }); });
+    setInterval(heartbeat, BEAT_MS);
+  }
+  function isDirty() {
+    return Excel.run(function (c) { var wb = c.workbook; wb.load('isDirty'); return c.sync().then(function () { return wb.isDirty; }); }).catch(function () { return null; });
+  }
+  function heartbeat() {
+    if (!ctx.session) return;
+    isDirty().then(function (dirty) {
+      var body = { action: 'beat', session: ctx.session, active: ctx.active, edits: ctx.edits };
+      if (typeof dirty === 'boolean') body.dirty = dirty;
+      ctx.active = false; ctx.edits = 0;
+      return post(body);
+    }).then(function (r) {
+      if (r && r.active_seconds != null) $('time').textContent = 'Temps de travail actif sur ce fichier pendant cette ouverture : ' + Math.round(r.active_seconds / 60) + ' min.';
+      if (r && r.save_close) saveAndClose();
+    }).catch(function () {});
+  }
+  // Validated in the application (the Orpailleur's proposal): save, then close.
+  function saveAndClose() {
+    Excel.run(function (c) { c.workbook.save(Excel.SaveBehavior.save); return c.sync(); })
+      .then(function () { return post({ action: 'end', session: ctx.session, reason: 'saved_closed' }); })
+      .then(function () { return Excel.run(function (c) { c.workbook.close(Excel.CloseBehavior.save); return c.sync(); }); })
+      .catch(function (e) { say('review-say', 'Enregistrement automatique impossible ici (' + e.message + ') : enregistrez le fichier.', true); });
+  }
+
+  // ---- Review: read the sheet(s), the Enhanced Auditor answers, remarks written into the file ----
+  function readSheets(all) {
+    return Excel.run(function (c) {
+      var sheets = c.workbook.worksheets; sheets.load('items/name');
+      var active = c.workbook.worksheets.getActiveWorksheet(); active.load('name');
+      return c.sync().then(function () {
+        var list = (all ? sheets.items : [active]).filter(function (s) { return s.name !== REVIEW_SHEET; }).slice(0, 12);
+        var used = list.map(function (s) { var u = s.getUsedRangeOrNullObject(true); u.load('rowIndex,columnIndex,rowCount,columnCount,isNullObject'); return { s: s, u: u }; });
+        return c.sync().then(function () {
+          var ranges = used.filter(function (x) { return !x.u.isNullObject; }).map(function (x) {
+            var r = x.s.getRangeByIndexes(x.u.rowIndex, x.u.columnIndex, Math.min(x.u.rowCount, MAX_ROWS), Math.min(x.u.columnCount, MAX_COLS));
+            r.load('address,values,formulas'); return { name: x.s.name, r: r };
+          });
+          return c.sync().then(function () { return ranges.map(function (x) { return { name: x.name, address: x.r.address, values: x.r.values, formulas: x.r.formulas }; }); });
+        });
+      });
+    });
+  }
+  function review(all) {
+    say('review-say', 'Lecture du ' + (all ? 'classeur' : 'contenu de la feuille') + '…');
+    readSheets(all).then(function (sheets) {
+      if (!sheets.length) throw new Error('SHEETS_REQUIRED');
+      say('review-say', 'L’Enhanced Auditor relit avec les risques de la mission…');
+      return post({ action: 'review', file_id: ctx.fileId, file_name: ctx.fileName, mission_id: ctx.missionId, sheets: sheets });
+    }).then(function (r) {
+      $('review-summary').textContent = r.summary || '';
+      say('review-say', r.remarks.length + ' remarque(s). Écrites dans la feuille « ' + REVIEW_SHEET + ' » et en commentaires.');
+      return writeRemarks(r.remarks).then(loadRemarks);
+    }).catch(function (e) { say('review-say', ERR[e.message] || e.message, true); });
+  }
+  function writeRemarks(remarks) {
+    var todo = (remarks || []).filter(function (x) { return !x.written_in_file_at && x.status !== 'closed'; });
+    if (!todo.length) return Promise.resolve();
+    return Excel.run(function (c) {
+      var ws = c.workbook.worksheets.getItemOrNullObject(REVIEW_SHEET); ws.load('isNullObject');
+      return c.sync().then(function () {
+        if (ws.isNullObject) {
+          ws = c.workbook.worksheets.add(REVIEW_SHEET);
+          var h = ws.getRange('A1:I1'); h.values = [['Date', 'Feuille', 'Cellule', 'Gravité', 'Remarque', 'Source', 'Statut', 'Réponse', 'Référence']]; h.format.font.bold = true;
+        }
+        var used = ws.getUsedRange(); used.load('rowCount'); return c.sync().then(function () {
+          var start = used.rowCount + 1;
+          var rows = todo.map(function (x) { return [new Date(x.created_at || Date.now()).toLocaleDateString('fr-FR'), x.sheet || '', x.cell || '', SEV[x.severity] || x.severity, x.remark, x.author || x.source, 'Ouverte', '', x.id || '']; });
+          ws.getRange('A' + start + ':I' + (start + rows.length - 1)).values = rows;
+          // The rows first; then each comment on its own (a cell may already carry one: the
+          // « Revue IA » sheet keeps everything anyway).
+          return c.sync().then(function () {
+            return todo.filter(function (x) { return x.sheet && x.cell; }).reduce(function (p, x) {
+              return p.then(function () {
+                try { c.workbook.comments.add(x.sheet + '!' + x.cell.split(':')[0], 'Enhanced Auditor : ' + x.remark); } catch (e) { return null; }
+                return c.sync().catch(function () {});
+              });
+            }, Promise.resolve());
+          });
+        });
+      });
+    }).then(function () {
+      return Promise.all(todo.filter(function (x) { return x.id; }).map(function (x) { return post({ action: 'remark', remark_id: x.id, written: true }).catch(function () {}); }));
+    });
+  }
+  function setRowStatus(id, status, reply) {
+    return Excel.run(function (c) {
+      var ws = c.workbook.worksheets.getItemOrNullObject(REVIEW_SHEET); ws.load('isNullObject');
+      return c.sync().then(function () {
+        if (ws.isNullObject) return;
+        var u = ws.getUsedRange(); u.load('values'); return c.sync().then(function () {
+          u.values.forEach(function (row, i) { if (row[8] === id) { ws.getRange('G' + (i + 1)).values = [[status]]; if (reply) ws.getRange('H' + (i + 1)).values = [[reply]]; } });
+          return c.sync();
+        });
+      });
+    }).catch(function () {});
+  }
+  function loadRemarks() {
+    var qs = ctx.fileId ? 'file_id=' + encodeURIComponent(ctx.fileId) : 'file_name=' + encodeURIComponent(ctx.fileName);
+    OM.api('/api/app?route=workfile&' + qs).then(function (d) {
+      var list = d.remarks || [];
+      writeRemarks(list).catch(function () {});   // remarks made from the application arrive in the file
+      var box = $('remarks'); box.textContent = '';
+      var open = list.filter(function (x) { return x.status !== 'closed'; });
+      if (!open.length) { box.appendChild(el('p', 'Aucune remarque ouverte sur ce fichier.', 'muted')); return; }
+      open.forEach(function (x) {
+        var r = el('div', null, 'remark ' + x.severity);
+        var where = el('button', (x.sheet || '') + (x.cell ? ' ! ' + x.cell : '') + ' — ' + (SEV[x.severity] || ''), 'where'); where.type = 'button'; where.style.cssText = 'background:none;border:0;text-align:left;padding:0;cursor:pointer';
+        where.addEventListener('click', function () { if (x.sheet && x.cell) Excel.run(function (c) { c.workbook.worksheets.getItem(x.sheet).getRange(x.cell).select(); return c.sync(); }).catch(function () {}); });
+        r.appendChild(where); r.appendChild(el('span', x.remark));
+        if (x.reply) r.appendChild(el('span', 'Réponse de ' + (x.replied_by || '') + ' : ' + x.reply, 'muted'));
+        var ta = document.createElement('textarea'); ta.placeholder = 'Votre réponse'; ta.setAttribute('aria-label', 'Réponse à la remarque');
+        var acts = el('div', null, 'acts');
+        var answer = el('button', 'Répondre'); answer.type = 'button';
+        answer.addEventListener('click', function () { if (!ta.value.trim()) return; post({ action: 'remark', remark_id: x.id, reply: ta.value.trim() }).then(function () { return setRowStatus(x.id, 'Répondue', ta.value.trim()); }).then(loadRemarks); });
+        var done = el('button', 'Soldée'); done.type = 'button';
+        done.addEventListener('click', function () { post({ action: 'remark', remark_id: x.id, status: 'closed' }).then(function () { return setRowStatus(x.id, 'Soldée'); }).then(loadRemarks); });
+        acts.appendChild(answer); acts.appendChild(done);
+        r.appendChild(ta); r.appendChild(acts); box.appendChild(r);
+      });
+    }).catch(function (e) { say('review-say', ERR[e.message] || e.message, true); });
+  }
+
+  // ---- Ask the agents about the selection ----
+  function ask() {
+    var question = $('question').value.trim(); if (!question) return;
+    var b = $('ask'); b.disabled = true; $('answer').hidden = false; $('answer').textContent = 'Les agents réfléchissent…';
+    var withSel = $('with-selection').checked ? Excel.run(function (c) {
+      var r = c.workbook.getSelectedRange(); r.load('address,values,rowCount,columnCount'); return c.sync().then(function () {
+        return 'Sélection ' + r.address + ' :\n' + r.values.slice(0, 50).map(function (row) { return row.slice(0, 20).join('\t'); }).join('\n');
+      });
+    }).catch(function () { return ''; }) : Promise.resolve('');
+    withSel.then(function (sel) {
+      var message = question + '\n\n(Depuis Excel : fichier « ' + ctx.fileName + ' »' + (ctx.missionId ? ', mission ' + ($('mission').selectedOptions[0] || {}).text + ' (id ' + ctx.missionId + ')' : '') + '.)' + (sel ? '\n\n' + sel.slice(0, 12000) : '');
+      return OM.api('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, agent: 'auto', provider: 'auto', risk: 'normal' }) });
+    }).then(function (d) { UI.richText($('answer'), d.answer || 'Réponse vide.'); })
+      .catch(function (e) { $('answer').textContent = 'Erreur : ' + e.message; })
+      .then(function () { b.disabled = false; });
+  }
+
+  function start() {
+    if (!OM.getSession()) { $('login-card').hidden = false; return; }
+    $('login-card').hidden = true;
+    OM.loadBranding && OM.loadBranding().catch(function () {});
+    identify().then(track);
+  }
+
+  Office.onReady(function (info) {
+    if (info.host !== Office.HostType.Excel) { document.body.textContent = 'Ce panneau fonctionne dans Excel.'; return; }
+    try { $('autoshow').checked = Office.context.document.settings.get('Office.AutoShowTaskpaneWithDocument') === true; } catch (e) {}
+    $('autoshow').addEventListener('change', function () {
+      Office.context.document.settings.set('Office.AutoShowTaskpaneWithDocument', this.checked);
+      Office.context.document.settings.saveAsync(function () {});
+    });
+    $('login-btn').addEventListener('click', login);
+    $('mission').addEventListener('change', function () { if (!this.value) return; ctx.missionId = this.value; post({ action: 'beat', session: ctx.session, active: true, mission_id: ctx.missionId }).catch(function () {}); });
+    $('review-sheet').addEventListener('click', function () { review(false); });
+    $('review-book').addEventListener('click', function () { review(true); });
+    $('ask').addEventListener('click', ask);
+    start();
+  });
+})();
+</script>
+</body>
+</html>

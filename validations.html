@@ -38,6 +38,12 @@
       <p class="lead">Les agents préparent, vous décidez. Votre décision est enregistrée et horodatée avec le contenu exact que vous avez vu. Valider lance l'action à l'intérieur du cabinet : tâche pour l'équipe, pièce à classer, ou message à un collègue (lui aussi à valider). Jamais d'e-mail à un client, jamais de suppression.</p>
     </header>
 
+    <section class="card" aria-labelledby="h-wf" id="wf-card" hidden>
+      <h2 id="h-wf">Vos fichiers restés ouverts</h2>
+      <p class="lead" style="margin:0">L'Orpailleur a vu un de vos fichiers de travail ouvert dans Excel sans activité depuis plusieurs heures. Si vous le voulez, le panneau Office Manager l'enregistre et le ferme.</p>
+      <div id="wf-list" class="stack"></div>
+    </section>
+
     <section class="card" aria-labelledby="h-mail" id="mail-card">
       <h2 id="h-mail">Messages de l'agent aux collègues <span class="meta" id="mail-meta"></span></h2>
       <p class="hint" style="margin:0">L'agent écrit <strong>uniquement aux collègues</strong> (adresses du cabinet), jamais aux clients. Aucun message ne part sans validation d'un propriétaire, associé ou manager. Vous pouvez corriger le texte avant de valider : c'est ce texte-là qui part.</p>
@@ -254,8 +260,31 @@
 
   $('open-only').addEventListener('change', function () { renderFilters(); render(); loadMail(); });
 
+  // Files left open in Excel: the proposal goes to its own user (any role), even on a phone.
+  function loadWorkfiles() {
+    OM.api('/api/app?route=workfile&mine=1').then(function (d) {
+      var list = d.actions || []; $('wf-card').hidden = !list.length;
+      var box = $('wf-list'); box.textContent = '';
+      list.forEach(function (a) {
+        var it = el('div', null, 'item'), t = el('div', null, 't');
+        t.appendChild(el('span', a.summary)); t.appendChild(el('span', 'Signalé le ' + UI.dateTime(a.requested_at), 'meta')); it.appendChild(t);
+        [['approve', 'Oui, enregistrer et fermer', 'btn'], ['reject', 'Non, laisser ouvert', 'btn ghost']].forEach(function (x) {
+          var b = el('button', x[1], x[2]); b.type = 'button';
+          b.addEventListener('click', function () {
+            OM.api('/api/app?route=workfile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'decide', action_id: a.id, decision: x[0] }) })
+              .then(function (r) { it.textContent = ''; it.appendChild(el('span', r.effect, 'meta')); })
+              .catch(function (e) { it.appendChild(el('span', e.message, 'status error')); });
+          });
+          it.appendChild(b);
+        });
+        box.appendChild(it);
+      });
+    }).catch(function () {});
+  }
+
   function start() {
     OM.loadBranding().catch(function () {});
+    loadWorkfiles();
     loadMail();
     show('Chargement…');
     OM.api('/api/app?route=actions').then(function (data) {

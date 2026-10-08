@@ -13,6 +13,7 @@ import { engagementMissions, tdrCandidates, engagementState, startEngagementPrep
 import { submissionState, startSubmissionReview, submissionStep } from '../lib/submissions.js';
 import { auditorState, auditorReviews, startAuditorReview, auditorStep } from '../lib/enhanced-auditor.js';
 import { startDepositAnalysis, depositStep, depositState, listDeposits, attachDeposit } from '../lib/deposit-analysis.js';
+import { startSession, beat, endSession, reviewWorkbook, listRemarks, updateRemark, myWorkfileActions, decideWorkfileAction, workfileKpis } from '../lib/workfiles.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -313,6 +314,22 @@ export const ROUTES = Object.freeze({
     unavailable: 'DEPOSIT_UNAVAILABLE'
   },
   'deposit-step': { POST: (orgId, req) => depositStep(orgId, req, req.body || {}), unavailable: 'DEPOSIT_UNAVAILABLE' },
+  // Work files in Excel (Office Manager panel): sessions, review remarks, files left open.
+  workfile: {
+    GET: users(ALL_ROLES, (orgId, req) => req.query?.mine ? myWorkfileActions(orgId, req.account) : listRemarks(orgId, req.query || {})),
+    POST: users(ALL_ROLES, (orgId, req) => {
+      const b = req.body || {}, a = b.action;
+      if (a === 'start') return startSession(orgId, req.account, b);
+      if (a === 'beat') return beat(orgId, req.account, b);
+      if (a === 'end') return endSession(orgId, b);
+      if (a === 'review') return reviewWorkbook(orgId, req.account, b);
+      if (a === 'remark') return updateRemark(orgId, req.account, b);
+      if (a === 'decide') return decideWorkfileAction(orgId, req.account, b);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'WORKFILE_UNAVAILABLE'
+  },
+  'workfile-kpi': { GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_workfile_kpi'); return workfileKpis(orgId); }), unavailable: 'WORKFILE_UNAVAILABLE' },
   // Partner Dashboard: firm improvement in one place (owner / partners).
   'partner-dashboard': {
     GET: users(PARTNERS, async (orgId, req) => {
