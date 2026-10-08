@@ -292,3 +292,30 @@ test('cockpit: each KPI says what, how, sources and lists its elements', async (
   assert.equal(k.delays.value, 2); assert.equal(k.mails.value, 1);
   for (const x of c.kpis) { assert.ok(x.measured && x.method && x.sources.length, x.key); assert.ok(Array.isArray(x.items)); }
 });
+
+test('search: « grand livre BLE TRANSIT » finds the ledger of that client, by name or by what was read in it', async () => {
+  const s = await import('../lib/smart-search.js');
+  const missions = [{ id: 'm1', name: 'BLE TRANSIT — Audit 2025', status: 'active', client_name: 'BLE TRANSIT' }, { id: 'm2', name: 'Nova — CAC 2025', status: 'completed' }, { id: 'm3', name: 'BLE TRANSIT — Audit 2024', status: 'completed', client_name: 'BLE TRANSIT' }];
+  const q = s.words('grand livre BLE TRANSIT');
+  const named = s.missionTerms(q, missions);
+  assert.deepEqual(named.missions.map(m => m.id), ['m1', 'm3']);
+  const groups = s.documentTerms(q.filter(w => !named.used.has(w)));
+  assert.equal(groups.length, 1); assert.ok(groups[0].alts.includes('general ledger'));
+  const docs = [
+    { file_id: 'f1', name: 'GL_2025.xlsx', path: '/Clients/BLE TRANSIT/2025/GL_2025.xlsx' },
+    { file_id: 'f2', name: 'export_sage.xlsx', path: '/Clients/BLE TRANSIT/2025/export_sage.xlsx', doc_type: 'grand livre', summary: 'Grand livre général 2025 de BLE TRANSIT' },
+    { file_id: 'f3', name: 'Grand livre.xlsx', path: '/Clients/Nova/2025/Grand livre.xlsx' },
+    { file_id: 'f4', name: 'Balance.xlsx', path: '/Clients/BLE TRANSIT/2025/Balance.xlsx' }];
+  const r = s.rankDocuments(docs, groups, named.missions);
+  assert.deepEqual(r.map(x => x.file_id).sort(), ['f1', 'f2']);
+  // « 2024 » asked: only the 2024 mission.
+  assert.deepEqual(s.missionTerms(s.words('grand livre BLE TRANSIT 2024'), missions).missions.map(m => m.id), ['m3']);
+  // Filters: status and mission are optional.
+  assert.equal(s.statusFilter('en_cours')('active'), true); assert.equal(s.statusFilter('active')('proposal'), true); assert.equal(s.statusFilter('terminee')('completed'), true);
+  const out = await s.smartSearch('org', { q: 'grand livre BLE TRANSIT', status: 'toutes' }, { fetchRows: async p => p.startsWith('office_missions') ? missions : [], drive: {}, folder: 'om',
+    loadFileIndex: async () => ({ f2: { id: 'f2', name: 'export_sage.xlsx', path: '/Clients/BLE TRANSIT/2025/export_sage.xlsx', doc_type: 'grand livre', summary: 'Grand livre 2025', parent: 'P' } }), loadScan: async () => ({ state: { items: [] } }) });
+  assert.equal(out.results.documents[0].file_id, 'f2');
+  assert.match(out.results.documents[0].web_url, /^https:\/\/drive\.google\.com\/file\/d\/f2/);
+  assert.match(out.results.documents[0].folder_url, /folders\/P/);
+  assert.deepEqual(out.understood.document, ['grand livre']);
+});

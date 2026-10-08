@@ -2,6 +2,7 @@ import { requirePilotAccess } from '../lib/auth.js';
 import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
 import { globalSearch } from '../lib/global-search.js';
+import { smartSearch } from '../lib/smart-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
@@ -100,7 +101,8 @@ export const ROUTES = Object.freeze({
     unavailable: 'BRANDING_UNAVAILABLE'
   },
   search: {
-    GET: (orgId, req) => globalSearch(orgId, req.query?.q, req.query?.scope),
+    // Smart search (2026-10-08): optional status and mission, keywords, what the agents read.
+    GET: (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null }),
     unavailable: 'SEARCH_UNAVAILABLE'
   },
   actions: {

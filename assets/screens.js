@@ -126,7 +126,8 @@
           var t = UI.el('div', null, 't');
           if (g === 'documents') {
             t.appendChild(UI.el('span', r.name || 'Sans nom'));
-            t.appendChild(UI.el('span', r.folder_path || '', 'meta'));
+            t.appendChild(UI.el('span', [r.mission, r.type, r.folder_path].filter(Boolean).join(' · '), 'meta'));
+            if (r.summary) t.appendChild(UI.el('span', r.summary, 'meta'));
           } else if (g === 'missions') {
             t.appendChild(UI.el('span', r.name || r.mission_code || 'Mission'));
             t.appendChild(UI.el('span', [r.mission_code, r.status].filter(Boolean).join(' · '), 'meta'));
@@ -136,9 +137,11 @@
           }
           item.appendChild(t);
           if (g === 'documents' && r.web_url) item.appendChild(UI.safeLink(r.web_url, 'Ouvrir'));
+          if (g === 'documents' && r.folder_url) item.appendChild(UI.safeLink(r.folder_url, 'Dossier'));
           box.appendChild(item);
         });
       });
+      if (data.query) { var more = UI.el('a', 'Voir tous les résultats et filtrer'); more.href = '/recherche.html?q=' + encodeURIComponent(data.query); box.appendChild(more); }
     },
     // Shows the login card when no token is stored, then calls start().
     requireLogin: function (start) {

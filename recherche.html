@@ -6,6 +6,7 @@
 <title>Recherche</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
 <style>
 .searchbox{display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--brand);border-radius:12px;padding:0 16px;min-height:56px}
 .searchbox input{flex:1;min-width:0;border:0;outline:none;font:inherit;font-size:17px;padding:14px 0;background:transparent}
@@ -44,24 +45,47 @@
       <div><button class="btn" id="connect" type="button">Se connecter</button></div>
     </section>
 
-    <form id="form" role="search" style="display:flex;flex-direction:column;gap:12px">
-      <label for="q">Rechercher dans tout le cabinet — documents, missions, personnes</label>
+    <header class="page-head">
+      <h1>Recherche</h1>
+      <p class="lead">Tapez ce que vous cherchez, en quelques mots : « grand livre BLE TRANSIT », « lettre de mission Nova 2025 ». Le nom de la mission n'est jamais obligatoire. La recherche utilise ce que les agents ont lu dans les fichiers, pas seulement leur nom.</p>
+    </header>
+    <form id="form" role="search" class="search-form">
       <div class="searchbox">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--brand)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
-        <input id="q" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="Ex. balance âgée Nova">
-        <span class="kbd" aria-hidden="true">Ctrl K</span>
+        <label for="q" class="sr">Mots-clés</label>
+        <input id="q" type="search" minlength="2" maxlength="80" autocomplete="off" placeholder="Ex. grand livre BLE TRANSIT">
+        <button class="btn" type="submit">Rechercher</button>
       </div>
-      <div class="chips" id="scopes">
-        <button type="button" class="chip" data-scope="all" aria-pressed="true">Tout</button>
-        <button type="button" class="chip" data-scope="documents" aria-pressed="false">Documents</button>
-        <button type="button" class="chip" data-scope="missions" aria-pressed="false">Missions</button>
-        <button type="button" class="chip" data-scope="people" aria-pressed="false">Personnes</button>
+      <div class="search-filters">
+        <div class="filter">
+          <span class="filter-label" id="lab-status">Statut des missions</span>
+          <div class="chips" id="status" role="group" aria-labelledby="lab-status">
+            <button type="button" class="chip" data-status="toutes" aria-pressed="true">Toutes</button>
+            <button type="button" class="chip" data-status="active" aria-pressed="false">Actives (pas commencées)</button>
+            <button type="button" class="chip" data-status="en_cours" aria-pressed="false">En cours</button>
+            <button type="button" class="chip" data-status="terminee" aria-pressed="false">Terminées</button>
+          </div>
+        </div>
+        <div class="filter">
+          <label class="filter-label" for="mission">Mission (facultatif)</label>
+          <select id="mission"><option value="">Toutes les missions</option></select>
+        </div>
+        <div class="filter">
+          <span class="filter-label" id="lab-scope">Chercher</span>
+          <div class="chips" id="scopes" role="group" aria-labelledby="lab-scope">
+            <button type="button" class="chip" data-scope="all" aria-pressed="true">Tout</button>
+            <button type="button" class="chip" data-scope="documents" aria-pressed="false">Documents</button>
+            <button type="button" class="chip" data-scope="missions" aria-pressed="false">Missions</button>
+            <button type="button" class="chip" data-scope="people" aria-pressed="false">Personnes</button>
+          </div>
+        </div>
       </div>
     </form>
 
-    <p class="status" id="status" role="status" aria-live="polite"></p>
-    <div id="results" style="display:flex;flex-direction:column;gap:20px"></div>
-    <p class="lead" style="font-size:13px">Recherche en lecture seule dans l'inventaire du Drive, les missions et l'annuaire. Elle ne modifie rien et n'appelle aucune IA.</p>
+    <p class="understood" id="understood" hidden></p>
+    <p class="status" id="status-line" role="status" aria-live="polite"></p>
+    <div id="results" class="search-results"></div>
+    <p class="lead" style="font-size:13px">Recherche en lecture seule : inventaire du Drive, fichiers lus par l'Orpailleur, documents rattachés aux missions et dépôts, missions et annuaire. Elle ne modifie rien.</p>
   </main>
 </div>
 
@@ -70,71 +94,100 @@
 (function () {
   var OM = window.OfficeManager;
   var $ = function (id) { return document.getElementById(id); };
-  var scope = 'all';
+  var scope = 'all', status = 'toutes';
   var LABELS = { documents: 'Documents', missions: 'Missions', people: 'Personnes' };
+  var ST = { opportunity: 'Proposition soumise', acceptance: 'Gagnée', planning: 'Planification', fieldwork: 'En cours', review: 'Revue', partner_review: 'Revue associé', report_issued: 'Rapport émis', closed: 'Terminée', archived: 'Archivée' };
 
   function el(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+  function link(href, text, cls) { if (!/^https:\/\//.test(href || '')) return null; var a = el('a', text, cls); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a; }
 
-  function renderItem(group, row) {
-    var item = el('div', null, 'item');
+  function docCard(r) {
+    var item = el('article', null, 'item doc-hit' + (r.complete ? ' best' : ''));
     var t = el('div', null, 't');
-    if (group === 'documents') {
-      t.appendChild(el('span', row.name || 'Sans nom'));
-      t.appendChild(el('span', row.folder_path || row.client_name || '', 'meta'));
-      item.appendChild(t);
-      if (row.decision_status) item.appendChild(el('span', row.decision_status, 'tag'));
-      if (row.web_url && /^https:\/\//.test(row.web_url)) {
-        var a = el('a', 'Ouvrir'); a.href = row.web_url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-        item.appendChild(a);
-      }
-    } else if (group === 'missions') {
+    t.appendChild(el('span', r.name || 'Sans nom', 'doc-name'));
+    var facts = el('dl', null, 'doc-facts');
+    [['Mission', r.mission], ['Type', r.type], ['Période', r.period], ['Emplacement', r.location]].forEach(function (p) { if (!p[1]) return; facts.appendChild(el('dt', p[0])); facts.appendChild(el('dd', p[1])); });
+    t.appendChild(facts);
+    if (r.summary) t.appendChild(el('p', r.summary, 'doc-sum'));
+    if (r.why && r.why.length) t.appendChild(el('span', 'Trouvé par : ' + r.why.join(', ') + (r.source ? ' · ' + r.source : ''), 'meta'));
+    item.appendChild(t);
+    var tools = el('div', null, 'doc-tools');
+    var a1 = link(r.web_url, 'Ouvrir le fichier', 'btn'); if (a1) tools.appendChild(a1);
+    var a2 = link(r.folder_url, 'Ouvrir le dossier', 'btn ghost'); if (a2) tools.appendChild(a2);
+    item.appendChild(tools);
+    return item;
+  }
+  function renderItem(group, row) {
+    if (group === 'documents') return docCard(row);
+    var item = el(group === 'missions' ? 'a' : 'div', null, 'item' + (group === 'missions' ? ' link-item' : ''));
+    var t = el('div', null, 't');
+    if (group === 'missions') {
+      item.href = '/mission.html?id=' + encodeURIComponent(row.id);
       t.appendChild(el('span', row.name || row.mission_code || 'Mission'));
-      t.appendChild(el('span', [row.mission_code, row.status].filter(Boolean).join(' · '), 'meta'));
-      item.appendChild(t);
+      t.appendChild(el('span', [row.mission_code, ST[row.status_label] || row.status].filter(Boolean).join(' · '), 'meta'));
     } else {
       t.appendChild(el('span', row.full_name || 'Personne'));
       t.appendChild(el('span', [row.role_title, row.department].filter(Boolean).join(' · '), 'meta'));
-      item.appendChild(t);
     }
+    item.appendChild(t);
     return item;
   }
 
   function render(data) {
     var box = $('results'); box.textContent = '';
+    var u = data.understood || {};
+    var parts = [];
+    if (u.document && u.document.length) parts.push('document : « ' + u.document.join(' ') + ' »');
+    if (u.missions && u.missions.length) parts.push('mission : ' + u.missions.join(', '));
+    $('understood').hidden = !parts.length; $('understood').textContent = 'Compris — ' + parts.join(' · ');
     Object.keys(data.results).forEach(function (group) {
       var rows = data.results[group];
+      if (scope === 'all' && !rows.length) return;
       var section = el('section', null, 'group');
       section.appendChild(el('h2', (LABELS[group] || group) + ' · ' + rows.length));
       if (!rows.length) section.appendChild(el('p', data.unavailable.indexOf(group) >= 0 ? 'Source indisponible pour le moment.' : 'Aucun résultat.', 'empty'));
       rows.forEach(function (row) { section.appendChild(renderItem(group, row)); });
       box.appendChild(section);
     });
-    $('status').textContent = data.total + ' résultat(s) pour « ' + data.query + ' ».';
-    $('status').className = 'status';
+    $('status-line').textContent = data.total ? data.total + ' résultat(s).' : 'Aucun résultat. Essayez un autre mot (ex. « GL » ou « general ledger »), ou retirez le filtre de statut.';
+    $('status-line').className = 'status';
   }
 
   function run() {
     var q = $('q').value.trim();
-    if (q.length < 2) { $('status').textContent = 'Tapez au moins 2 caractères.'; return; }
-    $('status').textContent = 'Recherche…'; $('status').className = 'status';
-    OM.api('/api/app?route=search&q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(scope))
-      .then(render)
-      .catch(function (err) { $('results').textContent = ''; $('status').textContent = 'Recherche impossible : ' + err.message; $('status').className = 'status error'; });
+    if (q.length < 2) { $('status-line').textContent = 'Tapez au moins 2 caractères.'; return; }
+    $('status-line').textContent = 'Recherche…'; $('status-line').className = 'status';
+    var url = '/api/app?route=search&q=' + encodeURIComponent(q) + '&scope=' + encodeURIComponent(scope) + '&status=' + encodeURIComponent(status) + ($('mission').value ? '&mission_id=' + encodeURIComponent($('mission').value) : '');
+    try { history.replaceState(null, '', '?q=' + encodeURIComponent(q)); } catch (e) {}
+    OM.api(url).then(render)
+      .catch(function (err) { $('results').textContent = ''; $('status-line').textContent = 'Recherche impossible : ' + err.message; $('status-line').className = 'status error'; });
   }
 
   $('form').addEventListener('submit', function (e) { e.preventDefault(); run(); });
-  Array.prototype.forEach.call($('scopes').children, function (b) {
-    b.addEventListener('click', function () {
-      scope = b.dataset.scope;
-      Array.prototype.forEach.call($('scopes').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      if ($('q').value.trim().length >= 2) run();
+  function chips(id, attr, set) {
+    Array.prototype.forEach.call($(id).children, function (b) {
+      b.addEventListener('click', function () {
+        set(b.dataset[attr]);
+        Array.prototype.forEach.call($(id).children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        if ($('q').value.trim().length >= 2) run();
+      });
     });
-  });
+  }
+  chips('scopes', 'scope', function (v) { scope = v; });
+  chips('status', 'status', function (v) { status = v; });
+  $('mission').addEventListener('change', function () { if ($('q').value.trim().length >= 2) run(); });
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); $('q').focus(); }
   });
 
-  function start() { OM.loadBranding().catch(function () { /* default look kept */ }); $('q').focus(); }
+  function start() {
+    OM.loadBranding().catch(function () { /* default look kept */ });
+    OM.api('/api/missions').then(function (d) {
+      ((d && d.missions) || []).forEach(function (m) { var o = el('option', m.name || m.mission_code); o.value = m.id; $('mission').appendChild(o); });
+    }).catch(function () {});
+    var q = new URLSearchParams(location.search).get('q');
+    if (q) { $('q').value = q; run(); } else $('q').focus();
+  }
   $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
   if (!OM.getToken()) { $('login').hidden = false; } else { start(); }
 })();
