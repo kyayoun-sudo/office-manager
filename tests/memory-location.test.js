@@ -4,7 +4,7 @@ import { loadMemory, memoryFolderId } from "../lib/memory-runtime.js";
 import { runMappingPass, MEMORY_FILE_NAMES } from "../lib/orpailleur-memory.js";
 import { FOLDER_MIME } from "../lib/mission-engine.js";
 test("migrated memory is found by ID in configured folder; absent files never reset it", async () => {
-  const keys=["OFFICE_MANAGER_MEMORY_FOLDER_ID","OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY"];
+  const keys=["OFFICE_MANAGER_MEMORY_FOLDER_ID","OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY","OFFICE_MANAGER_ALLOW_ENV_DRIVE"];
   const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
   const files=new Map(), buffers=new Map(); let serial=0,writes=0;
   const drive={
@@ -17,6 +17,7 @@ test("migrated memory is found by ID in configured folder; absent files never re
   try {
     delete process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID;
     delete process.env.OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY;
+    process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE="true"; // legacy server-configured memory, explicitly allowed
     await runMappingPass(drive,{rootFolderId:"root",memoryFolderId:"root",maxReads:0});
     const ids=[...files.keys()];
     for(const f of files.values())f.parents=["manager"];

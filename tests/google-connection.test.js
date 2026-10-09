@@ -253,3 +253,20 @@ test('Google always gets ONE registered return address, whatever address the app
   assert.equal(redirectUri(fromDeploy, preview), 'https://office-manager-personal-pilot-git-feature-whit-9611c0-paul-bc10.vercel.app/oauth/google/callback');
   assert.equal(redirectUri(fromDeploy, { ...prod, OFFICE_MANAGER_PUBLIC_URL: 'https://office.taty.ci/' }), 'https://office.taty.ci/oauth/google/callback');
 });
+
+test('never another Drive: without the firm’s choice, no silent fallback on a server or old Drive', async () => {
+  const { configuredDriveId } = await import('../lib/google-drive.js');
+  const { memoryFolderId } = await import('../lib/memory-runtime.js');
+  const keys = ['TATY_SHARED_DRIVE_ID', 'OFFICE_MANAGER_MEMORY_FOLDER_ID', 'OFFICE_MANAGER_ALLOW_ENV_DRIVE', 'VERCEL_ENV', 'OFFICE_MANAGER_TEST_RUN', 'AGENT_MAIL_SANDBOX'];
+  const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  try {
+    resetGoogleConnectionCache();
+    for (const k of keys) delete process.env[k];
+    Object.assign(process.env, { TATY_SHARED_DRIVE_ID: 'OLD_DRIVE', OFFICE_MANAGER_MEMORY_FOLDER_ID: 'OLD_MEMORY' });
+    assert.throws(() => configuredDriveId(), /FIRM_DRIVE_NOT_CHOSEN/);
+    assert.equal(memoryFolderId(), null);
+    process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = 'true';
+    assert.equal(configuredDriveId(), 'OLD_DRIVE');
+    assert.equal(memoryFolderId(), 'OLD_MEMORY');
+  } finally { keys.forEach(k => saved[k] === undefined ? delete process.env[k] : process.env[k] = saved[k]); }
+});

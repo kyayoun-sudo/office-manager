@@ -267,6 +267,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
 process.env.ORPAILLEUR_JOB_SECRET = "job-secret";
 process.env.TATY_SHARED_DRIVE_ID = DRIVE_ID;
 process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT";
+process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = "true"; // legacy server-configured Drive, explicitly allowed
 process.env.OFFICE_MANAGER_SCAN_ROOT_ID = "ROOT";
 delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 delete process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
