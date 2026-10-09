@@ -279,7 +279,7 @@ test('passes: the memory hooks see the start and the failure; the Orpailleur res
     return [];
   };
   await startPass('org', 'orpailleur', '2026-10-08 12:00', {}, { fetchRows: rows, memoryHooks: null, startChangesPass: null,
-    createRequest: async (org, b) => { since = b.since; return { id: 't1' }; }, startDriveScan: async () => false, fireInternal: async () => true });
+    createRequest: async (org, b) => { since = b.since; return { id: 't1' }; }, startDriveScan: async () => false, fireInternal: async () => true, legacy: true });
   assert.equal(since, '2026-10-07T20:00:00Z');
 });
 

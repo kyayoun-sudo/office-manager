@@ -67,7 +67,7 @@ test('tick: secret required; each slot runs once; agents work from each other', 
   const deps = {
     fetchRows, schedule: sched, now: at('2026-10-08T09:10:00Z'),
     fireInternal: async (req, path, body) => { fired.push({ path, body }); return true; },
-    startDriveScan: async () => true,
+    startDriveScan: async () => true, legacy: true,
     createRequest: async (org, body) => { created.push(body); return { id: 'T1' }; }
   };
   const r1 = await tick('org-1', secretReq, deps);

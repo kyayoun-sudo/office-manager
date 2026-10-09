@@ -32,7 +32,7 @@ test('the same pass is written once in memory; misplaced documents become a sign
   for (let i = 0; i < 3; i++) noteMisplaced(st, { doc_type: 'relevé bancaire' }, { path: '/01_CLIENTS_ET_MISSIONS/Scan' + '/r' + i + '.pdf' });
   assert.equal(signals(st)[0].count, 3);
   const sheets = journalSheets(st);
-  assert.deepEqual(sheets.map(s => s.name), ['Passages', 'Fichiers', 'Questions', 'Signaux Firm Manager']);
+  assert.deepEqual(sheets.map(s => s.name), ['Passages', 'Fichiers', 'Questions', 'Doublons possibles', 'Signaux Firm Manager']);
   assert.equal(sheets[0].rows[1][4], 'PASSAGE COMPLET');
 });
 
