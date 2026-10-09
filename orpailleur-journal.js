@@ -55,7 +55,12 @@ export function passReport(st) {
   const unreadable = Object.values(st.states || {}).filter(s => s.state === 'illisible').length;
   if (unreadable) reasons.push(unreadable + ' fichier(s) illisible(s) : non rangés automatiquement');
   const pendingScans = Object.keys(st.pending_read || {}).length;
-  if (pendingScans) reasons.push(pendingScans + ' scan(s) pas encore regardé(s) (lecture visuelle limitée par passage) : repris au prochain passage');
+  if (pendingScans) reasons.push(pendingScans + ' fichier(s) pas encore regardé(s) complètement (lecture différée ou à reprendre) : repris lorsque le délai le permet');
+  const inspections = Object.values(st.inspections || {});
+  const partialReads = inspections.filter(i => i.status === 'PARTIAL').length;
+  const failedReads = inspections.filter(i => ['ERROR_RETRYABLE', 'ERROR_FINAL', 'UNREADABLE'].includes(i.status)).length;
+  if (partialReads) reasons.push(partialReads + ' lecture(s) partielle(s) : couverture complète non établie');
+  if (failedReads) reasons.push(failedReads + ' lecture(s) non aboutie(s) : statut conservé, aucune réussite déclarée');
   const states = Object.values(st.states || {});
   const proposed = states.filter(s => s.state === 'proposé (À valider)').length;
   const unverified = states.filter(s => s.state === 'déplacé').length;
@@ -65,7 +70,7 @@ export function passReport(st) {
   return { status, reasons, counts: { inspectes: done, total, ok: st.ok || 0,
     deplaces: st.applied_moves ?? states.filter(s => ['déplacé', 'déplacé et vérifié'].includes(s.state)).length,
     propositions: proposed, deplacements_proposes: st.moves || 0, renommages_proposes: st.renames || 0,
-    renommes: st.applied_renames || 0, auto: st.auto || 0, verifies: st.verified || 0, questions: st.questions || 0, reponses: asked.filter(a => ['answered', 'resolved'].includes(a.status)).length } };
+    renommes: st.applied_renames || 0, lectures_completes: inspections.filter(i => i.status === 'READ_SUCCESS').length, lectures_partielles: partialReads, lectures_en_erreur: failedReads, formats_non_pris_en_charge: inspections.filter(i => i.status === 'UNSUPPORTED').length, auto: st.auto || 0, verifies: st.verified || 0, questions: st.questions || 0, reponses: asked.filter(a => ['answered', 'resolved'].includes(a.status)).length } };
 }
 
 // The pass written into his memory (one line per pass, the latest replaces the same pass).

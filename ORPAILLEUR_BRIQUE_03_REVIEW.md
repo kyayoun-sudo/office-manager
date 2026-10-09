@@ -1,3 +1,5 @@
+> Note de mise à jour : les limites de la Brique 3 décrites dans cette analyse historique sont remplacées par `docs/ORPAILLEUR_BRIQUE_03_COMPLETE.md` (lecteur 2.0.0).
+
 # Orpailleur — Brique 3 : analyse et premier lot implémenté
 
 Branche cible : `feature/white-label-desktop`. Installer après les briques 1 et 2.

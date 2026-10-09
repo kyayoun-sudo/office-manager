@@ -1,3 +1,5 @@
+> Note de mise à jour : les limites de la Brique 3 décrites dans cette analyse historique sont remplacées par `docs/ORPAILLEUR_BRIQUE_03_COMPLETE.md` (lecteur 2.0.0).
+
 # Orpailleur — analyse des briques 4 à 15 et livraison Brique 4
 
 Branche cible : `feature/white-label-desktop`. Travail par lots, en étendant le dépôt actuel. Ce document distingue les propositions du texte, le code existant et le lot réellement livré. Les quinze briques ne sont pas toutes terminées.

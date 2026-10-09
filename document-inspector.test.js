@@ -24,7 +24,7 @@ test('chunks preserve known page provenance without inventing page numbers for t
   assert.equal(normalizeInspection({ id: 'b' }, 'hello').chunks[0].source.page, undefined);
 });
 test('DOCX paragraphs and headers retain actual source parts and remain partial', async () => {
-  const zip = new JSZip(); zip.file('word/document.xml', '<w:document xmlns:w="urn:w"><w:p><w:r><w:t>Hello &amp; world</w:t></w:r></w:p></w:document>');
+  const zip = new JSZip(); zip.file('word/document.xml', '<w:document xmlns:w="urn:w"><w:body><w:p><w:r><w:t>Hello &amp; world</w:t></w:r></w:p></w:body></w:document>');
   zip.file('word/header1.xml', '<w:hdr xmlns:w="urn:w"><w:p><w:r><w:t>Header</w:t></w:r></w:p></w:hdr>');
   const result = await extractStructuredOffice(await zip.generateAsync({ type: 'nodebuffer' }), STRUCTURED_MIMES[0]);
   assert.match(result.text, /Hello & world/); assert.match(result.text, /Header/); assert.equal(result.truncated, true); assert.equal(result.sections[0].source.part, 'word/document.xml');

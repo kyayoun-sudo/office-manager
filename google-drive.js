@@ -4,6 +4,9 @@ import ExcelJS from "exceljs";
 import { documentReadLimit, spreadsheetCellText } from "./document-reading.js";
 import { extractPdfText, PDF_MIME } from "./pdf-reading.js";
 import { extractStructuredOffice, STRUCTURED_MIMES } from './structured-reading.js';
+import { decodeDocumentText, extractCsv } from './tabular-text-reading.js';
+import { readStructuredGoogleSheet } from './google-sheet-reader.js';
+import { boundedResponseBytes } from './bounded-content.js';
 import { isTestMode, testDrives } from "./test-mode.js";
 import { connectedHas, firmConnected, firmDriveKind, connectionAccessToken, SCOPES, firmDriveId } from "./google-connection.js";
 
@@ -236,7 +239,7 @@ async function bridgeRequest(action, payload = {}) {
     },
     body: JSON.stringify({ action, ...payload })
   });
-  const raw = await response.text();
+  const raw = (await boundedResponseBytes(response, 18000000)).toString('utf8');
   let data = raw;
   if (raw) {
     try { data = JSON.parse(raw); } catch {}
@@ -295,7 +298,7 @@ async function googleRequest(url, options = {}) {
     }
   });
 
-  const raw = await response.text();
+  const raw = (await boundedResponseBytes(response)).toString('utf8');
   let data = raw;
 
   if (raw) {
@@ -399,7 +402,7 @@ export async function getDriveFileMetadata(fileId) {
   const params = new URLSearchParams({
     supportsAllDrives: "true",
     fields:
-      "id,name,mimeType,parents,modifiedTime,createdTime,webViewLink,size,description,driveId,trashed,md5Checksum,lastModifyingUser(displayName,emailAddress),owners(displayName,emailAddress)"
+      "id,name,mimeType,parents,modifiedTime,createdTime,version,webViewLink,size,description,driveId,trashed,md5Checksum,capabilities(canDownload),lastModifyingUser(displayName,emailAddress),owners(displayName,emailAddress)"
   });
 
   return googleRequest(
@@ -472,9 +475,10 @@ async function extractOfficeBuffer(meta, buffer, limit, mimeOverride = null) {
 
 export async function readDriveFileText(
   fileId,
-  { maxChars = 30000, structured = false } = {}
+  { maxChars = 30000, structured = false, ...readerOptions } = {}
 ) {
   const meta = await getDriveFileMetadata(fileId);
+  if (meta.capabilities?.canDownload === false) throw new Error('READER_DOWNLOAD_NOT_ALLOWED');
   const mime = meta.mimeType || "";
   const limit = documentReadLimit(maxChars);
   if (Number(meta.size) > 8000000) throw new Error('READER_TOO_LARGE');
@@ -486,6 +490,7 @@ export async function readDriveFileText(
     });
     if (data.mode === "text") {
       const text = String(data.text || "");
+      if (structured && /csv/i.test(mime)) return { ...extractCsv(Buffer.from(text), limit, readerOptions), file: data.file || meta, partial: true, limitations: ['Bridge delivered decoded text; original encoding is not verifiable.'] };
       return {
         supported: true,
         extractor: "supabase-google-bridge-text",
@@ -496,7 +501,11 @@ export async function readDriveFileText(
       };
     }
     if (data.mode === "base64" && data.base64) {
-      if (structured && STRUCTURED_MIMES.includes(data.mime_type || meta.mimeType)) return { ...(await extractStructuredOffice(Buffer.from(data.base64, 'base64'), data.mime_type || meta.mimeType, limit)), file: meta };
+      const bytes = Buffer.from(data.base64, 'base64');
+      if (bytes.length > 8000000) throw new Error('READER_TOO_LARGE');
+      if (structured && /csv/i.test(data.mime_type || mime)) return { ...extractCsv(bytes, limit, readerOptions), file: meta };
+      if (structured && STRUCTURED_MIMES.includes(data.mime_type || meta.mimeType)) return { ...(await extractStructuredOffice(bytes, data.mime_type || meta.mimeType, limit, readerOptions)), file: meta };
+      if (structured && (data.mime_type || mime) === PDF_MIME) return { ...(await extractPdfText(bytes, { limit, ...readerOptions })), file: meta };
       return extractOfficeBuffer(
         data.file || meta,
         Buffer.from(data.base64, "base64"),
@@ -519,19 +528,17 @@ export async function readDriveFileText(
     if (!response.ok) {
       throw new Error(`GOOGLE_CONTENT_READ_${response.status}`);
     }
-    if (Number(response.headers.get('content-length')) > 8000000) { await response.body?.cancel(); throw new Error('READER_TOO_LARGE'); }
-    const chunks = []; let size = 0;
-    for await (const chunk of response.body) { size += chunk.length; if (size > 8000000) throw new Error('READER_TOO_LARGE'); chunks.push(Buffer.from(chunk)); }
-    return Buffer.concat(chunks);
+    return boundedResponseBytes(response);
   }
 
   if (structured) {
+    if (mime === 'application/vnd.google-apps.spreadsheet') return { ...(await readStructuredGoogleSheet(fileId, googleRequest, limit, readerOptions)), file: meta };
     const exports = { 'application/vnd.google-apps.document': STRUCTURED_MIMES[0], 'application/vnd.google-apps.spreadsheet': STRUCTURED_MIMES[1], 'application/vnd.google-apps.presentation': STRUCTURED_MIMES[2] };
     const targetMime = exports[mime] || mime;
     if (STRUCTURED_MIMES.includes(targetMime)) {
       const base = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`;
       const buffer = await fetchBuffer(exports[mime] ? `${base}/export?mimeType=${encodeURIComponent(targetMime)}` : `${base}?alt=media&supportsAllDrives=true`);
-      return { ...(await extractStructuredOffice(buffer, targetMime, limit)), file: meta };
+      return { ...(await extractStructuredOffice(buffer, targetMime, limit, readerOptions)), file: meta };
     }
   }
 
@@ -627,7 +634,7 @@ export async function readDriveFileText(
     const buffer = await fetchBuffer(
       `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`
     );
-    return { ...(await extractPdfText(buffer, { limit })), file: meta };
+    return { ...(await extractPdfText(buffer, { limit, ...readerOptions })), file: meta };
   }
 
   if (mime.startsWith("text/") || mime === "application/json") {
@@ -636,14 +643,15 @@ export async function readDriveFileText(
         fileId
       )}?alt=media&supportsAllDrives=true`;
     const bytes = await fetchBuffer(url);
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    if (structured && /csv/i.test(mime)) return { ...extractCsv(bytes, limit, readerOptions), file: meta };
+    const decoded = decodeDocumentText(bytes, readerOptions.encoding), text = decoded.text;
     return {
       supported: true,
       extractor: "plain-text",
       file: meta,
       text: text.slice(0, limit),
-      truncated: text.length > limit || (structured && /csv/i.test(mime)),
-      limitations: structured && /csv/i.test(mime) ? ['CSV read as UTF-8 text: delimiter, tables and row counts are not yet inspected.'] : []
+      truncated: text.length > limit,
+      metadata: { encoding: decoded.encoding, encoding_basis: decoded.encoding_basis }
     };
   }
 
@@ -886,16 +894,17 @@ export const MEMORY_BINARY_MAX_BYTES = 10 * 1024 * 1024;
 
 // Reads a memory file as bytes. Works in direct mode and through the existing
 // bridge (read_file returns base64 for non-Google files).
-export async function downloadFileBuffer(fileId) {
+export async function downloadFileBuffer(fileId, { maxBytes = MEMORY_BINARY_MAX_BYTES } = {}) {
+  maxBytes = Math.min(MEMORY_BINARY_MAX_BYTES, Math.max(1, Number(maxBytes) || MEMORY_BINARY_MAX_BYTES));
   if (!directGoogleConfigured() && googleBridgeConfigured()) {
     const data = await bridgeRequest("read_file", {
       file_id: fileId,
-      max_bytes: MEMORY_BINARY_MAX_BYTES
+      max_bytes: maxBytes
     });
     if (data.mode !== "base64" || !data.base64) {
       throw new Error("BINARY_READ_UNAVAILABLE");
     }
-    return Buffer.from(data.base64, "base64");
+    const buffer = Buffer.from(data.base64, 'base64'); if (buffer.length > maxBytes) throw new Error('READER_TOO_LARGE'); return buffer;
   }
   const token = await googleAccessToken();
   const response = await fetch(
@@ -903,7 +912,7 @@ export async function downloadFileBuffer(fileId) {
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!response.ok) throw new Error(`GOOGLE_CONTENT_READ_${response.status}`);
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const buffer = await boundedResponseBytes(response, maxBytes);
   if (buffer.length > MEMORY_BINARY_MAX_BYTES) throw new Error("MEMORY_FILE_TOO_LARGE");
   return buffer;
 }
