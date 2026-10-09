@@ -56,6 +56,12 @@ Supabase cron (office-manager-unified-scheduler, */5)
   `ORPAILLEUR_JOURNAL.xlsx` réécrit à chaque passage, et une seule ligne dans Supabase
   (`office_agent_checkpoints`) en secours. Mise à jour en place, jamais un nouveau fichier par passage.
 - Autres agents : `MEMORY/AGENTS` (`lib/agent-memory.js`), mémoire client/mission `MEMORY/CLIENTS`.
+- **Une mémoire par Drive** : la mémoire de l'Orpailleur appartient au Drive choisi dans Paramètres (`drive_id` dans TIDY_STATE et
+  dans le checkpoint). Un nouveau Drive = nouvelle mémoire : carte, puis premier rangement complet. Jamais la mémoire,
+  ni l'inventaire Supabase (`orpailleur_inventory`, lectures filtrées par `drive_id`), d'un autre Drive. Pas de repli
+  silencieux sur un Drive du serveur (`FIRM_DRIVE_NOT_CHOSEN`).
+- **Les agents ne sont pas des « Drive managers »** : seul l'Orpailleur range des documents ; les autres agents
+  travaillent sur leur intelligence (cabinet, mission, audit, facturation) et consomment ses événements.
 
 **Ancien cerveau à ne pas remettre au centre** : `supabase/functions/orpailleur-durable-worker` et `index.ts`
 (ancien tenant `cd95cc4f…`, ancien Drive). Un scanner peut alimenter le moteur, jamais décider à sa place.
