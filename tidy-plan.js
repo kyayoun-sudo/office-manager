@@ -1,5 +1,6 @@
 import { rest } from './supabase.js';
 import { inspectDocument, normalizeInspection, inspectionReceipt } from './document-inspector.js';
+import { understandDocuments } from './document-understanding.js';
 import { driveAdapter } from './drive-adapter.js';
 import { memoryFolderId } from './memory-runtime.js';
 import { runAI } from './ai.js';
@@ -202,7 +203,7 @@ export async function startTidyPlan(orgId, req, d = {}) {
     await (d.fire || fireInternal)(req, '/api/app?route=tidy-plan-step', {});
     return { started: true, resumed: true, done: prev.done, total: prev.total || null };
   }
-  await saveJsonFile(STATE, drive, folder, fileId, { status: 'planning', mode: 'first-scan', drive_id: currentDrive(d) || prev?.drive_id || null, started_at: new Date().toISOString(), last_pass_at: prev?.last_pass_at || null, seen: prev?.seen || {}, agent_memory: prev?.agent_memory, asked: prev?.asked || {}, states: prev?.states, misplaced: prev?.misplaced, passes: prev?.passes, pending_read: prev?.pending_read, references: prev?.references, duplicates: prev?.duplicates, done: 0, moves: 0, renames: 0, questions: 0, ok: 0, auto: 0 });
+  await saveJsonFile(STATE, drive, folder, fileId, { status: 'planning', mode: 'first-scan', drive_id: currentDrive(d) || prev?.drive_id || null, started_at: new Date().toISOString(), last_pass_at: prev?.last_pass_at || null, seen: prev?.seen || {}, agent_memory: prev?.agent_memory, asked: prev?.asked || {}, inspections: prev?.inspections, document_profiles: prev?.document_profiles, states: prev?.states, misplaced: prev?.misplaced, passes: prev?.passes, pending_read: prev?.pending_read, references: prev?.references, duplicates: prev?.duplicates, done: 0, moves: 0, renames: 0, questions: 0, ok: 0, auto: 0 });
   await (d.fire || fireInternal)(req, '/api/app?route=tidy-plan-step', {});
   return { started: true };
 }
@@ -275,7 +276,7 @@ export async function startChangesPass(orgId, req, d = {}) {
     if (files.some(f => f.id === id)) continue;
     files.push({ id, name: p.name, mimeType: p.mimeType, parents: p.parents || [], webViewLink: p.webViewLink || null, modifiedTime: null, by: null, path: p.path });
   }
-  const memo = { states: prev?.states, misplaced: prev?.misplaced, passes: prev?.passes, pending_read: pendingRead, references: prev?.references, duplicates: prev?.duplicates };
+  const memo = { states: prev?.states, misplaced: prev?.misplaced, passes: prev?.passes, pending_read: pendingRead, references: prev?.references, duplicates: prev?.duplicates, inspections: prev?.inspections, document_profiles: prev?.document_profiles };
   for (const f of files) noteFile(memo, f, asked[f.id]?.status === 'answered' ? 'confirmation reçue' : 'découvert', asked[f.id]?.status === 'answered' ? 'réponse de ' + (asked[f.id].answer_by || asked[f.id].to || '') : '');
   const st = { status: files.length ? 'planning' : 'done', mode: 'changes', drive_id: driveId || prev?.drive_id || null, first_scan_done: prev?.first_scan_done || null, since, started_at: passStarted, pass_started_at: passStarted, seen: prev?.seen || {}, agent_memory: prev?.agent_memory, asked, ...memo,
     last_pass_at: files.length ? since : passStarted, files, total: files.length, done: 0, moves: 0, renames: 0, questions: 0, ok: 0, auto: 0 };
@@ -319,7 +320,7 @@ export async function tidyPlanStep(orgId, req, d = {}) {
   // The AI reads each file (excerpt of its content), not only its name.
   const read = d.readText || ((id, o) => drive.readText(id, o));
   const lines = [];
-  const excerpts = new Map(), methods = new Map();
+  const excerpts = new Map(), methods = new Map(), inspections = [];
   const vision = { left: d.visionMax ?? VISION_PER_STEP };
   for (const f of batch) {
     let ex = '';
@@ -329,19 +330,24 @@ export async function tidyPlanStep(orgId, req, d = {}) {
     methods.set(f.id, got.method);
     st.inspections ||= {};
     st.inspections[f.id] = inspectionReceipt(got.inspection);
+    inspections.push(got.inspection);
     noteFile(st, f, ex === '(illisible)' || ex.trim().length < 40 ? 'illisible' : 'inspecté', 'lecture : ' + got.method);
     const a = (st.asked || {})[f.id];
     const answered = a && ['answered', 'resolved'].includes(a.status) ? '\nRÉPONSE HUMAINE OBTENUE (' + (a.answer_by || a.to || '') + ', ' + String(a.answered_at || '').slice(0, 10) + ', question : « ' + (a.missing || '') + ' ») : ' + (a.answer || '') +
       (a.moved?.from ? '\n(le fichier attend dans ' + REVIEW_FOLDER + ' ; sa place d’origine : ' + a.moved.from + ')' : '') : '';
     lines.push('### ' + f.id + ' | ' + f.path + answered + '\nLECTURE : ' + got.inspection.status + '\n' + ex);
   }
+  const profileScope = { organization_id: orgId, memory_folder_id: folder };
+  const profiles = await understandDocuments(inspections, { scope: d.readerScope || profileScope, analyze: d.understandAI || d.runAI || runAI });
+  st.document_profiles ||= {};
+  for (const profile of profiles) st.document_profiles[profile.document_id] = profile;
   const pbc = await pbcContext(scan?.items || [], batch, read, d).catch(() => '');
   // Corrections validated by a human become lessons (Shadow); the Orpailleur applies its own.
   const lessons = await (d.activeLessons || (async a => (await import('./shadow.js')).activeLessons(a, { drive, folder })))('orpailleur').catch(() => []);
   const input = (lessons?.length ? 'LEÇONS APPRISES DE CORRECTIONS VALIDÉES (applique-les ; une leçon propre à une mission ne vaut que pour elle) :\n- ' + lessons.slice(0, 30).join('\n- ') + '\n\n' : '') + (pbc ? pbc + '\n\n' : '') + (structure.pattern ? 'HYPOTHÈSE DE STRUCTURE DU CABINET (indices dans les chemins, non validée ; ne donne aucune autorisation) : ' + structure.pattern + '\nExemples réels : ' + structure.examples.join(' ; ') +
       (structure.models.length ? '\nMODÈLE DE DOSSIER DE MISSION du cabinet (une nouvelle mission en reçoit les sous-dossiers ; nomme le dossier comme les exemples, ex. CLIENT_TYPE_ANNEE ; range le fichier dans le bon sous-dossier, en le mettant comme dernier niveau de create_names) : ' + structure.models.map(m => m.path + ' → ' + m.subfolders.join(', ')).join(' | ') : '') + '\n\n' : '') +
     'DOSSIERS (id | chemin) :\n' + folders + '\n\nEXEMPLES DE DOSSIERS DE MISSION DU CABINET :\n' + missionRoots +
-    '\n\nCE QUE TU SAIS DU CABINET :\n' + context + '\n\nFICHIERS À DÉCIDER (id | chemin, puis extrait du contenu) :\n' + lines.join('\n\n');
+    '\n\nCE QUE TU SAIS DU CABINET :\n' + context + '\n\nPROFILS DOCUMENTAIRES (faits appuyés par des passages ; interprétations signalées, couverture parfois partielle ; absence de faits = inconnu) :\n' + JSON.stringify(profiles).slice(0, 30000) + '\n\nFICHIERS À DÉCIDER (id | chemin, puis extrait du contenu) :\n' + lines.join('\n\n');
   let plan = null, lastError = null;
   for (const provider of ['auto', 'openai', 'anthropic']) {
     try { plan = parseJson((await (d.runAI || runAI)({ agentKey: 'orpailleur', instructions: INSTRUCTIONS, input: input.slice(0, 150000), provider, maxTokens: 16000 })).text); break; }
