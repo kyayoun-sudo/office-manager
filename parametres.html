@@ -122,7 +122,7 @@
           <h2 id="h-names">Noms des agents</h2>
           <p class="hint" style="margin:0">Vous pouvez donner à chaque agent le nom que vous voulez. Le nouveau nom s'affiche partout dans l'application et l'agent se présente ainsi.</p>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px" id="names-grid"></div>
-          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="checkbox" id="auto-filing" style="margin-top:3px"> <span><strong>Rangement automatique</strong> : quand l'Orpailleur est sûr (client, mission et année lus dans le document, destination conforme à la structure du cabinet), il range tout de suite. Sinon, sa proposition attend dans « À valider ». Chaque rangement est journalisé et réversible.</span></label>
+          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="checkbox" id="auto-filing" style="margin-top:3px"> <span><strong>Rangement automatique</strong> : en activant cette option, vous autorisez l'Orpailleur à ranger les documents qu'il a lus lorsque les preuves et l'organisation observée permettent une décision sûre. Les créations de dossiers et les décisions incertaines attendent dans « À valider ». Chaque action est journalisée et son résultat est vérifié.</span></label>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="names-save" type="button">Enregistrer les noms</button><span class="status" id="names-status" role="status" aria-live="polite"></span></div>
         </section>
 
@@ -687,7 +687,7 @@
         var i = document.createElement('input'); i.type = 'text'; i.maxLength = 60; i.id = 'name-' + k; i.value = (s.names || {})[k] || ''; i.setAttribute('data-no-rename', '');
         f.appendChild(l); f.appendChild(i); g.appendChild(f);
       });
-      $('auto-filing').checked = s.auto_filing !== false;
+      $('auto-filing').checked = s.auto_filing === true;
     }).catch(function (e) { $('names-status').textContent = e.message; });
   }
   $('names-save').addEventListener('click', function () {
