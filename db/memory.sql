@@ -180,4 +180,33 @@ alter table public.office_agent_checkpoints enable row level security;
 revoke all on public.office_agent_checkpoints from public, anon, authenticated, service_role;
 grant select, insert, update on public.office_agent_checkpoints to service_role;
 
+-- 9. THE EVENT BUS (2026-10-09, architecture §11-14): agents exchange small structured events, not
+--    free conversations. One row per event; the idempotency key makes a repeated event a no-op.
+--    small_payload stays small (ids, refs, a few words) — never the content of a document.
+create table if not exists public.office_events (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  event_type text not null check (event_type ~ '^[A-Z][A-Z0-9_]{2,60}$'),
+  agent_id text check (agent_id is null or length(agent_id) <= 60),
+  actor_id text check (actor_id is null or length(actor_id) <= 200),
+  engagement_id uuid,
+  object_type text check (object_type is null or length(object_type) <= 60),
+  object_id text check (object_id is null or length(object_id) <= 200),
+  source_reference text check (source_reference is null or length(source_reference) <= 300),
+  consumer text check (consumer is null or length(consumer) <= 60),
+  idempotency_key text not null check (length(idempotency_key) between 8 and 300),
+  small_payload jsonb not null default '{}'::jsonb check (jsonb_typeof(small_payload) = 'object' and length(small_payload::text) <= 4000),
+  occurred_at timestamptz not null default now(),
+  status text not null default 'new' check (status in ('new', 'handled', 'ignored', 'failed')),
+  attempts integer not null default 0,
+  handled_at timestamptz,
+  result text check (result is null or length(result) <= 500),
+  unique (org_id, idempotency_key)
+);
+create index if not exists office_events_pending_idx on public.office_events (org_id, status, occurred_at);
+create index if not exists office_events_engagement_idx on public.office_events (org_id, engagement_id, occurred_at desc);
+alter table public.office_events enable row level security;
+revoke all on public.office_events from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_events to service_role;
+
 commit;

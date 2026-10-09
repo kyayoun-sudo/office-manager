@@ -64,14 +64,27 @@ relancer l'ancien moteur ; celui-ci n'est réactivable qu'explicitement (`ORPAIL
 Le pont `taty-google-bridge` garde un tenant par défaut ancien si `DEFAULT_ORG_ID` manque côté Supabase : à vérifier
 dans les secrets de la fonction avant tout redéploiement (non modifié dans le dépôt, le déployé peut différer).
 
-## Écarts connus avec l'architecture cible (à faire en étendant, pas en réécrivant)
+## Conformité à l'architecture (état au 2026-10-09) — on avance brique par brique
 
-- Pas encore de vrai event bus : les échanges passent par la file d'actions, l'audit log et les passages.
-- Changements Drive par date (`changedSince`), pas encore par curseur `changes.list` + webhook.
-- Pas encore de « PBC Service » unique ni de statut PBC à population attendue (PARTIAL 1/5).
-- Pas encore d'événement `DOCUMENT_CLASSIFIED` de l'Orpailleur vers le Mission Controller.
-- Archive pass / manifest / freeze non implémentés.
-- MCP / passerelle ChatGPT (« Mon IA ») : reporté, à faire via un Tool Gateway avec permissions.
+| Section | État | Ce qui existe / ce qui manque |
+|---|---|---|
+| §1-3 Données chez le cabinet, référence d'abord | ✅ | Drive/Gmail restent la source ; base = ids, liens, statuts, décisions. |
+| §5-7 Changements, curseur, fallback | 🟡 | Par date (`changedSince`), pas encore curseur `changes.list` ni webhook Drive. |
+| §8-10 Connecteurs abstraits | 🟡 | `drive-adapter` + `agent-mail` ; certains modules appellent encore Google directement ; pas de connecteur agenda. |
+| §11-14 Event bus + idempotence | 🟡 brique 1 posée | `office_events` + `lib/event-bus.js`. Événements actifs : `DOCUMENT_CLASSIFIED`, `NEEDS_HUMAN_CLASSIFICATION`, `POSSIBLE_DUPLICATE` (Orpailleur → Mission Controller, `lib/mission-events.js`). Les autres agents restent à brancher. |
+| §15-16 Workflow engine, gates | ❌ | « À valider » sépare déjà proposition et autorité ; pas encore d'étapes/gates de mission. |
+| §17-23 Petites mémoires d'agents | 🟡 | Existent (MEMORY/AGENTS, TIDY_STATE, checkpoint Supabase), champs pas encore alignés sur la spec. |
+| §24 Zone `_OFFICE_MANAGER` par mission | 🟡 | Mémoire client/mission existe ; pas encore MISSION_STATE / DECISION_LOG / ARCHIVE_MANIFEST par mission. |
+| §26-27 PBC Service unique | ❌ prochaine brique | Le Mission Controller reçoit les pièces avec `pbc_status` (RECEIVED_REVIEW_REQUIRED / PARTIAL / UNMATCHED) dans `OFFICE_MANAGER_MISSION_FILES.json` ; la checklist Excel n'est pas encore mise à jour (ni population attendue 1/5, ni `DRIVE_SYNC = PENDING`). |
+| §28-32 Gmail push, thread mapping PBC | ❌ | Lecture des mails étiquetés par passage ; pas de watch Gmail ni de mapping fil → PBC. |
+| §34-35 Orpailleur, incertitude | ✅ | Lecture réelle (PDF, scans), question ciblée, 00_A_REVOIR_AGENT, vérification Drive, doublons. |
+| §38-41 Sign-off | 🟡 | Lié à la version (date de modification) et à l'ouverture du fichier ; pas de révision/hash ni détection auto de modification après signature. |
+| §51 Isolement des cabinets | 🟡 | RLS activé sans policy (service_role seul) ; un déploiement = un cabinet (`DEFAULT_ORG_ID`). |
+| §53-54 Secrets | ✅ | Jetons chiffrés AES-GCM ; rien dans le navigateur. |
+| §55-56 Permissions par appel d'outil, outils par agent | ❌ | Interrupteur global « autoriser les agents » seulement. |
+| §5 / §58 Rôles | ❌ | 4 rôles en base (owner, partner, manager, collaborator) ; manquent auditor, senior, supervisor, EQR, secrétaire ; pas de vue « mes missions ». |
+| §66-70 Archivage | ❌ | `MISSION_READY_FOR_ARCHIVE` est routé vers l'Orpailleur dans le bus, mais l'archive pass n'existe pas. |
+| §57-61 Tool Gateway / MCP ChatGPT | ❌ reporté | « Mon IA », plus tard. |
 
 ## Règles de travail
 
