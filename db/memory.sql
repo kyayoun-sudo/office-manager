@@ -164,4 +164,20 @@ alter table public.office_agent_persona add column if not exists auto_filing boo
 alter table public.office_agent_persona alter column agent_display_name set default 'Firm Manager';
 update public.office_agent_persona set agent_display_name = 'Firm Manager' where agent_display_name = 'Office Manager';
 
+-- 8. The agents' SMALL memory in Supabase (2026-10-09, Paul: « une infime mémoire ira dans Supabase et il
+--    écrira dans un Excel ce qu'il fait »): one line per agent — the hour of its last pass and its
+--    result. The full memory stays in 00_TATY_AI_MANAGER/MEMORY, the journal in its Excel.
+create table if not exists public.office_agent_checkpoints (
+  org_id uuid not null,
+  agent_key text not null check (length(agent_key) between 2 and 60),
+  last_pass_at timestamptz,
+  status text check (status is null or length(status) <= 40),
+  report jsonb not null default '{}'::jsonb check (jsonb_typeof(report) = 'object' and length(report::text) <= 4000),
+  updated_at timestamptz not null default now(),
+  primary key (org_id, agent_key)
+);
+alter table public.office_agent_checkpoints enable row level security;
+revoke all on public.office_agent_checkpoints from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_agent_checkpoints to service_role;
+
 commit;
