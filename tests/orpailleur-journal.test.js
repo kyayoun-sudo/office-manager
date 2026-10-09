@@ -86,3 +86,29 @@ test('small memory in Supabase: the hour of the last pass is kept there; if the 
   assert.equal(writes[0].last_pass_at, st.last_pass_at);
   assert.ok(JSON.stringify(writes[0]).length < 1500);
 });
+
+test('a NEW Drive gets its own memory: first its map, then its first full scan — never another Drive’s memory or checkpoint', async () => {
+  const { startChangesPass, sameDrive } = await import('../lib/tidy-plan.js');
+  // Memory of another Drive (same memory file name) and a checkpoint of another Drive: both ignored.
+  const store = { 'OFFICE_MANAGER_TIDY_STATE.json': { status: 'done', drive_id: 'OLD', last_pass_at: '2026-10-08T20:00:00Z' } };
+  let mapping = 0, changed = 0;
+  const d = { drive: storeDrive(store), folder: 'MEM', driveId: 'NEW', fire: async () => true, fetchRows: async () => [],
+    loadCheckpoint: async () => ({ last_pass_at: '2026-10-08T20:00:00Z', report: { drive_id: 'OLD' } }),
+    startScan: async () => { mapping++; return { started: true }; }, changedSince: async () => { changed++; return []; } };
+  const r = await startChangesPass('org', {}, d);
+  assert.equal(r.reason, 'MAPPING_FIRST'); assert.equal(mapping, 1); assert.equal(changed, 0);
+  // Map ready → the first scan of THIS Drive starts (not a « since last pass » pass).
+  store['OFFICE_MANAGER_SCAN_STATE.json'] = { status: 'done', items: [{ id: 'a', name: 'x.pdf', mimeType: 'application/pdf', path: '/x.pdf' }] };
+  const r2 = await startChangesPass('org', {}, d);
+  assert.equal(r2.reason, 'FIRST_SCAN');
+  assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].mode, 'first-scan'); assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].drive_id, 'NEW');
+  assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].last_pass_at, null);
+  assert.equal(sameDrive({ drive_id: 'OLD' }, 'NEW'), false); assert.equal(sameDrive({}, 'NEW'), true);
+});
+
+test('reads of the other Orpailleur’s inventory are limited to the firm’s Drive', async () => {
+  const { scopeToFirmDrive } = await import('../lib/supabase.js');
+  assert.equal(scopeToFirmDrive('orpailleur_inventory?org_id=eq.o&is_folder=eq.false', 'GET', { id: 'TATY', kind: 'drive' }), 'orpailleur_inventory?org_id=eq.o&is_folder=eq.false&drive_id=eq.TATY');
+  assert.equal(scopeToFirmDrive('orpailleur_inventory?org_id=eq.o', 'PATCH', { id: 'TATY', kind: 'drive' }), 'orpailleur_inventory?org_id=eq.o');
+  assert.equal(scopeToFirmDrive('office_missions?org_id=eq.o', 'GET', { id: 'TATY', kind: 'drive' }), 'office_missions?org_id=eq.o');
+});
