@@ -3,6 +3,7 @@ import mammoth from "mammoth";
 import ExcelJS from "exceljs";
 import { documentReadLimit, spreadsheetCellText } from "./document-reading.js";
 import { extractPdfText, PDF_MIME } from "./pdf-reading.js";
+import { extractStructuredOffice, STRUCTURED_MIMES } from './structured-reading.js';
 import { isTestMode, testDrives } from "./test-mode.js";
 import { connectedHas, firmConnected, firmDriveKind, connectionAccessToken, SCOPES, firmDriveId } from "./google-connection.js";
 
@@ -471,11 +472,12 @@ async function extractOfficeBuffer(meta, buffer, limit, mimeOverride = null) {
 
 export async function readDriveFileText(
   fileId,
-  { maxChars = 30000 } = {}
+  { maxChars = 30000, structured = false } = {}
 ) {
   const meta = await getDriveFileMetadata(fileId);
   const mime = meta.mimeType || "";
   const limit = documentReadLimit(maxChars);
+  if (Number(meta.size) > 8000000) throw new Error('READER_TOO_LARGE');
 
   if (!directGoogleConfigured() && googleBridgeConfigured()) {
     const data = await bridgeRequest("read_file", {
@@ -489,10 +491,12 @@ export async function readDriveFileText(
         extractor: "supabase-google-bridge-text",
         file: data.file || meta,
         text: text.slice(0, limit),
-        truncated: text.length > limit
+        truncated: text.length > limit || (structured && !mime.startsWith('text/') && mime !== 'application/json'),
+        limitations: structured ? ['Bridge text output does not verify document structure or full coverage.'] : []
       };
     }
     if (data.mode === "base64" && data.base64) {
+      if (structured && STRUCTURED_MIMES.includes(data.mime_type || meta.mimeType)) return { ...(await extractStructuredOffice(Buffer.from(data.base64, 'base64'), data.mime_type || meta.mimeType, limit)), file: meta };
       return extractOfficeBuffer(
         data.file || meta,
         Buffer.from(data.base64, "base64"),
@@ -515,7 +519,20 @@ export async function readDriveFileText(
     if (!response.ok) {
       throw new Error(`GOOGLE_CONTENT_READ_${response.status}`);
     }
-    return Buffer.from(await response.arrayBuffer());
+    if (Number(response.headers.get('content-length')) > 8000000) { await response.body?.cancel(); throw new Error('READER_TOO_LARGE'); }
+    const chunks = []; let size = 0;
+    for await (const chunk of response.body) { size += chunk.length; if (size > 8000000) throw new Error('READER_TOO_LARGE'); chunks.push(Buffer.from(chunk)); }
+    return Buffer.concat(chunks);
+  }
+
+  if (structured) {
+    const exports = { 'application/vnd.google-apps.document': STRUCTURED_MIMES[0], 'application/vnd.google-apps.spreadsheet': STRUCTURED_MIMES[1], 'application/vnd.google-apps.presentation': STRUCTURED_MIMES[2] };
+    const targetMime = exports[mime] || mime;
+    if (STRUCTURED_MIMES.includes(targetMime)) {
+      const base = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`;
+      const buffer = await fetchBuffer(exports[mime] ? `${base}/export?mimeType=${encodeURIComponent(targetMime)}` : `${base}?alt=media&supportsAllDrives=true`);
+      return { ...(await extractStructuredOffice(buffer, targetMime, limit)), file: meta };
+    }
   }
 
   if (mime === "application/vnd.google-apps.document") {
@@ -618,20 +635,15 @@ export async function readDriveFileText(
       `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
         fileId
       )}?alt=media&supportsAllDrives=true`;
-    const token = await googleAccessToken();
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      throw new Error(`GOOGLE_CONTENT_READ_${response.status}`);
-    }
-    const text = await response.text();
+    const bytes = await fetchBuffer(url);
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     return {
       supported: true,
       extractor: "plain-text",
       file: meta,
       text: text.slice(0, limit),
-      truncated: text.length > limit
+      truncated: text.length > limit || (structured && /csv/i.test(mime)),
+      limitations: structured && /csv/i.test(mime) ? ['CSV read as UTF-8 text: delimiter, tables and row counts are not yet inspected.'] : []
     };
   }
 

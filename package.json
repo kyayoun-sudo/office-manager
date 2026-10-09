@@ -14,8 +14,10 @@
   "dependencies": {
     "@openai/agents": "0.18.0",
     "exceljs": "4.4.0",
+    "jszip": "3.10.1",
     "mammoth": "1.13.0",
     "pdfkit": "0.17.2",
+    "saxes": "6.0.0",
     "unpdf": "1.8.1",
     "zod": "4.6.5"
   },
