@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { noteFile, noteMisplaced, signals, passReport, closePass, journalSheets, JOURNAL } from '../lib/orpailleur-journal.js';
 
 const F = 'application/vnd.google-apps.folder';
+
+test('finished inspection with proposals, unanswered questions or unverified moves is not a completed business pass', () => {
+  const st = { status: 'done', total: 3, done: 3, moves: 2, asked: { a: { status: 'open', sent: true } } };
+  noteFile(st, { id: 'a' }, 'proposé (À valider)');
+  noteFile(st, { id: 'b' }, 'déplacé');
+  noteFile(st, { id: 'c' }, 'en place');
+  const report = passReport(st);
+  assert.equal(report.status, 'PASSAGE INCOMPLET');
+  assert.equal(report.counts.inspectes, 3); assert.equal(report.counts.deplaces, 1);
+  assert.equal(report.counts.propositions, 1);
+  assert.ok(report.reasons.some(r => /attendent une validation/.test(r)));
+  assert.ok(report.reasons.some(r => /restent à vérifier/.test(r)));
+  assert.ok(report.reasons.some(r => /humaine/.test(r)));
+});
 function storeDrive(store) {
   return {
     findFilesByExactName: async name => store[name] ? [{ id: name, modifiedTime: 't' }] : [],

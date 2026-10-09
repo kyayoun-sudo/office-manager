@@ -5,6 +5,20 @@ import { askMissing, checkAnswers, thankAfterVerified, whoToAsk } from '../lib/o
 const F = 'application/vnd.google-apps.folder';
 const members = [{ full_name: 'Yvan Kouassi', email: 'yvan@taty.info' }, { full_name: 'Awa Traoré', email: 'awa@taty.info' }];
 
+test('generic REVIEW preserves the original file location and the question says so', async () => {
+  const moves = [], mails = [];
+  const record = await askMissing('org', { id: 'f', name: 'document.pdf', path: '/Personnel/document.pdf', parents: ['P'] },
+    { known: 'Document personnel', missing: 'Destination souhaitée', question: 'Où le ranger ?' }, {}, {
+      leaveInPlace: true, whoToAsk: async () => ({ email: 'owner@example.invalid' }),
+      reviewFolderId: 'REV', tidyDrive: { move: async (...args) => moves.push(args) },
+      proposeMessage: async (org, m) => { mails.push(m); return { id: 'draft' }; }, emit: async () => null
+    });
+  assert.deepEqual(moves, []); assert.equal(record.moved, null);
+  assert.equal(record.file.from_parent, 'P');
+  assert.match(mails[0].body, /reste à son emplacement actuel/);
+  assert.doesNotMatch(mails[0].body, /Il attend dans 00_A_REVOIR_AGENT/);
+});
+
 function storeDrive(store) {
   return {
     findFilesByExactName: async name => store[name] ? [{ id: name, modifiedTime: 't' }] : [],

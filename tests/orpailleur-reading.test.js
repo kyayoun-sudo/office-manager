@@ -68,6 +68,9 @@ test('pass: a scan not yet looked at is not « seen »; it comes back at the nex
   assert.ok(st.pending_read.sc); assert.ok(!st.seen.sc);
   assert.ok(st.passes.at(-1).reasons.some(r => /pas encore regardé/.test(r)));
   assert.equal(st.passes.at(-1).status, 'PASSAGE INCOMPLET');
+  const notDue = await startChangesPass('org', {}, d);
+  assert.equal(notDue.files, 0); // budget-deferred reads respect their persisted backoff.
+  store['OFFICE_MANAGER_TIDY_STATE.json'].inspection_queue.sc.retry_at = '2000-01-01T00:00:00Z';
   const r = await startChangesPass('org', {}, d);
   assert.equal(r.files, 1);
 });

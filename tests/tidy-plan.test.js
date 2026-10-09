@@ -22,6 +22,36 @@ const items = [
 ];
 const json = o => ({ name: '', buffer: Buffer.from(JSON.stringify(o)) });
 
+test('a generic Drive uses neutral instructions and high confidence cannot substitute for explicit content evidence', async () => {
+  const genericItems = [
+    { id: 'D', name: 'Voyages', mimeType: F, path: '/Personnel/Voyages' },
+    { id: 'f', name: 'reservation.pdf', mimeType: 'application/pdf', path: '/reservation.pdf', parents: ['R'] }
+  ];
+  const drive = fakeDrive([{ ...json({ items: genericItems }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }]);
+  const approved = []; let instructions;
+  const d = { drive, folder: 'MEM', fire: async () => true, noLoop: true,
+    readText: async () => 'Réservation de voyage pour deux personnes du 12 au 18 décembre 2026.',
+    runAI: async o => { instructions = o.instructions; return { text: JSON.stringify({ decisions: [{ file_id: 'f', action: 'move', to_folder_id: 'D', confidence: 'haute' }] }) }; },
+    fetchRows: async (p, o = {}) => o.method === 'POST' ? [{ id: 'a' }] : [],
+    recordFiles: async () => null, writeJournal: async () => null, saveCheckpoint: async () => null,
+    activeLessons: async () => [], agentSettings: async () => ({ auto_filing: true }),
+    recordDecision: async (...args) => { approved.push(args); return { executed: true }; }
+  };
+  await startTidyPlan('org', {}, d);
+  const st = await tidyPlanStep('org', {}, d);
+  assert.match(instructions, /ne suppose pas qu'il existe des clients/);
+  assert.match(instructions, /hypothèses, jamais des règles validées/);
+  assert.equal(st.moves, 1); assert.deepEqual(approved, []);
+});
+
+test('missing agent settings default to proposals, explicit saved permission remains available', async () => {
+  const { agentSettings } = await import('../lib/agent-persona.js');
+  const absent = await agentSettings('generic-no-settings', async () => []);
+  assert.equal(absent.auto_filing, false);
+  const explicit = await agentSettings('generic-explicit-settings', async () => [{ auto_filing: true }]);
+  assert.equal(explicit.auto_filing, true);
+});
+
 test('first-scan tidy-up: the AI decides; moves/renames go to « À valider », ambiguous files become a question to whoever saved them', async () => {
   const drive = fakeDrive([{ ...json({ items }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }, { ...json({ status: 'applied', missions: [], answers: [{ question: 'q', answer: 'a' }] }), name: 'OFFICE_MANAGER_FIRM_KNOWLEDGE.json' }]);
   const fired = [], actions = [], messages = [];
