@@ -130,6 +130,7 @@
       trashButton.addEventListener('click', function () {
         trashButton.disabled = true; trashResult.textContent = 'Vérification du fichier à supprimer…';
         OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'inspect-file', action_id: action.id }) }).then(function (file) {
+          if (file.can_trash === false) { trashResult.textContent = 'Google autorise la modification mais pas la mise à la corbeille avec le compte connecté.' + (file.owner ? ' Propriétaire : ' + file.owner + '.' : '') + ' Le propriétaire doit supprimer le fichier ou autoriser un compte ayant ce droit.'; trashButton.disabled = true; return; }
           if (!window.confirm('Mettre à la corbeille « ' + file.name + ' » ?')) { trashButton.disabled = false; trashResult.textContent = 'Suppression annulée.'; return; }
           trashResult.textContent = 'Mise à la corbeille en cours…';
           return OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'trash-file', action_id: action.id, confirm_trash: true, file_name: file.name, version: file.version }) }).then(function (r) {
