@@ -282,7 +282,7 @@
       badgeLoading = true;
       var notices = OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {});
       var actions = OM.api('/api/app?route=actions').then(function (d) {
-        var pending = ((d && d.actions) || []).filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+        var pending = ((d && d.actions) || []).filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
         var link = document.querySelector('a[href="/validations.html"]');
         if (!link) return;
         var tag = document.getElementById('nav-count');
