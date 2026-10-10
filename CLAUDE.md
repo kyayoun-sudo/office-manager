@@ -104,6 +104,9 @@ Décision de Paul : elle précise la spec (§10 phases 1-5) pour le partage des 
    d'acceptation sous le nom que le modèle donne (`TATY_WP_PH0-1_[CLIENT]_[REFERENCE].xlsx`) ; remplit la fiche
    (onglet 01) ; prépare la Phase 0 (propositions sourcées, questions pour l'équipe). Décision « poursuivre » : l'Associé seul
    (jamais le préparateur ni le réviseur). Paul a demandé explicitement que le Firm Manager range le TDR et crée ce dossier.
+2b. **Équipe (spec phase 2, avant le KYC)** : après « poursuivre », le Firm Manager propose l'équipe (personnes du cabinet
+   seulement, choix expliqués, manques signalés) ; un manager ou l'Associé la valide ; chaque membre fait ensuite sa propre
+   déclaration d'indépendance (menaces de la section indépendance du classeur).
 3. **Lettre de confirmation du client** → rangée dans le dossier → événement `OPPORTUNITY_WON` → **Mission Controller** :
    « faire le KYC et l'indépendance » (onglet 03), vérifications publiques sourcées, l'indépendance est répondue par les
    personnes elles-mêmes, réponses écrites dans le même classeur ; rempli à la main → relu.
