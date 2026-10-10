@@ -70,7 +70,7 @@
   var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
   var all = [], filter = 'all', editing = false;
   document.addEventListener('input', function (e) { if (e.target.matches('input:not([type=checkbox]), textarea')) editing = true; });
-  var isOpen = function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; };
+  var isOpen = function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; };
   var openOnly = function () { return $('open-only').checked; };
 
   function agentName(key) { return AGENTS[key] || key || 'Agent'; }
@@ -123,6 +123,17 @@
       var done = el('p', LABELS[last.decision] + ' le ' + UI.dateTime(last.created_at) + (last.decided_by ? ' par ' + last.decided_by : '') + (last.note ? ' — ' + last.note : ''), 'tag ' + (last.decision === 'reject' ? 'warn' : ''));
       done.style.margin = '0'; done.style.alignSelf = 'flex-start';
       c.appendChild(done);
+      if (action.retry_needed) {
+        c.appendChild(el('p', 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
+        var retry = el('button', 'Reprendre le déplacement approuvé', 'btn'); retry.type = 'button';
+        retry.addEventListener('click', function () {
+          retry.disabled = true; retry.textContent = 'Reprise en cours…';
+          OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'retry', action_id: action.id }) })
+            .then(function (r) { show(r.effect || 'Reprise terminée.'); start(); })
+            .catch(function (e) { show('Reprise échouée : ' + e.message, true); retry.disabled = false; retry.textContent = 'Réessayer le déplacement'; });
+        });
+        c.appendChild(retry);
+      }
       return c;
     }
     if (last && last.decision === 'defer') {
@@ -168,7 +179,7 @@
   function render() {
     var list = $('list'); list.textContent = '';
     var rows = all.filter(function (a) { return (filter === 'all' || (a.agent_key || 'autre') === filter) && (!openOnly() || isOpen(a)); });
-    var open = all.filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+    var open = all.filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
     $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
     if (!rows.length) { list.appendChild(el('p', openOnly() ? 'Rien n’attend de réponse. Décochez le filtre pour revoir ce qui a déjà été décidé.' : 'Rien à valider pour le moment.', 'empty')); return; }
     rows.forEach(function (a) { list.appendChild(card(a)); });
