@@ -22,6 +22,8 @@
   .opp-fields input,.opp-fields select,.opp-fields textarea{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
   .opp-fields textarea{min-height:38px;resize:vertical}
   .opp-locked{font-size:12.5px;color:var(--muted)}
+  #team-card select,#team-card input:not([type=checkbox]){width:auto;max-width:100%;font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+  #team-card input[type=checkbox]{width:18px;height:18px}
 </style>
 </head>
 <body>
@@ -88,6 +90,23 @@
         <ul class="joblog" id="opp-log"></ul>
       </section>
 
+      <section class="card" aria-labelledby="h-team" id="team-card" hidden>
+        <div class="card-head"><h2 id="h-team">L’équipe</h2><span class="tag" id="team-status"></span></div>
+        <p class="lead" id="team-lead"></p>
+        <div class="stack" id="team-list"></div>
+        <div class="btn-row" id="team-actions"></div>
+        <p class="status" id="team-say" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-indep" id="indep-card" hidden>
+        <h2 id="h-indep">Ma déclaration d’indépendance</h2>
+        <p class="lead">Vous faites partie de l’équipe proposée. Répondez pour vous-même, à partir des menaces que le cabinet a listées. Une situation déclarée n’empêche rien d’elle-même : le Manager et l’Associé l’examinent et décident des sauvegardes.</p>
+        <div class="stack" id="indep-qs"></div>
+        <label class="opp-locked" style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--ink)"><input type="checkbox" id="indep-certify"> <span>Je certifie que ces réponses sont exactes et complètes à ce jour, et je signalerai tout changement.</span></label>
+        <div><button class="btn" id="indep-send" type="button">Enregistrer ma déclaration</button></div>
+        <p class="status" id="indep-say" role="status"></p>
+      </section>
+
       <section class="card" aria-labelledby="h-won" id="won-card" hidden>
         <h2 id="h-won">Le client a confirmé</h2>
         <p class="meta">Déposez la lettre de confirmation (ou d’attribution) du client, ou collez son lien. Elle est rangée dans le dossier de l’opportunité et le Mission Controller est prévenu : il ouvre le KYC et l’indépendance.</p>
@@ -126,7 +145,9 @@
     TDR_REQUIRED: 'Choisissez un document ou collez son lien.', FILE_TOO_LARGE: 'Document trop lourd.', PARTNER_DECISION_ONLY: 'Seul un Associé peut remplir cette ligne.',
     MANAGER_ONLY: 'Cette ligne est remplie par un Manager.', SEPARATION_OF_FUNCTIONS: 'L’Associé qui décide ne peut pas être celui qui a préparé ou revu le dossier.',
     PHASE1_NOT_OPEN: 'La Phase 1 s’ouvre quand le client a confirmé.', PERSONAL_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel pour répondre.',
-    MANAGERS_ONLY: 'Réservé aux managers et associés.', NOT_WAITING_FOR_CLIENT: 'L’opportunité n’attend pas de réponse du client.'
+    MANAGERS_ONLY: 'Réservé aux managers et associés.', NOT_WAITING_FOR_CLIENT: 'L’opportunité n’attend pas de réponse du client.',
+    ANSWER_ALL_QUESTIONS: 'Répondez Oui ou Non à chaque question.', CERTIFICATION_REQUIRED: 'Cochez la certification avant d’enregistrer.', NOT_IN_TEAM: 'Vous ne faites pas partie de l’équipe validée.',
+    TEAM_REQUIRED: 'Gardez au moins une personne.', TEAM_ALREADY_VALIDATED: 'L’équipe est déjà validée.', TEAM_NOT_VALIDATED: 'L’équipe n’est pas encore validée.', NO_TEAM_DATA: 'Aucune personne du cabinet connue (Équipe et CV).'
   };
   var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || m; };
   var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC / indépendance', duplicate: 'Doublon possible', failed: 'Arrêt' };
@@ -199,7 +220,7 @@
     var tick = function () {
       OM.api('/api/app?route=opportunities&id=' + encodeURIComponent(id)).then(function (o) {
         if (stop) return; render(o);
-        if (o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing')) timer = setTimeout(tick, 6000);
+        if (o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing')) timer = setTimeout(tick, 6000);
       }).catch(function (e) { if (stop) return; $('read-error').hidden = false; $('read-error').textContent = msg(e); });
     };
     tick();
@@ -228,6 +249,7 @@
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
     $('won-card').hidden = !(o.status === 'go' || o.status === 'phase0') || !(lead || role === 'manager');
     drawMine(o, role);
+    drawTeam(o, role);
     var p1 = o.phase1;
     $('kyc-card').hidden = !p1 && o.status !== 'won';
     if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il ouvre le KYC et l’indépendance dans le classeur (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
@@ -269,6 +291,80 @@
       box.appendChild(a);
     });
   }
+
+  // ---- Phase 2: the team proposed by the Firm Manager, validated by a manager or the Associé;
+  // ---- Phase 3: each member's own independence declaration ----
+  var TROLES = ['Associé', 'Manager', 'Superviseur', 'Senior', 'Auditeur', 'Spécialiste'];
+  function drawTeam(o, role) {
+    var t = o.team || null, mgr = ['owner', 'partner', 'manager', 'supervisor'].indexOf(role) >= 0;
+    var show = Boolean(t) || ['go', 'won', 'phase1'].indexOf(o.status) >= 0;
+    $('team-card').hidden = !show;
+    if (!show) { $('indep-card').hidden = true; return; }
+    var ST = { proposing: 'Le Firm Manager propose…', proposed: 'Proposée — à valider', validated: 'Validée', failed: 'Proposition impossible' };
+    $('team-status').textContent = t ? (ST[t.status] || t.status) : 'À proposer';
+    $('team-lead').textContent = !t ? 'Après « poursuivre », le Firm Manager propose l’équipe (compétences, expérience, charge, disponibilité) ; un manager ou l’Associé la valide ; chaque membre fait ensuite sa déclaration d’indépendance.'
+      : t.status === 'failed' ? 'Arrêt : ' + (t.error === 'NO_TEAM_DATA' ? 'aucune personne du cabinet connue (Équipe et CV).' : t.error)
+      : t.status === 'validated' ? 'Validée par ' + (t.validated_by || '?') + ' le ' + UI.dateTime(t.validated_at) + '. Déclarations d’indépendance : ' + t.members.filter(function (m) { return (o.declarations || {})[(m.email || m.name).toLowerCase()]; }).length + '/' + t.members.length + '.'
+      : t.status === 'proposed' ? 'Proposition du Firm Manager : décochez, changez le rôle, ajoutez une personne, puis validez.' : '';
+    var box = $('team-list'); box.textContent = '';
+    var rows = [];
+    var list = t && t.status === 'validated' ? t.members : (t && t.proposed) || [];
+    list.forEach(function (m) {
+      var it = el('div', null, 'item'), tt = el('div', null, 't');
+      tt.appendChild(el('span', m.name + (m.role ? ' — ' + m.role : '')));
+      var dec = (o.declarations || {})[(m.email || m.name).toLowerCase()];
+      tt.appendChild(el('span', t.status === 'validated' ? (dec ? 'Indépendance déclarée le ' + UI.dateTime(dec.at) + (dec.threats.length ? ' — ' + dec.threats.length + ' situation(s) à examiner : ' + dec.threats.join(' ; ') : ' — aucune menace') : 'Déclaration d’indépendance attendue') : (m.why || '') + (m.load_pct != null ? ' · charge ' + m.load_pct + ' %' : ''), 'meta'));
+      it.appendChild(tt);
+      if (t.status === 'proposed' && mgr) {
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; cb.setAttribute('aria-label', 'Garder ' + m.name);
+        var sel = document.createElement('select'); TROLES.forEach(function (r) { sel.appendChild(new Option(r, r)); }); sel.value = TROLES.indexOf(m.role) >= 0 ? m.role : 'Auditeur'; sel.setAttribute('aria-label', 'Rôle de ' + m.name);
+        it.appendChild(sel); it.appendChild(cb); rows.push({ m: m, cb: cb, sel: sel });
+      } else if (dec && dec.threats.length) it.appendChild(el('span', 'À examiner', 'tag warn'));
+      box.appendChild(it);
+    });
+    ((t && t.gaps) || []).forEach(function (g) { box.appendChild(el('div', 'Manque : ' + g.requirement + (g.why ? ' — ' + g.why : ''), 'item')); });
+    var act = $('team-actions'); act.textContent = '';
+    if (mgr && t && t.status === 'proposed') {
+      var extraName = document.createElement('input'); extraName.placeholder = 'Ajouter une personne (nom)'; extraName.setAttribute('aria-label', 'Ajouter une personne');
+      var extraRole = document.createElement('select'); TROLES.forEach(function (r) { extraRole.appendChild(new Option(r, r)); }); extraRole.value = 'Auditeur'; extraRole.setAttribute('aria-label', 'Rôle de la personne ajoutée');
+      var ok = el('button', 'Valider l’équipe', 'btn'); ok.type = 'button';
+      ok.addEventListener('click', function () {
+        var members = rows.filter(function (x) { return x.cb.checked; }).map(function (x) { return { name: x.m.name, email: x.m.email, role: x.sel.value }; });
+        if (extraName.value.trim()) members.push({ name: extraName.value.trim(), role: extraRole.value });
+        ok.disabled = true;
+        api({ action: 'validate-team', opportunity_id: o.id, members: members }).then(function () { $('team-say').textContent = 'Équipe validée : les noms sont écrits dans la fiche du classeur, chaque membre est invité à sa déclaration d’indépendance.'; window.reloadOpportunity(); })
+          .catch(function (e) { ok.disabled = false; $('team-say').textContent = msg(e); });
+      });
+      act.appendChild(extraName); act.appendChild(extraRole); act.appendChild(ok);
+    }
+    if (mgr && (!t || t.status === 'failed' || t.status === 'proposed')) {
+      var again = el('button', t ? 'Refaire la proposition' : 'Proposer l’équipe', t ? 'btn ghost' : 'btn'); again.type = 'button';
+      again.addEventListener('click', function () { again.disabled = true; api({ action: 'propose-team', opportunity_id: o.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { again.disabled = false; $('team-say').textContent = msg(e); }); });
+      act.appendChild(again);
+    }
+    // My own declaration (team members only).
+    var mine = o.viewer && o.viewer.in_team && t && t.status === 'validated';
+    $('indep-card').hidden = !mine || Boolean(o.my_declaration);
+    if (mine && !o.my_declaration && !$('indep-qs').children.length) {
+      (o.independence_questions || []).forEach(function (q) {
+        var row = el('div', null, 'opp-row'); row.appendChild(el('h3', q.ref + ' — ' + q.label));
+        var g = el('div', null, 'opp-fields');
+        var a = document.createElement('select'); a.dataset.ref = q.ref; a.appendChild(new Option('—', '')); a.appendChild(new Option('Non', 'Non')); a.appendChild(new Option('Oui', 'Oui')); a.setAttribute('aria-label', q.label);
+        var dtl = document.createElement('textarea'); dtl.dataset.detail = q.ref; dtl.placeholder = 'Si « Oui » : précisez'; dtl.rows = 1;
+        var l1 = el('label', 'Votre réponse'); l1.appendChild(a); var l2 = el('label', 'Précision'); l2.appendChild(dtl); g.appendChild(l1); g.appendChild(l2); row.appendChild(g);
+        $('indep-qs').appendChild(row);
+      });
+    }
+  }
+  $('indep-send').addEventListener('click', function () {
+    var answers = {}, details = {};
+    document.querySelectorAll('#indep-qs select').forEach(function (s) { answers[s.dataset.ref] = s.value; });
+    document.querySelectorAll('#indep-qs textarea').forEach(function (x) { if (x.value.trim()) details[x.dataset.detail] = x.value.trim(); });
+    var b = this; b.disabled = true;
+    api({ action: 'declare', opportunity_id: current.id, answers: answers, details: details, certify: $('indep-certify').checked })
+      .then(function (r) { $('indep-say').textContent = r.threats.length ? 'Déclaration enregistrée : ' + r.threats.length + ' situation(s) seront examinées par le Manager et l’Associé.' : 'Déclaration enregistrée : aucune menace.'; window.reloadOpportunity(); })
+      .catch(function (e) { b.disabled = false; $('indep-say').textContent = msg(e); });
+  });
 
   function drawSheets(o) {
     var box = $('sheets'); box.textContent = '';

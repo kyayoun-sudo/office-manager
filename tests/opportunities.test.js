@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -252,4 +252,29 @@ test('Firm Manager round: a TDR dropped in the opportunities folder is signalled
   const r = await opportunityRound('org', d);
   assert.equal(r.new_tdr, 1);
   assert.equal((await opportunityRound('org', d)).new_tdr, 0);
+});
+
+test('Phase 2 then 3: « poursuivre » → the Firm Manager proposes the team; a manager validates; each member declares their own independence', async () => {
+  const { d, fired } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(opportunity.id, d);
+  fired.length = 0;
+  await answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Ama Associée', role: 'partner' }, { ...d, req: { headers: { host: 'x' } } });
+  assert.equal(fired[0].path, '/api/app?route=opportunity-team-step', 'the team is proposed right after « poursuivre »');
+  const ai = async () => ({ provider: 'fake', text: JSON.stringify({ team: [{ name: 'A. Senior', role: 'Senior', why: 'secteur distribution, 40 % de charge' }, { name: 'Inconnu Externe', role: 'Manager', why: 'x' }], gaps: [{ requirement: 'Expert IFRS 17', why: 'personne au cabinet' }] }) });
+  const t = await teamStep('org', {}, { opportunity_id: o.id }, { ...d, ai, capabilityContext: async () => ({ people: [{ kind: 'employee', full_name: 'A. Senior', email: 'senior@cab.ci', title: 'Senior', load_pct: 40 }] }) });
+  assert.equal(t.team.status, 'proposed');
+  assert.deepEqual(t.team.proposed.map(m => m.name), ['A. Senior'], 'nobody outside the firm is proposed');
+  assert.equal(t.team.gaps.length, 1);
+  await assert.rejects(validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', role: 'Senior' }] }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'K. Manager', email: 'km@cab.ci', role: 'Manager' }] }, { display_name: 'Ama Associée', role: 'partner' }, d);
+  await assert.rejects(declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'Quelqu’un', email: 'other@cab.ci' }, d), /NOT_IN_TEAM/);
+  await assert.rejects(declareIndependence('org', { opportunity_id: o.id, answers: {}, certify: true }, { email: 'senior@cab.ci' }, d), /ANSWER_ALL_QUESTIONS/);
+  const a = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Oui' }, details: { 'C.01': 'actions de la société' }, certify: true }, { display_name: 'A. Senior', email: 'senior@cab.ci' }, d);
+  assert.deepEqual([a.threats.length, a.all_declared], [1, false]);
+  const b = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'K. Manager', email: 'km@cab.ci' }, d);
+  assert.equal(b.all_declared, true);
+  const view = await opportunityView('org', o.id, { display_name: 'A. Senior', email: 'senior@cab.ci', role: 'senior' }, d);
+  assert.equal(view.viewer.in_team, true); assert.equal(view.my_declaration.threats.length, 1);
+  assert.deepEqual(view.independence_questions, [{ ref: 'C.01', label: 'Intérêts financiers' }], 'the questions are the threats of the firm\'s own sheet');
 });

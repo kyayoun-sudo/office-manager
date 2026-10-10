@@ -354,7 +354,10 @@ export const ROUTES = Object.freeze({
       const o = await import('../lib/opportunities.js'); const b = req.body || {}; const a = b.action;
       if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
       if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
-      if (a === 'answer') return o.answerRow(orgId, b, req.account);
+      if (a === 'answer') return o.answerRow(orgId, b, req.account, { req });
+      if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
+      if (a === 'validate-team') return o.validateTeam(orgId, b, req.account);
+      if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
@@ -381,6 +384,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'MY_AI_UNAVAILABLE'
   },
   'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-team-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).teamStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
