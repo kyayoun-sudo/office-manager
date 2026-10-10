@@ -281,7 +281,8 @@
     bell.addEventListener('click', function (e) { e.stopPropagation(); toggle(panel.hidden); });
     document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && e.target !== bell) toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { toggle(false); bell.focus(); } });
-    setTimeout(load, 1500); setInterval(function () { if (!document.hidden) load(); }, 120000);
+    setTimeout(load, 1500); setInterval(function () { if (!document.hidden) load(); }, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
   }
   function openClose() {
     var s = readSession() || {}, email = (s.user && s.user.email) || '';
