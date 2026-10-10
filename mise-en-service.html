@@ -170,7 +170,7 @@
        ['À lire', m.objects.pending_read + m.objects.needs_understanding], ['Passages', m.scan_count]].forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
     }
     $('map-warning').hidden = !m.warning && !m.error; $('map-warning').textContent = m.warning || m.error || '';
-    $('map-pass').disabled = m.mapping_state === 'NO_DRIVE';
+    if (m.mapping_state === 'NO_DRIVE') $('map-pass').disabled = true;
     $('map-review').hidden = m.mapping_state !== 'MAPPING_PENDING_REVIEW';
 
     var qs = $('questions'); qs.textContent = '';
@@ -208,13 +208,16 @@
     clearTimeout(scanTimer);
     OM.api('/api/app?route=mapping-scan', { headers: ownerHeaders() }).then(function (s) {
       if (!s) return;
-      var t = s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
+      var t = s.stalled ? '⚠ Scan interrompu ou bloqué : aucune progression confirmée depuis ' + (s.last_progress_at ? UI.dateTime(s.last_progress_at) : 'une heure inconnue') + '. ' + s.files_seen + ' fichiers recensés ; ' + s.folders_left + ' dossiers restant à parcourir.' + (s.resumable ? ' Cliquez sur « Reprendre le scan » pour continuer depuis le dernier point enregistré.' : ' La finalisation doit être vérifiée avant de relancer.')
+        : s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
         : s.status === 'mapping' ? 'Parcours terminé (' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers). L’Orpailleur écrit sa cartographie…'
         : s.status === 'done' ? 'Inventaire terminé : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers découverts. Leur lecture et leur compréhension sont des étapes distinctes.'
         : s.status === 'incomplete' ? 'Inventaire incomplet : ' + s.files_seen + ' fichiers découverts, ' + s.folders_left + ' dossiers restant à parcourir. ' + (s.reason === 'ITEM_LIMIT' ? 'La limite de taille du parcours a été atteinte.' : 'Certains dossiers sont inaccessibles ou attendent une nouvelle tentative.')
         : s.status === 'failed' ? 'La cartographie a échoué : ' + ((s.errors || []).map(function (e) { return e.path + ' — ' + e.error; }).pop() || 'cause inconnue') + '.' : '';
       if (s.errors && s.errors.length && s.status !== 'failed') t += ' ' + s.errors.length + ' dossier(s) illisible(s).';
       live(t);
+      $('map-pass').textContent = s.stalled && s.resumable ? 'Reprendre le scan' : s.status === 'walking' || s.status === 'mapping' ? 'Scan en cours' : 'Lancer le premier scan';
+      $('map-pass').disabled = ['walking', 'mapping'].includes(s.status) && !s.resumable;
       if (s.status === 'walking' || s.status === 'mapping') scanTimer = setTimeout(watchScan, 5000); else { load(); if (typeof loadKnow === 'function') setTimeout(loadKnow, 3000); }
     }).catch(function () {});
   }
