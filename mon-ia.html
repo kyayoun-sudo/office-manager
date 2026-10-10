@@ -63,12 +63,12 @@
       <div class="ai-form">
         <label>Fournisseur<select id="provider"></select></label>
         <label>Clé d’API personnelle<input id="key" type="password" autocomplete="off" placeholder="sk-…"></label>
-        <label>Modèle (facultatif)<input id="model" type="text" maxlength="80"></label>
+        <label>Modèle (facultatif, laisser vide)<input id="model" type="text" maxlength="80"></label>
       </div>
       <label class="accept"><input type="checkbox" id="accept"> <span>J’ai lu l’avertissement ci-dessus. Je comprends que ce que je soumets à mon IA est envoyé à son fournisseur sous ma responsabilité, et que ni le cabinet ni Office Manager n’en sont responsables.</span></label>
       <div><button class="btn" id="go" type="button" disabled>Connecter mon IA</button></div>
       <p class="status" id="say" role="status"></p>
-      <p class="meta">La clé est vérifiée par un court essai, puis gardée chiffrée ; elle n’est jamais réaffichée (seuls ses 4 derniers caractères). Où trouver une clé : console.anthropic.com, platform.openai.com, aistudio.google.com. Un abonnement grand public (ChatGPT Plus, Claude Pro) ne donne pas de clé d’API : il faut un compte « API » chez le fournisseur.</p>
+      <p class="meta">La clé est vérifiée auprès du fournisseur (liste des modèles de votre compte ; laissez « Modèle » vide pour le meilleur disponible), puis gardée chiffrée ; elle n’est jamais réaffichée (seuls ses 4 derniers caractères). Où trouver une clé : console.anthropic.com, platform.openai.com, aistudio.google.com. Un abonnement grand public (ChatGPT Plus, Claude Pro) ne donne pas de clé d’API : il faut un compte « API » chez le fournisseur.</p>
     </section>
 
     <section class="card" aria-labelledby="h-firm" id="firm-card" hidden>
@@ -90,7 +90,7 @@
     PERSONAL_AI_DISABLED_BY_FIRM: 'Le cabinet n’autorise pas les IA personnelles pour l’instant.', PERSONAL_AI_SQL_NOT_INSTALLED: 'Fonction pas encore installée dans la base (db/personal-ai.sql à exécuter dans Supabase).',
     MODEL_INVALID: 'Nom de modèle non valide.', ROLE_NOT_ALLOWED: 'Connectez-vous avec votre compte personnel (e-mail et mot de passe).', USER_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel (e-mail et mot de passe).'
   };
-  var msg = function (e) { var m = String(e && e.message || e); if (/^KEY_REFUSED_BY_PROVIDER/.test(m)) return 'Le fournisseur a refusé la clé : ' + m.replace(/^KEY_REFUSED_BY_PROVIDER:\s*/, ''); return ERR[m] || m; };
+  var msg = function (e) { var m = String(e && e.message || e); if (/^MODEL_NOT_AVAILABLE/.test(m)) return 'Ce modèle n’est pas disponible avec votre clé. Laissez le champ « Modèle » vide pour que le meilleur modèle de votre compte soit choisi' + (m.split(': ')[1] ? ' (disponibles : ' + m.split(': ')[1] + ')' : '') + '.'; if (/^KEY_REFUSED_BY_PROVIDER/.test(m)) return 'Le fournisseur a refusé la clé : ' + m.replace(/^KEY_REFUSED_BY_PROVIDER:\s*/, ''); return ERR[m] || m; };
   var api = function (route, body) { return OM.api('/api/app?route=' + route, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined); };
 
   function render() {
@@ -99,7 +99,7 @@
     $('state').textContent = !data.installed ? ERR.PERSONAL_AI_SQL_NOT_INSTALLED : !data.firm_allows ? ERR.PERSONAL_AI_DISABLED_BY_FIRM : '';
     $('add-card').hidden = !data.installed || !data.firm_allows;
     var sel = $('provider'); if (!sel.options.length) Object.keys(data.providers).forEach(function (k) { sel.appendChild(new Option(data.providers[k], k)); });
-    $('model').placeholder = data.default_models[sel.value] || '';
+    $('model').placeholder = 'choisi automatiquement';
     var box = $('mine'); box.textContent = '';
     var on = (data.keys || []).filter(function (k) { return k.active; });
     if (!on.length) box.appendChild(el('p', 'Aucune IA personnelle connectée : vos demandes utilisent l’IA du cabinet.', 'empty'));
@@ -114,12 +114,12 @@
     });
   }
   function load() { return api('my-ai').then(function (d) { data = d; render(); }).catch(function (e) { $('mine').textContent = ''; $('mine').appendChild(el('p', msg(e), 'empty')); }); }
-  $('provider').addEventListener('change', function () { if (data) $('model').placeholder = data.default_models[this.value] || ''; });
+
   $('accept').addEventListener('change', function () { $('go').disabled = !this.checked; });
   $('go').addEventListener('click', function () {
     var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = 'Vérification de la clé auprès du fournisseur…';
     api('my-ai', { action: 'connect', provider: $('provider').value, key: $('key').value.trim(), model: $('model').value.trim(), accept_notice: $('accept').checked, notice_version: data.notice_version })
-      .then(function (r) { $('say').textContent = 'Connectée (' + r.key_hint + '). Vos demandes passent maintenant d’abord par votre IA.'; $('key').value = ''; $('accept').checked = false; return load(); })
+      .then(function (r) { $('say').textContent = 'Connectée (' + r.key_hint + ', modèle ' + r.model + '). Vos demandes passent maintenant d’abord par votre IA.'; $('key').value = ''; $('accept').checked = false; return load(); })
       .catch(function (e) { $('say').className = 'status error'; $('say').textContent = msg(e); b.disabled = !$('accept').checked; });
   });
 

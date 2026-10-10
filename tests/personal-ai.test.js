@@ -20,12 +20,12 @@ const me = { auth_user_id: 'u1', email: 'awa@cab.ci', display_name: 'Awa' };
 
 test('Mon IA: connecting requires the warning accepted (current version); the key is checked, kept sealed, never shown back', async () => {
   const { rows, fetchRows } = db();
-  const d = { fetchRows, sealer, audit: async () => null, callModel: async () => ({ text: 'OK' }) };
+  const d = { fetchRows, sealer, audit: async () => null, availableModels: async () => ['claude-sonnet-4-5', 'claude-opus-4-1'] };
   assert.match(NOTICE, /ne sont pas responsables|n’en sont pas responsables/);
   await assert.rejects(connectMyAI('o', me, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) }, d), /NOTICE_NOT_ACCEPTED/);
   await assert.rejects(connectMyAI('o', me, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30), accept_notice: true, notice_version: 'old' }, d), /NOTICE_NOT_ACCEPTED/);
   await assert.rejects(connectMyAI('o', me, { provider: 'anthropic', key: 'bad key', accept_notice: true, notice_version: NOTICE_VERSION }, d), /KEY_INVALID/);
-  await assert.rejects(connectMyAI('o', me, { provider: 'anthropic', key: 'sk-ant-' + 'y'.repeat(30), accept_notice: true, notice_version: NOTICE_VERSION }, { ...d, callModel: async () => { throw new Error('ANTHROPIC_401: invalid x-api-key'); } }), /KEY_REFUSED_BY_PROVIDER/);
+  await assert.rejects(connectMyAI('o', me, { provider: 'anthropic', key: 'sk-ant-' + 'y'.repeat(30), accept_notice: true, notice_version: NOTICE_VERSION }, { ...d, availableModels: async () => { throw new Error('ANTHROPIC_401: invalid x-api-key'); } }), /KEY_REFUSED_BY_PROVIDER/);
   const r = await connectMyAI('o', me, { provider: 'anthropic', key: 'sk-ant-' + 'z'.repeat(26) + 'ABCD', accept_notice: true, notice_version: NOTICE_VERSION }, d);
   assert.equal(r.key_hint, '…ABCD');
   assert.match(rows[0].key_enc, /^sealed:/);
@@ -55,4 +55,16 @@ test('Mon IA: a person\'s request tries their AI first, then the firm\'s AI exac
   assert.equal(c.provider, 'anthropic'); assert.deepEqual(calls, [['anthropic', 'firm-oa', 'firm']], 'background work: firm only');
   assert.equal(await tryPersonal(['openai'], {}, callModel, d), null);
   assert.equal(personalEnv({ provider: 'gemini', key: 'g', model: 'gm' }, {}).GEMINI_API_KEY, 'g');
+});
+
+test('Mon IA: the key is checked by listing its models (no tiny answer); the model is one the key really has', async () => {
+  const { pickModel, availableModels } = await import('../lib/personal-ai.js');
+  assert.equal(pickModel('openai', '', 'gpt-x-firm', ['gpt-4o-mini', 'gpt-5', 'gpt-4o-realtime-preview', 'text-embedding-3']), 'gpt-5');
+  assert.equal(pickModel('openai', '', 'gpt-5', ['gpt-5', 'gpt-4o']), 'gpt-5', 'the firm model when the key has it');
+  assert.equal(pickModel('anthropic', 'claude-none', null, ['claude-sonnet-4-5']), null);
+  assert.equal(pickModel('gemini', '', null, ['gemini-2.5-flash', 'gemini-2.5-pro', 'embedding-001']), 'gemini-2.5-pro');
+  const fetchImpl = async (url, o) => ({ ok: true, json: async () => url.includes('googleapis') ? { models: [{ name: 'models/gemini-2.5-pro', supportedGenerationMethods: ['generateContent'] }, { name: 'models/embedding-001', supportedGenerationMethods: ['embedContent'] }] } : { data: [{ id: 'gpt-5' }] } });
+  assert.deepEqual(await availableModels('gemini', 'k', { fetchImpl }), ['gemini-2.5-pro']);
+  assert.deepEqual(await availableModels('openai', 'k', { fetchImpl }), ['gpt-5']);
+  await assert.rejects(availableModels('openai', 'bad', { fetchImpl: async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Incorrect API key provided' } }) }) }), /OPENAI_401: Incorrect API key/);
 });
