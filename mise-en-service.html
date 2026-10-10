@@ -296,13 +296,14 @@
     b.appendChild(tp);
     if (t.status === 'done') { var av = document.createElement('a'); av.href = '/validations.html'; av.textContent = 'Ouvrir « À valider »'; b.appendChild(av); }
     var rb = el('button', t.stalled ? 'Reprendre le rangement' : t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
-    rb.addEventListener('click', function () { rb.disabled = true; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function (r) {
+    rb.addEventListener('click', function () { clearTimeout(knowTimer); rb.disabled = true; rb.textContent = 'Demande en cours…'; tp.textContent = 'Demande de reprise du rangement en cours…'; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function (r) {
       if (r.reason === 'MAPPING_INTERRUPTED') tp.textContent = 'Le scan est interrompu : reprenez-le dans Cartographie du Drive.';
       else if (r.reason === 'MAPPING_IN_PROGRESS') tp.textContent = 'Le scan du Drive est en cours : le rangement attend sa fin.';
       else if (r.reason === 'FIRST_SCAN_RUNNING' || r.reason === 'PASS_ALREADY_RUNNING') tp.textContent = 'Le rangement est déjà en cours.';
-      else knowTimer = setTimeout(loadKnow, 4000);
-      rb.disabled = false;
-    }).catch(function (e) { tp.textContent = msg(e); rb.disabled = false; }); });
+      else { tp.textContent = r.resumed ? 'Reprise demandée à partir du fichier ' + (r.done || 0) + '. En attente de la prochaine progression confirmée…' : 'Lancement demandé. En attente de la première progression confirmée…'; knowTimer = setTimeout(loadKnow, 4000); }
+      rb.textContent = 'Demande enregistrée';
+      knowTimer = setTimeout(loadKnow, 4000);
+    }).catch(function (e) { tp.textContent = 'La demande a échoué : ' + msg(e); rb.textContent = 'Réessayer la reprise'; rb.disabled = false; }); });
     b.appendChild(rb);
     if (t.status === 'planning') knowTimer = setTimeout(loadKnow, 6000);
   }
