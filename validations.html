@@ -126,11 +126,17 @@
       if (action.retry_needed) {
         c.appendChild(el('p', 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
         var retry = el('button', 'Reprendre le déplacement approuvé', 'btn'); retry.type = 'button';
+        var resultLine = el('p', '', 'status'); resultLine.setAttribute('role', 'status'); c.appendChild(resultLine);
         retry.addEventListener('click', function () {
-          retry.disabled = true; retry.textContent = 'Reprise en cours…';
+          retry.disabled = true; retry.textContent = 'Reprise en cours…'; resultLine.textContent = 'Demande reçue : vérification et déplacement en cours…';
           OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'retry', action_id: action.id }) })
-            .then(function (r) { show(r.effect || 'Reprise terminée.'); start(); })
-            .catch(function (e) { show('Reprise échouée : ' + e.message, true); retry.disabled = false; retry.textContent = 'Réessayer le déplacement'; });
+            .then(function (r) {
+              resultLine.textContent = r.effect || (r.executed ? 'Déplacement effectué.' : 'Déplacement non effectué.');
+              show(resultLine.textContent, !r.executed);
+              if (r.executed) { retry.textContent = r.verified ? 'Déplacement vérifié' : 'Déplacement effectué'; action.retry_needed = false; }
+              else { retry.disabled = false; retry.textContent = 'Réessayer après vérification'; }
+            })
+            .catch(function (e) { resultLine.textContent = 'Reprise échouée : ' + e.message; show(resultLine.textContent, true); retry.disabled = false; retry.textContent = 'Réessayer le déplacement'; });
         });
         c.appendChild(retry);
       }
@@ -281,7 +287,7 @@
   }
   UI.requireLogin(function () {
     start();
-    setInterval(function () { if (!document.hidden && !editing && !document.querySelector('button:disabled') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) start(); }, 15000);
+    setInterval(function () { if (!document.hidden && !editing && !document.querySelector('article [role="status"]:not(:empty)') && !document.querySelector('button:disabled') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) start(); }, 15000);
   });
 })();
 </script>
