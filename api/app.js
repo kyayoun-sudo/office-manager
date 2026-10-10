@@ -297,7 +297,7 @@ export const ROUTES = Object.freeze({
   'firm-knowledge': {
     GET: owner(async () => ({ ...(await firmKnowledge()), tidy: await tidyStatus().catch(() => null) })),
     POST: owner(async (orgId, req) => {
-      if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
+      if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
@@ -306,7 +306,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
   },
   // Understanding the firm, then (same first scan) where every file goes.
-  'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); if (req.body?.skip_tidy !== true) await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
   'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
   translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
