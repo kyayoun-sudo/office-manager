@@ -19,6 +19,17 @@
   .opp-prop p{margin:0 0 4px}
   .opp-review{border-left:3px solid var(--accent, #2F5597);padding:8px 12px;margin:6px 0 12px;font-size:14px;line-height:1.5}
   .opp-review p{margin:0 0 6px}
+  .quick{display:flex;flex-direction:column;gap:12px}
+  .quick .q-step{font-size:13px;color:var(--muted);margin:0}
+  .quick h3{margin:0;font-size:18px;line-height:1.4;font-weight:600}
+  .quick .q-ctx{font-size:13px;color:var(--muted);margin:0}
+  .quick .q-ai{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.5;margin:0}
+  .quick .q-ai ul{margin:6px 0 0;padding-left:18px}
+  .quick .q-opts{display:flex;flex-wrap:wrap;gap:8px}
+  .quick .q-opts .btn{min-width:84px}
+  .quick input.q-note{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+  .quick .q-done{font-size:15px;margin:0}
+  #all-sheets>summary{cursor:pointer;font-weight:600;padding:10px 0}
   .opp-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 12px}
   .opp-fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
   .opp-fields input,.opp-fields select,.opp-fields textarea{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
@@ -56,7 +67,7 @@
 
     <header class="page-head">
       <h1>Opportunités</h1>
-      <p class="lead">Déposez un TDR, un AMI ou un appel d’offres. Le <span data-agent="grand-controleur">Firm Manager</span> le lit, le range dans le dossier des appels d’offres avec le classeur d’acceptation du cabinet, remplit la fiche et prépare la Phase 0. Quand le client confirme, le Mission Controller fait le KYC dans le même classeur. Les agents remplissent tout ce qu’ils trouvent (TDR, Internet, missions et équipe du cabinet), avec leurs sources ; l’équipe relit et répond seulement à ce que personne d’autre ne peut savoir ; l’Associé décide.</p>
+      <p class="lead">Déposez un TDR ou un AMI : le <span data-agent="grand-controleur">Firm Manager</span> remplit le classeur d’acceptation avec ce qu’il trouve. Vous répondez seulement à ce qu’il ne peut pas savoir.</p>
     </header>
 
     <div id="list-view" class="stack">
@@ -89,7 +100,12 @@
         <p class="lead" id="opp-waiting"></p>
         <div class="links" id="opp-links"></div>
         <dl class="facts" id="opp-facts"></dl>
-        <ul class="joblog" id="opp-log"></ul>
+        <details class="opp-journal"><summary class="meta">Journal des agents</summary><ul class="joblog" id="opp-log"></ul></details>
+      </section>
+
+      <section class="card" aria-labelledby="h-mine" id="mine-card" hidden>
+        <h2 id="h-mine">À faire maintenant</h2>
+        <div class="quick" id="mine" aria-live="polite"></div>
       </section>
 
       <section class="card" aria-labelledby="h-team" id="team-card" hidden>
@@ -125,16 +141,10 @@
         <p class="status" id="kyc-say" role="status"></p>
       </section>
 
-      <section class="card" aria-labelledby="h-mine" id="mine-card" hidden>
-        <h2 id="h-mine">Pour vous</h2>
-        <p class="lead" id="mine-lead"></p>
-        <div class="stack" id="mine"></div>
-      </section>
-
       <div class="btn-row" id="again-row" hidden><button class="btn ghost" id="again" type="button">Refaire la Phase 0 avec le Firm Manager</button><span class="meta" id="again-say">Il refait ses recherches et remplit ce qu’il trouve, seulement dans les cases encore vides.</span></div>
 
       <p class="status error" id="read-error" hidden></p>
-      <div id="sheets" class="stack"></div>
+      <details id="all-sheets" class="card"><summary>Voir et corriger tout le classeur</summary><div id="sheets" class="stack"></div></details>
     </div>
   </main>
 </div>
@@ -251,7 +261,7 @@
     if (o.status === 'running') log.appendChild(el('li', 'Le Firm Manager travaille…', 'meta'));
     var role = (o.viewer && o.viewer.role) || '';
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
-    $('won-card').hidden = !(o.status === 'go' || o.status === 'phase0') || !(lead || role === 'manager');
+    $('won-card').hidden = o.status !== 'go' || !(lead || role === 'manager');
     drawMine(o, role);
     drawTeam(o, role);
     $('again-row').hidden = !(o.status === 'phase0' && mayReview(role));
@@ -282,42 +292,109 @@
     return out;
   }
 
-  // What THIS person has to do here, first: the Associé sees the decisions, the Manager the
-  // recommendation and the risk rating, the team the questions and the agents' proposals.
-  function drawMine(o, role) {
-    var rank = { partner: 0, manager: 1, team: 2 }, mine = [];
-    // Only the step the opportunity is at: Phase 0 before the client's answer, then Phase 1 and the conclusion.
-    var later = ['won', 'phase1'].indexOf(o.status) >= 0;
+  // ---- « À faire maintenant »: one short question at a time, answered with a button ----
+  // The agents have filled what they could find; a person only gets what needs them: a question
+  // nobody else can answer, a proposal without a source to confirm, a section to read once, the
+  // Manager's rating, the Associé's decision. The whole workbook stays behind « Voir et corriger ».
+  var skipped = {};
+  function shortLabel(r) { return String(r.label || '').split(' — ')[0]; }
+  function choiceField(r) { return r.fields.find(function (f) { return f.options && f.options.length; }) || null; }
+  function noteField(r) { return r.fields.find(function (f) { return !(f.options && f.options.length) && f.type !== 'date' && !/Pr[ée]par[ée] par|Revu|^Date|Lien|Preuve/i.test(f.header || ''); }) || null; }
+  function isEmpty(r) { return r.fields.every(function (f) { return !f.value; }); }
+  function queueFor(o, role) {
+    var later = ['won', 'phase1'].indexOf(o.status) >= 0, q = [];
+    var lead = ['partner', 'owner'].indexOf(role) >= 0;
     (o.sheets || []).forEach(function (s) {
       if (!s.open || (later ? s.owner === 'firm-manager' : s.owner !== 'firm-manager')) return;
       s.rows.forEach(function (r) {
-        if (!r.may_fill || r.identity || r.fields.some(function (f) { return f.value; })) return;
-        var mineFirst = ['partner', 'owner'].indexOf(role) >= 0 ? r.authority === 'partner' && /D[ÉE]CISION/i.test(r.label || '') && !/^(Date|Nom)/i.test(r.label || '') : role === 'manager' ? r.authority === 'manager' && !/^Nom |date$/i.test(r.label || '') : Boolean(r.proposal);
-        if (!mineFirst) return;
-        mine.push({ s: s, r: r });
+        if (!r.may_fill || r.identity || !isEmpty(r) || /^(Nom|Date)\b/i.test(shortLabel(r))) return;
+        var key = s.name + '!' + r.row, p = r.proposal, done = (o.ai_filled || {})[key];
+        if (r.authority === 'partner') { if (lead && /D[ÉE]CISION/i.test(shortLabel(r)) && choiceField(r)) q.push({ kind: 'decide', s: s, r: r, order: 5 }); return; }
+        if (r.authority === 'manager') { if (mayReview(role) && choiceField(r)) q.push({ kind: 'rate', s: s, r: r, order: 4 }); return; }
+        if (p && p.for_team) q.push({ kind: 'ask', s: s, r: r, p: p, order: 1 });
+        else if (p && !done && Object.keys(p.values || {}).length) q.push({ kind: 'confirm', s: s, r: r, p: p, order: 2 });
       });
     });
-    mine.sort(function (a, b) { return rank[a.r.authority] - rank[b.r.authority]; });
-    // Managers and above: the sections the agents filled that nobody has read yet.
-    var toRead = mayReview(role) ? agentSections(o).filter(function (x) { return !x.review; }) : [];
-    var box = $('mine'); box.textContent = '';
-    toRead.forEach(function (x) {
-      var a = el('a', null, 'item link-item'); a.href = '#sec-' + x.id;
-      var t = el('div', null, 't'); t.appendChild(el('span', 'À relire : ' + (x.section.trim() || x.sheet.title)));
-      t.appendChild(el('span', x.count + ' ligne(s) remplie(s) par ' + x.agent, 'meta')); a.appendChild(t);
-      a.addEventListener('click', function () { var d = document.getElementById('sec-' + x.id); if (d) { d.open = true; var p = d.parentNode; while (p && p.tagName) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentNode; } } });
-      box.appendChild(a);
+    if (mayReview(role)) agentSections(o).filter(function (x) { return !x.review && x.sheet.open; }).forEach(function (x) { q.push({ kind: 'review', x: x, order: 3 }); });
+    q.forEach(function (it) { it.id = it.kind === 'review' ? 'rev:' + it.x.id : it.s.name + '!' + it.r.row; });
+    return q.sort(function (a, b) { return (skipped[a.id] || 0) - (skipped[b.id] || 0) || a.order - b.order; });
+  }
+  function drawMine(o, role) {
+    var q = queueFor(o, role), box = $('mine'); box.textContent = '';
+    var busy = o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing');
+    $('mine-card').hidden = !q.length && !busy && !(o.ai_filled && Object.keys(o.ai_filled).length);
+    if (!q.length) {
+      box.appendChild(el('p', busy ? 'Les agents remplissent le classeur. Revenez dans quelques minutes : seules les questions qu’ils n’auront pas pu résoudre apparaîtront ici.' : 'Rien d’autre à faire pour vous ici. Le classeur est à jour.', 'q-done'));
+      return;
+    }
+    var it = q[0];
+    box.appendChild(el('p', q.length === 1 ? 'Dernière chose pour vous' : '1 sur ' + q.length + ' · ' + (q.length - 1) + ' ensuite', 'q-step'));
+    var say = el('p', '', 'meta');
+    var send = function (values, fromProposal) {
+      [].forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = true; });
+      say.textContent = 'Écriture dans le classeur…';
+      api({ action: 'answer', opportunity_id: o.id, sheet: it.s.name, row: it.r.row, values: values, from_proposal: Boolean(fromProposal) })
+        .then(function () { window.reloadOpportunity(); })
+        .catch(function (e) { say.textContent = msg(e); [].forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = false; }); });
+    };
+    var later = function () { var b = el('button', 'Plus tard', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { skipped[it.id] = (skipped[it.id] || 0) + 1; drawMine(o, role); }); return b; };
+
+    if (it.kind === 'review') {
+      var x = it.x;
+      box.appendChild(el('h3', 'Relire : ' + (x.section.trim() || x.sheet.title)));
+      box.appendChild(el('p', x.agent + ' a rempli ' + x.count + ' ligne(s), chacune avec sa source.', 'q-ctx'));
+      var ai = el('div', null, 'q-ai'), ul = el('ul');
+      x.sheet.rows.filter(function (r) { return (r.section || '') === x.section && (o.ai_filled || {})[x.sheet.name + '!' + r.row]; }).slice(0, 10).forEach(function (r) {
+        var vals = r.fields.filter(function (f) { return f.value && !/Pr[ée]par[ée] par|^Date$/i.test(f.header || ''); }).map(function (f) { return f.value; }).join(' · ');
+        ul.appendChild(el('li', (r.ref ? r.ref + ' ' : '') + shortLabel(r) + ' : ' + vals));
+      });
+      if (x.count > 10) ul.appendChild(el('li', '… et ' + (x.count - 10) + ' autre(s)'));
+      ai.appendChild(ul); box.appendChild(ai);
+      var row = el('div', null, 'q-opts');
+      var ok = el('button', 'J’ai relu, c’est bon', 'btn'); ok.type = 'button';
+      ok.addEventListener('click', function () {
+        ok.disabled = true; say.textContent = 'Votre nom et la date vont dans « Revu par »…';
+        api({ action: 'review-section', opportunity_id: o.id, sheet: x.sheet.name, section: x.section }).then(function () { window.reloadOpportunity(); }).catch(function (e) { ok.disabled = false; say.textContent = msg(e); });
+      });
+      var fix = el('button', 'Corriger quelque chose', 'btn ghost'); fix.type = 'button';
+      fix.addEventListener('click', function () { var all = $('all-sheets'); all.open = true; var d = document.getElementById('sec-' + x.id); if (d) { d.open = true; var p = d.parentNode; while (p && p.tagName) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentNode; } d.scrollIntoView({ behavior: 'smooth' }); } });
+      row.appendChild(ok); row.appendChild(fix); row.appendChild(later()); box.appendChild(row); box.appendChild(say);
+      if (['partner', 'owner'].indexOf(role) >= 0) box.appendChild(el('p', 'Si c’est vous qui déciderez, laissez cette relecture à un Manager (celui qui relit ne peut pas décider).', 'meta'));
+      return;
+    }
+
+    var r = it.r, p = it.p, choice = choiceField(r), note = noteField(r);
+    var title = it.kind === 'ask' && p.question ? p.question : (r.ref ? r.ref + ' — ' : '') + shortLabel(r);
+    box.appendChild(el('h3', title));
+    var ctx = ((it.s.title || it.s.name).split('—')[1] || it.s.name).split(':')[0];
+    box.appendChild(el('p', (it.kind === 'decide' ? 'Votre décision d’Associé · ' : it.kind === 'rate' ? 'Votre cotation de Manager · ' : '') + ctx.trim() + (r.section && /SECTION/i.test(r.section) ? ' · ' + r.section.split(' — ')[0] : ''), 'q-ctx'));
+    if (it.kind === 'confirm') {
+      var pa = el('div', null, 'q-ai');
+      pa.appendChild(el('p', agentName(it.s.owner).replace(' (IA)', '') + ' pense : ' + Object.keys(p.values).map(function (c) { return p.values[c]; }).join(' · ')));
+      if (p.why) pa.appendChild(el('p', p.why, 'meta'));
+      box.appendChild(pa);
+    }
+    var input = null;
+    if (note) { input = document.createElement('input'); input.className = 'q-note'; input.type = 'text'; input.maxLength = 400; input.placeholder = choice ? 'Précision (facultatif)' : 'Votre réponse, en quelques mots'; input.setAttribute('aria-label', note.header || 'Précision'); }
+    var opts = el('div', null, 'q-opts');
+    if (it.kind === 'confirm') {
+      var yes = el('button', 'C’est juste', 'btn'); yes.type = 'button';
+      yes.addEventListener('click', function () { send(p.values, true); });
+      opts.appendChild(yes);
+    }
+    if (choice) choice.options.forEach(function (v) {
+      var b = el('button', v.length > 40 ? v.slice(0, 38) + '…' : v, it.kind === 'confirm' ? 'btn ghost' : 'btn'); b.type = 'button'; b.title = v;
+      b.addEventListener('click', function () { var vals = {}; vals[choice.cell] = v; if (input && input.value.trim() && note) vals[note.cell] = input.value.trim(); send(vals); });
+      opts.appendChild(b);
     });
-    $('mine-card').hidden = !mine.length && !toRead.length;
-    $('mine-lead').textContent = ['partner', 'owner'].indexOf(role) >= 0 ? 'Les décisions qui vous reviennent, en tant qu’Associé, et ce que les agents ont rempli à relire.' : mayReview(role) ? 'Ce que les agents ont rempli, à relire ; votre recommandation et votre cotation du risque.' : 'Les questions des agents : seulement ce qu’ils n’ont pas pu trouver eux-mêmes.';
-    mine.slice(0, 15).forEach(function (x) {
-      var a = el('a', null, 'item link-item'); a.href = '#r-' + x.s.name + '-' + x.r.row;
-      var t = el('div', null, 't'); t.appendChild(el('span', (x.r.ref ? x.r.ref + ' — ' : '') + (x.r.label || '').split(' — ')[0]));
-      t.appendChild(el('span', x.s.name.replace(/_/g, ' ') + (x.r.section ? ' · ' + x.r.section.split(' — ')[0] : '') + (x.r.proposal ? (x.r.proposal.for_team ? ' · question des agents' : ' · proposition des agents') : ''), 'meta'));
-      a.appendChild(t);
-      a.addEventListener('click', function () { var d = document.getElementById(a.hash.slice(1)); if (d) { var p = d.parentNode; while (p && p.tagName) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentNode; } } });
-      box.appendChild(a);
-    });
+    else if (note) {
+      var save = el('button', 'Enregistrer', 'btn'); save.type = 'button';
+      save.addEventListener('click', function () { if (!input.value.trim()) { input.focus(); return; } var vals = {}; vals[note.cell] = input.value.trim(); send(vals); });
+      opts.appendChild(save);
+    }
+    if (input) box.appendChild(input);
+    opts.appendChild(later());
+    box.appendChild(opts); box.appendChild(say);
   }
 
   // ---- Phase 2: the team proposed by the Firm Manager, validated by a manager or the Associé;
@@ -398,7 +475,7 @@
     var box = $('sheets'); box.textContent = '';
     (o.sheets || []).forEach(function (s, i) {
       var card = el('section', null, 'card');
-      var det = document.createElement('details'); det.className = 'opp-sheet'; det.open = s.open && (s.owner === 'firm-manager' ? ['phase0', 'go'].indexOf(o.status) >= 0 : s.owner === 'mission-controller' ? Boolean(o.phase1) : false);
+      var det = document.createElement('details'); det.className = 'opp-sheet'; det.open = false;
       var sum = document.createElement('summary'); sum.textContent = s.title + (s.open ? '' : ' — s’ouvre quand le client a confirmé');
       det.appendChild(sum);
       var sections = []; s.rows.forEach(function (r) { var k = r.section || ' '; var g = sections.find(function (x) { return x.k === k; }); if (!g) sections.push(g = { k: k, rows: [] }); g.rows.push(r); });
@@ -406,7 +483,7 @@
         var sd = document.createElement('details'); sd.className = 'opp-sec'; sd.id = 'sec-' + secId(s, g.k === ' ' ? '' : g.k);
         var ai = g.rows.filter(function (r) { return (o.ai_filled || {})[s.name + '!' + r.row]; }).length;
         var rv = (o.reviews || {})[s.name + '|' + (g.k === ' ' ? '' : g.k)] || null;
-        sd.open = g.rows.some(function (r) { return r.proposal && !(o.ai_filled || {})[s.name + '!' + r.row] && r.fields.every(function (f) { return !f.value; }); }) || (ai > 0 && !rv);
+        sd.open = false;
         var ss = document.createElement('summary');
         var todo = g.rows.filter(function (r) { return !r.identity && r.fields.every(function (f) { return !f.value; }); }).length;
         ss.textContent = (g.k.trim() || 'Identification du dossier') + ' — ' + (g.rows.length - todo) + '/' + g.rows.length + ' renseignée(s)' + (ai ? ' · ' + ai + ' par ' + agentName(s.owner) + (rv ? ' · relu' : ' · à relire') : '');
