@@ -28,6 +28,7 @@ details.card[open] summary{margin-bottom:6px}
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -111,6 +112,22 @@ details.card[open] summary{margin-bottom:6px}
       <p class="hint">Pour la mission choisie ci-dessus, l'IA applique la politique de gestion des personnes du cabinet (dossier RH / CV du Drive) : rôle et autorité de chacun, style de management pour la tâche, briefing écrit selon le protocole de communication de la personne, RACI et alertes d'équipe mal composée. Les règles de l'application priment ; le responsable décide, rien n'est envoyé.</p>
       <div class="btn-row"><button class="btn" id="people-brief" type="button" disabled>Préparer l'équipe et les briefings</button><button class="btn ghost" id="people-read" type="button" disabled>Consulter l'équipe possible (sans IA)</button></div>
       <div class="reply" id="people-answer">Choisissez d'abord une mission.</div>
+    </details>
+
+    <!-- 3b. Spécialistes externes -->
+    <details class="card" id="externals-card">
+      <summary>Spécialistes externes (compétence absente du cabinet)</summary>
+      <p class="hint">Quand l'équipe a besoin d'un spécialiste que le cabinet n'a pas, l'IA cherche sur le web et propose plusieurs personnes ou cabinets (nom, spécialité, expérience, pays, source, contact professionnel public, raison). Vous choisissez ; un message est préparé pour chacun. Rien n'est sélectionné ni envoyé automatiquement.</p>
+      <div class="two">
+        <div class="field"><label for="ex-gap">Compétence manquante</label><input id="ex-gap" maxlength="300" placeholder="Ex. évaluation de réserves minières (NI 43-101)"></div>
+        <div class="field"><label for="ex-country">Pays</label><input id="ex-country" maxlength="80" placeholder="Ex. Côte d’Ivoire"></div>
+      </div>
+      <p class="meta">La mission choisie plus haut est utilisée si elle est sélectionnée.</p>
+      <div class="btn-row"><button class="btn" id="ex-search" type="button">Chercher des spécialistes</button></div>
+      <p class="status" id="ex-status" aria-live="polite"></p>
+      <div id="ex-list" class="stack"></div>
+      <div class="btn-row"><button class="btn ghost" id="ex-draft" type="button" hidden>Préparer un message aux spécialistes choisis</button></div>
+      <div id="ex-drafts" class="stack"></div>
     </details>
 
     <!-- 4. Suivi -->
@@ -271,10 +288,56 @@ details.card[open] summary{margin-bottom:6px}
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mission_id: id, content: content, phases: phases })
     }).then(function (data) {
-      $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée comme proposition, sans approbation.';
+      $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée comme proposition, sans approbation. Intégration dans le dossier de la mission…';
+      // 2026-10-08: the plan also feeds the mission's structured data (briefing, risks, skills, planning, documents, team).
+      OM.api('/api/app?route=plan-integrate', { method: 'POST', body: JSON.stringify({ mission_id: id, content: content, answer: lastReply && lastReply.missionId === id && lastReply.text !== content ? lastReply.text : '' }) }).then(function (r) {
+        if (!r || !r.integrated) { $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée comme proposition, sans approbation.'; return; }
+        var parts = [r.briefing ? 'briefing' : null, r.risks ? r.risks + ' risque(s)' : null, r.skills ? r.skills + ' compétence(s)' : null, r.deadlines ? r.deadlines + ' échéance(s)' : null, r.documents ? r.documents + ' document(s) à demander' : null, r.team_proposed ? r.team_proposed + ' personne(s) proposée(s)' : null, r.other ? r.other + ' autre(s) information(s)' : null].filter(Boolean);
+        $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée. Intégré au dossier de la mission : ' + (parts.join(', ') || 'rien de nouveau') + '. Les agents en tiennent compte ; rien n’est approuvé ni affecté sans vous.';
+      }).catch(function (e) { $('plan-result').textContent = 'Version ' + data.plan.version + ' enregistrée ; intégration dans le dossier impossible pour l’instant (' + readable(e) + ').'; });
       openMission(id);
     }).catch(function (err) { $('plan-result').textContent = 'Erreur : ' + readable(err) + ' Vérifiez le dossier avant de réessayer.'; })
       .then(function () { $('plan-save').disabled = !opened; });
+  });
+
+  // 3b. External specialists: proposed, chosen, message prepared (never sent by the app)
+  var exFound = [];
+  $('ex-search').addEventListener('click', function () {
+    var gap = $('ex-gap').value.trim(); if (!gap) { $('ex-status').textContent = 'Indiquez la compétence manquante.'; return; }
+    var b = this; b.disabled = true; $('ex-status').textContent = 'Recherche sur le web… (jusqu’à 2 minutes)'; $('ex-list').textContent = ''; $('ex-drafts').textContent = ''; $('ex-draft').hidden = true;
+    OM.api('/api/app?route=external-specialists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gap: gap, country: $('ex-country').value.trim(), mission_id: $('mission-select').value || null }) }).then(function (r) {
+      exFound = r.specialists || [];
+      $('ex-status').textContent = r.web ? exFound.length + ' proposition(s) (' + r.provider + ') — à vérifier : personne n’a été contacté.' : 'Recherche web indisponible : ' + (r.error || 'aucune clé d’IA avec recherche') + '.';
+      exFound.forEach(function (s, i) {
+        var row = el('label', null, 'item ex-item'); var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = String(i); row.appendChild(cb);
+        var t = el('div', null, 't'); t.appendChild(el('span', s.name + (s.speciality ? ' — ' + s.speciality : '')));
+        t.appendChild(el('span', [s.country, s.experience].filter(Boolean).join(' · '), 'meta'));
+        if (s.why) t.appendChild(el('span', 'Pourquoi : ' + s.why, 'meta'));
+        if (s.contact) t.appendChild(el('span', 'Contact professionnel : ' + s.contact, 'meta'));
+        if (s.source) { var a = UI.safeLink(s.source, 'Source'); if (a) t.appendChild(a); }
+        row.appendChild(t); $('ex-list').appendChild(row);
+      });
+      $('ex-draft').hidden = !exFound.length;
+    }).catch(function (e) { $('ex-status').textContent = 'Recherche impossible : ' + readable(e); }).then(function () { b.disabled = false; });
+  });
+  $('ex-draft').addEventListener('click', function () {
+    var chosen = Array.prototype.map.call($('ex-list').querySelectorAll('input:checked'), function (c) { return exFound[Number(c.value)]; });
+    if (!chosen.length) { $('ex-status').textContent = 'Cochez au moins un spécialiste.'; return; }
+    $('ex-drafts').textContent = '';
+    chosen.forEach(function (s) {
+      var box = el('div', null, 'reply'); box.appendChild(el('strong', s.name)); box.appendChild(el('p', 'Rédaction…', 'meta')); $('ex-drafts').appendChild(box);
+      OM.api('/api/app?route=external-specialists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'draft', specialist: s, gap: $('ex-gap').value.trim() }) }).then(function (d) {
+        box.textContent = ''; box.appendChild(el('strong', s.name + (d.to ? ' — ' + d.to : '')));
+        var subj = document.createElement('input'); subj.value = d.subject; subj.setAttribute('aria-label', 'Objet'); subj.style.width = '100%';
+        var body = document.createElement('textarea'); body.value = d.body; body.rows = 10; body.setAttribute('aria-label', 'Message'); body.style.width = '100%';
+        var row = el('div', null, 'btn-row');
+        var copy = el('button', 'Copier', 'btn ghost'); copy.type = 'button'; copy.addEventListener('click', function () { navigator.clipboard && navigator.clipboard.writeText(subj.value + '\n\n' + body.value); copy.textContent = 'Copié'; });
+        var open = el('a', 'Ouvrir dans ma messagerie', 'btn'); open.addEventListener('click', function () { open.href = 'mailto:' + encodeURIComponent(d.to || '') + '?subject=' + encodeURIComponent(subj.value) + '&body=' + encodeURIComponent(body.value); });
+        open.href = d.mailto;
+        row.appendChild(copy); row.appendChild(open);
+        box.appendChild(subj); box.appendChild(body); box.appendChild(row); box.appendChild(el('p', d.notice, 'meta'));
+      }).catch(function (e) { box.lastChild.textContent = 'Impossible : ' + readable(e); });
+    });
   });
 
   // 3a. Team and briefings with the firm's policy (AI)

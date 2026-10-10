@@ -138,3 +138,17 @@ details>summary{cursor:pointer;font-weight:600}
   .tabs button{font-size:13px;padding:7px 10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important;scroll-behavior:auto !important}}
+/* Global bell (2026-10-08) */
+.nav .bell{position:relative}
+.bell-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.bell-panel{position:fixed;bottom:72px;left:16px;z-index:60;width:min(380px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:8px}
+.bell-head{display:flex;justify-content:space-between;align-items:center;padding:8px 10px}
+.bell-head .linkish{font:inherit;font-size:13px;background:none;border:0;color:var(--brand-ink);text-decoration:underline;cursor:pointer}
+.bell-item{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:10px;text-decoration:none;color:var(--ink);border-left:3px solid var(--brand)}
+.bell-item:hover{background:var(--surface-2)}
+.bell-item.read{border-left-color:transparent;opacity:.72}
+.bell-type{font-size:11.5px;font-weight:700;color:var(--brand-ink)}
+.bell-title{font-size:14px;font-weight:500}
+.bell-meta{font-size:12.5px;color:var(--muted)}
+.bell-empty{padding:10px;color:var(--muted);margin:0}
+@media (max-width:900px){.bell-panel{position:fixed;top:64px;bottom:auto;left:16px;right:16px;width:auto}}

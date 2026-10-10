@@ -50,6 +50,47 @@
     },
     setUserName: function (n) { safeSet(window.localStorage, USER_KEY, String(n || '').trim().slice(0, 80)); },
 
+    // Error codes in words a person can act on (2026-10-08).
+    explain: function (code) {
+      var c = String(code || '');
+      var E = {
+        MIGRATION_MISSING_DB_MEMORY_SQL: 'Base pas encore à jour : exécutez db/memory.sql dans Supabase (SQL Editor).',
+        MAIL_NOT_CONFIGURED: 'Envoi non branché : connectez Google avec l’autorisation d’envoyer des e-mails (Paramètres → Google).',
+        MAIL_SENDER_NOT_CONNECTED_ACCOUNT: 'L’adresse d’envoi de l’agent n’est pas le compte Google connecté : connectez Google avec la boîte de l’agent, ou indiquez sa vraie boîte (alias).',
+        MAIL_DELEGATION_MISSING: 'Google refuse l’envoi : le super administrateur Google Workspace doit autoriser l’envoi au nom de l’agent.',
+        MAIL_AUTH_FAILED: 'Google refuse la connexion de la boîte de l’agent : reconnectez Google.',
+        ROLE_NOT_ALLOWED: 'Action réservée à un autre rôle (propriétaire, associé ou manager).',
+        INVALID_BODY: 'Message vide ou trop long.'
+      };
+      if (E[c]) return E[c];
+      if (/^GMAIL_SEND_\d+_API_DISABLED/.test(c)) return 'Gmail refuse l’envoi : l’API Gmail n’est pas activée dans le projet Google Cloud du cabinet (console.cloud.google.com → API et services → Gmail API → Activer).';
+      if (/^GMAIL_SEND_\d+_SCOPE_MISSING/.test(c)) return 'Gmail refuse l’envoi : la connexion Google n’a pas l’autorisation d’envoyer. Reconnectez Google (Paramètres) et acceptez « Envoyer des e-mails ».';
+      if (/^GMAIL_SEND_\d+_FROM_NOT_ALLOWED/.test(c)) return 'Gmail refuse l’adresse d’expédition : ajoutez l’adresse de l’agent comme alias « Envoyer en tant que » dans la boîte Gmail connectée.';
+      if (/^GMAIL_SEND_\d+_NO_GMAIL/.test(c)) return 'Gmail refuse l’envoi : la boîte de l’agent n’a pas Gmail activé (licence Google Workspace).';
+      if (/^GMAIL_SEND_403/.test(c)) return 'Gmail refuse l’envoi (403) : vérifiez que l’API Gmail est activée dans Google Cloud et reconnectez Google en acceptant l’envoi d’e-mails.';
+      return c;
+    },
+
+    // One file to the Drive (2026-10-08): small files through the app, large ones straight to Google.
+    // extra: { rel_path, deposit_label, wish, send_to }. Resolves { file_id, url, ... }.
+    uploadFile: function (file, extra) {
+      extra = extra || {};
+      var meta = { name: file.name, mime: file.type || 'application/octet-stream', rel_path: extra.rel_path || file.webkitRelativePath || file.name, deposit_label: extra.deposit_label || null, wish: extra.wish || null, send_to: extra.send_to || null };
+      if (file.size <= 2.5 * 1024 * 1024) {
+        return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1]); }; r.onerror = rej; r.readAsDataURL(file); })
+          .then(function (b64) { return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ base64: b64 }, meta)) }); });
+      }
+      return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ action: 'start_upload', size: file.size }, meta)) })
+        .then(function (s) {
+          return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) {
+            if (!r.ok) throw new Error('Envoi vers Google refusé (' + r.status + ')');
+            return r.json();
+          }).then(function (g) {
+            return OM.api('/api/app?route=drop', { method: 'POST', body: JSON.stringify(Object.assign({ action: 'finish_upload', file_id: g.id }, meta)) });
+          });
+        });
+    },
+
     api: function (path, options, retried) {
       options = options || {};
       var s = readSession();
@@ -57,7 +98,12 @@
       if (OM.getLang && OM.getLang() === 'en') base['x-om-lang'] = 'en';
       // Personal token: lets the server check who you are on sensitive routes.
       if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
+      // The owner's code (session, or typed in Paramètres) goes with every call: owner-only actions work from any page.
+      var ot = OM.getOwnerToken(); if (!ot) { try { ot = window.sessionStorage.getItem('officeManagerOwnerToken') || ''; } catch (e) { ot = ''; } }
+      if (ot) base['x-office-manager-owner-token'] = ot;
       var headers = Object.assign(base, options.headers || {});
+      // A JSON body always says so (the server reads it as JSON).
+      if (typeof options.body === 'string' && !Object.keys(headers).some(function (k) { return k.toLowerCase() === 'content-type'; })) headers['Content-Type'] = 'application/json';
       return fetch(path, Object.assign({}, options, { headers: headers })).then(function (r) {
         return r.text().then(function (raw) {
           var data = null;
@@ -73,7 +119,8 @@
             }
             // Wrong or changed access code: back to the login page.
             if (r.status === 401 && (code === 'UNAUTHORIZED' || code === 'SESSION_EXPIRED') && !onLoginPage()) OM.forget(true);
-            var err = new Error(data && data.detail ? code + ' (' + data.detail + ')' : code); err.status = r.status; err.code = code; throw err;
+            var known = OM.explain(code);
+            var err = new Error(known !== code ? known : (data && data.detail ? code + ' (' + data.detail + ')' : code)); err.status = r.status; err.code = code; throw err;
           }
           return data;
         });
@@ -177,6 +224,7 @@
     b.appendChild(svgIcon(ICONS['/parametres.html']));
     me.appendChild(b);
     who.textContent = ''; who.appendChild(me);
+    addBell(me);
     var menu = node('div', null, 'gear-menu'); menu.hidden = true; menu.id = 'gear-menu';
     who.appendChild(menu);
     function build() {
@@ -204,6 +252,56 @@
     b.addEventListener('click', function (e) { e.stopPropagation(); toggle(menu.hidden); });
     document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { toggle(false); b.focus(); } });
+  }
+  // The global bell (2026-10-08): one notification per event, « lu » remembered on this device.
+  function addBell(me) {
+    if (document.getElementById('bell-btn') || /\/excel\//.test(location.pathname)) return;
+    var KEY = 'om_seen_notifications';
+    var seen = {}; try { seen = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { seen = {}; }
+    var save = function () { try { var keys = Object.keys(seen); if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(function (k) { delete seen[k]; }); localStorage.setItem(KEY, JSON.stringify(seen)); } catch (e) {} };
+    var bell = node('button', null, 'gear bell'); bell.type = 'button'; bell.id = 'bell-btn';
+    bell.setAttribute('aria-label', 'Notifications'); bell.setAttribute('aria-haspopup', 'true'); bell.setAttribute('aria-expanded', 'false');
+    bell.appendChild(svgIcon('M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'));
+    var badge = node('span', '', 'bell-badge'); badge.hidden = true; bell.appendChild(badge);
+    me.insertBefore(bell, me.lastChild);
+    var panel = node('div', null, 'bell-panel'); panel.hidden = true; panel.id = 'bell-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Notifications');
+    document.body.appendChild(panel);   // outside the navigation: its link styles do not apply
+    var list = [];
+    function count() { var n = list.filter(function (x) { return !seen[x.key]; }).length; badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n); bell.setAttribute('aria-label', 'Notifications' + (n ? ' (' + n + ' non lues)' : '')); }
+    function draw() {
+      panel.textContent = '';
+      var head = node('div', null, 'bell-head'); head.appendChild(node('strong', 'Notifications'));
+      var all = node('button', 'Tout marquer comme lu', 'linkish'); all.type = 'button'; all.addEventListener('click', function () { list.forEach(function (x) { seen[x.key] = 1; }); save(); count(); draw(); });
+      head.appendChild(all); panel.appendChild(head);
+      if (!list.length) { panel.appendChild(node('p', 'Rien de nouveau.', 'bell-empty')); return; }
+      list.slice(0, 40).forEach(function (x) {
+        var a = node(x.href ? 'a' : 'div', null, 'bell-item' + (seen[x.key] ? ' read' : '')); if (x.href) a.href = x.href;
+        a.appendChild(node('span', x.label, 'bell-type')); a.appendChild(node('span', x.title, 'bell-title')); if (x.meta) a.appendChild(node('span', x.meta, 'bell-meta'));
+        a.addEventListener('click', function () { seen[x.key] = 1; save(); count(); });
+        panel.appendChild(a);
+      });
+    }
+    var badgeLoading = false;
+    function load() {
+      if (!OM.getToken || !OM.getToken() || badgeLoading) return;
+      badgeLoading = true;
+      var notices = OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {});
+      var actions = OM.api('/api/app?route=actions').then(function (d) {
+        var pending = ((d && d.actions) || []).filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+        var link = document.querySelector('a[href="/validations.html"]');
+        if (!link) return;
+        var tag = document.getElementById('nav-count');
+        if (!tag) { tag = node('span', '', 'badge'); tag.id = 'nav-count'; link.appendChild(tag); }
+        tag.hidden = !pending; tag.textContent = String(pending);
+      }).catch(function () {});
+      Promise.all([notices, actions]).then(function () { badgeLoading = false; });
+    }
+    function toggle(open) { if (open) draw(); panel.hidden = !open; bell.setAttribute('aria-expanded', String(open)); }
+    bell.addEventListener('click', function (e) { e.stopPropagation(); toggle(panel.hidden); });
+    document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && e.target !== bell) toggle(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { toggle(false); bell.focus(); } });
+    setTimeout(load, 1500); setInterval(function () { if (!document.hidden) load(); }, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
   }
   function openClose() {
     var s = readSession() || {}, email = (s.user && s.user.email) || '';
@@ -410,6 +508,67 @@
     sync(); if (!fromHash()) select(Math.min(saved, best.length - 1));
   }
 
+
+  // Agents' names chosen by the firm (2026-10-08: « Firm Manager au lieu d'Office Manager,
+  // Orpailleur clandestin… et la possibilité de les renommer »). The page keeps its texts; the
+  // names are replaced on screen, everywhere, from the firm's choice (Paramètres → Noms des agents).
+  var NAMES_KEY = 'om_agent_names';
+  var DEFAULT_LABELS = [
+    ['grand-controleur', ['Grand Contrôleur / Office Manager AI', 'Office Manager AI', 'Office Manager', 'Grand Contrôleur', 'Grand Controleur', 'Firm Manager']],
+    ['orpailleur', ['Orpailleur']],
+    ['sika', ['Sika']],
+    ['mission-controller', ['Mission Controller']],
+    ['enhanced-auditor', ['Enhanced Auditor']]
+  ];
+  var renameRe = null, renameMap = {};
+  function escRe(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function buildRename(names) {
+    var alts = [];
+    renameMap = {};
+    DEFAULT_LABELS.forEach(function (d) {
+      var to = names && names[d[0]]; if (!to) return;
+      d[1].forEach(function (from) {
+        if (from === to) return;
+        renameMap[from.toLowerCase()] = to;
+        // « Orpailleur » → « Orpailleur clandestin »: never twice.
+        var tail = to.indexOf(from) === 0 ? to.slice(from.length) : '';
+        alts.push(escRe(from) + (tail ? '(?!' + escRe(tail) + ')' : ''));
+      });
+    });
+    alts.sort(function (a, b) { return b.length - a.length; });
+    renameRe = alts.length ? new RegExp('(^|[^\\p{L}])(' + alts.join('|') + ')(?![\\p{L}])', 'gu') : null;
+  }
+  function renameText(t) {
+    if (!renameRe || !t) return t;
+    return t.replace(renameRe, function (m, pre, word) { return pre + (renameMap[word.toLowerCase()] || word); });
+  }
+  function renameIn(root) {
+    if (!renameRe || !root) return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) {
+      var p = n.parentElement; if (!p) return NodeFilter.FILTER_REJECT;
+      if (/^(SCRIPT|STYLE|TEXTAREA|INPUT|CODE|PRE)$/.test(p.tagName) || p.closest('[data-no-rename],[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT; } });
+    var n, list = [];
+    while ((n = w.nextNode())) list.push(n);
+    list.forEach(function (x) { var v = renameText(x.nodeValue); if (v !== x.nodeValue) x.nodeValue = v; });
+    if (root.querySelectorAll) Array.prototype.forEach.call(root.querySelectorAll('[title],[placeholder],[aria-label]'), function (el) {
+      if (el.closest('[data-no-rename]')) return;
+      ['title', 'placeholder', 'aria-label'].forEach(function (a) { var v = el.getAttribute(a); if (v) { var r = renameText(v); if (r !== v) el.setAttribute(a, r); } });
+    });
+    var t = renameText(document.title); if (t !== document.title) document.title = t;
+  }
+  OM.agentNames = function () { try { return JSON.parse(window.localStorage.getItem(NAMES_KEY) || 'null'); } catch (e) { return null; } };
+  OM.setAgentNames = function (names) { try { window.localStorage.setItem(NAMES_KEY, JSON.stringify(names || {})); } catch (e) { /* private mode */ } buildRename(names); renameIn(document.body); };
+  OM.agentName = function (key) { var n = OM.agentNames(); return (n && n[key]) || ({ 'grand-controleur': 'Firm Manager', orpailleur: 'Orpailleur clandestin', sika: 'Silkoundêfouê', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', shadow: 'Shadow' })[key] || key; };
+  function startRename() {
+    var cached = OM.agentNames() || { 'grand-controleur': 'Firm Manager', orpailleur: 'Orpailleur clandestin', sika: 'Silkoundêfouê' };
+    buildRename(cached); renameIn(document.body);
+    var pendingR = false;
+    new MutationObserver(function () { if (pendingR) return; pendingR = true; setTimeout(function () { pendingR = false; renameIn(document.body); }, 50); })
+      .observe(document.body, { childList: true, subtree: true, characterData: true });
+    if (!onLoginPage() && readSession()) OM.api('/api/app?route=agent-names').then(function (s) { if (s && s.names) OM.setAgentNames(s.names); }).catch(function () {});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startRename); else startRename();
   var i18nReady = function () { startI18n(); if (onLoginPage()) loginLangSwitch(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', i18nReady); else i18nReady();
   function loginLangSwitch() {

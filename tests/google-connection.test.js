@@ -242,3 +242,31 @@ test('primary memory: an existing « TATY_AI_office manager » folder of the dri
   const f = await findPrimaryMemory('0ASHARE', { headers: {} }, fetchImpl);
   assert.equal(f.id, 'm1');
 });
+
+test('Google always gets ONE registered return address, whatever address the app was opened from', () => {
+  const fromAlias = { headers: { host: 'office-manager-personal-pilot-paul-bc10.vercel.app' } };
+  const fromDeploy = { headers: { host: 'office-manager-personal-pilot-5tg9pz8nc-paul-bc10.vercel.app' } };
+  const prod = { VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: 'office-manager-personal-pilot.vercel.app' };
+  assert.equal(redirectUri(fromAlias, prod), 'https://office-manager-personal-pilot.vercel.app/oauth/google/callback');
+  assert.equal(redirectUri(fromDeploy, prod), 'https://office-manager-personal-pilot.vercel.app/oauth/google/callback');
+  const preview = { VERCEL_ENV: 'preview', VERCEL_BRANCH_URL: 'office-manager-personal-pilot-git-feature-whit-9611c0-paul-bc10.vercel.app' };
+  assert.equal(redirectUri(fromDeploy, preview), 'https://office-manager-personal-pilot-git-feature-whit-9611c0-paul-bc10.vercel.app/oauth/google/callback');
+  assert.equal(redirectUri(fromDeploy, { ...prod, OFFICE_MANAGER_PUBLIC_URL: 'https://office.taty.ci/' }), 'https://office.taty.ci/oauth/google/callback');
+});
+
+test('never another Drive: without the firm’s choice, no silent fallback on a server or old Drive', async () => {
+  const { configuredDriveId } = await import('../lib/google-drive.js');
+  const { memoryFolderId } = await import('../lib/memory-runtime.js');
+  const keys = ['TATY_SHARED_DRIVE_ID', 'OFFICE_MANAGER_MEMORY_FOLDER_ID', 'OFFICE_MANAGER_ALLOW_ENV_DRIVE', 'VERCEL_ENV', 'OFFICE_MANAGER_TEST_RUN', 'AGENT_MAIL_SANDBOX'];
+  const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  try {
+    resetGoogleConnectionCache();
+    for (const k of keys) delete process.env[k];
+    Object.assign(process.env, { TATY_SHARED_DRIVE_ID: 'OLD_DRIVE', OFFICE_MANAGER_MEMORY_FOLDER_ID: 'OLD_MEMORY' });
+    assert.throws(() => configuredDriveId(), /FIRM_DRIVE_NOT_CHOSEN/);
+    assert.equal(memoryFolderId(), null);
+    process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = 'true';
+    assert.equal(configuredDriveId(), 'OLD_DRIVE');
+    assert.equal(memoryFolderId(), 'OLD_MEMORY');
+  } finally { keys.forEach(k => saved[k] === undefined ? delete process.env[k] : process.env[k] = saved[k]); }
+});

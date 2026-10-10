@@ -13,6 +13,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -37,6 +38,26 @@
       <p class="lead">L'agent de revue d'audit. Il reprend l'évaluation des risques du Grand Contrôleur et celle de l'auditeur, relit les fichiers de travail et les pièces (photos et scans compris), repère les motifs dans les classeurs, signale les procédures manquantes, évalue les éléments probants et dit si chaque risque est couvert. Plusieurs modèles d'IA répondent séparément ; le verdict le plus prudent est retenu.</p>
     </header>
 
+    <div class="chips ea-tabs" id="ea-tabs" role="tablist" aria-label="Enhanced Auditor">
+      <button type="button" class="chip" data-panel="evening" aria-pressed="true">Point du soir</button>
+      <button type="button" class="chip" data-panel="review" aria-pressed="false">Revue d'une mission</button>
+      <button type="button" class="chip" data-panel="wp" aria-pressed="false">Working papers</button>
+      <button type="button" class="chip" data-panel="signoff" aria-pressed="false">Sign-off</button>
+      <button type="button" class="chip" data-panel="retro" aria-pressed="false">Anciennes missions</button>
+      <button type="button" class="chip partner-only" data-panel="partner" aria-pressed="false" hidden>Vue associé</button>
+    </div>
+
+    <div class="ea-panel" data-panel="evening">
+      <section class="card" aria-labelledby="h-evening">
+        <div class="card-head"><h2 id="h-evening">Point du soir des missions en cours</h2><span class="meta" id="ev-run"></span></div>
+        <p class="note">Chaque soir (à partir de 19 h), l'Enhanced Auditor fait le point sur chaque mission en cours avec ce que savent les autres agents : risques et couverture, travaux prévus et réalisés, preuves, PBC, points de revue, anomalies, retards, budget, temps, et ce qui demande l'attention du manager ou de l'associé. Il compare les risques de l'auditeur, ceux de Mission Controller et les travaux réellement documentés. Il alerte ; il ne décide pas.</p>
+        <div class="btn-row"><select id="ev-mission" aria-label="Mission"><option value="">Faire le point maintenant sur…</option></select><button class="btn ghost" id="ev-now" type="button">Faire le point</button></div>
+        <p class="status" id="ev-status" role="status" aria-live="polite"></p>
+        <div id="evening" class="stack"></div>
+      </section>
+    </div>
+
+    <div class="ea-panel" data-panel="review" hidden>
     <section class="card" aria-labelledby="h-start">
       <h2 id="h-start">Lancer une revue</h2>
       <div class="field"><label for="mission">Mission</label><select id="mission"><option value="">Chargement…</option></select></div>
@@ -44,6 +65,9 @@
       <div class="field"><label for="risk-files">Évaluation des risques de l'auditeur (liens Drive, un par ligne)</label><textarea id="risk-files" style="min-height:60px" placeholder="https://docs.google.com/spreadsheets/d/…"></textarea></div>
       <div class="field"><label for="work-files">Programme de travail et fichiers de travail (liens Drive, un par ligne)</label><textarea id="work-files" style="min-height:80px" placeholder="Feuilles de travail Excel, programme, mémos…"></textarea></div>
       <div class="field"><label for="evidence-files">Pièces justificatives : photos, scans, PDF (liens Drive, un par ligne)</label><textarea id="evidence-files" style="min-height:70px" placeholder="Photos d'inventaire, relevés scannés, factures, états de dépréciation…"></textarea></div>
+      <div class="dropzone" id="rv-drop" tabindex="0" role="button" aria-label="Déposer des fichiers pour la revue">Ou glissez ici les fichiers de la mission (évaluation des risques, programme, working papers, pièces), ou <label class="linkish" for="rv-files">choisissez des fichiers</label> / <label class="linkish" for="rv-folder">un dossier</label>
+        <input type="file" id="rv-files" multiple hidden><input type="file" id="rv-folder" webkitdirectory multiple hidden></div>
+      <p class="meta">Sans fichier, la revue part des documents déjà rattachés à la mission et de l'évaluation des risques du Firm Manager.</p>
       <div class="field"><label for="focus">Point d'attention (facultatif)</label><input type="text" id="focus" placeholder="Exemple : dépréciation des stocks et des créances"></div>
       <div><button class="btn" id="go" type="button">Lancer la revue</button></div>
       <p class="status" id="say" role="status"></p>
@@ -73,6 +97,59 @@
       <h2 id="h-past">Revues précédentes</h2>
       <div id="past" class="stack"></div>
     </section>
+    </div>
+
+    <div class="ea-panel" data-panel="wp" hidden>
+      <section class="card" aria-labelledby="h-wp">
+        <h2 id="h-wp">Revue de working papers</h2>
+        <p class="note">Déposez un working paper, plusieurs fichiers ou un dossier d'audit entier (ou collez des liens Drive). L'IA lit chaque fichier, le compare au programme et aux risques de la mission, contrôle la cohérence, repère les points faibles et propose des points de revue. Le manager ou l'associé ouvre le vrai fichier depuis ici.</p>
+        <div class="form-grid">
+          <label>Mission<select id="wp-mission"><option value="">—</option></select></label>
+          <label class="wide">Liens ou identifiants Drive (fichiers ou dossiers)<textarea id="wp-links" rows="2" placeholder="https://drive.google.com/…"></textarea></label>
+        </div>
+        <div class="dropzone" id="wp-drop" tabindex="0" role="button" aria-label="Déposer des fichiers ou un dossier">Glissez ici des fichiers ou un dossier, ou <label class="linkish" for="wp-files">choisissez des fichiers</label> / <label class="linkish" for="wp-folder">un dossier</label>
+          <input type="file" id="wp-files" multiple hidden><input type="file" id="wp-folder" webkitdirectory multiple hidden></div>
+        <div class="btn-row"><button class="btn" id="wp-start" type="button">Lancer la revue</button></div>
+        <p class="status" id="wp-status" role="status" aria-live="polite"></p>
+        <div id="wp-list" class="stack"></div>
+      </section>
+    </div>
+
+    <div class="ea-panel" data-panel="signoff" hidden>
+      <section class="card" aria-labelledby="h-so">
+        <h2 id="h-so">Sign-off des fichiers de travail</h2>
+        <p class="note">Le sign-off est lié au vrai fichier et à sa version dans le Drive. Le reviewer ouvre le fichier avant de signer (l'application le vérifie) ; le préparateur ne peut pas signer son propre travail. Tout est conservé : préparateur, reviewer, date, version, commentaires, corrections, sign-off.</p>
+        <div class="form-grid">
+          <label>Mission<select id="so-mission"><option value="">Toutes</option></select></label>
+          <label class="wide">Ajouter un fichier (lien ou identifiant Drive)<input id="so-link" placeholder="https://docs.google.com/spreadsheets/d/…"></label>
+        </div>
+        <div class="btn-row"><button class="btn ghost" id="so-prepare" type="button">Marquer comme préparé par moi</button></div>
+        <p class="status" id="so-status" role="status" aria-live="polite"></p>
+        <div id="so-list" class="stack"></div>
+      </section>
+    </div>
+
+    <div class="ea-panel" data-panel="retro" hidden>
+      <section class="card" aria-labelledby="h-retro">
+        <h2 id="h-retro">Retour d'expérience sur une ancienne mission</h2>
+        <p class="note">Choisissez une mission terminée (et, si vous voulez, des documents de son dossier) : quels risques existaient, lesquels avaient été identifiés, si les travaux y répondaient, ce qui a été bien fait, ce qui a été manqué, ce qu'il faut améliorer. Les enseignements nourrissent l'apprentissage d'Office Manager (observé une fois, confirmé à la deuxième mission ou par un associé).</p>
+        <div class="form-grid">
+          <label>Mission terminée<select id="re-mission"><option value="">—</option></select></label>
+          <label class="wide">Documents (liens Drive, facultatif)<textarea id="re-links" rows="2"></textarea></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="re-start" type="button">Analyser</button></div>
+        <p class="status" id="re-status" role="status" aria-live="polite"></p>
+        <div id="retro" class="stack"></div>
+      </section>
+    </div>
+
+    <div class="ea-panel" data-panel="partner" hidden>
+      <section class="card" aria-labelledby="h-partner">
+        <h2 id="h-partner">Pour l'associé</h2>
+        <p class="note">Seulement ce qui relève de l'associé : risques élevés, fraude, continuité d'exploitation, indépendance, jugements significatifs, estimations, litiges, opinion potentiellement modifiée, preuves insuffisantes, anomalies significatives, points non résolus.</p>
+        <div id="partner" class="stack"></div>
+      </section>
+    </div>
   </main>
 </div>
 
@@ -178,6 +255,204 @@
         .then(function () { b.disabled = false; });
     });
   }
+
+  // Files dropped for a mission review: uploaded, then sorted by their name into the three lists.
+  function rvUpload(list) {
+    var arr = Array.prototype.slice.call(list).slice(0, 40), i = 0;
+    function next() {
+      if (i >= arr.length) { $('say').textContent = arr.length + ' fichier(s) ajouté(s) à la revue : cliquez sur « Lancer la revue ».'; return; }
+      var f = arr[i++], path = f.webkitRelativePath || f.name; $('say').textContent = 'Dépôt de « ' + path + ' » (' + i + '/' + arr.length + ')…';
+      OM.uploadFile(f, { rel_path: path, deposit_label: 'REVUE_' + new Date().toISOString().slice(0, 10), wish: 'Revue Enhanced Auditor de la mission' }).then(function (r) {
+        var box = /risque|risk/i.test(f.name) ? 'risk-files' : /\.(jpe?g|png|webp|gif|heic)$|scan|facture|releve|relevé|piece|pièce|justif/i.test(f.name) ? 'evidence-files' : 'work-files';
+        $(box).value = ($(box).value ? $(box).value + '\n' : '') + (r.url || r.file_id);
+      }).catch(function (e) { $('say').textContent = path + ' : non déposé (' + e.message + ')'; }).then(next);
+    }
+    next();
+  }
+  $('rv-files').addEventListener('change', function () { rvUpload(this.files); });
+  $('rv-folder').addEventListener('change', function () { rvUpload(this.files); });
+  $('rv-drop').addEventListener('dragover', function (e) { e.preventDefault(); this.classList.add('over'); });
+  $('rv-drop').addEventListener('dragleave', function () { this.classList.remove('over'); });
+  $('rv-drop').addEventListener('drop', function (e) { e.preventDefault(); this.classList.remove('over'); rvUpload(e.dataTransfer.files); });
+
+  // ---- Sections (2026-10-08) ----
+  Array.prototype.forEach.call($('ea-tabs').children, function (b) {
+    b.addEventListener('click', function () {
+      Array.prototype.forEach.call($('ea-tabs').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      Array.prototype.forEach.call(document.querySelectorAll('.ea-panel'), function (p) { p.hidden = p.dataset.panel !== b.dataset.panel; });
+      if (b.dataset.panel === 'partner') loadPartner();
+      if (b.dataset.panel === 'signoff') loadSignoffs();
+      if (b.dataset.panel === 'wp' || b.dataset.panel === 'retro' || b.dataset.panel === 'evening') loadWork();
+    });
+  });
+  var ALL_MISSIONS = [];
+  function fillSelects() {
+    OM.api('/api/missions').then(function (d) {
+      ALL_MISSIONS = (d && d.missions) || [];
+      ['ev-mission', 'wp-mission', 'so-mission'].forEach(function (id) { ALL_MISSIONS.forEach(function (m) { var o = el('option', m.name || m.mission_code); o.value = m.id; $(id).appendChild(o); }); });
+      ALL_MISSIONS.filter(function (m) { return /complet|clos|termin|done|archiv/i.test(m.status || ''); }).concat(ALL_MISSIONS.filter(function (m) { return !/complet|clos|termin|done|archiv/i.test(m.status || ''); }))
+        .forEach(function (m) { var o = el('option', (m.name || m.mission_code) + (/complet|clos|termin|done|archiv/i.test(m.status || '') ? ' (terminée)' : '')); o.value = m.id; $('re-mission').appendChild(o); });
+    }).catch(function () {});
+  }
+  function mName(id) { var m = ALL_MISSIONS.filter(function (x) { return x.id === id; })[0]; return m ? (m.name || m.mission_code) : ''; }
+  function bullets(box, title, list, cls) {
+    if (!list || !list.length) return;
+    box.appendChild(el('h4', title)); var ul = el('ul', null, cls || '');
+    list.forEach(function (x) { ul.appendChild(el('li', typeof x === 'string' ? x : (x.point || x.alert || x.risk || x.text || JSON.stringify(x)) + (x.evidence ? ' — ' + x.evidence : '') + (x.severity ? ' [' + x.severity + ']' : '') + (x.label ? ' (' + x.label + ')' : ''))); });
+    box.appendChild(ul);
+  }
+  function eveningCard(p) {
+    var c = el('article', null, 'item ev-card'); var t = el('div', null, 't');
+    t.appendChild(el('span', p.mission && p.mission.name || mName(p.mission && p.mission.id) || 'Mission', 'ev-title'));
+    t.appendChild(el('span', 'Point du ' + UI.dateTime(p.at) + (p.by_model ? ' · ' + p.by_model : ''), 'meta'));
+    if (p.summary) t.appendChild(el('p', p.summary));
+    if ((p.risk_comparison || []).length) t.appendChild(UI.table(['Risque', 'Auditeur', 'Mission Controller', 'Travaux documentés', 'Commentaire'], p.risk_comparison.map(function (r) { return [r.risk, r.auditor ? 'oui' : 'non', r.mission_controller ? 'oui' : 'non', r.work_documented, r.comment]; })));
+    bullets(t, 'Vigilance', p.vigilance, 'vig');
+    bullets(t, 'Attention du manager', p.manager_attention);
+    bullets(t, 'Pour l’associé', p.partner_items, 'partner');
+    bullets(t, 'Points de revue', p.review_points); bullets(t, 'PBC', p.pbc); bullets(t, 'Anomalies', p.anomalies); bullets(t, 'Retards', p.delays);
+    if (p.work && (p.work.planned || p.work.done)) bullets(t, 'Travaux', ['Prévus : ' + (p.work.planned || '–'), 'Réalisés : ' + (p.work.done || '–'), 'Écart : ' + (p.work.gap || '–')]);
+    if (p.budget_time) bullets(t, 'Budget et temps', [p.budget_time]);
+    c.appendChild(t); return c;
+  }
+  function loadWork() {
+    OM.api('/api/app?route=auditor-work').then(function (d) {
+      var r = d.evening_run; $('ev-run').textContent = r ? 'Dernier passage : ' + r.date + ' · ' + (r.done || []).length + ' mission(s)' + ((r.queue || []).length ? ' · en cours (' + r.queue.length + ' restante(s))' : '') : 'Pas encore de passage du soir.';
+      var box = $('evening'); box.textContent = '';
+      var pts = Object.keys(d.evening || {}).map(function (k) { return d.evening[k][0]; }).filter(Boolean);
+      if (!pts.length) box.appendChild(el('p', 'Aucun point pour l’instant : le premier passage a lieu ce soir, ou faites le point maintenant sur une mission.', 'empty'));
+      pts.forEach(function (p) { box.appendChild(eveningCard(p)); });
+      var wl = $('wp-list'); wl.textContent = '';
+      (d.wp_jobs || []).filter(function (j) { return j.status === 'running'; }).forEach(function (j) { wl.appendChild(el('p', 'Revue en cours : ' + j.done + ' fichier(s) lu(s), ' + j.left + ' restant(s)…', 'status')); });
+      (d.wp_reviews || []).forEach(function (rv) { wl.appendChild(wpCard(rv)); });
+      var rb = $('retro'); rb.textContent = '';
+      (d.retrospectives || []).forEach(function (x) {
+        var c = el('article', null, 'item ev-card'); var t = el('div', null, 't');
+        t.appendChild(el('span', (x.mission && x.mission.name) || 'Mission', 'ev-title')); t.appendChild(el('span', 'Analyse du ' + UI.dateTime(x.at) + (x.by ? ' · ' + x.by : ''), 'meta'));
+        if (x.summary) t.appendChild(el('p', x.summary));
+        bullets(t, 'Risques qui existaient', x.risks_existing); bullets(t, 'Identifiés ?', (x.risks_identified || []).map(function (r) { return r.risk + ' — ' + r.identified; }));
+        bullets(t, 'Les travaux répondaient-ils ?', (x.work_responded || []).map(function (r) { return r.risk + ' — ' + r.answer + (r.comment ? ' : ' + r.comment : ''); }));
+        bullets(t, 'Bien fait', x.done_well); bullets(t, 'Manqué', x.missed); bullets(t, 'À améliorer la prochaine fois', x.improve_next_time);
+        bullets(t, 'Enseignements enregistrés', ((x.learnings_recorded && x.learnings_recorded.recorded) || []).map(function (l) { return l.statement + ' (' + l.status + ')'; }));
+        c.appendChild(t); rb.appendChild(c);
+      });
+    }).catch(function (e) { $('ev-status').textContent = ERR[e.code] || e.message; });
+  }
+  function wpCard(rv) {
+    var c = el('article', null, 'item ev-card'); var t = el('div', null, 't');
+    var f = rv.file || {};
+    var head = el('div', null, 'btn-row'); head.appendChild(el('span', f.name || 'Fichier', 'ev-title'));
+    var open = UI.safeLink(f.url, 'Ouvrir le fichier'); if (open && open.href) { open.className = 'btn ghost'; head.appendChild(open); }
+    t.appendChild(head);
+    t.appendChild(el('span', [mName(rv.mission_id), 'revu le ' + UI.dateTime(rv.at), rv.by_model].filter(Boolean).join(' · '), 'meta'));
+    if (rv.error) { t.appendChild(el('p', 'Lecture impossible : ' + rv.error, 'status error')); c.appendChild(t); return c; }
+    if (rv.summary) t.appendChild(el('p', rv.summary));
+    bullets(t, 'Risques liés', rv.linked_risks); bullets(t, 'Cohérence', rv.consistency); bullets(t, 'Points faibles', rv.weak_points); bullets(t, 'Période', rv.period_issues);
+    if (rv.conclusion_vs_evidence) bullets(t, 'Conclusion et preuves', [rv.conclusion_vs_evidence]);
+    bullets(t, 'Attention', rv.attention);
+    if ((rv.review_points || []).length) {
+      t.appendChild(el('h4', 'Points de revue proposés'));
+      rv.review_points.forEach(function (p) {
+        var row = el('div', null, 'rp'); row.appendChild(el('span', (p.ref ? p.ref + ' — ' : '') + p.point + ' [' + p.severity + (p.for ? ', ' + p.for : '') + ']'));
+        var sel = document.createElement('select'); ['ouvert', 'répondu', 'corrigé', 'clos'].forEach(function (s) { var o = el('option', s); o.value = s; if (s === p.status) o.selected = true; sel.appendChild(o); });
+        sel.setAttribute('aria-label', 'Statut du point');
+        sel.addEventListener('change', function () { OM.api('/api/app?route=auditor-work', { method: 'POST', body: JSON.stringify({ action: 'point', file_id: f.id, point_id: p.id, status: sel.value }) }).catch(function () {}); });
+        row.appendChild(sel); t.appendChild(row);
+      });
+    }
+    c.appendChild(t); return c;
+  }
+  $('ev-now').addEventListener('click', function () {
+    var id = $('ev-mission').value; if (!id) { $('ev-status').textContent = 'Choisissez une mission.'; return; }
+    var b = this; b.disabled = true; $('ev-status').textContent = 'L’Enhanced Auditor fait le point… (environ une minute)';
+    OM.api('/api/app?route=auditor-work', { method: 'POST', body: JSON.stringify({ action: 'evening', mission_id: id }) }).then(function () { $('ev-status').textContent = 'Point fait.'; loadWork(); })
+      .catch(function (e) { $('ev-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+  // Working papers: dropped files go to the review folder of the Drive (as in Rangement), then are reviewed.
+  var wpUploaded = [];
+  function b64(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1]); }; r.onerror = rej; r.readAsDataURL(file); }); }
+  function upload(list) {
+    var arr = Array.prototype.slice.call(list).slice(0, 40); var i = 0;
+    function next() {
+      // Dropped = reviewed (2026-10-08: « déposer le working paper directement pour review »).
+      if (i >= arr.length) { if (wpUploaded.length) { $('wp-status').textContent = wpUploaded.length + ' fichier(s) déposé(s) : la revue démarre…'; $('wp-start').click(); } return; }
+      var f = arr[i++]; var path = f.webkitRelativePath || f.name; $('wp-status').textContent = 'Dépôt de « ' + path + ' » (' + i + '/' + arr.length + ')…';
+      OM.uploadFile(f, { rel_path: path, deposit_label: 'REVUE_' + new Date().toISOString().slice(0, 10), wish: 'Revue Enhanced Auditor' })
+        .then(function (r) { wpUploaded.push(r.file_id); }).catch(function (e) { $('wp-status').textContent = path + ' : non déposé (' + e.message + ')'; }).then(next);
+    }
+    next();
+  }
+  $('wp-files').addEventListener('change', function () { upload(this.files); });
+  $('wp-folder').addEventListener('change', function () { upload(this.files); });
+  $('wp-drop').addEventListener('dragover', function (e) { e.preventDefault(); this.classList.add('over'); });
+  $('wp-drop').addEventListener('dragleave', function () { this.classList.remove('over'); });
+  $('wp-drop').addEventListener('drop', function (e) { e.preventDefault(); this.classList.remove('over'); upload(e.dataTransfer.files); });
+  $('wp-start').addEventListener('click', function () {
+    var ids = UI.driveIds($('wp-links').value).concat(wpUploaded);
+    if (!ids.length) { $('wp-status').textContent = 'Déposez des fichiers ou collez des liens Drive.'; return; }
+    var b = this; b.disabled = true;
+    OM.api('/api/app?route=auditor-work', { method: 'POST', body: JSON.stringify({ action: 'wp_review', mission_id: $('wp-mission').value || null, file_ids: ids }) })
+      .then(function (r) { $('wp-status').textContent = 'Revue lancée sur ' + r.files + ' fichier(s). Les résultats arrivent au fur et à mesure.'; wpUploaded = []; setTimeout(loadWork, 15000); })
+      .catch(function (e) { $('wp-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+  // Sign-off
+  var STEP = { opened: 'ouvert', prepared: 'préparé', reviewed: 'revu', comment: 'commentaire', correction_requested: 'corrections demandées', corrected: 'corrigé', signed_off: 'signé' };
+  function so(file_id, step, comment, mission_id) { return OM.api('/api/app?route=signoff', { method: 'POST', body: JSON.stringify({ file_id: file_id, step: step, comment: comment || null, mission_id: mission_id || $('so-mission').value || null }) }); }
+  var SOERR = { OPEN_THE_FILE_FIRST: 'Ouvrez d’abord le fichier (cette version) avant de le revoir ou de le signer.', PREPARER_CANNOT_SIGN: 'Le préparateur ne peut pas signer son propre travail.', MIGRATION_MISSING_DB_MEMORY_SQL: 'Le sign-off sera disponible dès que db/memory.sql aura été exécuté dans Supabase.', ROLE_NOT_ALLOWED: 'Réservé aux managers, associés et au propriétaire.' };
+  function loadSignoffs() {
+    var mid = $('so-mission').value;
+    OM.api('/api/app?route=signoff' + (mid ? '&mission_id=' + encodeURIComponent(mid) : '')).then(function (d) {
+      var box = $('so-list'); box.textContent = '';
+      if (d.migration_missing) { box.appendChild(el('p', SOERR.MIGRATION_MISSING_DB_MEMORY_SQL, 'note')); return; }
+      if (!(d.files || []).length) box.appendChild(el('p', 'Aucun fichier suivi : ajoutez un fichier de travail ci-dessus.', 'empty'));
+      (d.files || []).forEach(function (f) {
+        var c = el('article', null, 'item ev-card'); var t = el('div', null, 't');
+        var head = el('div', null, 'btn-row'); head.appendChild(el('span', f.file_name || f.file_id, 'ev-title'));
+        head.appendChild(el('span', f.status, f.status === 'signé' ? 'tag' : 'tag warn')); t.appendChild(head);
+        t.appendChild(el('span', ['préparé par ' + (f.preparer || '–'), 'reviewer ' + (f.reviewer || '–'), 'version ' + UI.dateTime(f.version), mName(f.mission_id)].filter(Boolean).join(' · '), 'meta'));
+        var hist = el('ol', null, 'so-hist'); f.events.forEach(function (e) { hist.appendChild(el('li', UI.dateTime(e.created_at) + ' — ' + (STEP[e.step] || e.step) + ' par ' + (e.by_name || '?') + (e.comment ? ' : « ' + e.comment + ' »' : '') + ' (version ' + UI.dateTime(e.version) + ')')); }); t.appendChild(hist);
+        var row = el('div', null, 'btn-row');
+        var open = el('a', 'Ouvrir le fichier', 'btn ghost'); open.href = f.file_url || '#'; open.target = '_blank'; open.rel = 'noopener noreferrer';
+        open.addEventListener('click', function () { so(f.file_id, 'opened', null, f.mission_id).then(loadSignoffs).catch(function () {}); });
+        row.appendChild(open);
+        var cm = document.createElement('input'); cm.placeholder = 'Commentaire / correction demandée'; cm.setAttribute('aria-label', 'Commentaire'); row.appendChild(cm);
+        [['comment', 'Commenter'], ['correction_requested', 'Demander une correction'], ['corrected', 'Corrigé'], ['reviewed', 'Revu'], ['signed_off', 'Signer']].forEach(function (a) {
+          if (['correction_requested', 'reviewed', 'signed_off'].indexOf(a[0]) >= 0 && !OM.isManager()) return;
+          var bt = el('button', a[1], a[0] === 'signed_off' ? 'btn' : 'btn ghost'); bt.type = 'button';
+          bt.addEventListener('click', function () { bt.disabled = true; so(f.file_id, a[0], cm.value, f.mission_id).then(function () { $('so-status').textContent = a[1] + ' : enregistré.'; loadSignoffs(); }).catch(function (e) { bt.disabled = false; $('so-status').textContent = SOERR[e.code] || e.message; }); });
+          row.appendChild(bt);
+        });
+        t.appendChild(row); c.appendChild(t); box.appendChild(c);
+      });
+    }).catch(function (e) { $('so-status').textContent = SOERR[e.code] || e.message; });
+  }
+  $('so-mission').addEventListener('change', loadSignoffs);
+  $('so-prepare').addEventListener('click', function () {
+    var ids = UI.driveIds($('so-link').value); if (!ids.length) { $('so-status').textContent = 'Collez le lien Drive du fichier.'; return; }
+    so(ids[0], 'prepared').then(function () { $('so-status').textContent = 'Marqué comme préparé.'; $('so-link').value = ''; loadSignoffs(); }).catch(function (e) { $('so-status').textContent = SOERR[e.code] || e.message; });
+  });
+  // Former missions
+  $('re-start').addEventListener('click', function () {
+    var id = $('re-mission').value; if (!id) { $('re-status').textContent = 'Choisissez une mission.'; return; }
+    var b = this; b.disabled = true; $('re-status').textContent = 'Analyse de la mission… (1 à 2 minutes)';
+    OM.api('/api/app?route=auditor-work', { method: 'POST', body: JSON.stringify({ action: 'retro', mission_id: id, file_ids: UI.driveIds($('re-links').value) }) }).then(function () { $('re-status').textContent = 'Analyse faite.'; loadWork(); })
+      .catch(function (e) { $('re-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+  // Partner view
+  function loadPartner() {
+    OM.api('/api/app?route=partner-view').then(function (d) {
+      var box = $('partner'); box.textContent = '';
+      if (!(d.items || []).length) { box.appendChild(el('p', 'Rien qui relève de l’associé pour l’instant.', 'empty')); return; }
+      var groups = {}; d.items.forEach(function (x) { (groups[x.label] = groups[x.label] || []).push(x); });
+      Object.keys(groups).forEach(function (g) {
+        box.appendChild(el('h4', g + ' · ' + groups[g].length));
+        groups[g].forEach(function (x) { var it = el(x.mission_id ? 'a' : 'div', null, 'item' + (x.mission_id ? ' link-item' : '')); if (x.mission_id) it.href = '/mission.html?id=' + encodeURIComponent(x.mission_id); var t = el('div', null, 't'); t.appendChild(el('span', x.point)); t.appendChild(el('span', [x.mission || mName(x.mission_id), x.evidence, x.source, UI.dateTime(x.at)].filter(Boolean).join(' · '), 'meta')); it.appendChild(t); box.appendChild(it); });
+      });
+    }).catch(function (e) { $('partner').textContent = e.message; });
+  }
+  if (OM.isOwner()) Array.prototype.forEach.call(document.querySelectorAll('.partner-only'), function (x) { x.hidden = false; });
+  fillSelects(); loadWork();
+  var pm = new URLSearchParams(location.search).get('mission'); if (pm) { var rb = document.querySelector('[data-panel="review"]'); if (rb) rb.click(); }
   UI.requireLogin(start);
 })();
 </script>

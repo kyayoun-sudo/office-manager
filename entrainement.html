@@ -34,6 +34,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -122,6 +123,25 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         <h2 id="h-lessons">Leçons retenues</h2>
         <p class="small">Données à l'agent les jours suivants. Elles ne modifient pas l'agent en production tant que vous ne l'avez pas décidé.</p>
         <ul id="lessons" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-shadow" id="shadow-card" hidden>
+        <h2 id="h-shadow">Shadow — le laboratoire d'apprentissage</h2>
+        <p class="small">Shadow observe le travail réel et les entraînements, les erreurs et vos corrections, en tire des leçons courtes, les teste sur des cas permanents (golden tests), et vous propose les changements importants. Il ne travaille jamais sur une vraie mission, n'écrit à personne et ne touche pas au Drive. Les leçons sûres (un fait prouvé, une correction de l'équipe) s'appliquent tout de suite ; le reste attend votre décision. Aucun agent ne peut s'accorder plus de droits.</p>
+        <div class="chips" id="sh-tabs" role="tablist" aria-label="Shadow">
+          <button type="button" class="chip" data-p="overview" aria-pressed="true">Vue générale</button>
+          <button type="button" class="chip" data-p="perf" aria-pressed="false">Performance</button>
+          <button type="button" class="chip" data-p="problems" aria-pressed="false">Problèmes</button>
+          <button type="button" class="chip" data-p="lessons" aria-pressed="false">Leçons</button>
+          <button type="button" class="chip" data-p="tests" aria-pressed="false">Golden tests</button>
+          <button type="button" class="chip" data-p="exp" aria-pressed="false">Propositions</button>
+          <button type="button" class="chip" data-p="code" aria-pressed="false">Code</button>
+          <button type="button" class="chip" data-p="norms" aria-pressed="false">Normes</button>
+          <button type="button" class="chip" data-p="survey" aria-pressed="false">Questionnaire</button>
+          <button type="button" class="chip" data-p="history" aria-pressed="false">Historique</button>
+        </div>
+        <div id="sh-body" class="stack" style="margin-top:12px"></div>
+        <p class="status" id="sh-status" role="status" aria-live="polite"></p>
       </section>
 
       <section class="card" aria-labelledby="h-cases">
@@ -326,6 +346,128 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
     setInterval(function () { if (!document.hidden) load(); }, 30000);
   }
   UI.requireLogin(start);
+})();
+</script>
+
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
+  var $ = function (id) { return document.getElementById(id); };
+  if (!OM || !OM.isOwner || !OM.isOwner()) return;
+  $('shadow-card').hidden = false;
+  var NAME = function (k) { return OM.agentName ? OM.agentName(k) : k; };
+  var TYPE = { professional_rule: 'Règle professionnelle', firm_rule: 'Règle du cabinet', experience_lesson: 'Leçon d’expérience', hypothesis: 'Hypothèse' };
+  var ST = { active: 'active', under_review: 'à revoir', superseded: 'remplacée', deprecated: 'obsolète', rejected: 'refusée' };
+  var OP = { favorable: 'Favorable', favorable_avec_reserves: 'Favorable avec réserves', defavorable: 'Défavorable' };
+  var data = null, panel = 'overview';
+  function api(body) { return OM.api('/api/app?route=shadow', body ? { method: 'POST', body: JSON.stringify(body) } : undefined); }
+  function say(t) { $('sh-status').textContent = t || ''; }
+  function item(title, meta, extra) { var it = el('div', null, 'item'); var t = el('div', null, 't'); t.appendChild(el('span', title)); if (meta) t.appendChild(el('span', meta, 'meta')); it.appendChild(t); if (extra) it.appendChild(extra); return it; }
+  function btn(label, cls, fn) { var b = el('button', label, cls || 'btn ghost'); b.type = 'button'; b.addEventListener('click', fn); return b; }
+  function act(body, done) { say('…'); api(body).then(function (r) { say(done || 'Fait.'); return load(); }).catch(function (e) { say(e.message); }); }
+  function render() {
+    var b = $('sh-body'); b.textContent = ''; if (!data) return;
+    if (panel === 'overview') {
+      var u = data.usage_today || {}, m = data.usage_30d || {};
+      var dl = el('dl', null, 'facts');
+      [['État', data.config.enabled ? 'actif' : 'désactivé (SHADOW_ENABLED)'], ['Dernier passage', data.last_run || 'jamais'], ['Aujourd’hui', (u.runs || 0) + ' appel(s) IA sur ' + data.config.max_daily_runs + ', coût estimé ' + (u.cost || 0) + ' $ sur ' + data.config.max_daily_cost + ' $'],
+       ['30 derniers jours', (m.runs || 0) + ' appel(s), coût estimé ' + (m.cost || 0) + ' $'], ['Leçons actives', data.lessons.filter(function (l) { return l.status === 'active'; }).length], ['À revoir par vous', data.lessons.filter(function (l) { return l.status === 'under_review'; }).length],
+       ['Golden tests', data.tests.length], ['Propositions en attente', data.experiments.filter(function (x) { return x.status === 'awaiting_owner'; }).length],
+       ['Shadow lui-même', 'propositions ' + data.self.proposals + ', approuvées ' + data.self.approved + ', refusées ' + data.self.rejected + ', retours arrière ' + data.self.rollbacks + ', régressions après approbation ' + data.self.regressions_after]
+      ].forEach(function (p) { dl.appendChild(el('dt', p[0])); dl.appendChild(el('dd', String(p[1]))); });
+      b.appendChild(dl);
+      var row = el('div', null, 'btn-row'); row.appendChild(btn('Lancer un passage maintenant', 'btn', function () { act({ action: 'run' }, 'Passage fait.'); })); b.appendChild(row);
+    }
+    if (panel === 'perf') {
+      Object.keys(data.agents).forEach(function (k) {
+        var a = data.agents[k], s = a.scores || {};
+        var meta = 'version ' + a.version + ' · entraînement ' + (s.entrainement != null ? s.entrainement + ' %' : '—') + ' · reconnaissance ' + (s.reconnaissance != null ? s.reconnaissance + ' %' : '—') + ' · anomalies détectées ' + (s.anomalies_detectees != null ? s.anomalies_detectees + ' %' : '—') + ' · exactitude ' + (s.exactitude != null ? s.exactitude + ' %' : '—');
+        var x = el('div', null, 'btn-row');
+        x.appendChild(btn('Créer des cas plus difficiles', null, function () { act({ action: 'tests', agent: k }, 'Cas d’entraînement créés.'); }));
+        x.appendChild(btn('Tester les leçons à revoir', null, function () { act({ action: 'experiment', agent: k }, 'Expérience faite : voir Propositions.'); }));
+        b.appendChild(item(NAME(k), meta + ((a.weaknesses || []).length ? ' · faiblesses : ' + a.weaknesses.join(', ') : ''), x));
+      });
+      b.appendChild(el('p', 'Indicateurs techniques des agents (pas des personnes), calculés sur 30 jours d’entraînement et sur les golden tests.', 'note'));
+    }
+    if (panel === 'problems') { if (!data.problems.length) b.appendChild(el('p', 'Aucun problème relevé pour l’instant.', 'empty'));
+      data.problems.forEach(function (p) { b.appendChild(item(NAME(p.agent) + ' — ' + (p.category || '') + ' : ' + p.problem, 'Cause probable : ' + (p.cause || '?') + ' · preuves : ' + (p.evidence || []).join(', ') + ' · ' + UI.dateTime(p.at))); }); }
+    if (panel === 'lessons') { if (!data.lessons.length) b.appendChild(el('p', 'Aucune leçon pour l’instant.', 'empty'));
+      data.lessons.forEach(function (l) {
+        var x = el('div', null, 'btn-row');
+        if (l.status === 'under_review') { x.appendChild(btn('Activer', null, function () { act({ action: 'lesson', id: l.id, status: 'active' }); })); x.appendChild(btn('Refuser', null, function () { act({ action: 'lesson', id: l.id, status: 'rejected' }); })); }
+        if (l.status === 'active') x.appendChild(btn('Rendre obsolète', null, function () { act({ action: 'lesson', id: l.id, status: 'deprecated' }); }));
+        b.appendChild(item((l.rule || l.lesson), NAME(l.agent) + ' · ' + (TYPE[l.type] || l.type) + ' · ' + (ST[l.status] || l.status) + ' · ' + l.occurrences + ' occurrence(s) · confiance ' + l.confidence + (l.source ? ' · source : ' + l.source : '') + (l.cause ? ' · cause : ' + l.cause : ''), x));
+      }); }
+    if (panel === 'tests') { if (!data.tests.length) b.appendChild(el('p', 'Les erreurs importantes deviennent ici des tests permanents.', 'empty'));
+      data.tests.forEach(function (t) { var last = (t.results || [])[t.results.length - 1]; b.appendChild(item(t.id + ' — ' + t.name, NAME(t.agent) + ' · ' + (t.kind === 'challenge' ? 'cas difficile' : 'golden') + ' · attendu : ' + t.expected + (last ? ' · dernier résultat : ' + (last.pass ? 'réussi' : 'échoué') : ''))); }); }
+    if (panel === 'exp') { if (!data.experiments.length) b.appendChild(el('p', 'Aucune proposition pour l’instant.', 'empty'));
+      data.experiments.forEach(function (x) {
+        var box = el('div', null, 'stack');
+        var dl = el('dl', null, 'facts');
+        var r = x.review || {};
+        [['Agent', NAME(x.agent) + ' (version ' + x.baseline.version + ')'], ['Problème', x.problem], ['Modification', (x.change || []).join(' | ')], ['Golden tests — version actuelle', x.baseline.golden != null ? x.baseline.golden + ' %' : '—'],
+         ['Golden tests — version candidate', x.candidate.golden != null ? x.candidate.golden + ' %' : '—'], ['Régressions', (x.regressions || []).length ? x.regressions.join(', ') : 'aucune détectée'], ['Tests', (x.tests || []).join(', ')],
+         ['Coût (jour)', (x.cost || 0) + ' $ estimé'], ['Avis du Firm Manager', (OP[r.opinion] || r.opinion || '—') + (r.justification ? ' — ' + r.justification : '')], ['Pour', (r.pros || []).join(' ; ')], ['Contre', (r.cons || []).join(' ; ')], ['Risques', (r.risks || []).join(' ; ')],
+         ['Retour arrière', x.rollback], ['Statut', x.status === 'awaiting_owner' ? 'attend votre décision' : x.status + (x.decided_by ? ' par ' + x.decided_by : '')]].forEach(function (p) { if (p[1] == null || p[1] === '') return; dl.appendChild(el('dt', p[0])); dl.appendChild(el('dd', String(p[1]))); });
+        box.appendChild(dl);
+        if (x.status === 'awaiting_owner') { var row = el('div', null, 'btn-row');
+          row.appendChild(btn('Approuver', 'btn', function () { act({ action: 'decide', experiment_id: x.id, decision: 'approve' }, 'Approuvé : nouvelle version.'); }));
+          row.appendChild(btn('Tester davantage', null, function () { act({ action: 'decide', experiment_id: x.id, decision: 'more_tests' }, 'Shadow va tester davantage.'); }));
+          row.appendChild(btn('Refuser', null, function () { act({ action: 'decide', experiment_id: x.id, decision: 'refuse' }, 'Refusé.'); }));
+          box.appendChild(row); }
+        b.appendChild(item('Proposition ' + x.id + ' — ' + UI.dateTime(x.at), null, box));
+      }); }
+    if (panel === 'code') {
+      // Shadow rewrites code — as a proposal: its own branch and a draft pull request; a person reviews,
+      // tests and merges. The guard rails (rights, approvals, audit, secrets) can never be changed.
+      var c = data.code || { github: {}, agents: [], proposals: [] };
+      b.appendChild(el('p', 'Shadow peut proposer une modification du code d’un agent — ou de lui-même — à partir de ce qu’il a observé ou d’un objectif que vous écrivez. Il ne fusionne jamais et ne déploie jamais : la modification part sur sa propre branche avec une pull request en brouillon ; une personne relit, lance les tests et décide. Les garde-fous (droits, validations, journal d’audit, secrets, envois) ne peuvent pas être modifiés.', 'note'));
+      b.appendChild(el('p', c.github.connected ? 'GitHub connecté : ' + c.github.repo + ' (base ' + c.github.base + ').' : 'GitHub n’est pas connecté (SHADOW_GITHUB_TOKEN dans Vercel) : les propositions attendent ici avec leur diff, rien n’est appliqué.', c.github.connected ? 'small' : 'small warn-text'));
+      var form = el('div', null, 'stack');
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Agent');
+      (c.agents || []).forEach(function (k) { var o = el('option', k === 'shadow' ? 'Shadow (lui-même)' : NAME(k)); o.value = k; sel.appendChild(o); });
+      var goal = document.createElement('textarea'); goal.placeholder = 'Objectif (facultatif) : le comportement à corriger. Sans objectif, Shadow part de ce qu’il a observé.'; goal.setAttribute('aria-label', 'Objectif'); goal.style.minHeight = '60px';
+      var row = el('div', null, 'btn-row'); row.appendChild(sel);
+      row.appendChild(btn('Proposer une amélioration du code', 'btn', function () { act({ action: 'code', agent: sel.value, goal: goal.value.trim() }, 'Shadow prépare la proposition (quelques minutes).'); }));
+      form.appendChild(goal); form.appendChild(row); b.appendChild(form);
+      var CS = { drafting: 'en préparation', pr_open: 'pull request ouverte — à relire', ready_without_github: 'prête, GitHub non connecté', refused: 'refusée par les garde-fous', nothing_proposed: 'rien de sûr à proposer', failed: 'échec', closed: 'close' };
+      if (!(c.proposals || []).length) b.appendChild(el('p', 'Aucune proposition de code pour l’instant.', 'empty'));
+      (c.proposals || []).forEach(function (p) {
+        var box = el('div', null, 'stack');
+        var dl = el('dl', null, 'facts');
+        [['Agent', p.agent === 'shadow' ? 'Shadow' : NAME(p.agent)], ['Demandée par', p.requested_by], ['Objectif', p.goal], ['Problème', p.problem], ['Cause', p.cause], ['Modification', p.summary], ['Fichiers', (p.files || []).join(', ')],
+         ['Tests à lancer', (p.tests_to_run || []).join(' ; ')], ['Risques', (p.risks || []).join(' ; ')], ['Retour arrière', p.rollback], ['Refusée parce que', (p.refused || []).join(' ; ')], ['Erreur', p.error], ['Note', p.note]
+        ].forEach(function (f) { if (!f[1]) return; dl.appendChild(el('dt', f[0])); dl.appendChild(el('dd', String(f[1]))); });
+        box.appendChild(dl);
+        if (p.diff) { var det = document.createElement('details'); var sm = document.createElement('summary'); sm.textContent = 'Voir le diff'; det.appendChild(sm); var pre = el('pre', p.diff); pre.style.cssText = 'white-space:pre-wrap;font-size:12px;max-height:420px;overflow:auto'; det.appendChild(pre); box.appendChild(det); }
+        var r2 = el('div', null, 'btn-row');
+        if (p.pr_url) r2.appendChild(UI.safeLink(p.pr_url, 'Ouvrir la pull request'));
+        if (['pr_open', 'ready_without_github', 'drafting'].indexOf(p.status) >= 0) r2.appendChild(btn('Refuser et clore', null, function () { act({ action: 'code-close', id: p.id }, 'Proposition close (rien n’est fusionné).'); }));
+        box.appendChild(r2);
+        b.appendChild(item(p.id + ' — ' + (CS[p.status] || p.status), UI.dateTime(p.at), box));
+      });
+    }
+    if (panel === 'norms') {
+      var f = el('div', null, 'btn-row'); var inp = el('input'); inp.type = 'text'; inp.placeholder = 'Lien Drive d’une norme (ISA, IFRS, ACCA, SYSCOHADA, procédure du cabinet)'; inp.style.flex = '1'; inp.setAttribute('aria-label', 'Lien Drive de la norme');
+      f.appendChild(inp); f.appendChild(btn('Ajouter à la bibliothèque', 'btn', function () { if (!inp.value.trim()) return; act({ action: 'source', link: inp.value.trim() }, 'Norme indexée (le PDF reste dans le Drive).'); }));
+      b.appendChild(f);
+      b.appendChild(el('p', 'Le document reste dans votre Drive : seuls ses références, sa version, son empreinte et un court index des paragraphes sont gardés. Une nouvelle version ne remplace pas l’ancienne, qui reste valable pour les missions de sa période.', 'note'));
+      (data.sources || []).forEach(function (s2) { b.appendChild(item(s2.standard + ' ' + s2.number + ' — ' + s2.title, (s2.version || 'version ?') + ' · ' + s2.status + ' · ' + s2.sections + ' paragraphe(s) indexé(s) · ajoutée le ' + UI.dateTime(s2.ingested_at))); });
+    }
+    if (panel === 'survey') { if (!(data.surveys || []).length) b.appendChild(el('p', 'Le premier questionnaire part au prochain passage de Shadow.', 'empty'));
+      (data.surveys || []).forEach(function (s3) { var box = el('div', null, 'stack'); (s3.latest || []).forEach(function (a) { box.appendChild(el('p', a.by + ' : ' + Object.keys(a.answers).map(function (k) { return a.answers[k]; }).filter(Boolean).join(' — '), 'small')); });
+        b.appendChild(item('Questionnaire ' + s3.id, s3.answers + ' réponse(s)' + (s3.closed ? ' · clos' : ' · en cours'), box)); }); }
+    if (panel === 'history') {
+      Object.keys(data.agents).forEach(function (k) { (data.agents[k].versions || []).slice().reverse().forEach(function (v) {
+        var x = el('div', null, 'btn-row');
+        if (v.version === data.agents[k].version && !v.rolled_back) x.appendChild(btn('Revenir à la version ' + v.rollback_to, null, function () { act({ action: 'rollback', agent: k }, 'Retour arrière fait.'); }));
+        b.appendChild(item(NAME(k) + ' ' + v.previous + ' → ' + v.version, 'raison : ' + v.reason + ' · golden tests ' + (v.tests.before ?? '—') + ' % → ' + (v.tests.after ?? '—') + ' % · approuvée par ' + v.approver + ' le ' + UI.dateTime(v.at) + (v.rolled_back ? ' · annulée le ' + UI.dateTime(v.rolled_back.at) : ''), x)); }); });
+      if (!b.children.length) b.appendChild(el('p', 'Aucune nouvelle version pour l’instant.', 'empty'));
+    }
+  }
+  Array.prototype.forEach.call($('sh-tabs').children, function (c) { c.addEventListener('click', function () { panel = c.dataset.p; Array.prototype.forEach.call($('sh-tabs').children, function (x) { x.setAttribute('aria-pressed', String(x === c)); }); render(); }); });
+  function load() { return api().then(function (d) { data = d; render(); }).catch(function (e) { say('Shadow indisponible : ' + e.message); }); }
+  load();
 })();
 </script>
 </body>

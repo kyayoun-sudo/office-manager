@@ -14,6 +14,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html" aria-current="page">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -37,9 +38,16 @@
     <section id="list-view" hidden>
       <header class="page-head" style="margin-bottom:16px">
         <h1>Missions</h1>
-        <p class="lead">Choisissez une mission pour ouvrir son dossier.</p>
+        <p class="lead">Une mission <strong>active</strong> est une proposition soumise dont on attend le résultat, ou une mission gagnée pas encore commencée. Une mission <strong>en cours</strong> est acceptée et ses travaux ont commencé. Mission Controller propose les changements de statut ; vous validez.</p>
       </header>
-      <div id="missions" class="stack"><p class="empty">Chargement…</p></div>
+      <div class="chips" id="phase-filter" role="group" aria-label="Filtrer les missions">
+        <button type="button" class="chip" data-phase="all" aria-pressed="true">Toutes</button>
+        <button type="button" class="chip" data-phase="running" aria-pressed="false">En cours</button>
+        <button type="button" class="chip" data-phase="waiting" aria-pressed="false">Actives — en attente du résultat</button>
+        <button type="button" class="chip" data-phase="won" aria-pressed="false">Actives — gagnées, pas commencées</button>
+        <button type="button" class="chip" data-phase="ended" aria-pressed="false">Terminées</button>
+      </div>
+      <div id="missions" class="stack" style="margin-top:14px"><p class="empty">Chargement…</p></div>
     </section>
 
     <!-- One mission -->
@@ -48,80 +56,182 @@
         <a href="/mission.html">← Toutes les missions</a>
         <h1 id="m-name">Mission</h1>
         <p class="meta" id="m-meta"></p>
+        <div class="status-line"><span class="tag" id="m-phase"></span><span class="tag neutral" id="m-status"></span>
+          <span class="status-move" id="move-box" hidden><label for="move-to" class="sr">Proposer un changement de statut</label><select id="move-to"></select><button class="btn ghost" id="move" type="button">Proposer ce statut</button></span></div>
+        <p class="note" id="move-status" role="status" aria-live="polite"></p>
       </header>
 
       <div class="kpis">
         <div class="kpi"><span>Documents reliés</span><strong id="k-docs">–</strong></div>
-        <div class="kpi"><span>Documents vérifiés</span><strong id="k-ver">–</strong></div>
+        <div class="kpi"><span>PBC attendues</span><strong id="k-pbc">–</strong></div>
         <div class="kpi"><span>Équipe active</span><strong id="k-team">–</strong></div>
         <div class="kpi"><span>Actions ouvertes</span><strong id="k-act">–</strong></div>
+        <div class="kpi"><span>Temps prévu</span><strong id="k-time">–</strong></div>
       </div>
 
-      <section class="card" id="blockers-card" aria-labelledby="h-block" hidden>
-        <h2 id="h-block">Points à régler</h2>
-        <ul class="blockers" id="blockers"></ul>
-      </section>
+      <div class="mission-sections">
+        <section class="card" id="sec-summary" aria-labelledby="h-summary">
+          <h2 id="h-summary">Synthèse</h2>
+          <div id="blockers-card" hidden><h3 class="sub">Points à régler</h3><ul class="blockers" id="blockers"></ul></div>
+          <h3 class="sub">Échéances</h3>
+          <div id="deadlines" class="stack"></div>
+          <h3 class="sub">Prochaines étapes suggérées</h3>
+          <ol class="blockers" id="steps"></ol>
+          <h3 class="sub">Plan proposé (dernière version)</h3>
+          <p class="empty" id="plan-empty">Aucun plan enregistré.</p>
+          <ol class="blockers" id="phases"></ol>
+          <p class="meta" id="plan-guard"></p>
+        </section>
 
-      <div class="row">
-        <div class="grow">
-          <section class="card" aria-labelledby="h-team">
-            <h2 id="h-team">Équipe</h2>
-            <div class="table-box"><table>
-              <thead><tr><th scope="col">Personne</th><th scope="col">Rôle sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
-              <tbody id="team"></tbody>
-            </table></div>
-          </section>
-          <section class="card" aria-labelledby="h-act">
-            <div class="card-head"><h2 id="h-act">Actions de la mission</h2><a href="/validations.html">À valider</a></div>
-            <div id="actions" class="stack"></div>
-          </section>
-          <section class="card" aria-labelledby="h-docs">
-            <h2 id="h-docs">Documents</h2>
-            <div id="docs" class="stack"></div>
-          </section>
-          <section class="card" aria-labelledby="h-remarks" id="remarks-card" hidden>
-            <h2 id="h-remarks">Remarques dans les fichiers de travail</h2>
-            <p class="meta" style="margin:0">Écrites dans les fichiers par le panneau Office Manager d'Excel (feuille « Revue IA ») et suivies ici.</p>
-            <div id="remarks" class="stack"></div>
-          </section>
-        </div>
-        <aside class="side">
-          <section class="card" aria-labelledby="h-plan">
-            <h2 id="h-plan">Plan proposé (dernière version)</h2>
-            <p class="empty" id="plan-empty">Aucun plan enregistré.</p>
-            <ol class="blockers" id="phases"></ol>
-            <p class="meta" id="plan-guard"></p>
-          </section>
-          <section class="card" aria-labelledby="h-steps">
-            <h2 id="h-steps">Prochaines étapes suggérées</h2>
-            <ol class="blockers" id="steps"></ol>
-          </section>
-        </aside>
+        <section class="card" id="sec-brief" aria-labelledby="h-brief">
+          <h2 id="h-brief">Briefing TDR</h2>
+          <div id="brief"></div>
+        </section>
+
+        <section class="card" id="sec-risks" aria-labelledby="h-risks">
+          <h2 id="h-risks">Risques</h2>
+          <div id="risks"></div>
+          <details id="risk-brief-box" hidden><summary>Briefing des risques du secteur (Mission Controller)</summary><div id="risk-brief" class="rich"></div></details>
+        </section>
+
+        <section class="card" id="sec-team" aria-labelledby="h-team">
+          <h2 id="h-team">Équipe</h2>
+          <h3 class="sub">Équipe retenue (affectations)</h3>
+          <div class="table-box"><table>
+            <thead><tr><th scope="col">Personne</th><th scope="col">Rôle sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
+            <tbody id="team"></tbody>
+          </table></div>
+          <div id="reco-box" hidden>
+            <h3 class="sub">Recommandation d'équipe (deux jugements IA indépendants)</h3>
+            <p class="note">Prend en compte CV, compétences, expérience, disponibilité, charge, performance passée et KPI, profil RH, questionnaire, Management Card, comportement observé, évolution récente et risques d'indépendance ou de conflit. L'IA propose et explique ; vous retenez.</p>
+            <div class="btn-row"><button class="btn" id="reco-run" type="button">Recommander une équipe</button></div>
+            <p class="note" id="reco-status" role="status" aria-live="polite"></p>
+            <div id="reco"></div>
+          </div>
+          <h3 class="sub">Équipe proposée par Mission Controller</h3>
+          <div id="team-proposed" class="stack"></div>
+          <h3 class="sub">Compétences requises — équipe nécessaire</h3>
+          <div id="needed"></div>
+          <div id="externals-box" hidden><h3 class="sub">Spécialistes externes suggérés (aucun n'a été contacté)</h3><div id="externals" class="stack"></div></div>
+        </section>
+
+        <section class="card" id="sec-docs" aria-labelledby="h-docs">
+          <h2 id="h-docs">Documents et PBC</h2>
+          <h3 class="sub">PBC</h3>
+          <div id="pbc" class="stack"></div>
+          <h3 class="sub">Documents</h3>
+          <div id="docs" class="stack"></div>
+        </section>
+        <section class="card" aria-labelledby="h-remarks" id="remarks-card" hidden>
+          <h2 id="h-remarks">Remarques dans les fichiers de travail</h2>
+          <p class="meta" style="margin:0">Écrites dans les fichiers par le panneau Office Manager d'Excel (feuille « Revue IA ») et suivies ici.</p>
+          <div id="remarks" class="stack"></div>
+        </section>
+
+        <section class="card" id="sec-budget" aria-labelledby="h-budget">
+          <h2 id="h-budget">Budget et temps</h2>
+          <div id="budget"></div>
+        </section>
+
+        <section class="card" id="sec-actions" aria-labelledby="h-act">
+          <div class="card-head"><h2 id="h-act">Actions</h2><a href="/validations.html">À valider</a></div>
+          <div id="actions" class="stack"></div>
+        </section>
+
+        <section class="card" id="sec-contacts" aria-labelledby="h-contacts">
+          <h2 id="h-contacts">Contacts client</h2>
+          <p class="note">Interlocuteurs du client relevés par les agents (TDR, lettre de mission, organigramme, e-mails, PBC). Un contact « proposé » doit être validé par un responsable : seuls les contacts validés peuvent recevoir un e-mail de la mission.</p>
+          <div id="contacts" class="stack"></div>
+          <details id="add-contact" hidden><summary>Ajouter un contact</summary>
+            <div class="form-grid">
+              <label>Nom<input id="c-name" maxlength="120"></label>
+              <label>Fonction<select id="c-role"></select></label>
+              <label>Cycle (facultatif)<input id="c-cycle" maxlength="60"></label>
+              <label>E-mail<input id="c-email" type="email" maxlength="200"></label>
+              <label>Téléphone<input id="c-phone" maxlength="40"></label>
+            </div>
+            <div class="btn-row"><button class="btn" id="c-add" type="button">Ajouter (validé)</button></div>
+            <p class="note" id="c-status" role="status" aria-live="polite"></p>
+          </details>
+        </section>
+
+        <section class="card" id="sec-messages" aria-labelledby="h-msg">
+          <h2 id="h-msg">Messages</h2>
+          <div class="ask">
+            <h3 class="sub">Écrire au client</h3>
+            <p class="note">Choisissez le but et le cycle : les destinataires sont proposés. Dites simplement ce que vous voulez demander ; l'IA rédige le message professionnel ; vous le relisez. Rien ne part avant une validation.</p>
+            <div class="form-grid">
+              <label>But<select id="x-purpose"></select></label>
+              <label>Cycle<select id="x-cycle"></select></label>
+            </div>
+            <div id="x-meeting" class="form-grid" hidden>
+              <label>Objet de la réunion<input id="x-msubject" maxlength="200"></label>
+              <label>Créneau<input id="x-slot" type="datetime-local"></label>
+              <label>Durée<select id="x-duration"><option>30 min</option><option selected>1 h</option><option>1 h 30</option><option>2 h</option></select></label>
+              <label>Participants<input id="x-participants" maxlength="500" placeholder="noms ou fonctions"></label>
+              <label class="wide">Lien de réunion<input id="x-link" type="url" maxlength="300"></label>
+              <p class="note wide">Un lien de visioconférence est créé automatiquement ; vous pouvez le remplacer par votre lien Teams ou Google Meet. Il est intégré au message.</p>
+            </div>
+            <label for="x-to">À</label>
+            <input id="x-to" type="text" maxlength="1000" placeholder="adresses séparées par des virgules">
+            <label for="x-cc">Cc</label>
+            <input id="x-cc" type="text" maxlength="1000">
+            <div id="x-hint" class="note"></div>
+            <label for="x-request">Ce que vous voulez demander</label>
+            <textarea id="x-request" maxlength="3000" placeholder="Ex. le grand livre fournisseurs 2025 et les 10 plus grosses factures d'achats de décembre, pour le 20 octobre"></textarea>
+            <div class="btn-row"><button class="btn" id="x-draft" type="button">Rédiger le message</button></div>
+            <div id="x-review" hidden>
+              <label for="x-subject">Objet</label><input id="x-subject" maxlength="200">
+              <label for="x-body">Message</label><textarea id="x-body" rows="12"></textarea>
+              <div class="btn-row"><button class="btn" id="x-send" type="button">Valider et envoyer</button><button class="btn ghost" id="x-propose" type="button">Envoyer pour validation</button></div>
+            </div>
+            <p class="note" id="x-status" role="status" aria-live="polite"></p>
+          </div>
+          <div class="ask">
+            <h3 class="sub" id="h-write">Écrire à l'équipe de la mission</h3>
+            <p class="note">Pour une validation ou une question : les personnes de la mission (programme de travail, planning) sont déjà choisies. Ajoutez ou retirez qui vous voulez dans la liste du cabinet. Le message attend la validation d'un responsable dans « À valider » avant de partir.</p>
+            <label for="w-to">Destinataires</label>
+            <input id="w-to" type="text" list="w-people" maxlength="1000" placeholder="adresses séparées par des virgules" style="width:100%;box-sizing:border-box">
+            <datalist id="w-people"></datalist>
+            <div id="w-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"></div>
+            <label for="w-topic">Ce que vous voulez demander ou faire valider</label>
+            <textarea id="w-topic" maxlength="2000" placeholder="Ex. Valider le programme de travail du cycle Ventes avant vendredi"></textarea>
+            <div class="btn-row"><button class="btn" id="w-send" type="button">Préparer et envoyer pour validation</button></div>
+            <p class="note" id="w-status" role="status" aria-live="polite"></p>
+          </div>
+          <h3 class="sub">Messages de la mission</h3>
+          <div id="messages" class="stack"></div>
+        </section>
+
+        <section class="card" id="sec-review" aria-labelledby="h-review">
+          <h2 id="h-review">Revue Enhanced Auditor</h2>
+          <div id="review"></div>
+        </section>
+
+        <section class="card" id="sec-history" aria-labelledby="h-hist">
+          <h2 id="h-hist">Historique</h2>
+          <div id="history" class="stack"></div>
+        </section>
+
+        <section class="card" id="sec-ask" aria-labelledby="h-ask">
+          <h2 id="h-ask">Questions sur la mission</h2>
+          <div class="ask">
+            <label for="question">Votre question</label>
+            <textarea id="question" maxlength="2000" placeholder="Ex. Quelles pièces manquent encore pour le cycle Achats ? Quels risques ne sont pas encore couverts ?"></textarea>
+            <div class="btn-row"><button class="btn" id="ask" type="button">Demander à Mission Controller</button></div>
+            <p class="note">Mission Controller répond avec tout le dossier de la mission (briefing, risques, équipe, documents, PBC, contacts, revue). Il prépare et propose ; il n'envoie rien au client.</p>
+            <div class="answer rich" id="answer" role="status" aria-live="polite" hidden></div>
+          </div>
+          <h3 class="sub">Ajouter une information à la mission</h3>
+          <div class="form-grid">
+            <label>Type<select id="f-kind"><option value="contexte">Contexte</option><option value="risque">Risque</option><option value="echeance">Échéance</option><option value="budget">Budget</option><option value="temps">Temps</option><option value="decision">Décision</option><option value="point_de_revue">Point de revue</option><option value="pbc">PBC</option><option value="independance">Indépendance</option><option value="autre">Autre</option></select></label>
+            <label>Titre<input id="f-label" maxlength="200"></label>
+            <label class="wide">Détail<textarea id="f-value" maxlength="2000" rows="3"></textarea></label>
+          </div>
+          <div class="btn-row"><button class="btn ghost" id="f-add" type="button">Ajouter</button></div>
+          <p class="note" id="f-status" role="status" aria-live="polite"></p>
+        </section>
       </div>
-
-      <section class="ask" aria-labelledby="h-ask">
-        <h2 id="h-ask">Demander au Mission Controller sur cette mission</h2>
-        <label for="question" class="sr">Votre question</label>
-        <textarea id="question" maxlength="2000" placeholder="Ex. Quelles pièces manquent encore pour le cycle Achats ?"></textarea>
-        <div class="btn-row">
-          <button class="btn" id="ask" type="button" style="background:#E2B05A;color:var(--ink)">Demander</button>
-        </div>
-        <p class="note">Cette question est envoyée à l'IA (OpenAI) avec les informations de la mission. L'agent prépare et propose ; il n'envoie rien au client.</p>
-        <div class="answer" id="answer" role="status" aria-live="polite" hidden></div>
-      </section>
-
-      <section class="ask" aria-labelledby="h-write">
-        <h2 id="h-write">Écrire à l'équipe de la mission</h2>
-        <p class="note">Pour une validation ou une question : les personnes de la mission (programme de travail, planning) sont déjà choisies. Ajoutez ou retirez qui vous voulez dans la liste du cabinet. Le message attend la validation d'un responsable dans « À valider » avant de partir.</p>
-        <label for="w-to">Destinataires</label>
-        <input id="w-to" type="text" list="w-people" maxlength="1000" placeholder="adresses séparées par des virgules" style="width:100%;box-sizing:border-box">
-        <datalist id="w-people"></datalist>
-        <div id="w-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"></div>
-        <label for="w-topic">Ce que vous voulez demander ou faire valider</label>
-        <textarea id="w-topic" maxlength="2000" placeholder="Ex. Valider le programme de travail du cycle Ventes avant vendredi"></textarea>
-        <div class="btn-row"><button class="btn" id="w-send" type="button">Préparer et envoyer pour validation</button></div>
-        <p class="note" id="w-status" role="status" aria-live="polite"></p>
-      </section>
     </section>
   </main>
 </div>
@@ -135,75 +245,148 @@
   var params = new URLSearchParams(location.search);
   var missionId = params.get('id');
   var current = null;
+  var ROLES = { cfo: 'Directeur financier (CFO)', ceo: 'Directeur général (CEO)', tcwg: 'Gouvernance (TCWG)', achats: 'Responsable achats', ventes: 'Responsable ventes', tresorerie: 'Trésorerie', it: 'Informatique (IT)', paie: 'Paie / RH', comptabilite: 'Comptabilité', juridique: 'Juridique', cycle: 'Responsable de cycle', autre: 'Autre interlocuteur' };
+  var LABELS = { opportunity: 'Proposition soumise', acceptance: 'Gagnée', planning: 'Planification', fieldwork: 'Terrain', review: 'Revue', partner_review: 'Revue associé', report_issued: 'Rapport émis', closed: 'Clôturée', archived: 'Archivée', cancelled: 'Annulée' };
+  var LEGACY = { active: 'fieldwork', planned: 'planning', proposal: 'opportunity', prospect: 'opportunity', tender: 'opportunity', won: 'acceptance', completed: 'closed', done: 'closed', canceled: 'cancelled', merged: 'cancelled' };
+  function canon(s) { s = String(s || '').toLowerCase(); return LABELS[s] ? s : (LEGACY[s] || 'fieldwork'); }
+  function phase(m) {
+    var c = canon(m.status), today = new Date().toISOString().slice(0, 10);
+    if (c === 'opportunity') return 'waiting';
+    if (c === 'acceptance' || c === 'planning') return 'won';
+    if (['fieldwork', 'review', 'partner_review', 'report_issued'].indexOf(c) >= 0) return m.planned_start && m.planned_start > today ? 'won' : 'running';
+    return c === 'cancelled' ? 'cancelled' : 'ended';
+  }
+  var PHASE = { waiting: 'Active — en attente du résultat', won: 'Active — gagnée, pas commencée', running: 'En cours', ended: 'Terminée', cancelled: 'Annulée' };
 
+  // ---- List ----
+  var allMissions = [], phaseFilter = 'all';
+  function drawList() {
+    var box = $('missions'); box.textContent = '';
+    var list = allMissions.filter(function (m) { return phaseFilter === 'all' || phase(m) === phaseFilter; });
+    if (!list.length) { box.appendChild(el('p', allMissions.length ? 'Aucune mission dans ce filtre.' : 'Aucune mission enregistrée.', 'empty')); return; }
+    list.forEach(function (m) {
+      var a = el('a', null, 'item link-item');
+      a.href = '/mission.html?id=' + encodeURIComponent(m.id);
+      var t = el('div', null, 't');
+      t.appendChild(el('span', m.name || m.mission_code || 'Mission'));
+      t.appendChild(el('span', [m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta'));
+      a.appendChild(t);
+      var ph = phase(m);
+      a.appendChild(el('span', PHASE[ph] + ' · ' + LABELS[canon(m.status)], ph === 'running' ? 'tag' : ph === 'ended' ? 'tag neutral' : 'tag warn'));
+      box.appendChild(a);
+    });
+  }
   function showList() {
     $('list-view').hidden = false;
-    OM.api('/api/missions').then(function (data) {
-      var box = $('missions'); box.textContent = '';
-      var list = (data && data.missions) || [];
-      if (!list.length) { box.appendChild(el('p', 'Aucune mission enregistrée.', 'empty')); return; }
-      list.forEach(function (m) {
-        var a = el('a', null, 'item link-item');
-        a.href = '/mission.html?id=' + encodeURIComponent(m.id);
-        var t = el('div', null, 't');
-        t.appendChild(el('span', m.name || m.mission_code || 'Mission'));
-        t.appendChild(el('span', [m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta'));
-        a.appendChild(t);
-        if (m.status) a.appendChild(el('span', m.status, 'tag'));
-        box.appendChild(a);
-      });
-    }).catch(function (e) { UI.fail($('missions'), e); });
+    OM.api('/api/missions').then(function (data) { allMissions = (data && data.missions) || []; drawList(); })
+      .catch(function (e) { UI.fail($('missions'), e); });
+    Array.prototype.forEach.call($('phase-filter').children, function (b) {
+      b.addEventListener('click', function () { phaseFilter = b.dataset.phase; Array.prototype.forEach.call($('phase-filter').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); drawList(); });
+    });
   }
 
+  // ---- Helpers ----
   function fillList(boxId, items, render, emptyText) {
     var box = $(boxId); box.textContent = '';
-    if (!items.length) { box.appendChild(el('p', emptyText, 'empty')); return; }
+    if (!items || !items.length) { box.appendChild(el('p', emptyText, 'empty')); return; }
     items.forEach(function (x) { box.appendChild(render(x)); });
   }
+  function row(title, meta, tag, tagCls, href) {
+    var item = el(href ? 'a' : 'div', null, 'item' + (href ? ' link-item' : ''));
+    if (href) { item.href = href; if (/^https:/.test(href)) { item.target = '_blank'; item.rel = 'noopener noreferrer'; } }
+    var t = el('div', null, 't'); t.appendChild(el('span', title)); if (meta) t.appendChild(el('span', meta, 'meta'));
+    item.appendChild(t); if (tag) item.appendChild(el('span', tag, tagCls || 'tag neutral')); return item;
+  }
+  function facts(box, pairs) {
+    var dl = el('dl', null, 'facts'); var n = 0;
+    pairs.forEach(function (p) { if (!p[1] || (Array.isArray(p[1]) && !p[1].length)) return; n++; dl.appendChild(el('dt', p[0])); var dd = el('dd'); if (Array.isArray(p[1])) { var ul = el('ul'); p[1].forEach(function (x) { ul.appendChild(el('li', x)); }); dd.appendChild(ul); } else dd.textContent = p[1]; dl.appendChild(dd); });
+    if (n) box.appendChild(dl); return n;
+  }
+  function table(head, rows) { return UI.table(head, rows); }
 
+  // ---- The mission file ----
   function showDossier(d) {
     current = d;
     $('dossier-view').hidden = false;
     var m = d.mission || {};
     $('m-name').textContent = m.name || m.mission_code || 'Mission';
     document.title = (m.name || 'Mission') + ' · Missions';
-    $('m-meta').textContent = [m.mission_code, m.status, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · ');
-    var s = d.summary || {};
-    $('k-docs').textContent = s.documents_total; $('k-ver').textContent = s.documents_verified;
-    $('k-team').textContent = s.team_size; $('k-act').textContent = s.open_actions;
-
-    var blockers = d.blockers || [];
-    $('blockers-card').hidden = !blockers.length;
-    $('blockers').textContent = '';
-    blockers.forEach(function (b) { $('blockers').appendChild(el('li', b)); });
-
-    var tbody = $('team'); tbody.textContent = '';
-    if (!(d.assignments || []).length) {
-      var tr = el('tr'); var td = el('td', 'Aucune affectation enregistrée.', 'empty'); td.colSpan = 5; tr.appendChild(td); tbody.appendChild(tr);
+    $('m-meta').textContent = [d.client ? 'Client : ' + d.client : null, m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · ');
+    var st = d.status || {};
+    $('m-phase').textContent = st.phase_label || ''; $('m-status').textContent = 'Statut : ' + (st.label || m.status || '–');
+    if (OM.isManager() && (st.moves || []).length) {
+      $('move-box').hidden = false; var sel = $('move-to'); sel.textContent = '';
+      st.moves.forEach(function (x) { var o = el('option', x.label); o.value = x.key; sel.appendChild(o); });
     }
+    var s = d.summary || {};
+    $('k-docs').textContent = s.documents_total; $('k-pbc').textContent = (d.pbc || []).length;
+    $('k-team').textContent = s.team_size; $('k-act').textContent = s.open_actions;
+    $('k-time').textContent = d.time_budget ? d.time_budget.planned_days + ' j' : '–';
+
+    // Summary
+    var blockers = d.blockers || [];
+    $('blockers-card').hidden = !blockers.length; $('blockers').textContent = '';
+    blockers.forEach(function (b) { $('blockers').appendChild(el('li', b)); });
+    fillList('deadlines', d.deadlines, function (x) { return row(x.what, x.due, null); }, 'Aucune échéance connue.');
+    $('steps').textContent = ''; (d.next_steps || []).forEach(function (x) { $('steps').appendChild(el('li', x)); });
+    var plan = (d.plans || [])[0];
+    $('plan-empty').hidden = Boolean(plan); $('phases').textContent = '';
+    if (plan) (plan.phases || []).forEach(function (p) { $('phases').appendChild(el('li', String(p))); });
+    $('plan-guard').textContent = plan ? 'Version ' + plan.version + ' — proposition, non approuvée.' : '';
+
+    // TDR briefing
+    var bx = $('brief'); bx.textContent = '';
+    var b = d.briefing;
+    var pb = d.plan_briefing;
+    if (!b && pb) {
+      bx.appendChild(el('p', 'D’après le plan enregistré dans l’Assistant (' + (pb.by || '') + ', ' + UI.dateTime(pb.at) + '). Le TDR n’a pas encore été lu par Mission Controller.', 'note'));
+      facts(bx, [['Objectifs', (pb.briefing || {}).objectives], ['Périmètre (scope)', (pb.briefing || {}).scope], ['Livrables', ((pb.briefing || {}).deliverables || []).map(function (x) { return x.name + (x.due ? ' — ' + x.due : ''); })],
+        ['Planning', (pb.planning || []).map(function (p) { return p.phase + (p.start || p.end ? ' (' + [p.start, p.end].filter(Boolean).join(' → ') + ')' : ''); })], ['Compétences nécessaires', (pb.skills || []).map(function (k) { return k.capability + (k.level ? ' — ' + k.level : ''); })]]);
+    }
+    if (!b && !pb) { bx.appendChild(el('p', 'Le TDR n’a pas encore été lu. Lancez « Préparer une mission » pour que Mission Controller le lise, fasse la recherche et propose l’équipe.', 'empty')); var go = el('a', 'Préparer cette mission', 'btn ghost'); go.href = '/preparation.html?mission=' + encodeURIComponent(m.id); bx.appendChild(go); }
+    else {
+      facts(bx, [['Client', b.client], ['Pays', b.country], ['Secteur', b.industry], ['Type de mission', b.engagement_type], ['Bailleur / financement', b.funder], ['Référentiel', b.framework],
+        ['Objectifs', b.objectives], ['Périmètre (scope)', b.scope], ['Livrables', (b.deliverables || []).map(function (x) { return x.name + (x.due ? ' — ' + x.due : ''); })],
+        ['Calendrier', b.timeline ? [b.timeline.start && 'début ' + b.timeline.start, b.timeline.end && 'fin ' + b.timeline.end, b.timeline.duration, b.timeline.submission_deadline && 'soumission ' + b.timeline.submission_deadline].filter(Boolean).join(' · ') : null],
+        ['Experts clés demandés', (b.key_experts || []).map(function (x) { return [x.role, x.qualifications, x.years && x.years + ' ans'].filter(Boolean).join(' — '); })],
+        ['Critères d’évaluation', b.evaluation_criteria], ['Questions ouvertes', b.open_questions]]);
+      var links = el('div', null, 'btn-row');
+      [[b.report_doc, 'Préparation complète (Drive)'], [b.risk_doc, 'Briefing des risques (Drive)']].forEach(function (l) { var a = UI.safeLink(l[0], l[1]); if (a && a.href) { a.className = 'btn ghost'; links.appendChild(a); } });
+      (b.tdr_sources || []).forEach(function (f) { var a = UI.safeLink(f.url, 'TDR : ' + f.name); if (a && a.href) { a.className = 'btn ghost'; links.appendChild(a); } });
+      bx.appendChild(links);
+    }
+
+    // Risks
+    var rb = $('risks'); rb.textContent = '';
+    if (!(d.risks || []).length) rb.appendChild(el('p', 'Aucun risque enregistré pour l’instant (TDR, briefing du secteur, revue Enhanced Auditor ou information ajoutée par un agent).', 'empty'));
+    else rb.appendChild(table(['Risque', 'Identifié par', 'Niveau', 'Couverture', 'Procédures manquantes'], d.risks.map(function (r) { return [r.risk, r.source, r.level, r.verdict, (r.missing || []).join(' ; ')]; })));
+    $('risk-brief-box').hidden = !(b && b.risk_brief);
+    if (b && b.risk_brief) UI.richText($('risk-brief'), b.risk_brief);
+
+    // Team
+    var tbody = $('team'); tbody.textContent = '';
+    if (!(d.assignments || []).length) { var tr = el('tr'); var td = el('td', 'Aucune affectation enregistrée.', 'empty'); td.colSpan = 5; tr.appendChild(td); tbody.appendChild(tr); }
     (d.assignments || []).forEach(function (a) {
       var tr = el('tr');
-      tr.appendChild(el('td', a.full_name || 'Profil non trouvé'));
-      tr.appendChild(el('td', a.mission_role || a.role_title || '–'));
-      tr.appendChild(el('td', UI.dateRange(a.planned_start, a.planned_end)));
-      tr.appendChild(el('td', a.allocation_pct != null ? a.allocation_pct + ' %' : '–'));
-      var st = el('td'); st.appendChild(el('span', a.status || '–', 'tag neutral')); tr.appendChild(st);
-      tbody.appendChild(tr);
+      tr.appendChild(el('td', a.full_name || 'Profil non trouvé')); tr.appendChild(el('td', a.mission_role || a.role_title || '–'));
+      tr.appendChild(el('td', UI.dateRange(a.planned_start, a.planned_end))); tr.appendChild(el('td', a.allocation_pct != null ? a.allocation_pct + ' %' : '–'));
+      var stc = el('td'); stc.appendChild(el('span', a.status || '–', 'tag neutral')); tr.appendChild(stc); tbody.appendChild(tr);
     });
+    fillList('team-proposed', d.team_proposed, function (p) { return row(p.name + (p.role ? ' — ' + p.role : ''), [p.why, (p.covers || []).length ? 'couvre : ' + p.covers.join(', ') : null].filter(Boolean).join(' · '), 'proposé', 'tag warn'); }, 'Pas encore d’équipe proposée (préparation de la mission à lancer).');
+    var nb = $('needed'); nb.textContent = '';
+    if (!(d.team_needed || []).length) nb.appendChild(el('p', 'Compétences requises pas encore analysées.', 'empty'));
+    else nb.appendChild(table(['Compétence requise', 'Niveau', 'Disponible en interne', 'Personne(s)', 'Manque'], d.team_needed.map(function (r) { return [r.capability, r.level, r.internal, r.people.join(', '), r.gap ? 'oui' : 'non']; })));
+    $('externals-box').hidden = !(d.external_specialists || []).length;
+    fillList('externals', d.external_specialists, function (g) {
+      var box = el('div', null, 'item'); var t = el('div', null, 't'); t.appendChild(el('span', 'Manque : ' + g.gap));
+      (g.suggestions || []).forEach(function (x) { t.appendChild(el('span', x.name + ' — ' + (x.why || '') + (x.source ? ' (' + x.source + ')' : ''), 'meta')); });
+      box.appendChild(t); return box;
+    }, '');
 
-    fillList('actions', d.actions || [], function (a) {
-      var item = el('div', null, 'item');
-      var t = el('div', null, 't');
-      t.appendChild(el('span', a.summary || a.action_type));
-      t.appendChild(el('span', [a.agent_key, a.action_type, a.due_at ? 'échéance ' + UI.date(a.due_at) : ''].filter(Boolean).join(' · '), 'meta'));
-      item.appendChild(t);
-      item.appendChild(el('span', a.work_state || a.status || '–', a.status === 'proposed' ? 'tag warn' : 'tag neutral'));
-      return item;
-    }, 'Aucune action enregistrée.');
-
+    // Documents and PBC
+    fillList('pbc', d.pbc, function (a) { return row(a.summary, a.due_at ? 'attendue le ' + UI.date(a.due_at) : '', a.status, a.status === 'executed' || a.status === 'verified' ? 'tag' : 'tag warn'); }, 'Aucune pièce PBC suivie pour cette mission.');
     fillList('docs', d.documents || [], function (doc) {
-      var item = el('div', null, 'item');
-      var t = el('div', null, 't');
+      var item = el('div', null, 'item'); var t = el('div', null, 't');
       t.appendChild(doc.web_url ? UI.safeLink(doc.web_url, doc.name || 'Sans nom') : el('span', doc.name || 'Sans nom'));
       t.appendChild(el('span', [doc.document_type, doc.deposited ? 'déposé' + (doc.deposited_by ? ' par ' + doc.deposited_by : '') + (doc.deposited_at ? ' le ' + UI.date(doc.deposited_at) : '') : ''].filter(Boolean).join(' · '), 'meta'));
       if (doc.summary) t.appendChild(el('span', doc.summary, 'meta'));
@@ -212,31 +395,153 @@
       return item;
     }, 'Aucun document relié à cette mission.');
 
-    var plan = (d.plans || [])[0];
-    $('plan-empty').hidden = Boolean(plan);
-    $('phases').textContent = '';
-    if (plan) (plan.phases || []).forEach(function (p) { $('phases').appendChild(el('li', String(p))); });
-    $('plan-guard').textContent = plan ? 'Version ' + plan.version + ' — proposition, non approuvée.' : '';
+    // Budget and time
+    var bb = $('budget'); bb.textContent = ''; var tb = d.time_budget || {};
+    facts(bb, [['Temps prévu', tb.planned_days != null ? tb.planned_days + ' jours (équipe affectée)' : null], ['Budget (TDR / lettre de mission)', tb.budget_text], ['Écart prévu − budget', tb.gap_days != null ? (tb.gap_days > 0 ? '+' : '') + tb.gap_days + ' jours' : null]]);
+    if ((tb.by_person || []).length) bb.appendChild(table(['Personne', 'Rôle', 'Jours prévus'], tb.by_person.map(function (r) { return [r.person, r.role, r.days]; })));
+    (d.facts || []).filter(function (f) { return f.kind === 'budget' || f.kind === 'temps'; }).forEach(function (f) { bb.appendChild(row(f.label || f.kind, f.value + ' · ' + f.agent, null)); });
+    if (tb.method) bb.appendChild(el('p', tb.method, 'note'));
 
-    $('steps').textContent = '';
-    (d.next_steps || []).forEach(function (s) { $('steps').appendChild(el('li', s)); });
+    // Actions
+    fillList('actions', d.actions || [], function (a) { return row(a.summary || a.action_type, [a.agent_key, a.action_type, a.due_at ? 'échéance ' + UI.date(a.due_at) : ''].filter(Boolean).join(' · '), a.work_state || a.status || '–', a.status === 'proposed' ? 'tag warn' : 'tag neutral'); }, 'Aucune action enregistrée.');
+
+    drawContacts(d.contacts || []);
+    fillList('messages', d.messages, function (x) { return row(x.subject, [(x.recipients || []).join(', '), x.audience === 'client' ? 'client' : 'équipe', UI.dateTime(x.sent_at || x.created_at)].filter(Boolean).join(' · '), { sent: 'envoyé', pending_approval: 'à valider', rejected: 'refusé', failed: 'échec', sending: 'en cours' }[x.status] || x.status, x.status === 'sent' ? 'tag' : 'tag warn', '/messagerie.html'); }, 'Aucun message pour cette mission.');
+
+    // Review
+    var rv = $('review'); rv.textContent = ''; var r = d.review;
+    if (!r) { rv.appendChild(el('p', 'Pas encore de revue Enhanced Auditor pour cette mission.', 'empty')); var g = el('a', 'Lancer une revue', 'btn ghost'); g.href = '/auditeur.html?mission=' + encodeURIComponent(m.id); rv.appendChild(g); }
+    else {
+      facts(rv, [['Statut', r.status + (r.finished_at ? ' · ' + UI.dateTime(r.finished_at) : '')], ['Conclusion', r.summary], ['Actions prioritaires', r.priority_actions]]);
+      if ((r.coverage || []).length) rv.appendChild(table(['Risque', 'Niveau', 'Verdict', 'Procédures manquantes'], r.coverage.map(function (c) { return [c.risk, c.level, c.verdict, (c.missing_procedures || []).join(' ; ')]; })));
+      var l2 = el('div', null, 'btn-row'); [[r.report, 'Rapport de revue'], [r.matrix, 'Matrice de couverture']].forEach(function (x) { var a = UI.safeLink(x[0], x[1]); if (a && a.href) { a.className = 'btn ghost'; l2.appendChild(a); } }); rv.appendChild(l2);
+    }
+    // History
+    fillList('history', d.history, function (h) { return row(h.what, [UI.dateTime(h.at), h.who].filter(Boolean).join(' · '), null); }, 'Pas encore d’historique.');
   }
 
+  // ---- Team recommendation (managers) ----
+  function drawReco(r) {
+    var box = $('reco'); box.textContent = '';
+    if (!r || !r.team) return;
+    $('reco-status').textContent = 'Recommandation du ' + UI.dateTime(r.at) + (r.independent ? ' — deux jugements indépendants : ' + r.judgements.map(function (j) { return j.provider; }).join(' et ') : ' — un seul modèle disponible') + '.';
+    r.team.forEach(function (p) {
+      var item = el('div', null, 'item reco'); var t = el('div', null, 't');
+      t.appendChild(el('span', p.name + (p.roles.length ? ' — ' + p.roles.join(' / ') : '')));
+      p.why.forEach(function (w) { t.appendChild(el('span', w, 'meta')); });
+      if (p.risks.length) t.appendChild(el('span', 'Risques : ' + p.risks.join(' ; '), 'meta warn-text'));
+      item.appendChild(t); item.appendChild(el('span', p.agreement, p.agreement === 'les deux jugements' ? 'tag' : 'tag warn'));
+      var keep = el('button', 'Retenir', 'btn ghost'); keep.type = 'button';
+      keep.addEventListener('click', function () { keep.disabled = true; OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ action: 'retain', mission_id: missionId, name: p.name, role: p.roles[0] || 'membre' }) })
+        .then(function (x) { keep.textContent = 'Retenu'; reload(); }).catch(function (e) { keep.disabled = false; $('reco-status').textContent = 'Impossible : ' + e.message; }); });
+      item.appendChild(keep); box.appendChild(item);
+    });
+    if ((r.risks || []).length) { box.appendChild(el('h4', 'Risques signalés')); var ul = el('ul'); r.risks.forEach(function (x) { ul.appendChild(el('li', '[' + x.type + '] ' + x.message + ' (' + x.by + ')')); }); box.appendChild(ul); }
+    if ((r.alternatives || []).length) { box.appendChild(el('h4', 'Alternatives')); var ul2 = el('ul'); r.alternatives.forEach(function (x) { ul2.appendChild(el('li', x.name + (x.instead_of ? ' à la place de ' + x.instead_of : '') + ' — ' + x.why + ' (' + x.by + ')')); }); box.appendChild(ul2); }
+    if ((r.gaps || []).length) box.appendChild(el('p', 'Manques : ' + r.gaps.join(', '), 'note'));
+  }
+  $('reco-run').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('reco-status').textContent = 'Deux IA analysent l’équipe indépendamment… (1 à 2 minutes)';
+    OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ mission_id: missionId }) }).then(drawReco)
+      .catch(function (e) { $('reco-status').textContent = 'Recommandation impossible : ' + e.message; }).then(function () { b.disabled = false; });
+  });
+
+  // ---- Contacts ----
+  function drawContacts(list) {
+    var manager = OM.isManager();
+    $('add-contact').hidden = !manager;
+    fillList('contacts', list, function (c) {
+      var item = el('div', null, 'item contact'); var t = el('div', null, 't');
+      t.appendChild(el('span', (c.name || c.email || 'Contact') + ' — ' + (c.role || c.role_label || ROLES[c.role_key] || '')));
+      t.appendChild(el('span', [c.cycle && 'cycle ' + c.cycle, c.email, c.phone, c.organisation, c.source && 'source : ' + c.source].filter(Boolean).join(' · '), 'meta'));
+      item.appendChild(t);
+      item.appendChild(el('span', c.status === 'validé' ? 'validé' : 'proposé par ' + (c.found_by || 'un agent'), c.status === 'validé' ? 'tag' : 'tag warn'));
+      if (manager && c.id) {
+        var tools = el('div', null, 'btn-row');
+        if (c.status !== 'validé') { var v = el('button', 'Valider', 'btn'); v.type = 'button'; v.addEventListener('click', function () { contactAction('validate', c.id); }); tools.appendChild(v); }
+        var x = el('button', 'Retirer', 'btn ghost'); x.type = 'button'; x.addEventListener('click', function () { contactAction('remove', c.id); }); tools.appendChild(x);
+        item.appendChild(tools);
+      }
+      return item;
+    }, 'Aucun contact client pour l’instant. Les agents en ajoutent quand ils lisent le TDR, la lettre de mission, un organigramme ou un e-mail du client.');
+  }
+  function contactAction(action, id) {
+    OM.api('/api/app?route=mission-client-contacts', { method: 'POST', body: JSON.stringify({ action: action, id: id, mission_id: missionId }) }).then(reload).catch(function (e) { $('c-status').textContent = 'Impossible : ' + e.message; });
+  }
+  Object.keys(ROLES).forEach(function (k) { var o = el('option', ROLES[k]); o.value = k; $('c-role').appendChild(o); });
+  $('c-add').addEventListener('click', function () {
+    var c = { name: $('c-name').value.trim(), role: ROLES[$('c-role').value], role_key: $('c-role').value, cycle: $('c-cycle').value.trim(), email: $('c-email').value.trim(), phone: $('c-phone').value.trim(), source: 'ajouté à la main' };
+    if (!c.name && !c.email) { $('c-status').textContent = 'Indiquez au moins un nom ou un e-mail.'; return; }
+    OM.api('/api/app?route=mission-client-contacts', { method: 'POST', body: JSON.stringify({ action: 'add', mission_id: missionId, contact: c }) })
+      .then(function () { $('c-status').textContent = 'Contact ajouté.'; ['c-name', 'c-cycle', 'c-email', 'c-phone'].forEach(function (i) { $(i).value = ''; }); reload(); })
+      .catch(function (e) { $('c-status').textContent = 'Impossible : ' + e.message; });
+  });
+
+  // ---- Status change (proposed, validated in « À valider ») ----
+  $('move').addEventListener('click', function () {
+    var to = $('move-to').value; if (!to) return;
+    $('move').disabled = true;
+    OM.api('/api/app?route=memory', { method: 'POST', body: JSON.stringify({ action: 'propose_status', mission_id: missionId, status: to, why: 'proposé depuis le dossier de la mission' }) })
+      .then(function () { $('move-status').textContent = 'Proposé : à valider dans « À valider ».'; })
+      .catch(function (e) { $('move-status').textContent = 'Impossible : ' + e.message; }).then(function () { $('move').disabled = false; });
+  });
+
+  // ---- Write to the client ----
+  var PURPOSES = { pbc: 'Demande PBC', relance_pbc: 'Relance PBC', achats: 'Question Achats', ventes: 'Question Ventes', reunion: 'Réunion', document: 'Demande de document', confirmation: 'Confirmation', information: 'Information', autre: 'Autre' };
+  var CYCLES = { autre: '—', achats: 'Achats', ventes: 'Ventes', tresorerie: 'Trésorerie', paie: 'Paie / personnel', immobilisations: 'Immobilisations', stocks: 'Stocks', fiscalite: 'Fiscalité', it: 'Systèmes d’information', cloture: 'Clôture / états financiers', juridique: 'Juridique' };
+  Object.keys(PURPOSES).forEach(function (k) { var o = el('option', PURPOSES[k]); o.value = k; $('x-purpose').appendChild(o); });
+  Object.keys(CYCLES).forEach(function (k) { var o = el('option', CYCLES[k]); o.value = k; $('x-cycle').appendChild(o); });
+  var ERR = { CLIENT_CONTACT_NOT_REGISTERED: 'Aucun contact client validé sur la mission : validez ou ajoutez un contact dans « Contacts client ».', RECIPIENT_NOT_CLIENT_CONTACT: 'Un destinataire n’est pas un contact client validé de la mission.', REQUEST_REQUIRED: 'Dites en quelques mots ce que vous voulez demander.', RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.' };
+  function list(v) { return String(v || '').split(/[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function suggestRecipients() {
+    if (!missionId) return;
+    var p = $('x-purpose').value, c = $('x-cycle').value;
+    $('x-meeting').hidden = p !== 'reunion';
+    if (p === 'achats' && c === 'autre') $('x-cycle').value = 'achats';
+    if (p === 'ventes' && c === 'autre') $('x-cycle').value = 'ventes';
+    OM.api('/api/app?route=mission-write', { method: 'POST', body: JSON.stringify({ action: 'suggest', mission_id: missionId, purpose: p, cycle: $('x-cycle').value }) }).then(function (s) {
+      $('x-to').value = (s.to || []).map(function (x) { return x.email; }).join(', ');
+      $('x-cc').value = (s.cc || []).map(function (x) { return x.email; }).join(', ');
+      $('x-hint').textContent = s.missing || ['À : ' + (s.to || []).map(function (x) { return x.label; }).join(', '), 'Cc : ' + (s.cc || []).map(function (x) { return x.label; }).join(', ')].join(' — ');
+      if (s.meeting_link && !$('x-link').value) $('x-link').value = s.meeting_link;
+    }).catch(function (e) { $('x-hint').textContent = 'Destinataires non proposés : ' + e.message; });
+  }
+  $('x-purpose').addEventListener('change', suggestRecipients); $('x-cycle').addEventListener('change', suggestRecipients);
+  $('x-draft').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('x-status').textContent = 'Rédaction…';
+    OM.api('/api/app?route=mission-write', { method: 'POST', body: JSON.stringify({ action: 'draft', mission_id: missionId, purpose: $('x-purpose').value, cycle: $('x-cycle').value, to: list($('x-to').value), request: $('x-request').value,
+      meeting: { subject: $('x-msubject').value, slot: $('x-slot').value ? $('x-slot').value.replace('T', ' à ') : '', duration: $('x-duration').value, participants: $('x-participants').value, link: $('x-link').value } }) })
+      .then(function (r) { $('x-review').hidden = false; $('x-subject').value = r.subject; $('x-body').value = r.body; if (r.meeting && r.meeting.link) $('x-link').value = r.meeting.link;
+        $('x-send').hidden = !OM.isManager(); $('x-status').textContent = 'Relisez et modifiez si besoin. Rien n’est parti.'; })
+      .catch(function (e) { $('x-status').textContent = ERR[e.code] || ('Rédaction impossible : ' + e.message); }).then(function () { b.disabled = false; });
+  });
+  function submit(send) {
+    $('x-send').disabled = $('x-propose').disabled = true; $('x-status').textContent = send ? 'Envoi…' : 'Enregistrement…';
+    OM.api('/api/app?route=mission-write', { method: 'POST', body: JSON.stringify({ action: 'submit', mission_id: missionId, purpose: $('x-purpose').value, cycle: $('x-cycle').value, to: list($('x-to').value), cc: list($('x-cc').value), subject: $('x-subject').value, body: $('x-body').value, request: $('x-request').value, send: send }) })
+      .then(function (r) { $('x-status').textContent = r.sent ? 'Message validé et envoyé.' : 'Message enregistré : il attend la validation d’un responsable dans « Messagerie ».'; $('x-review').hidden = true; $('x-request').value = ''; reload(); })
+      .catch(function (e) { $('x-status').textContent = ERR[e.code] || ('Impossible : ' + e.message); }).then(function () { $('x-send').disabled = $('x-propose').disabled = false; });
+  }
+  $('x-send').addEventListener('click', function () { submit(true); });
+  $('x-propose').addEventListener('click', function () { submit(false); });
+
+  // ---- Questions ----
   $('ask').addEventListener('click', function () {
     var q = $('question').value.trim();
     if (!q || !current) return;
     var m = current.mission || {};
     $('ask').disabled = true;
-    $('answer').hidden = false; $('answer').textContent = 'Le Mission Controller réfléchit…';
-    OM.api('/api/agent', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: 'Mission ' + (m.name || '') + ' (UUID ' + m.id + ') : ' + q,
-        agent: 'mission-controller', provider: 'auto', risk: 'normal'
-      })
+    $('answer').hidden = false; $('answer').textContent = 'Mission Controller lit le dossier de la mission…';
+    OM.api('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Mission ' + (m.name || '') + ' (UUID ' + m.id + '). Lis d’abord le dossier complet de la mission (get_mission_file). Question : ' + q, agent: 'mission-controller', provider: 'auto', risk: 'normal' })
     }).then(function (data) { UI.richText($('answer'), (data && data.answer) || 'Réponse vide.'); })
       .catch(function (err) { $('answer').textContent = 'Erreur : ' + err.message; })
       .then(function () { $('ask').disabled = false; });
+  });
+  $('f-add').addEventListener('click', function () {
+    var body = { mission_id: missionId, kind: $('f-kind').value, label: $('f-label').value.trim(), value: $('f-value').value.trim(), source: 'ajouté depuis le dossier de la mission' };
+    if (!body.label && !body.value) { $('f-status').textContent = 'Écrivez un titre ou un détail.'; return; }
+    OM.api('/api/app?route=mission-fact', { method: 'POST', body: JSON.stringify(body) }).then(function () { $('f-status').textContent = 'Ajouté : les agents en tiendront compte.'; $('f-label').value = ''; $('f-value').value = ''; reload(); })
+      .catch(function (e) { $('f-status').textContent = 'Impossible : ' + e.message; });
   });
 
   // ---- Message to the mission's people (they are pre-selected) ----
@@ -267,10 +572,14 @@
       .catch(function (err) { $('w-status').textContent = 'Échec : ' + err.message; }).then(function () { b.disabled = false; });
   });
 
+  function reload() {
+    return OM.api('/api/app?route=mission-file&mission_id=' + encodeURIComponent(missionId)).then(showDossier)
+      .catch(function () { return OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId)).then(showDossier); });
+  }
   function start() {
     OM.loadBranding().catch(function () {});
-    if (missionId) loadContacts();
     if (!missionId) { showList(); return; }
+    // Remarks written in the work files by the Excel panel (branch « amelioration »).
     OM.api('/api/app?route=workfile&mission_id=' + encodeURIComponent(missionId)).then(function (d) {
       var list = d.remarks || []; if (!list.length) return;
       $('remarks-card').hidden = false;
@@ -285,9 +594,9 @@
         box.appendChild(it);
       });
     }).catch(function () {});
-    OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId))
-      .then(showDossier)
-      .catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });
+    loadContacts();
+    if (OM.isManager()) { $('reco-box').hidden = false; OM.api('/api/app?route=team-recommendation&mission_id=' + encodeURIComponent(missionId)).then(drawReco).catch(function () {}); }
+    reload().then(suggestRecipients).catch(function (e) { $('list-view').hidden = false; UI.fail($('missions'), e); });
   }
   UI.requireLogin(start);
 })();

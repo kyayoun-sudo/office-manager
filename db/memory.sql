@@ -1,0 +1,212 @@
+-- Memory and recovery extension (2026-10-08). ADDITIVE ONLY: nothing is dropped, renamed or
+-- rewritten. Run once in the Supabase SQL editor. The application works without it (the new
+-- features report « migration manquante ») and uses it as soon as it exists.
+--
+-- Principle: Drive = detailed memory (agents' MEMORY folder, MISSION_MEMORY.json in each mission
+-- folder); Supabase = state, index, relations and the useful cross-mission learnings only.
+begin;
+
+-- 1. Index of each mission's memory (no client detail): where its folder and memory file are,
+--    and when its status last changed / it was closed / archived. status itself stays as it is
+--    (free text); lib/mission-status.js maps old values (active, completed…) to the common list.
+alter table public.office_missions add column if not exists client_name text check (client_name is null or length(client_name) <= 200);
+alter table public.office_missions add column if not exists drive_folder_id text check (drive_folder_id is null or length(drive_folder_id) <= 200);
+alter table public.office_missions add column if not exists memory_file_id text check (memory_file_id is null or length(memory_file_id) <= 200);
+-- The client's folder (its permanent file holds 00_OFFICE_MANAGER/CLIENT_MEMORY.json, shared by all its missions).
+alter table public.office_missions add column if not exists client_folder_id text check (client_folder_id is null or length(client_folder_id) <= 200);
+alter table public.office_missions add column if not exists status_changed_at timestamptz;
+alter table public.office_missions add column if not exists closed_at timestamptz;
+alter table public.office_missions add column if not exists archived_at timestamptz;
+-- Copies of a message (client e-mails: CFO, mission manager, the agent's alias in Cc).
+alter table public.office_agent_messages add column if not exists cc text[];
+create index if not exists office_missions_client_idx on public.office_missions (org_id, client_name);
+
+-- 2. Audit log, APPEND-ONLY (insert and select only: no update, no delete, for anyone).
+--    References and hashes only — never the content of client documents, never the model's reasoning.
+create table if not exists public.office_audit_events (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  at timestamptz not null default now(),
+  agent text not null check (length(agent) between 1 and 60),
+  mission_id uuid,
+  action_type text not null check (length(action_type) between 1 and 80),
+  source_ref text check (source_ref is null or length(source_ref) <= 500),
+  input_hash text check (input_hash is null or input_hash ~ '^[0-9a-f]{64}$'),
+  decision text check (decision is null or length(decision) <= 60),
+  output_ref text check (output_ref is null or length(output_ref) <= 500),
+  status text not null check (status in ('started', 'succeeded', 'failed', 'proposed', 'approved', 'rejected', 'executed', 'verified', 'retried', 'recovered', 'skipped')),
+  error text check (error is null or length(error) <= 500),
+  reviewer text check (reviewer is null or length(reviewer) <= 120),
+  approved_by text check (approved_by is null or length(approved_by) <= 120),
+  approved_at timestamptz,
+  executed_at timestamptz,
+  verified_at timestamptz,
+  ref_id text check (ref_id is null or length(ref_id) <= 120)
+);
+create index if not exists office_audit_events_org_idx on public.office_audit_events (org_id, at desc);
+create index if not exists office_audit_events_mission_idx on public.office_audit_events (org_id, mission_id, at desc);
+alter table public.office_audit_events enable row level security;
+revoke all on public.office_audit_events from public, anon, authenticated, service_role;
+grant select, insert on public.office_audit_events to service_role;
+
+-- 3. Cross-mission learnings, with their provenance. An isolated observation stays « observed »;
+--    it becomes « confirmed » only when seen on 2+ missions or validated by a partner.
+create table if not exists public.office_learnings (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  category text not null check (category in ('risk', 'cycle_duration', 'overrun_cause', 'recurring_error', 'training_need', 'staffing', 'pbc_difficulty', 'management', 'other')),
+  statement text not null check (length(statement) between 3 and 1000),
+  key text not null check (length(key) between 3 and 200),
+  source_mission_ids uuid[] not null default '{}',
+  occurrences integer not null default 1 check (occurrences >= 1),
+  status text not null default 'observed' check (status in ('observed', 'confirmed', 'rejected')),
+  confirmed_by text check (confirmed_by is null or length(confirmed_by) <= 120),
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  unique (org_id, category, key)
+);
+create index if not exists office_learnings_org_idx on public.office_learnings (org_id, category, status);
+alter table public.office_learnings enable row level security;
+revoke all on public.office_learnings from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_learnings to service_role;
+
+-- 4. People (2026-10-08): documented observations on missions (R012: a manager validates) and the
+--    successive versions of each Management Card (evolution over time). Owner / managers only.
+create table if not exists public.office_people_observations (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  staff_profile_id uuid not null,
+  office_mission_id uuid,
+  kind text not null default 'comportement' check (kind in ('force', 'developpement', 'comportement', 'resultat')),
+  observation text not null check (length(observation) between 5 and 1500),
+  source text check (source is null or length(source) <= 300),
+  status text not null default 'proposed' check (status in ('proposed', 'validated', 'rejected')),
+  created_by text check (created_by is null or length(created_by) <= 120),
+  validated_by text check (validated_by is null or length(validated_by) <= 120),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_people_observations_idx on public.office_people_observations (org_id, staff_profile_id, created_at desc);
+alter table public.office_people_observations enable row level security;
+revoke all on public.office_people_observations from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_people_observations to service_role;
+
+create table if not exists public.office_management_card_versions (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  staff_profile_id uuid not null,
+  version integer not null check (version >= 1),
+  card jsonb not null check (jsonb_typeof(card) = 'object'),
+  created_by text check (created_by is null or length(created_by) <= 120),
+  created_at timestamptz not null default now(),
+  unique (org_id, staff_profile_id, version)
+);
+alter table public.office_management_card_versions enable row level security;
+revoke all on public.office_management_card_versions from public, anon, authenticated, service_role;
+grant select, insert on public.office_management_card_versions to service_role;
+
+-- 5. Instant internal messaging (2026-10-08): between the people of the firm, no validation;
+--    visible about 24 h, then archived (kept). External e-mails stay in office_agent_messages.
+create table if not exists public.office_chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  conversation text not null check (length(conversation) between 3 and 300),
+  sender_email text not null check (length(sender_email) <= 200),
+  sender_name text check (sender_name is null or length(sender_name) <= 120),
+  body text not null check (length(body) between 1 and 4000),
+  archived boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists office_chat_messages_idx on public.office_chat_messages (org_id, archived, created_at desc);
+create index if not exists office_chat_messages_conv_idx on public.office_chat_messages (org_id, conversation, created_at desc);
+alter table public.office_chat_messages enable row level security;
+revoke all on public.office_chat_messages from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_chat_messages to service_role;
+
+-- 5b. Group discussions (2026-10-08): a name and its members; only members read and write.
+create table if not exists public.office_chat_groups (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  name text not null check (length(name) between 1 and 80),
+  members text[] not null check (cardinality(members) between 2 and 60),
+  created_by text not null check (length(created_by) <= 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_chat_groups_idx on public.office_chat_groups (org_id, created_at desc);
+alter table public.office_chat_groups enable row level security;
+revoke all on public.office_chat_groups from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_chat_groups to service_role;
+
+-- 6. Sign-off of working papers (2026-10-08), APPEND-ONLY: each step on the REAL Drive file and its
+--    version (modifiedTime): opened, prepared, reviewed, comment, correction requested, corrected, signed off.
+create table if not exists public.office_workpaper_signoffs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  office_mission_id uuid,
+  file_id text not null check (length(file_id) between 5 and 200),
+  file_name text check (file_name is null or length(file_name) <= 250),
+  file_url text check (file_url is null or length(file_url) <= 500),
+  version text check (version is null or length(version) <= 60),
+  step text not null check (step in ('opened', 'prepared', 'reviewed', 'comment', 'correction_requested', 'corrected', 'signed_off')),
+  by_name text check (by_name is null or length(by_name) <= 120),
+  by_email text check (by_email is null or length(by_email) <= 200),
+  comment text check (comment is null or length(comment) <= 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists office_workpaper_signoffs_idx on public.office_workpaper_signoffs (org_id, file_id, created_at);
+alter table public.office_workpaper_signoffs enable row level security;
+revoke all on public.office_workpaper_signoffs from public, anon, authenticated, service_role;
+grant select, insert on public.office_workpaper_signoffs to service_role;
+
+-- 7. Agents' names chosen by the firm and the « rangement automatique » switch (2026-10-08).
+--    Office Manager becomes Firm Manager (only where the old default name was still in place).
+alter table public.office_agent_persona add column if not exists agent_names jsonb not null default '{}'::jsonb check (jsonb_typeof(agent_names) = 'object');
+alter table public.office_agent_persona add column if not exists auto_filing boolean not null default true;
+alter table public.office_agent_persona alter column agent_display_name set default 'Firm Manager';
+update public.office_agent_persona set agent_display_name = 'Firm Manager' where agent_display_name = 'Office Manager';
+
+-- 8. The agents' SMALL memory in Supabase (2026-10-09, Paul: « une infime mémoire ira dans Supabase et il
+--    écrira dans un Excel ce qu'il fait »): one line per agent — the hour of its last pass and its
+--    result. The full memory stays in 00_TATY_AI_MANAGER/MEMORY, the journal in its Excel.
+create table if not exists public.office_agent_checkpoints (
+  org_id uuid not null,
+  agent_key text not null check (length(agent_key) between 2 and 60),
+  last_pass_at timestamptz,
+  status text check (status is null or length(status) <= 40),
+  report jsonb not null default '{}'::jsonb check (jsonb_typeof(report) = 'object' and length(report::text) <= 4000),
+  updated_at timestamptz not null default now(),
+  primary key (org_id, agent_key)
+);
+alter table public.office_agent_checkpoints enable row level security;
+revoke all on public.office_agent_checkpoints from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_agent_checkpoints to service_role;
+
+-- 9. THE EVENT BUS (2026-10-09, architecture §11-14): agents exchange small structured events, not
+--    free conversations. One row per event; the idempotency key makes a repeated event a no-op.
+--    small_payload stays small (ids, refs, a few words) — never the content of a document.
+create table if not exists public.office_events (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  event_type text not null check (event_type ~ '^[A-Z][A-Z0-9_]{2,60}$'),
+  agent_id text check (agent_id is null or length(agent_id) <= 60),
+  actor_id text check (actor_id is null or length(actor_id) <= 200),
+  engagement_id uuid,
+  object_type text check (object_type is null or length(object_type) <= 60),
+  object_id text check (object_id is null or length(object_id) <= 200),
+  source_reference text check (source_reference is null or length(source_reference) <= 300),
+  consumer text check (consumer is null or length(consumer) <= 60),
+  idempotency_key text not null check (length(idempotency_key) between 8 and 300),
+  small_payload jsonb not null default '{}'::jsonb check (jsonb_typeof(small_payload) = 'object' and length(small_payload::text) <= 4000),
+  occurred_at timestamptz not null default now(),
+  status text not null default 'new' check (status in ('new', 'handled', 'ignored', 'failed')),
+  attempts integer not null default 0,
+  handled_at timestamptz,
+  result text check (result is null or length(result) <= 500),
+  unique (org_id, idempotency_key)
+);
+create index if not exists office_events_pending_idx on public.office_events (org_id, status, occurred_at);
+create index if not exists office_events_engagement_idx on public.office_events (org_id, engagement_id, occurred_at desc);
+alter table public.office_events enable row level security;
+revoke all on public.office_events from public, anon, authenticated, service_role;
+grant select, insert, update on public.office_events to service_role;
+
+commit;

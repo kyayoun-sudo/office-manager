@@ -2,6 +2,7 @@ import { requirePilotAccess } from '../lib/auth.js';
 import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
 import { globalSearch } from '../lib/global-search.js';
+import { smartSearch } from '../lib/smart-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
@@ -37,6 +38,22 @@ import { dropFile } from '../lib/drop-box.js';
 import { peopleBrief } from '../lib/people-brief.js';
 import { dedupeMissions } from '../lib/mission-dedupe.js';
 import { fireInternal } from '../lib/agent-passes.js';
+import { AGENT_FILES, loadAgentMemory, rebuildAgentMemory } from '../lib/agent-memory.js';
+import { readMissionMemory, refreshMissionMemories, listLearnings, confirmLearning, proposeStatusChange } from '../lib/mission-memory.js';
+import { listAuditEvents } from '../lib/audit-log.js';
+import { rest } from '../lib/supabase.js';
+import { cockpit } from '../lib/cockpit.js';
+import { notifications } from '../lib/notifications.js';
+import { getMissionFull } from '../lib/mission-full.js';
+import { assignAction } from '../lib/action-executor.js';
+import { chatState, sendChat, createGroup } from '../lib/chat.js';
+import { integratePlan } from '../lib/plan-integration.js';
+import { searchSpecialists, draftOutreach } from '../lib/external-specialists.js';
+import { workState, eveningPoint, eveningStep, startWpReview, wpStep, updateReviewPoint, retrospective, signoffEvents, signoffStatus, signoffAction, partnerView } from '../lib/auditor-plus.js';
+import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
+import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
+import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
+import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -95,7 +112,8 @@ export const ROUTES = Object.freeze({
     unavailable: 'BRANDING_UNAVAILABLE'
   },
   search: {
-    GET: (orgId, req) => globalSearch(orgId, req.query?.q, req.query?.scope),
+    // Smart search (2026-10-08): optional status and mission, keywords, what the agents read.
+    GET: (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null }),
     unavailable: 'SEARCH_UNAVAILABLE'
   },
   actions: {
@@ -107,6 +125,44 @@ export const ROUTES = Object.freeze({
   'mission-view': {
     GET: (orgId, req) => getMissionView(orgId, req.query?.mission_id),
     unavailable: 'MISSION_VIEW_UNAVAILABLE'
+  },
+  // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
+  // « rangement automatique » switch.
+  // One question about a real situation, for the Management Cards (managers answer).
+  // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
+  shadow: {
+    GET: owner(async () => (await import('../lib/shadow.js')).labView()),
+    POST: owner(async (orgId, req) => {
+      const s = await import('../lib/shadow.js'); const b = req.body || {};
+      if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
+      // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
+      if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
+      if (b.action === 'code-close') return (await import('../lib/shadow-code.js')).closeCodeProposal(orgId, { id: b.id, reason: b.reason }, who(req) || 'propriétaire');
+      if (b.action === 'decide') return s.decide(orgId, b, who(req));
+      if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
+      if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
+      if (b.action === 'tests') return s.generateTests(orgId, String(b.agent || ''));
+      if (b.action === 'experiment') return s.runExperiment(orgId, String(b.agent || ''));
+      if (b.action === 'source') { const m = String(b.link || '').match(/[-\w]{25,}/); return s.addSource(orgId, { file_id: m ? m[0] : b.link }, who(req)); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'SHADOW_UNAVAILABLE'
+  },
+  'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
+  'shadow-survey': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
+    POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).answerSurvey(req.body || {}, req.account)),
+    unavailable: 'SHADOW_UNAVAILABLE'
+  },
+  'people-questions': {
+    GET: users(MANAGERS, async () => ({ questions: await (await import('../lib/people-questions.js')).openQuestions() })),
+    POST: users(MANAGERS, async (orgId, req) => (await import('../lib/people-questions.js')).answerQuestion(orgId, req.body || {}, who(req))),
+    unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  'agent-names': {
+    GET: users(ALL_ROLES, async orgId => (await import('../lib/agent-persona.js')).agentSettings(orgId)),
+    POST: owner(async (orgId, req) => (await import('../lib/agent-persona.js')).saveAgentSettings(orgId, req.body || {}, who(req))),
+    unavailable: 'PERSONA_UNAVAILABLE'
   },
   'agent-persona': {
     GET: owner((orgId) => getPersona(orgId)),
@@ -163,7 +219,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'COORDINATION_UNAVAILABLE'
   },
   'team-kpi': {
-    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); return teamKpis(orgId); }),
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null); return teamKpis(orgId); }),
     unavailable: 'KPI_UNAVAILABLE'
   },
   'my-kpi': {
@@ -246,7 +302,7 @@ export const ROUTES = Object.freeze({
   'firm-knowledge': {
     GET: owner(async () => ({ ...(await firmKnowledge()), tidy: await tidyStatus().catch(() => null) })),
     POST: owner(async (orgId, req) => {
-      if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', {}); return { started: true }; }
+      if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
@@ -255,7 +311,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'KNOWLEDGE_UNAVAILABLE'
   },
   // Understanding the firm, then (same first scan) where every file goes.
-  'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
+  'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); if (req.body?.skip_tidy !== true) await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
   'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
   translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
@@ -287,6 +343,29 @@ export const ROUTES = Object.freeze({
     unavailable: 'ENGAGEMENT_UNAVAILABLE'
   },
   'engagement-step': { POST: (orgId, req) => engagementStep(orgId, req, req.body || {}), unavailable: 'ENGAGEMENT_UNAVAILABLE' },
+  // Opportunities (2026-10-10): a TDR / AMI deposited → Firm Manager reads, files, fills the firm's
+  // acceptance workbook and prepares Phase 0; the client's confirmation → Mission Controller (KYC,
+  // independence) in the same workbook. People answer; only the Associé decides.
+  opportunities: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const o = await import('../lib/opportunities.js');
+      return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const o = await import('../lib/opportunities.js'); const b = req.body || {}; const a = b.action;
+      if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
+      if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
+      if (a === 'answer') return o.answerRow(orgId, b, req.account);
+      if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
+      if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
+      if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
+      if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'OPPORTUNITIES_UNAVAILABLE'
+  },
+  'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
     GET: users(MANAGERS, async () => light(await submissionState())),
@@ -339,18 +418,174 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'DASHBOARD_UNAVAILABLE'
   },
+  // The global bell: notifications computed from what is recorded, one per event.
+  notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
+  // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
+  cockpit: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const c = await cockpit(orgId);
+      // Collaborators: the firm's work, not the people indicators nor the firm's mailbox.
+      if (!MANAGERS.includes(req.account?.role)) c.kpis = c.kpis.filter(k => !['capacity', 'conflicts', 'quality', 'mails', 'ethics', 'training'].includes(k.key));
+      return c;
+    }),
+    unavailable: 'COCKPIT_UNAVAILABLE'
+  },
+  // Management Card (owner, partners, managers): opened from a person; each opening is journaled.
+  'management-card': {
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null); return managementCard(orgId, String(req.query?.staff_id || '')); }),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'refresh') return refreshCard(orgId, String(b.staff_id || ''), who(req));
+      if (b.action === 'observe') return addObservation(orgId, { ...b, staff_profile_id: b.staff_id }, who(req), true);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  // Team recommendation: two independent AI judgements; a manager retains people.
+  'team-recommendation': {
+    GET: users(MANAGERS, (orgId, req) => lastRecommendation(String(req.query?.mission_id || ''))),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'retain') return retainPerson(orgId, String(b.mission_id || ''), b, who(req));
+      return recommendTeam(orgId, String(b.mission_id || ''), who(req));
+    }),
+    unavailable: 'PEOPLE_UNAVAILABLE'
+  },
+  // A saved plan feeds the mission's structured data (Assistant « Enregistrer »).
+  'plan-integrate': { POST: users(ALL_ROLES, (orgId, req) => integratePlan(orgId, String(req.body?.mission_id || ''), req.body || {}, who(req))), unavailable: 'MISSION_UNAVAILABLE' },
+  // External specialists for a missing capability: proposed, chosen by a person, message prepared (never sent by the app).
+  'external-specialists': {
+    POST: users(MANAGERS, (orgId, req) => req.body?.action === 'draft' ? draftOutreach(orgId, req.body || {}, req.account) : searchSpecialists(orgId, req.body || {})),
+    unavailable: 'SPECIALISTS_UNAVAILABLE'
+  },
+  // Enhanced Auditor, its own section: evening points, former missions, working-paper review, partner view.
+  'auditor-work': {
+    GET: users(MANAGERS, async (orgId, req) => {
+      const st = await workState();
+      const mid = req.query?.mission_id || null;
+      const evening = Object.fromEntries(Object.entries(st.evening || {}).filter(([k]) => !mid || k === mid).map(([k, v]) => [k, mid ? v : v.slice(0, 1)]));
+      const wp = Object.values(st.wp_reviews || {}).filter(r => !mid || r.mission_id === mid).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 60);
+      return { evening, evening_run: st.evening_run || null, retrospectives: Object.values(st.retrospectives || {}).filter(r => !mid || r.mission?.id === mid), wp_reviews: wp, wp_jobs: Object.values(st.wp_jobs || {}).slice(-10).map(j => ({ id: j.id, status: j.status, left: (j.queue || []).length, done: (j.done || []).length, started_at: j.started_at })) };
+    }),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'evening') return eveningPoint(orgId, String(b.mission_id || ''));
+      if (b.action === 'retro') return retrospective(orgId, b, who(req));
+      if (b.action === 'wp_review') return startWpReview(orgId, req, b, who(req));
+      if (b.action === 'point') return updateReviewPoint(String(b.file_id || ''), String(b.point_id || ''), String(b.status || ''), who(req));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'AUDITOR_UNAVAILABLE'
+  },
+  'auditor-evening-step': { POST: (orgId, req) => eveningStep(orgId, req), unavailable: 'AUDITOR_UNAVAILABLE' },
+  'auditor-wp-step': { POST: (orgId, req) => wpStep(orgId, req, req.body || {}), unavailable: 'AUDITOR_UNAVAILABLE' },
+  // Sign-off linked to the real working file and its version (the reviewer opens it before signing).
+  signoff: {
+    GET: users(ALL_ROLES, async (orgId, req) => { const r = await signoffEvents(orgId, { file_id: req.query?.file_id || null, mission_id: req.query?.mission_id || null }); return { ...r, files: signoffStatus(r.events) }; }),
+    POST: users(ALL_ROLES, (orgId, req) => signoffAction(orgId, req.body || {}, req.account)),
+    unavailable: 'SIGNOFF_UNAVAILABLE'
+  },
+  // Partner view: only what a partner must see.
+  'partner-view': { GET: users(PARTNERS, () => partnerView()), unavailable: 'AUDITOR_UNAVAILABLE' },
+  // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
+  chat: {
+    GET: users(ALL_ROLES, (orgId, req) => chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),
+    POST: users(ALL_ROLES, (orgId, req) => req.body?.action === 'group' ? createGroup(orgId, req.account, req.body) : sendChat(orgId, req.account, req.body || {})),
+    unavailable: 'CHAT_UNAVAILABLE'
+  },
+  // Give an action to a person (« Sans responsable », or right after validating it).
+  'assign-action': { POST: users(MANAGERS, (orgId, req) => assignAction(orgId, String(req.body?.id || ''), String(req.body?.staff_profile_id || ''), who(req))), unavailable: 'ACTIONS_UNAVAILABLE' },
+  // The mission file (2026-10-08): everything the agents and the team know about one mission.
+  'mission-file': { GET: users(ALL_ROLES, (orgId, req) => getMissionFull(orgId, String(req.query?.mission_id || ''))), unavailable: 'MISSION_UNAVAILABLE' },
+  // Client contacts of a mission: found by the agents (proposed), validated by a manager.
+  'mission-client-contacts': {
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {}, mid = String(b.mission_id || '');
+      if (b.action === 'add') return addContacts(orgId, mid, [b.contact || {}], who(req), { validated: true });
+      if (b.action === 'validate') return decideContact(orgId, mid, String(b.id || ''), b.role ? { role: b.role } : 'validate', who(req));
+      if (b.action === 'remove') return decideContact(orgId, mid, String(b.id || ''), 'remove', who(req));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MISSION_UNAVAILABLE'
+  },
+  // Information added to a mission by a person (agents use their tool).
+  'mission-fact': { POST: users(ALL_ROLES, (orgId, req) => addFact(String(req.body?.mission_id || ''), { ...(req.body || {}), agent: who(req) })), unavailable: 'MISSION_UNAVAILABLE' },
+  // Writing to the client from a mission: purpose, suggested recipients, AI draft, validation.
+  'mission-write': {
+    POST: users(ALL_ROLES, (orgId, req) => {
+      const b = req.body || {}, mid = String(b.mission_id || '');
+      if (b.action === 'suggest') return writeSuggest(orgId, mid, b);
+      if (b.action === 'draft') return writeDraft(orgId, mid, b, req.account);
+      if (b.action === 'submit') return writeSubmit(orgId, mid, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MISSION_UNAVAILABLE'
+  },
+  // Important e-mails of the firm's authorised mailbox: list, refresh, AI reply, send / propose.
+  'mail-triage': {
+    GET: users(MANAGERS, () => importantMails()),
+    POST: users(MANAGERS, (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'refresh') return triageInbox(orgId);
+      if (b.action === 'draft') return draftReply(orgId, String(b.id || ''), String(b.instruction || ''), req.account);
+      if (b.action === 'send') return sendReply(orgId, { id: b.id, subject: b.subject, body: b.body, mission_id: b.mission_id || null, send: b.send !== false }, req.account);
+      if (b.action === 'done') return markMailDone(String(b.id || ''), req.account, b.how || 'traité');
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MAIL_UNAVAILABLE'
+  },
+  // Memories (2026-10-08): agents' memories, missions' memories, learnings, audit log.
+  memory: {
+    GET: users(MANAGERS, async (orgId, req) => {
+      if (req.query?.mission_id) return readMissionMemory(orgId, String(req.query.mission_id));
+      if (req.query?.agent) return (await loadAgentMemory(String(req.query.agent))).memory;
+      const agents = {};
+      for (const a of Object.keys(AGENT_FILES)) {
+        try { const m = (await loadAgentMemory(a)).memory; agents[a] = { status: m.status, last_successful_at: m.last_successful_at, last_attempted_at: m.last_attempted_at, last_error: m.last_error, retry_count: m.retry_count, pending: (m.pending || []).length, recovered_at: m.recovered_at || null }; }
+        catch (e) { agents[a] = { error: String(e.message || e).slice(0, 120) }; }
+      }
+      return { agents };
+    }),
+    POST: users(MANAGERS, async (orgId, req) => {
+      const b = req.body || {};
+      if (b.action === 'propose_status') {
+        const m = (await rest('office_missions?org_id=eq.' + encodeURIComponent(orgId) + '&id=eq.' + encodeURIComponent(String(b.mission_id || '')) + '&select=id,name,status&limit=1'))?.[0];
+        if (!m) throw fail('MISSION_NOT_FOUND', 404);
+        return proposeStatusChange(orgId, m, String(b.status || ''), String(b.why || '').slice(0, 300) + ' (demandé par ' + who(req) + ')');
+      }
+      if (req.account?.role !== 'owner') throw fail('ROLE_NOT_ALLOWED', 403);
+      if (b.action === 'home') return (await import('../lib/memory-home.js')).ensureMemoryHome(orgId, { force: true });
+      if (b.action === 'rebuild') return rebuildAgentMemory(orgId, String(b.agent || ''), who(req), { fetchRows: rest });
+      if (b.action === 'refresh_missions') return refreshMissionMemories(orgId, { limit: Math.min(10, Number(b.limit) || 5) });
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MEMORY_UNAVAILABLE'
+  },
+  learnings: {
+    GET: users(MANAGERS, (orgId, req) => listLearnings(orgId, { category: req.query?.category || null, status: req.query?.status || null })),
+    POST: users(PARTNERS, (orgId, req) => confirmLearning(orgId, req.body?.id, who(req), req.body?.decision || 'confirmed')),
+    unavailable: 'MEMORY_UNAVAILABLE'
+  },
+  'audit-log': { GET: users(PARTNERS, (orgId, req) => listAuditEvents(orgId, { missionId: req.query?.mission_id || null, agent: req.query?.agent || null, limit: req.query?.limit })), unavailable: 'MEMORY_UNAVAILABLE' },
   'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
   'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   // The firm's people-management policy, kept in the agents' Drive memory (owner).
   // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
-  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => dropFile(orgId, req.body || {}, req.account)), unavailable: 'DROP_UNAVAILABLE' },
+  // Small files through the app; large ones straight from the browser to Google (start / finish).
+  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], async (orgId, req) => {
+    const a = req.body?.action;
+    if (a === 'start_upload') return (await import('../lib/drop-box.js')).startLargeUpload(orgId, req.body || {}, req.account, req);
+    if (a === 'finish_upload') return (await import('../lib/drop-box.js')).finishLargeUpload(orgId, req.body || {}, req.account);
+    return dropFile(orgId, req.body || {}, req.account);
+  }), unavailable: 'DROP_UNAVAILABLE' },
   // « Équipe et briefing » with the firm's people-management policy (AI) — managers.
   'people-brief': { POST: users(MANAGERS, (orgId, req) => peopleBrief(orgId, req.body?.mission_id)), unavailable: 'PEOPLE_BRIEF_UNAVAILABLE' },
   // Messagerie: the Gmail conversation of a sent message (replies of the colleagues) — managers.
   'mail-thread': { GET: users(MANAGERS, (orgId, req) => messageThread(orgId, req.query?.id)), unavailable: 'MAIL_THREAD_UNAVAILABLE' },
-  'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner((orgId, req) => savePeoplePolicy(req.body || {})), unavailable: 'POLICY_UNAVAILABLE' },
+  // Saved → read at once by the agents (team, preferences, questionnaire answers → Équipe and Management Cards).
+  'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner(async (orgId, req) => { const r = await savePeoplePolicy(req.body || {}); const read = await (await import('../lib/capabilities.js')).startCapabilityRefresh(orgId, req).catch(e => ({ error: String(e.message || e) })); return { ...r, reading: read }; }), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
     GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
@@ -431,6 +666,10 @@ export async function handleApp(req) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  // A JSON body sent without « Content-Type: application/json » arrives as text: read it anyway
+  // (2026-10-08: the chat said « INVALID_BODY », several buttons did nothing).
+  if (typeof req.body === 'string' && req.body.trim().startsWith('{')) { try { req.body = JSON.parse(req.body); } catch { /* left as is */ } }
+  if (Buffer.isBuffer(req.body)) { try { req.body = JSON.parse(req.body.toString('utf8')); } catch { /* left as is */ } }
   try {
     const out = await handleApp(req);
     // Only the Google callback redirects, and only to a page of this app.

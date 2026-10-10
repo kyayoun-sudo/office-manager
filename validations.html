@@ -14,6 +14,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -74,8 +75,9 @@
   var $ = function (id) { return document.getElementById(id); };
   var AGENTS = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
   var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
-  var all = [], filter = 'all';
-  var isOpen = function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; };
+  var all = [], filter = 'all', editing = false;
+  document.addEventListener('input', function (e) { if (e.target.matches('input:not([type=checkbox]), textarea')) editing = true; });
+  var isOpen = function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; };
   var openOnly = function () { return $('open-only').checked; };
 
   function agentName(key) { return AGENTS[key] || key || 'Agent'; }
@@ -89,10 +91,12 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_id: action.id, decision: decision, note: note || null, decided_by: OM.getUserName() || null })
     }).then(function (r) {
+      editing = false;
       action.last_decision = { decision: decision, note: note || null, decided_by: OM.getUserName() || null, created_at: new Date().toISOString() };
       show('Décision enregistrée : ' + LABELS[decision] + '.' + (r && r.effect ? ' ' + r.effect : ''));
       if (r && r.message_id) loadMail();
       render();
+      if (r && r.needs_assignee && OM.isManager()) { var st = $('status'); st.appendChild(document.createTextNode(' ')); st.appendChild(UI.assignPicker(action.id, function () { show('Action validée et confiée.'); })); }
     }).catch(function (err) {
       show('Échec : ' + err.message, true);
       Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; });
@@ -126,6 +130,23 @@
       var done = el('p', LABELS[last.decision] + ' le ' + UI.dateTime(last.created_at) + (last.decided_by ? ' par ' + last.decided_by : '') + (last.note ? ' — ' + last.note : ''), 'tag ' + (last.decision === 'reject' ? 'warn' : ''));
       done.style.margin = '0'; done.style.alignSelf = 'flex-start';
       c.appendChild(done);
+      if (action.retry_needed) {
+        c.appendChild(el('p', 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
+        var retry = el('button', 'Reprendre le déplacement approuvé', 'btn'); retry.type = 'button';
+        var resultLine = el('p', '', 'status'); resultLine.setAttribute('role', 'status'); c.appendChild(resultLine);
+        retry.addEventListener('click', function () {
+          retry.disabled = true; retry.textContent = 'Reprise en cours…'; resultLine.textContent = 'Demande reçue : vérification et déplacement en cours…';
+          OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'retry', action_id: action.id }) })
+            .then(function (r) {
+              resultLine.textContent = r.effect || (r.executed ? 'Déplacement effectué.' : 'Déplacement non effectué.');
+              show(resultLine.textContent, !r.executed);
+              if (r.executed) { retry.textContent = r.verified ? 'Déplacement vérifié' : 'Déplacement effectué'; action.retry_needed = false; }
+              else { retry.disabled = false; retry.textContent = 'Réessayer après vérification'; }
+            })
+            .catch(function (e) { resultLine.textContent = 'Reprise échouée : ' + e.message; show(resultLine.textContent, true); retry.disabled = false; retry.textContent = 'Réessayer le déplacement'; });
+        });
+        c.appendChild(retry);
+      }
       return c;
     }
     if (last && last.decision === 'defer') {
@@ -171,7 +192,7 @@
   function render() {
     var list = $('list'); list.textContent = '';
     var rows = all.filter(function (a) { return (filter === 'all' || (a.agent_key || 'autre') === filter) && (!openOnly() || isOpen(a)); });
-    var open = all.filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+    var open = all.filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
     $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
     if (!rows.length) { list.appendChild(el('p', openOnly() ? 'Rien n’attend de réponse. Décochez le filtre pour revoir ce qui a déjà été décidé.' : 'Rien à valider pour le moment.', 'empty')); return; }
     rows.forEach(function (a) { list.appendChild(card(a)); });
@@ -186,7 +207,7 @@
     ROLE_NOT_ALLOWED: 'Validation réservée au propriétaire, aux associés et aux managers.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre e-mail.', COMMENT_REQUIRED: 'Indiquez pourquoi vous refusez.',
     RECIPIENT_NOT_CLIENT_CONTACT: 'Ce destinataire n’est pas le contact client enregistré sur la mission.', CLIENT_CONTACT_NOT_REGISTERED: 'Aucun contact client enregistré sur la mission.',
     MAIL_SANDBOX_RECIPIENT_REFUSED: 'Mode test : cette adresse n’est pas dans la liste autorisée.', RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', TOPIC_REQUIRED: 'Indiquez le sujet du message.' };
-  function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || m; }
+  function mmsg(e) { var m = e && e.message || String(e); return MERR[m] || OM.explain(m); }
   function msay(t) { $('mail-status').textContent = t || ''; }
   function mailApi(body) { return OM.api('/api/app?route=messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
 
@@ -210,7 +231,7 @@
       body.style.cssText = 'font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5';
       var why = el('input'); why.type = 'text'; why.maxLength = 1000; why.placeholder = 'Pourquoi refuser (obligatoire pour refuser)'; why.setAttribute('aria-label', 'Motif du refus');
       why.style.cssText = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px';
-      if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || m.error), 'hint'));
+      if (m.error) c.appendChild(el('p', 'Dernière tentative : ' + (MERR[m.error] || OM.explain(m.error)), 'hint'));
       c.appendChild(subj); c.appendChild(body); c.appendChild(why);
       var row = el('div', null, 'btn-row');
       var ok = el('button', client ? 'Valider et envoyer au client' : 'Valider et envoyer', 'btn'); ok.type = 'button';
@@ -232,12 +253,13 @@
       c.appendChild(el('strong', m.subject));
       var pre = el('div', m.body, 'hint'); pre.style.whiteSpace = 'pre-wrap'; c.appendChild(pre);
       if (m.decision_comment) c.appendChild(el('p', 'Commentaire : ' + m.decision_comment, 'hint'));
-      if (m.status === 'failed' && m.error) c.appendChild(el('p', MERR[m.error] || m.error, 'hint'));
+      if (m.status === 'failed' && m.error) c.appendChild(el('p', MERR[m.error] || OM.explain(m.error), 'hint'));
     }
     return c;
   }
 
   function loadMail() {
+    editing = false;
     if (!OM.hasPersonalSession()) { $('mail-list').textContent = ''; msay('Connectez-vous avec votre e-mail pour gérer les messages.'); return; }
     if (!OM.isManager()) { $('mail-meta').textContent = ''; return; }
     OM.api('/api/app?route=messages').then(function (d) {
@@ -293,7 +315,10 @@
       renderFilters(); render();
     }).catch(function (err) { show('Indisponible : ' + err.message, true); });
   }
-  UI.requireLogin(start);
+  UI.requireLogin(function () {
+    start();
+    setInterval(function () { if (!document.hidden && !editing && !document.querySelector('article [role="status"]:not(:empty)') && !document.querySelector('button:disabled') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) start(); }, 15000);
+  });
 })();
 </script>
 </body>

@@ -373,7 +373,7 @@ test("a fake AI approval is refused", async () => {
 test("owner endpoint requires the owner credential", async () => {
   process.env.OFFICE_MANAGER_OWNER_TOKEN = "owner-token";
   process.env.OWNER_APPROVAL_SECRET = SECRET;
-  process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT";
+  process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT"; process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = "true";
   const { handleOwnerRequest } = await import("../api/owner.js");
   const drive = orgDrive();
   await pass(drive);
@@ -410,7 +410,7 @@ test("documentary actions start only after an owner-signed MAPPING_REVIEWED", as
   await saveMemory(drive, memory);
 
   // Same through the runtime gate used by the business-write tools.
-  process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT";
+  process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT"; process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = "true";
   process.env.OWNER_APPROVAL_SECRET = SECRET;
   delete process.env.OFFICE_MANAGER_REQUIRE_MAPPING;
   const { mappingGate } = await import("../lib/memory-runtime.js");

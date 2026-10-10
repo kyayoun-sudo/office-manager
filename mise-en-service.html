@@ -32,6 +32,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -170,7 +171,7 @@
        ['À lire', m.objects.pending_read + m.objects.needs_understanding], ['Passages', m.scan_count]].forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
     }
     $('map-warning').hidden = !m.warning && !m.error; $('map-warning').textContent = m.warning || m.error || '';
-    $('map-pass').disabled = m.mapping_state === 'NO_DRIVE';
+    if (m.mapping_state === 'NO_DRIVE') $('map-pass').disabled = true;
     $('map-review').hidden = m.mapping_state !== 'MAPPING_PENDING_REVIEW';
 
     var qs = $('questions'); qs.textContent = '';
@@ -208,19 +209,23 @@
     clearTimeout(scanTimer);
     OM.api('/api/app?route=mapping-scan', { headers: ownerHeaders() }).then(function (s) {
       if (!s) return;
-      var t = s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
+      var t = s.stalled ? '⚠ Scan interrompu ou bloqué : aucune progression confirmée depuis ' + (s.last_progress_at ? UI.dateTime(s.last_progress_at) : 'une heure inconnue') + '. ' + s.files_seen + ' fichiers recensés ; ' + s.folders_left + ' dossiers restant à parcourir.' + (s.resumable ? ' Cliquez sur « Reprendre le scan » pour continuer depuis le dernier point enregistré.' : ' La finalisation doit être vérifiée avant de relancer.')
+        : s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
         : s.status === 'mapping' ? 'Parcours terminé (' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers). L’Orpailleur écrit sa cartographie…'
-        : s.status === 'done' ? 'Cartographie terminée : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers. Ses questions apparaissent ci-dessous.'
+        : s.status === 'done' ? 'Inventaire terminé : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers découverts. Leur lecture et leur compréhension sont des étapes distinctes.'
+        : s.status === 'incomplete' ? 'Inventaire incomplet : ' + s.files_seen + ' fichiers découverts, ' + s.folders_left + ' dossiers restant à parcourir. ' + (s.reason === 'ITEM_LIMIT' ? 'La limite de taille du parcours a été atteinte.' : 'Certains dossiers sont inaccessibles ou attendent une nouvelle tentative.')
         : s.status === 'failed' ? 'La cartographie a échoué : ' + ((s.errors || []).map(function (e) { return e.path + ' — ' + e.error; }).pop() || 'cause inconnue') + '.' : '';
       if (s.errors && s.errors.length && s.status !== 'failed') t += ' ' + s.errors.length + ' dossier(s) illisible(s).';
       live(t);
+      $('map-pass').textContent = s.stalled && s.resumable ? 'Reprendre le scan' : s.status === 'walking' || s.status === 'mapping' ? 'Scan en cours' : 'Lancer le premier scan';
+      $('map-pass').disabled = ['walking', 'mapping'].includes(s.status) && !s.resumable;
       if (s.status === 'walking' || s.status === 'mapping') scanTimer = setTimeout(watchScan, 5000); else { load(); if (typeof loadKnow === 'function') setTimeout(loadKnow, 3000); }
     }).catch(function () {});
   }
   watchScan();
 
   // ---- What the Orpailleur understood of the firm ----
-  var knowTimer = null, knowData = null;
+  var knowTimer = null, knowData = null, knowDrafts = {};
   function el(tag, text, css) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (css) e.style.cssText = css; return e; }
   function knowList(title, rows, fmt) {
     var box = el('div', null, 'display:flex;flex-direction:column;gap:4px');
@@ -232,6 +237,11 @@
     return box;
   }
   function renderKnow(k) {
+    if (Object.keys(knowDrafts).length || ($('know-body').contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) {
+      knowData = k;
+      knowTimer = setTimeout(loadKnow, 6000);
+      return;
+    }
     var b = $('know-body'); b.textContent = '';
     if (k.status === 'none') { $('know-live').textContent = 'Pas encore fait : lancez le premier scan (la compréhension du cabinet suit toute seule).'; return; }
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
@@ -258,12 +268,20 @@
         row.appendChild(el('div', qq, 'font-size:14px;font-weight:600'));
         var line = el('div', null, 'display:flex;gap:8px;flex-wrap:wrap');
         var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 2000; inp.value = answered[qq] || ''; inp.placeholder = 'Votre réponse'; inp.style.cssText = 'flex:1;min-width:220px';
+        inp.addEventListener('input', function () { knowDrafts[qq] = inp.value; });
         var btn = el('button', answered[qq] ? 'Modifier' : 'Répondre', 'btn ghost'); btn.type = 'button';
         var st = el('span', answered[qq] ? '✓ répondu' : '', 'small');
         btn.addEventListener('click', function () {
           if (!inp.value.trim()) return; btn.disabled = true;
           OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'answer', question: qq, answer: inp.value.trim(), by: OM.getUserName() || null }) })
-            .then(function () { st.textContent = '✓ enregistré dans la mémoire de l’Orpailleur'; btn.textContent = 'Modifier'; })
+            .then(function () {
+              delete knowDrafts[qq];
+              st.textContent = '✓ Réponse enregistrée. Orpailleur va la prendre en compte…';
+              btn.textContent = 'Modifier';
+              return OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'learn', skip_tidy: true }) })
+                .then(function () { knowTimer = setTimeout(loadKnow, 4000); })
+                .catch(function (e) { st.textContent = 'Réponse enregistrée ; relecture non confirmée : ' + msg(e); });
+            })
             .catch(function (e) { st.textContent = msg(e); }).then(function () { btn.disabled = false; });
         });
         line.appendChild(inp); line.appendChild(btn); row.appendChild(line); row.appendChild(st); b.appendChild(row);
@@ -271,14 +289,22 @@
     }
     // Tidy-up of the first scan: where each file goes.
     var t = k.tidy || {};
-    var tl = t.status === 'planning' ? 'Rangement : l’Orpailleur décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers vus.'
+    var tl = t.stalled ? '⚠ Rangement interrompu ou bloqué : aucune progression depuis ' + (t.last_progress_at ? UI.dateTime(t.last_progress_at) : 'une heure inconnue') + '. ' + (t.done || 0) + ' fichier(s) traité(s). Cliquez sur « Reprendre le rangement ».'
+      : t.status === 'planning' ? 'Rangement : l’Orpailleur décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers vus.'
       : t.status === 'done' ? 'Rangement proposé : ' + (t.moves || 0) + ' déplacement(s), ' + (t.renames || 0) + ' renommage(s) dans « À valider » ; ' + (t.questions || 0) + ' question(s) envoyée(s) pour validation aux personnes qui ont enregistré des fichiers ambigus ; ' + (t.ok || 0) + ' fichier(s) déjà bien rangés.'
       : t.status === 'failed' ? 'Le rangement a échoué : ' + (t.error || '') : 'Rangement : pas encore lancé.';
     var tp = el('p', tl, 'margin:0;font-size:14px;font-weight:600');
     b.appendChild(tp);
     if (t.status === 'done') { var av = document.createElement('a'); av.href = '/validations.html'; av.textContent = 'Ouvrir « À valider »'; b.appendChild(av); }
-    var rb = el('button', t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
-    rb.addEventListener('click', function () { rb.disabled = true; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function () { knowTimer = setTimeout(loadKnow, 4000); }).catch(function (e) { tp.textContent = msg(e); rb.disabled = false; }); });
+    var rb = el('button', t.stalled ? 'Reprendre le rangement' : t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
+    rb.addEventListener('click', function () { clearTimeout(knowTimer); rb.disabled = true; rb.textContent = 'Demande en cours…'; tp.textContent = 'Demande de reprise du rangement en cours…'; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function (r) {
+      if (r.reason === 'MAPPING_INTERRUPTED') tp.textContent = 'Le scan est interrompu : reprenez-le dans Cartographie du Drive.';
+      else if (r.reason === 'MAPPING_IN_PROGRESS') tp.textContent = 'Le scan du Drive est en cours : le rangement attend sa fin.';
+      else if (r.reason === 'FIRST_SCAN_RUNNING' || r.reason === 'PASS_ALREADY_RUNNING') tp.textContent = 'Le rangement est déjà en cours.';
+      else { tp.textContent = r.resumed ? 'Reprise demandée à partir du fichier ' + (r.done || 0) + '. En attente de la prochaine progression confirmée…' : 'Lancement demandé. En attente de la première progression confirmée…'; knowTimer = setTimeout(loadKnow, 4000); }
+      rb.textContent = 'Demande enregistrée';
+      knowTimer = setTimeout(loadKnow, 4000);
+    }).catch(function (e) { tp.textContent = 'La demande a échoué : ' + msg(e); rb.textContent = 'Réessayer la reprise'; rb.disabled = false; }); });
     b.appendChild(rb);
     if (t.status === 'planning') knowTimer = setTimeout(loadKnow, 6000);
   }

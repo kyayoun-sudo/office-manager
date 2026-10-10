@@ -27,6 +27,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html">Équipe</a>
@@ -116,6 +117,14 @@
           <div class="swatches" id="swatches" role="radiogroup" aria-label="Couleur principale"></div>
           <div class="field" style="max-width:260px"><label for="hex">Ou code couleur exact de la charte</label><input id="hex" class="mono" type="text" maxlength="7" placeholder="#0E5A52"></div>
           <p class="status" id="contrast" aria-live="polite"></p>
+        </section>
+
+        <section class="card" aria-labelledby="h-names" id="agent-names-card">
+          <h2 id="h-names">Noms des agents</h2>
+          <p class="hint" style="margin:0">Vous pouvez donner à chaque agent le nom que vous voulez. Le nouveau nom s'affiche partout dans l'application et l'agent se présente ainsi.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px" id="names-grid"></div>
+          <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px"><input type="checkbox" id="auto-filing" style="margin-top:3px"> <span><strong>Rangement automatique</strong> : en activant cette option, vous autorisez l'Orpailleur à ranger les documents qu'il a lus lorsque les preuves et l'organisation observée permettent une décision sûre. Les créations de dossiers et les décisions incertaines attendent dans « À valider ». Chaque action est journalisée et son résultat est vérifié.</span></label>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="names-save" type="button">Enregistrer les noms</button><span class="status" id="names-status" role="status" aria-live="polite"></span></div>
         </section>
 
         <section class="card" aria-labelledby="h-mail">
@@ -221,8 +230,9 @@
       </div>
 
       <aside class="side" aria-labelledby="h-apercu">
-        <h2 id="h-apercu" style="margin:0;font-size:14px;color:var(--muted)">Aperçu</h2>
-        <div class="preview">
+        <h2 id="h-apercu" style="margin:0;font-size:14px;color:var(--muted)">Aperçu de vos couleurs</h2>
+        <p class="hint" style="margin:0">Une image d'exemple pour voir le logo et la couleur : elle ne se clique pas. La vraie recherche est dans <a href="/recherche.html">Recherche</a>, les validations dans <a href="/validations.html">À valider</a>.</p>
+        <div class="preview" aria-hidden="true" style="pointer-events:none;user-select:none">
           <div class="preview-top"><div class="logo" id="pv-logo">C</div><span id="pv-name">Office Manager</span></div>
           <div class="preview-body">
             <div class="pv-search">Rechercher dans tout le cabinet…</div>
@@ -662,6 +672,33 @@
 
   $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
   if (!OM.getToken()) { $('login').hidden = false; render(); } else { start(); }
+})();
+</script>
+
+<script>
+(function () {
+  var OM = window.OfficeManager, $ = function (id) { return document.getElementById(id); };
+  var LABELS = { 'grand-controleur': 'Agent central (Firm Manager)', orpailleur: 'Orpailleur (documents, Drive)', sika: 'Facturation et administratif', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', shadow: 'Shadow (entraînement)' };
+  function load() {
+    OM.api('/api/app?route=agent-names').then(function (s) {
+      var g = $('names-grid'); g.textContent = '';
+      Object.keys(LABELS).forEach(function (k) {
+        var f = document.createElement('div'); f.className = 'field';
+        var l = document.createElement('label'); l.htmlFor = 'name-' + k; l.textContent = LABELS[k];
+        var i = document.createElement('input'); i.type = 'text'; i.maxLength = 60; i.id = 'name-' + k; i.value = (s.names || {})[k] || ''; i.setAttribute('data-no-rename', '');
+        f.appendChild(l); f.appendChild(i); g.appendChild(f);
+      });
+      $('auto-filing').checked = s.auto_filing === true;
+    }).catch(function (e) { $('names-status').textContent = e.message; });
+  }
+  $('names-save').addEventListener('click', function () {
+    var names = {}; Object.keys(LABELS).forEach(function (k) { var i = $('name-' + k); if (i) names[k] = i.value; });
+    $('names-status').textContent = 'Enregistrement…';
+    OM.api('/api/app?route=agent-names', { method: 'POST', body: JSON.stringify({ names: names, auto_filing: $('auto-filing').checked }) })
+      .then(function (s) { if (OM.setAgentNames) OM.setAgentNames(s.names); $('names-status').textContent = 'Noms enregistrés.'; })
+      .catch(function (e) { $('names-status').textContent = e.message; });
+  });
+  load();
 })();
 </script>
 </body>

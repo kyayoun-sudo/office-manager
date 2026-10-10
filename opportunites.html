@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opportunités</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .opp-drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted);cursor:pointer}
+  .opp-drop.over{border-color:var(--brand);color:var(--ink)}
+  .opp-sheet>summary{cursor:pointer;font-weight:700;font-size:16px;padding:6px 0}
+  .opp-sec>summary{cursor:pointer;font-weight:600;color:var(--muted);padding:8px 0}
+  .opp-row{border-top:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:8px}
+  .opp-row h3{margin:0;font-size:14.5px;font-weight:600;line-height:1.4}
+  .opp-row h3 b{color:var(--muted);font-weight:600;margin-right:6px}
+  .opp-help{font-size:13px;color:var(--muted);margin:0;line-height:1.45}
+  .opp-prop{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.5}
+  .opp-prop p{margin:0 0 4px}
+  .opp-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 12px}
+  .opp-fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .opp-fields input,.opp-fields select,.opp-fields textarea{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+  .opp-fields textarea{min-height:38px;resize:vertical}
+  .opp-locked{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html" aria-current="page">Opportunités</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Opportunités</h1>
+      <p class="lead">Déposez un TDR, un AMI ou un appel d’offres. Le <span data-agent="grand-controleur">Firm Manager</span> le lit, le range dans le dossier des appels d’offres avec le classeur d’acceptation du cabinet, remplit la fiche et prépare la Phase 0. Quand le client confirme, le Mission Controller fait le KYC et l’indépendance dans le même classeur. Les agents proposent ; l’équipe répond ; l’Associé décide.</p>
+    </header>
+
+    <div id="list-view" class="stack">
+      <section class="card" aria-labelledby="h-new">
+        <h2 id="h-new">Nouvelle opportunité</h2>
+        <label class="opp-drop" id="drop" for="file">Glissez le TDR ici, ou cliquez pour le choisir (PDF, Word, scan, photo)</label>
+        <input id="file" type="file" hidden>
+        <div class="field"><label for="links">Ou collez le lien Drive du document</label><input id="links" type="text" placeholder="https://drive.google.com/file/d/…"></div>
+        <div class="field"><label for="notes">Précisions pour le Firm Manager (facultatif)</label><textarea id="notes" style="min-height:60px" placeholder="Exemple : reçu par e-mail du bailleur ; date limite à confirmer."></textarea></div>
+        <div><button class="btn" id="send" type="button">Envoyer au Firm Manager</button></div>
+        <p class="status" id="say" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-signals" id="signals-card" hidden>
+        <h2 id="h-signals">Trouvés dans le Drive</h2>
+        <p class="meta">Documents qui ressemblent à un TDR ou un AMI, apparus dans le dossier des appels d’offres depuis la dernière ronde du Firm Manager.</p>
+        <div class="stack" id="signals"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-list">
+        <h2 id="h-list">Opportunités en cours</h2>
+        <div class="stack" id="list"><p class="empty">Chargement…</p></div>
+      </section>
+    </div>
+
+    <div id="detail-view" class="stack" hidden>
+      <p><a href="/opportunites.html">← Toutes les opportunités</a></p>
+      <section class="card" aria-labelledby="h-opp">
+        <div class="card-head"><h2 id="h-opp">Opportunité</h2><span class="tag" id="opp-status"></span></div>
+        <p class="lead" id="opp-waiting"></p>
+        <div class="links" id="opp-links"></div>
+        <dl class="facts" id="opp-facts"></dl>
+        <ul class="joblog" id="opp-log"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-won" id="won-card" hidden>
+        <h2 id="h-won">Le client a confirmé</h2>
+        <p class="meta">Déposez la lettre de confirmation (ou d’attribution) du client, ou collez son lien. Elle est rangée dans le dossier de l’opportunité et le Mission Controller est prévenu : il ouvre le KYC et l’indépendance.</p>
+        <input id="won-file" type="file">
+        <div class="field"><label for="won-link">Ou le lien Drive de la lettre</label><input id="won-link" type="text"></div>
+        <div><button class="btn" id="won-send" type="button">Enregistrer la confirmation</button></div>
+        <p class="status" id="won-say" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-kyc" id="kyc-card" hidden>
+        <h2 id="h-kyc">Mission Controller — KYC et indépendance</h2>
+        <p class="lead" id="kyc-lead"></p>
+        <div><button class="btn" id="kyc-go" type="button">Préparer les vérifications</button></div>
+        <p class="status" id="kyc-say" role="status"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-mine" id="mine-card" hidden>
+        <h2 id="h-mine">Pour vous</h2>
+        <p class="lead" id="mine-lead"></p>
+        <div class="stack" id="mine"></div>
+      </section>
+
+      <p class="status error" id="read-error" hidden></p>
+      <div id="sheets" class="stack"></div>
+    </div>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var MAX = 3 * 1024 * 1024, picked = null, wonFile = null, stopPoll = null, current = null;
+  var ERR = {
+    ACCEPTANCE_TEMPLATE_NOT_FOUND: 'Le classeur d’acceptation du cabinet n’a pas été trouvé dans le Drive : un Associé peut en donner le lien (Paramètres → classeur d’acceptation).',
+    TDR_REQUIRED: 'Choisissez un document ou collez son lien.', FILE_TOO_LARGE: 'Document trop lourd.', PARTNER_DECISION_ONLY: 'Seul un Associé peut remplir cette ligne.',
+    MANAGER_ONLY: 'Cette ligne est remplie par un Manager.', SEPARATION_OF_FUNCTIONS: 'L’Associé qui décide ne peut pas être celui qui a préparé ou revu le dossier.',
+    PHASE1_NOT_OPEN: 'La Phase 1 s’ouvre quand le client a confirmé.', PERSONAL_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel pour répondre.',
+    MANAGERS_ONLY: 'Réservé aux managers et associés.', NOT_WAITING_FOR_CLIENT: 'L’opportunité n’attend pas de réponse du client.'
+  };
+  var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || m; };
+  var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC / indépendance', duplicate: 'Doublon possible', failed: 'Arrêt' };
+  var api = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
+  var b64 = function (file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); };
+
+  // ---- New opportunity ----
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { if (e.dataTransfer.files[0]) pick(e.dataTransfer.files[0]); });
+  $('file').addEventListener('change', function () { if (this.files[0]) pick(this.files[0]); });
+  function pick(f) { picked = f; drop.textContent = f.name + ' (' + Math.ceil(f.size / 1024) + ' Ko)'; }
+
+  // Small files go through the app; larger ones straight to Google, then the app is told.
+  function upload(file) {
+    if (file.size <= MAX) return b64(file).then(function (data) { return { name: file.name, mime: file.type || 'application/octet-stream', base64: data }; });
+    return api({ action: 'upload-start', name: file.name, size: file.size, mime: file.type || 'application/octet-stream' }).then(function (s) {
+      return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) { if (!r.ok) throw new Error('UPLOAD_FAILED_' + r.status); return r.json(); });
+    }).then(function (g) { return { file_ids: [g.id], staged: true }; });
+  }
+  $('send').addEventListener('click', function () {
+    var link = $('links').value.trim();
+    if (!picked && !link) { $('say').textContent = ERR.TDR_REQUIRED; return; }
+    var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = picked ? 'Envoi du document…' : 'Envoi…';
+    (picked ? upload(picked) : Promise.resolve({ file_ids: UI.driveIds(link) }))
+      .then(function (body) { body.action = 'create'; body.notes = $('notes').value.trim(); return api(body); })
+      .then(function (r) {
+        if (r.duplicate) { $('say').textContent = 'Ce document a déjà ouvert une opportunité.'; location.href = '/opportunites.html?id=' + r.opportunity.id; return; }
+        location.href = '/opportunites.html?id=' + r.opportunity.id;
+      })
+      .catch(function (e) { $('say').className = 'status error'; $('say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
+
+  function loadList() {
+    OM.api('/api/app?route=opportunities').then(function (d) {
+      var box = $('list'); box.textContent = '';
+      if (!d.opportunities.length) box.appendChild(el('p', 'Aucune opportunité pour l’instant : déposez un TDR ci-dessus.', 'empty'));
+      d.opportunities.forEach(function (o) {
+        var a = el('a', null, 'item link-item'); a.href = '/opportunites.html?id=' + o.id;
+        var t = el('div', null, 't'); t.appendChild(el('span', o.title || 'Opportunité'));
+        t.appendChild(el('span', (o.waiting || '') + (o.deadline ? ' — date limite ' + UI.date(o.deadline) : ''), 'meta'));
+        a.appendChild(t); a.appendChild(el('span', STATUS[o.status] || o.status, 'tag' + (/failed|duplicate/.test(o.status) ? ' warn' : '')));
+        box.appendChild(a);
+      });
+      var sb = $('signals'); sb.textContent = '';
+      $('signals-card').hidden = !d.signals.length;
+      d.signals.forEach(function (s) {
+        var it = el('div', null, 'item'); var t = el('div', null, 't');
+        t.appendChild(s.url ? UI.safeLink(s.url, s.name) : el('span', s.name)); t.appendChild(el('span', 'Apparu le ' + UI.dateTime(s.at) + (s.by ? ' (' + s.by + ')' : ''), 'meta'));
+        it.appendChild(t);
+        var go = el('button', 'Créer l’opportunité', 'btn'); go.type = 'button';
+        go.addEventListener('click', function () { go.disabled = true; api({ action: 'create', file_ids: [s.file_id], source: 'Drive' }).then(function (r) { api({ action: 'dismiss-signal', file_id: s.file_id }); location.href = '/opportunites.html?id=' + r.opportunity.id; }).catch(function (e) { go.disabled = false; alertBox(it, msg(e)); }); });
+        var no = el('button', 'Ignorer', 'btn ghost'); no.type = 'button';
+        no.addEventListener('click', function () { api({ action: 'dismiss-signal', file_id: s.file_id }).then(loadList); });
+        var row = el('div', null, 'btn-row'); row.appendChild(go); row.appendChild(no); it.appendChild(row);
+        sb.appendChild(it);
+      });
+    }).catch(function (e) { UI.fail($('list'), e); });
+  }
+  function alertBox(box, text) { var p = el('p', text, 'status error'); box.appendChild(p); }
+
+  // ---- One opportunity: its workbook, as the firm wrote it ----
+  function loadDetail(id) {
+    $('list-view').hidden = true; $('detail-view').hidden = false;
+    if (stopPoll) stopPoll();
+    var stop = false, timer = null;
+    // Follows the agents while they work (Firm Manager stages, Mission Controller checks).
+    var tick = function () {
+      OM.api('/api/app?route=opportunities&id=' + encodeURIComponent(id)).then(function (o) {
+        if (stop) return; render(o);
+        if (o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing')) timer = setTimeout(tick, 6000);
+      }).catch(function (e) { if (stop) return; $('read-error').hidden = false; $('read-error').textContent = msg(e); });
+    };
+    tick();
+    stopPoll = function () { stop = true; clearTimeout(timer); };
+    window.reloadOpportunity = function () { if (current) current.updated_at = null; clearTimeout(timer); tick(); };
+  }
+  function render(o) {
+    var first = !current || current.updated_at !== o.updated_at;
+    current = o;
+    $('h-opp').textContent = o.title || 'Opportunité';
+    $('opp-status').textContent = STATUS[o.status] || o.status;
+    $('opp-waiting').textContent = o.status === 'failed' ? 'Arrêt : ' + (o.error || '') : o.status === 'duplicate' ? 'POSSIBLE DUPLICATE — REVIEW REQUIRED : même référence qu’une opportunité existante. Rien n’a été créé.' : (o.summary || '');
+    var links = $('opp-links'); links.textContent = '';
+    if (o.folder && o.folder.url) links.appendChild(UI.safeLink(o.folder.url, 'Dossier de l’opportunité'));
+    if (o.workbook && o.workbook.url) links.appendChild(UI.safeLink(o.workbook.url, 'Classeur d’acceptation'));
+    (o.tdr_files || []).forEach(function (f) { if (f.url) links.appendChild(UI.safeLink(f.url, f.name || 'TDR')); });
+    if (o.won && o.won.letter && o.won.letter.url) links.appendChild(UI.safeLink(o.won.letter.url, 'Lettre de confirmation'));
+    var facts = $('opp-facts'); facts.textContent = '';
+    [['Client', o.client], ['Référence', o.reference], ['Document', o.kind], ['Date limite', o.deadline && UI.date(o.deadline)], ['Questions à clarifier', (o.open_questions || []).join(' ; ')],
+     ['Conflits (missions du cabinet)', o.conflicts ? (o.conflicts.matches.length ? o.conflicts.matches.map(function (m) { return m.mission + ' (' + m.status + ')'; }).join(' ; ') : 'aucune mission au même nom') : null]]
+      .forEach(function (f) { if (!f[1]) return; facts.appendChild(el('dt', f[0])); facts.appendChild(el('dd', f[1])); });
+    var log = $('opp-log'); log.textContent = '';
+    (o.log || []).slice(-12).forEach(function (l) { var li = el('li'); li.appendChild(el('time', UI.dateTime(l.at))); li.appendChild(el('span', l.m)); log.appendChild(li); });
+    if (o.status === 'running') log.appendChild(el('li', 'Le Firm Manager travaille…', 'meta'));
+    var role = (o.viewer && o.viewer.role) || '';
+    var lead = ['partner', 'owner'].indexOf(role) >= 0;
+    $('won-card').hidden = !(o.status === 'go' || o.status === 'phase0') || !(lead || role === 'manager');
+    drawMine(o, role);
+    var p1 = o.phase1;
+    $('kyc-card').hidden = !p1 && o.status !== 'won';
+    if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il ouvre le KYC et l’indépendance dans le classeur (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
+    if (p1) {
+      $('kyc-lead').textContent = p1.status === 'preparing' ? 'Vérifications en cours (registre, sanctions, personnes exposées, presse, conflits)…' : p1.status === 'ready' ? 'Vérifications faites le ' + UI.dateTime(p1.prepared_at) + ' : les propositions sont sous chaque ligne de la Phase 1. Confirmez ou corrigez ; l’indépendance est répondue par l’équipe.' : p1.status === 'failed' ? 'Arrêt des vérifications : ' + (p1.error || '') : (p1.todo || 'À faire : KYC et indépendance.');
+      $('kyc-go').hidden = p1.status === 'preparing';
+      $('kyc-go').textContent = p1.status === 'ready' ? 'Refaire les vérifications' : 'Préparer les vérifications';
+    }
+    $('read-error').hidden = !o.read_error; $('read-error').textContent = o.read_error ? 'Le classeur n’a pas pu être lu : ' + o.read_error : '';
+    // Re-draw the questions only when something changed and nobody is typing.
+    if (first && !document.activeElement.closest('#sheets')) drawSheets(o);
+  }
+
+  // What THIS person has to do here, first: the Associé sees the decisions, the Manager the
+  // recommendation and the risk rating, the team the questions and the agents' proposals.
+  function drawMine(o, role) {
+    var rank = { partner: 0, manager: 1, team: 2 }, mine = [];
+    // Only the step the opportunity is at: Phase 0 before the client's answer, then Phase 1 and the conclusion.
+    var later = ['won', 'phase1'].indexOf(o.status) >= 0;
+    (o.sheets || []).forEach(function (s) {
+      if (!s.open || (later ? s.owner === 'firm-manager' : s.owner !== 'firm-manager')) return;
+      s.rows.forEach(function (r) {
+        if (!r.may_fill || r.identity || r.fields.some(function (f) { return f.value; })) return;
+        var mineFirst = ['partner', 'owner'].indexOf(role) >= 0 ? r.authority === 'partner' && /D[ÉE]CISION/i.test(r.label || '') && !/^(Date|Nom)/i.test(r.label || '') : role === 'manager' ? r.authority === 'manager' && !/^Nom |date$/i.test(r.label || '') : Boolean(r.proposal);
+        if (!mineFirst) return;
+        mine.push({ s: s, r: r });
+      });
+    });
+    mine.sort(function (a, b) { return rank[a.r.authority] - rank[b.r.authority]; });
+    var box = $('mine'); box.textContent = '';
+    $('mine-card').hidden = !mine.length;
+    $('mine-lead').textContent = ['partner', 'owner'].indexOf(role) >= 0 ? 'Les décisions qui vous reviennent, en tant qu’Associé.' : role === 'manager' ? 'Votre recommandation et votre cotation du risque.' : 'Les questions et propositions des agents qui attendent votre réponse.';
+    mine.slice(0, 15).forEach(function (x) {
+      var a = el('a', null, 'item link-item'); a.href = '#r-' + x.s.name + '-' + x.r.row;
+      var t = el('div', null, 't'); t.appendChild(el('span', (x.r.ref ? x.r.ref + ' — ' : '') + (x.r.label || '').split(' — ')[0]));
+      t.appendChild(el('span', x.s.name.replace(/_/g, ' ') + (x.r.section ? ' · ' + x.r.section.split(' — ')[0] : '') + (x.r.proposal ? (x.r.proposal.for_team ? ' · question des agents' : ' · proposition des agents') : ''), 'meta'));
+      a.appendChild(t);
+      a.addEventListener('click', function () { var d = document.getElementById(a.hash.slice(1)); if (d) { var p = d.parentNode; while (p && p.tagName) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentNode; } } });
+      box.appendChild(a);
+    });
+  }
+
+  function drawSheets(o) {
+    var box = $('sheets'); box.textContent = '';
+    (o.sheets || []).forEach(function (s, i) {
+      var card = el('section', null, 'card');
+      var det = document.createElement('details'); det.className = 'opp-sheet'; det.open = s.open && (s.owner === 'firm-manager' ? ['phase0', 'go'].indexOf(o.status) >= 0 : s.owner === 'mission-controller' ? Boolean(o.phase1) : false);
+      var sum = document.createElement('summary'); sum.textContent = s.title + (s.open ? '' : ' — s’ouvre quand le client a confirmé');
+      det.appendChild(sum);
+      var sections = []; s.rows.forEach(function (r) { var k = r.section || ' '; var g = sections.find(function (x) { return x.k === k; }); if (!g) sections.push(g = { k: k, rows: [] }); g.rows.push(r); });
+      sections.forEach(function (g) {
+        var sd = document.createElement('details'); sd.className = 'opp-sec'; sd.open = g.rows.some(function (r) { return r.proposal; });
+        var ss = document.createElement('summary');
+        var todo = g.rows.filter(function (r) { return !r.identity && r.fields.every(function (f) { return !f.value; }); }).length;
+        ss.textContent = (g.k.trim() || 'Identification du dossier') + ' — ' + (g.rows.length - todo) + '/' + g.rows.length + ' renseignée(s)';
+        sd.appendChild(ss);
+        g.rows.forEach(function (r) { sd.appendChild(drawRow(o, s, r)); });
+        det.appendChild(sd);
+      });
+      card.appendChild(det); box.appendChild(card);
+    });
+  }
+
+  function drawRow(o, s, r) {
+    var row = el('div', null, 'opp-row'); row.id = 'r-' + s.name + '-' + r.row;
+    var h = el('h3'); if (r.ref) h.appendChild(el('b', r.ref)); h.appendChild(document.createTextNode(r.label || '(sans libellé)')); row.appendChild(h);
+    if (r.help) row.appendChild(el('p', r.help, 'opp-help'));
+    var p = r.proposal;
+    var inputs = {};
+    if (p) {
+      var pb = el('div', null, 'opp-prop');
+      var who = s.owner === 'mission-controller' ? 'Mission Controller' : (OM.agentName ? OM.agentName('grand-controleur') : 'Firm Manager');
+      if (p.for_team) pb.appendChild(el('p', who + ' : question pour l’équipe — ' + (p.question || 'à confirmer par une personne.')));
+      else {
+        pb.appendChild(el('p', who + ' propose : ' + Object.keys(p.values).map(function (c) { var f = r.fields.find(function (x) { return x.cell === c; }); return (f && f.header ? f.header + ' : ' : '') + p.values[c]; }).join(' · ')));
+        if (p.why) pb.appendChild(el('p', 'Pourquoi : ' + p.why, 'meta'));
+        (p.sources || []).forEach(function (u) { if (/^https?:/.test(u)) { var a = UI.safeLink(u, u.slice(0, 80)); pb.appendChild(a); pb.appendChild(document.createTextNode(' ')); } });
+      }
+      row.appendChild(pb);
+    }
+    if (!r.may_fill) {
+      var filled = r.fields.filter(function (f) { return f.value; });
+      row.appendChild(el('p', filled.length ? filled.map(function (f) { return (f.header ? f.header + ' : ' : '') + f.value; }).join(' · ') : (r.authority === 'partner' ? 'En attente de la décision de l’Associé.' : 'En attente du Manager.'), 'opp-locked'));
+      return row;
+    }
+    var grid = el('div', null, 'opp-fields');
+    r.fields.forEach(function (f) {
+      var lab = el('label', f.header || (r.fields.length === 1 ? 'Réponse' : f.cell));
+      var inp;
+      if (f.options && f.options.length) { inp = document.createElement('select'); inp.appendChild(el('option', '—')); inp.options[0].value = ''; f.options.forEach(function (v) { var op = el('option', v); op.value = v; inp.appendChild(op); }); inp.value = f.value || ''; }
+      else if (f.type === 'date') { inp = document.createElement('input'); inp.type = 'date'; inp.value = /^\d{4}-\d{2}-\d{2}$/.test(f.value) ? f.value : ''; }
+      else { inp = document.createElement('textarea'); inp.rows = 1; inp.value = f.value || ''; }
+      inp.disabled = !r.may_fill || !s.open;
+      inputs[f.cell] = inp; lab.appendChild(inp); grid.appendChild(lab);
+    });
+    row.appendChild(grid);
+    if (!s.open) return row;
+    var bar = el('div', null, 'btn-row');
+    if (p && !p.for_team && Object.keys(p.values).length) {
+      var take = el('button', 'Reprendre la proposition', 'btn ghost'); take.type = 'button';
+      take.addEventListener('click', function () { Object.keys(p.values).forEach(function (c) { if (inputs[c]) inputs[c].value = p.values[c]; }); take.dataset.used = '1'; });
+      bar.appendChild(take);
+    }
+    var save = el('button', 'Enregistrer dans le classeur', 'btn'); save.type = 'button';
+    var say = el('span', '', 'meta');
+    save.addEventListener('click', function () {
+      var values = {}; Object.keys(inputs).forEach(function (c) { var f = r.fields.find(function (x) { return x.cell === c; }); if (inputs[c].value !== (f.value || '')) values[c] = inputs[c].value; });
+      if (!Object.keys(values).length) { say.textContent = 'Rien de changé.'; return; }
+      save.disabled = true; say.textContent = 'Écriture…';
+      api({ action: 'answer', opportunity_id: o.id, sheet: s.name, row: r.row, values: values, from_proposal: Boolean(bar.querySelector('[data-used]')) })
+        .then(function (res) { say.textContent = res.verified ? 'Écrit dans le classeur et vérifié.' : 'Écrit, vérification à refaire.'; r.fields.forEach(function (f) { if (values[f.cell] !== undefined) f.value = values[f.cell]; }); })
+        .catch(function (e) { say.textContent = msg(e); say.className = 'meta warn-text'; })
+        .then(function () { save.disabled = false; });
+    });
+    bar.appendChild(save); bar.appendChild(say); row.appendChild(bar);
+    return row;
+  }
+
+  $('won-file').addEventListener('change', function () { wonFile = this.files[0] || null; });
+  $('won-send').addEventListener('click', function () {
+    var link = $('won-link').value.trim();
+    if (!wonFile && !link) { $('won-say').textContent = 'Déposez la lettre ou collez son lien.'; return; }
+    if (wonFile && wonFile.size > MAX) { $('won-say').textContent = 'Lettre trop lourde ici (3 Mo) : rangez-la dans le Drive et collez son lien.'; return; }
+    var b = this; b.disabled = true;
+    (wonFile ? b64(wonFile).then(function (d) { return { name: wonFile.name, mime: wonFile.type, base64: d }; }) : Promise.resolve({ link: link }))
+      .then(function (body) { body.action = 'won'; body.opportunity_id = current.id; return api(body); })
+      .then(function () { $('won-say').textContent = 'Confirmation enregistrée : le Mission Controller est prévenu.'; window.reloadOpportunity(); })
+      .catch(function (e) { $('won-say').className = 'status error'; $('won-say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
+  $('kyc-go').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'kyc-prepare', opportunity_id: current.id })
+      .then(function () { $('kyc-say').textContent = 'Le Mission Controller vérifie : registre, sanctions, personnes exposées, presse, conflits. Cela prend quelques minutes.'; window.reloadOpportunity(); })
+      .catch(function (e) { $('kyc-say').className = 'status error'; $('kyc-say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
+
+  function start() {
+    OM.loadBranding().catch(function () {});
+    var id = new URLSearchParams(location.search).get('id');
+    if (id) loadDetail(id); else loadList();
+  }
+  UI.requireLogin(start);
+})();
+</script>
+</body>
+</html>

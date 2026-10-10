@@ -54,6 +54,7 @@
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
     <a href="/accueil.html">Accueil</a>
     <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
     <a href="/mission.html">Missions</a>
     <a href="/rangement.html">Rangement</a>
     <a href="/equipe.html" aria-current="page">Équipe</a>
@@ -147,6 +148,7 @@
     c.appendChild(st);
     (p.signals || []).forEach(function (s) { c.appendChild(el('p', (s.level === 'warn' ? '▲ ' : '● ') + s.text, 'sig ' + s.level)); });
     (p.coverage || []).forEach(function (s) { c.appendChild(el('p', s, 'cov')); });
+    if (!mine && p.id && OM.isManager()) { var mc = el('a', 'Ouvrir la Management Card', 'btn ghost'); mc.href = '/carte.html?staff=' + encodeURIComponent(p.id); c.appendChild(mc); }
     return c;
   }
 
@@ -198,7 +200,7 @@
         .forEach(function (x) { k.appendChild(kpi(x[0], x[1])); });
       MISSIONS = d.missions || []; renderMissions();
       list('overdue', d.overdue, function (x) { return [x.summary, [x.mission, x.assignee || 'sans responsable', x.days_late + ' j de retard']]; }, 'Aucune action en retard.');
-      list('unassigned', d.unassigned, function (x) { return [x.summary, [x.mission, x.due_at ? 'échéance ' + UI.date(x.due_at) : 'sans échéance']]; }, 'Tout est assigné.');
+      list('unassigned', d.unassigned, function (x) { return [x.summary, [x.mission, x.due_at ? 'échéance ' + UI.date(x.due_at) : 'sans échéance'], OM.isManager() ? UI.assignPicker(x.id, function () { setTimeout(loadCoordination, 800); }) : null]; }, 'Tout est assigné.');
     }).catch(function (e) { UI.fail($('missions'), { message: ERR[e.message] || e.message }); });
   }
 
@@ -210,6 +212,7 @@
       var f = fmt(r); var li = el('li');
       li.appendChild(el('span', null, 'dot')); li.appendChild(el('span', f[0] || 'Action', 'sum'));
       var sub = el('div', null, 'sub'); f[1].filter(Boolean).forEach(function (x) { sub.appendChild(el('span', x)); }); li.appendChild(sub);
+      if (f[2]) li.appendChild(f[2]);
       box.appendChild(li);
     });
   }

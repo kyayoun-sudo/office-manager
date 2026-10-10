@@ -21,7 +21,9 @@ const actions = [
   { id: 'A1', assigned_staff_profile_id: 'S1', office_mission_id: 'M1', summary: 'Relance PBC', due_at: D(-3), requested_at: D(-10), status: 'proposed' },
   { id: 'A2', assigned_staff_profile_id: 'S1', office_mission_id: 'M1', summary: 'Feuille Ventes', due_at: D(-2), requested_at: D(-8), executed_at: D(-4), status: 'approved' },
   { id: 'A3', assigned_staff_profile_id: 'S1', office_mission_id: 'M1', summary: 'Revue', due_at: D(-6), requested_at: D(-12), executed_at: D(-5), verified_at: D(-5), status: 'approved' },
-  { id: 'A4', assigned_staff_profile_id: null, office_mission_id: 'M1', summary: 'Rapprochement', due_at: D(2), status: 'proposed' },
+  { id: 'A4', assigned_staff_profile_id: null, office_mission_id: 'M1', summary: 'Rapprochement', due_at: D(2), status: 'approved' },
+  { id: 'A4b', assigned_staff_profile_id: null, office_mission_id: 'M1', summary: 'Proposition encore à valider', due_at: D(2), status: 'proposed' },
+  { id: 'A4c', assigned_staff_profile_id: null, office_mission_id: 'M1', summary: 'Classer une pièce', status: 'approved', action_type: 'REVIEW_FILE' },
   { id: 'A5', assigned_staff_profile_id: 'S1', summary: 'Annulée', due_at: D(-20), status: 'rejected' }
 ];
 
@@ -57,6 +59,8 @@ test('coordination: missions at risk, late and unassigned actions', () => {
   assert.equal(c.overdue[0].assignee, 'Yannick KONAN');
   assert.equal(c.overdue[0].days_late, 3);
   assert.equal(c.unassigned[0].summary, 'Rapprochement');
+  // 2026-10-08: a proposal waits in « À valider », work done by the agents needs no person.
+  assert.equal(c.unassigned.length, 1);
 });
 
 test('my kpi: linked by e-mail only', async () => {

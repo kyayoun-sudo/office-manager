@@ -223,6 +223,37 @@ export default async function handler(req, res) {
       runAgentKey = resolved.storageKey;
     }
 
+    // Added 2026-10-08: the agent's own memory (MEMORY/AGENTS) — where it stopped, what is
+    // pending, where its detailed memories are. Short text; never blocks the answer (4 s max).
+    try {
+      const memAgent = requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent;
+      const { AGENT_FILES, loadAgentMemory, memorySummary } = await import("../lib/agent-memory.js");
+      if (AGENT_FILES[memAgent]) {
+        const loaded = await Promise.race([loadAgentMemory(memAgent), new Promise(r => setTimeout(() => r(null), 4000))]).catch(() => null);
+        const summary = memorySummary(memAgent, loaded?.memory || null);
+        if (requestedAgent === ROOT_ROUTE) rootContext = { ...rootContext, agent_memory: summary };
+        else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], agent_memory: summary };
+      }
+    } catch { /* memory unavailable: the agent works as before */ }
+    // The names the firm gave its agents (Paramètres → Noms des agents): each agent uses them.
+    try {
+      const { agentSettings } = await import("../lib/agent-persona.js");
+      const { names } = await agentSettings(orgId);
+      const line = "NOMS DANS CE CABINET (utilise-les pour te présenter et pour parler des autres agents) : agent central = " + names["grand-controleur"] + ", documents et Drive = " + names.orpailleur + ", facturation et administratif = " + names.sika + ", préparation des missions = " + names["mission-controller"] + ", revue d'audit = " + names["enhanced-auditor"] + ".";
+      // Who the firm's people are (team sheet, users, confirmed profiles): every agent knows them.
+      let members = null;
+      try { members = await Promise.race([(await import("../lib/firm-members.js")).membersLine(orgId), new Promise(r => setTimeout(() => r(null), 5000))]); } catch { members = null; }
+      if (members) { rootContext = { ...rootContext, firm_members: members }; for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], firm_members: members }; }
+      rootContext = { ...rootContext, agent_names: line };
+      // What each agent has really learnt (Shadow: lessons confirmed by facts or approved by the owner).
+      try {
+        const { activeLessons } = await import("../lib/shadow.js");
+        const own = await activeLessons(requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent);
+        if (own.length) { const t = "LEÇONS APPRISES (applique-les) :\n- " + own.join("\n- "); if (requestedAgent === ROOT_ROUTE) rootContext = { ...rootContext, learned_lessons: t }; else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], learned_lessons: t }; }
+      } catch { /* no lesson yet */ }
+      for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], agent_names: line };
+    } catch { /* default names */ }
+
     const orchestration =
       requestedAgent === ROOT_ROUTE ? "manager" : "direct-specialist";
     const logicalAgentKey =
