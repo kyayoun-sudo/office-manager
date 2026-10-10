@@ -276,7 +276,21 @@
         panel.appendChild(a);
       });
     }
-    function load() { if (!OM.getToken || !OM.getToken()) return; OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {}); }
+    var badgeLoading = false;
+    function load() {
+      if (!OM.getToken || !OM.getToken() || badgeLoading) return;
+      badgeLoading = true;
+      var notices = OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {});
+      var actions = OM.api('/api/app?route=actions').then(function (d) {
+        var pending = ((d && d.actions) || []).filter(function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+        var link = document.querySelector('a[href="/validations.html"]');
+        if (!link) return;
+        var tag = document.getElementById('nav-count');
+        if (!tag) { tag = node('span', '', 'badge'); tag.id = 'nav-count'; link.appendChild(tag); }
+        tag.hidden = !pending; tag.textContent = String(pending);
+      }).catch(function () {});
+      Promise.all([notices, actions]).then(function () { badgeLoading = false; });
+    }
     function toggle(open) { if (open) draw(); panel.hidden = !open; bell.setAttribute('aria-expanded', String(open)); }
     bell.addEventListener('click', function (e) { e.stopPropagation(); toggle(panel.hidden); });
     document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && e.target !== bell) toggle(false); });
