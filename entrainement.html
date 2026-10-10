@@ -135,6 +135,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           <button type="button" class="chip" data-p="lessons" aria-pressed="false">Leçons</button>
           <button type="button" class="chip" data-p="tests" aria-pressed="false">Golden tests</button>
           <button type="button" class="chip" data-p="exp" aria-pressed="false">Propositions</button>
+          <button type="button" class="chip" data-p="code" aria-pressed="false">Code</button>
           <button type="button" class="chip" data-p="norms" aria-pressed="false">Normes</button>
           <button type="button" class="chip" data-p="survey" aria-pressed="false">Questionnaire</button>
           <button type="button" class="chip" data-p="history" aria-pressed="false">Historique</button>
@@ -416,6 +417,36 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           box.appendChild(row); }
         b.appendChild(item('Proposition ' + x.id + ' — ' + UI.dateTime(x.at), null, box));
       }); }
+    if (panel === 'code') {
+      // Shadow rewrites code — as a proposal: its own branch and a draft pull request; a person reviews,
+      // tests and merges. The guard rails (rights, approvals, audit, secrets) can never be changed.
+      var c = data.code || { github: {}, agents: [], proposals: [] };
+      b.appendChild(el('p', 'Shadow peut proposer une modification du code d’un agent — ou de lui-même — à partir de ce qu’il a observé ou d’un objectif que vous écrivez. Il ne fusionne jamais et ne déploie jamais : la modification part sur sa propre branche avec une pull request en brouillon ; une personne relit, lance les tests et décide. Les garde-fous (droits, validations, journal d’audit, secrets, envois) ne peuvent pas être modifiés.', 'note'));
+      b.appendChild(el('p', c.github.connected ? 'GitHub connecté : ' + c.github.repo + ' (base ' + c.github.base + ').' : 'GitHub n’est pas connecté (SHADOW_GITHUB_TOKEN dans Vercel) : les propositions attendent ici avec leur diff, rien n’est appliqué.', c.github.connected ? 'small' : 'small warn-text'));
+      var form = el('div', null, 'stack');
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Agent');
+      (c.agents || []).forEach(function (k) { var o = el('option', k === 'shadow' ? 'Shadow (lui-même)' : NAME(k)); o.value = k; sel.appendChild(o); });
+      var goal = document.createElement('textarea'); goal.placeholder = 'Objectif (facultatif) : le comportement à corriger. Sans objectif, Shadow part de ce qu’il a observé.'; goal.setAttribute('aria-label', 'Objectif'); goal.style.minHeight = '60px';
+      var row = el('div', null, 'btn-row'); row.appendChild(sel);
+      row.appendChild(btn('Proposer une amélioration du code', 'btn', function () { act({ action: 'code', agent: sel.value, goal: goal.value.trim() }, 'Shadow prépare la proposition (quelques minutes).'); }));
+      form.appendChild(goal); form.appendChild(row); b.appendChild(form);
+      var CS = { drafting: 'en préparation', pr_open: 'pull request ouverte — à relire', ready_without_github: 'prête, GitHub non connecté', refused: 'refusée par les garde-fous', nothing_proposed: 'rien de sûr à proposer', failed: 'échec', closed: 'close' };
+      if (!(c.proposals || []).length) b.appendChild(el('p', 'Aucune proposition de code pour l’instant.', 'empty'));
+      (c.proposals || []).forEach(function (p) {
+        var box = el('div', null, 'stack');
+        var dl = el('dl', null, 'facts');
+        [['Agent', p.agent === 'shadow' ? 'Shadow' : NAME(p.agent)], ['Demandée par', p.requested_by], ['Objectif', p.goal], ['Problème', p.problem], ['Cause', p.cause], ['Modification', p.summary], ['Fichiers', (p.files || []).join(', ')],
+         ['Tests à lancer', (p.tests_to_run || []).join(' ; ')], ['Risques', (p.risks || []).join(' ; ')], ['Retour arrière', p.rollback], ['Refusée parce que', (p.refused || []).join(' ; ')], ['Erreur', p.error], ['Note', p.note]
+        ].forEach(function (f) { if (!f[1]) return; dl.appendChild(el('dt', f[0])); dl.appendChild(el('dd', String(f[1]))); });
+        box.appendChild(dl);
+        if (p.diff) { var det = document.createElement('details'); var sm = document.createElement('summary'); sm.textContent = 'Voir le diff'; det.appendChild(sm); var pre = el('pre', p.diff); pre.style.cssText = 'white-space:pre-wrap;font-size:12px;max-height:420px;overflow:auto'; det.appendChild(pre); box.appendChild(det); }
+        var r2 = el('div', null, 'btn-row');
+        if (p.pr_url) r2.appendChild(UI.safeLink(p.pr_url, 'Ouvrir la pull request'));
+        if (['pr_open', 'ready_without_github', 'drafting'].indexOf(p.status) >= 0) r2.appendChild(btn('Refuser et clore', null, function () { act({ action: 'code-close', id: p.id }, 'Proposition close (rien n’est fusionné).'); }));
+        box.appendChild(r2);
+        b.appendChild(item(p.id + ' — ' + (CS[p.status] || p.status), UI.dateTime(p.at), box));
+      });
+    }
     if (panel === 'norms') {
       var f = el('div', null, 'btn-row'); var inp = el('input'); inp.type = 'text'; inp.placeholder = 'Lien Drive d’une norme (ISA, IFRS, ACCA, SYSCOHADA, procédure du cabinet)'; inp.style.flex = '1'; inp.setAttribute('aria-label', 'Lien Drive de la norme');
       f.appendChild(inp); f.appendChild(btn('Ajouter à la bibliothèque', 'btn', function () { if (!inp.value.trim()) return; act({ action: 'source', link: inp.value.trim() }, 'Norme indexée (le PDF reste dans le Drive).'); }));

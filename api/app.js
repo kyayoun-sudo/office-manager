@@ -133,7 +133,10 @@ export const ROUTES = Object.freeze({
     GET: owner(async () => (await import('../lib/shadow.js')).labView()),
     POST: owner(async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
-      if (b.action === 'run') return s.shadowPass(orgId, { force: true });
+      if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
+      // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
+      if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
+      if (b.action === 'code-close') return (await import('../lib/shadow-code.js')).closeCodeProposal(orgId, { id: b.id, reason: b.reason }, who(req) || 'propriétaire');
       if (b.action === 'decide') return s.decide(orgId, b, who(req));
       if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
       if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
@@ -144,6 +147,7 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'SHADOW_UNAVAILABLE'
   },
+  'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   'shadow-survey': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).answerSurvey(req.body || {}, req.account)),
