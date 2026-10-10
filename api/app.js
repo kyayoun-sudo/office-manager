@@ -303,7 +303,8 @@ export const ROUTES = Object.freeze({
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
-      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
+      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req, req.body.browser_batches === true ? { resume: true, fire: async () => true } : {});
+      if (req.body?.action === 'tidy-batch') return tidyPlanStep(orgId, req, { noLoop: true });
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
       throw fail('UNKNOWN_ACTION', 400);
     }),
