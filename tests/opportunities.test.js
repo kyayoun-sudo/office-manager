@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -188,6 +188,14 @@ test('Firm Manager: TDR read, filed with the workbook in the opportunity folder,
   assert.deepEqual(Object.keys(o.proposals).sort(), ['01_OPPORTUNITE!59', '02_PHASE_0!23', '02_PHASE_0!24']);
   assert.deepEqual(o.proposals['02_PHASE_0!23'].values, { E23: 'Aucune mission au même nom', F23: 'Oui' });
   assert.equal(o.proposals['02_PHASE_0!24'].for_team, true);
+  // Man + machine: the sourced answer is written straight into the workbook, signed by the agent; the
+  // unsourced one stays a proposal (its cells empty); the question stays a question.
+  const w = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C59' }, { sheet: '01_OPPORTUNITE', cell: 'C7' }, { sheet: '02_PHASE_0', cell: 'E23' }, { sheet: '02_PHASE_0', cell: 'K23' }]);
+  assert.equal(w['01_OPPORTUNITE!C59'], '≈ 12 milliards FCFA (source : EF 2025)');
+  assert.equal(w['01_OPPORTUNITE!C7'], 'Firm Manager (IA)');
+  assert.equal(w['02_PHASE_0!E23'], '');
+  assert.deepEqual(Object.keys(o.ai_filled), ['01_OPPORTUNITE!59']);
+  assert.equal(o.ai_filled['01_OPPORTUNITE!59'].verified, true);
   assert.equal(o.conflicts.matches.length, 1, 'the earlier mission of the same client is found');
   assert.ok(audits.some(a => a.action_type === 'OPPORTUNITY_FILED'));
   // The same file never opens a second opportunity.
@@ -224,6 +232,11 @@ test('people answer, only the Associé decides (never the preparer), then the cl
   const k = await kycStep('org', {}, { opportunity_id: o.id }, d);
   assert.equal(k.phase1.status, 'ready', k.phase1.error);
   assert.deepEqual(Object.keys(k.phase1.proposals).sort(), ['03_PHASE_1!61']);
+  // Sourced KYC facts are already in the workbook; independence never is (each person answers).
+  const kw = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '03_PHASE_1', cell: 'H61' }, { sheet: '03_PHASE_1', cell: 'D76' }]);
+  assert.equal(kw['03_PHASE_1!H61'], 'Non');
+  assert.equal(kw['03_PHASE_1!D76'], '');
+  assert.ok(k.ai_filled['03_PHASE_1!61']);
   await answerRow('org', { opportunity_id: o.id, sheet: '03_PHASE_1', row: 61, values: k.phase1.proposals['03_PHASE_1!61'].values, from_proposal: true }, senior, d);
   wb = drive.files.get(o.workbook.id).buffer;
   assert.equal((await readCells(wb, [{ sheet: '03_PHASE_1', cell: 'H61' }]))['03_PHASE_1!H61'], 'Non');
@@ -277,4 +290,33 @@ test('Phase 2 then 3: « poursuivre » → the Firm Manager proposes the team; a
   const view = await opportunityView('org', o.id, { display_name: 'A. Senior', email: 'senior@cab.ci', role: 'senior' }, d);
   assert.equal(view.viewer.in_team, true); assert.equal(view.my_declaration.threats.length, 1);
   assert.deepEqual(view.independence_questions, [{ ref: 'C.01', label: 'Intérêts financiers' }], 'the questions are the threats of the firm\'s own sheet');
+});
+
+test('man + machine: agents write only into empty cells; a Manager signs the review of a section once', async () => {
+  const st = await describeWorkbook(await buildTemplate());
+  const props = { '02_PHASE_0!23': { values: { E23: 'Aucune mission', F23: 'Oui' }, sources: ['missions du cabinet'], why: 'recherche' }, '02_PHASE_0!24': { values: {}, for_team: true, sources: [] } };
+  const kept = agentWrites(st, props, { '02_PHASE_0!E23': 'Réponse de Awa' }, 'firm-manager');
+  assert.deepEqual(kept.writes.map(w => w.cell).sort(), ['D7', 'F23', 'K23', 'L23'], 'a person\'s answer is never overwritten');
+  assert.equal(kept.writes.find(w => w.cell === 'K23').value, 'Firm Manager (IA)');
+  const unsourced = agentWrites(st, { '02_PHASE_0!23': { values: { E23: 'x' }, sources: [] } }, {}, 'firm-manager');
+  assert.equal(unsourced.writes.length, 0, 'without a source it stays a proposal');
+  const decision = agentWrites(st, {}, {}, 'firm-manager', [{ sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }]);
+  assert.equal(decision.writes.length, 0, 'an agent never writes a decision');
+
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(opportunity.id, d);
+  const section = (await describeWorkbook(drive.files.get(o.workbook.id).buffer)).sheets[0].rows.find(r => r.row === 59).section || '';
+  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '02_PHASE_0', section: 'PROCÉDURES DE LA PHASE 0' }, { display_name: 'Moussa', role: 'manager' }, d), /NOTHING_TO_REVIEW/);
+  const r = await reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Moussa Manager', role: 'manager' }, d);
+  assert.equal(r.verified, true);
+  const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]);
+  assert.equal(back['01_OPPORTUNITE!C9'], 'Moussa Manager', 'every section the agent filled is read: the sheet is signed « revu par »');
+  // Phase 0 done again (new facts): the Firm Manager is asked again; cells already filled stay as they are.
+  await assert.rejects(prepareAgain('org', {}, { opportunity_id: o.id }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  assert.equal((await prepareAgain('org', {}, { opportunity_id: o.id }, { display_name: 'Moussa', role: 'manager' }, d)).status, 'running');
+  const again = await run(o.id, d);
+  assert.equal(again.status, 'phase0');
+  assert.equal((await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]))['01_OPPORTUNITE!C9'], 'Moussa Manager');
 });

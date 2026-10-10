@@ -356,6 +356,8 @@ export const ROUTES = Object.freeze({
       if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
       if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
       if (a === 'answer') return o.answerRow(orgId, b, req.account, { req });
+      if (a === 'review-section') return o.reviewSection(orgId, b, req.account);
+      if (a === 'prepare-again') return o.prepareAgain(orgId, req, b, req.account);
       if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
       if (a === 'validate-team') return o.validateTeam(orgId, b, req.account);
       if (a === 'declare') return o.declareIndependence(orgId, b, req.account);

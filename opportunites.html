@@ -17,6 +17,8 @@
   .opp-help{font-size:13px;color:var(--muted);margin:0;line-height:1.45}
   .opp-prop{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.5}
   .opp-prop p{margin:0 0 4px}
+  .opp-review{border-left:3px solid var(--accent, #2F5597);padding:8px 12px;margin:6px 0 12px;font-size:14px;line-height:1.5}
+  .opp-review p{margin:0 0 6px}
   .opp-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 12px}
   .opp-fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
   .opp-fields input,.opp-fields select,.opp-fields textarea{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
@@ -54,7 +56,7 @@
 
     <header class="page-head">
       <h1>Opportunités</h1>
-      <p class="lead">Déposez un TDR, un AMI ou un appel d’offres. Le <span data-agent="grand-controleur">Firm Manager</span> le lit, le range dans le dossier des appels d’offres avec le classeur d’acceptation du cabinet, remplit la fiche et prépare la Phase 0. Quand le client confirme, le Mission Controller fait le KYC et l’indépendance dans le même classeur. Les agents proposent ; l’équipe répond ; l’Associé décide.</p>
+      <p class="lead">Déposez un TDR, un AMI ou un appel d’offres. Le <span data-agent="grand-controleur">Firm Manager</span> le lit, le range dans le dossier des appels d’offres avec le classeur d’acceptation du cabinet, remplit la fiche et prépare la Phase 0. Quand le client confirme, le Mission Controller fait le KYC dans le même classeur. Les agents remplissent tout ce qu’ils trouvent (TDR, Internet, missions et équipe du cabinet), avec leurs sources ; l’équipe relit et répond seulement à ce que personne d’autre ne peut savoir ; l’Associé décide.</p>
     </header>
 
     <div id="list-view" class="stack">
@@ -129,6 +131,8 @@
         <div class="stack" id="mine"></div>
       </section>
 
+      <div class="btn-row" id="again-row" hidden><button class="btn ghost" id="again" type="button">Refaire la Phase 0 avec le Firm Manager</button><span class="meta" id="again-say">Il refait ses recherches et remplit ce qu’il trouve, seulement dans les cases encore vides.</span></div>
+
       <p class="status error" id="read-error" hidden></p>
       <div id="sheets" class="stack"></div>
     </div>
@@ -143,7 +147,7 @@
   var ERR = {
     ACCEPTANCE_TEMPLATE_NOT_FOUND: 'Le classeur d’acceptation du cabinet n’a pas été trouvé dans le Drive : un Associé peut en donner le lien (Paramètres → classeur d’acceptation).',
     TDR_REQUIRED: 'Choisissez un document ou collez son lien.', FILE_TOO_LARGE: 'Document trop lourd.', PARTNER_DECISION_ONLY: 'Seul un Associé peut remplir cette ligne.',
-    MANAGER_ONLY: 'Cette ligne est remplie par un Manager.', SEPARATION_OF_FUNCTIONS: 'L’Associé qui décide ne peut pas être celui qui a préparé ou revu le dossier.',
+    MANAGER_ONLY: 'Réservé à un Manager ou à un Associé.', NOTHING_TO_REVIEW: 'Rien de rempli par les agents dans cette section.', NOT_IN_PHASE0: 'La Phase 0 ne peut être refaite qu’avant la décision de l’Associé.', SEPARATION_OF_FUNCTIONS: 'L’Associé qui décide ne peut pas être celui qui a préparé ou revu le dossier.',
     PHASE1_NOT_OPEN: 'La Phase 1 s’ouvre quand le client a confirmé.', PERSONAL_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel pour répondre.',
     MANAGERS_ONLY: 'Réservé aux managers et associés.', NOT_WAITING_FOR_CLIENT: 'L’opportunité n’attend pas de réponse du client.',
     ANSWER_ALL_QUESTIONS: 'Répondez Oui ou Non à chaque question.', CERTIFICATION_REQUIRED: 'Cochez la certification avant d’enregistrer.', NOT_IN_TEAM: 'Vous ne faites pas partie de l’équipe validée.',
@@ -250,17 +254,32 @@
     $('won-card').hidden = !(o.status === 'go' || o.status === 'phase0') || !(lead || role === 'manager');
     drawMine(o, role);
     drawTeam(o, role);
+    $('again-row').hidden = !(o.status === 'phase0' && mayReview(role));
     var p1 = o.phase1;
     $('kyc-card').hidden = !p1 && o.status !== 'won';
     if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il ouvre le KYC et l’indépendance dans le classeur (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
     if (p1) {
-      $('kyc-lead').textContent = p1.status === 'preparing' ? 'Vérifications en cours (registre, sanctions, personnes exposées, presse, conflits)…' : p1.status === 'ready' ? 'Vérifications faites le ' + UI.dateTime(p1.prepared_at) + ' : les propositions sont sous chaque ligne de la Phase 1. Confirmez ou corrigez ; l’indépendance est répondue par l’équipe.' : p1.status === 'failed' ? 'Arrêt des vérifications : ' + (p1.error || '') : (p1.todo || 'À faire : KYC et indépendance.');
+      $('kyc-lead').textContent = p1.status === 'preparing' ? 'Vérifications en cours (registre, sanctions, personnes exposées, presse, conflits)…' : p1.status === 'ready' ? 'Vérifications faites le ' + UI.dateTime(p1.prepared_at) + (p1.written ? ' : ' + p1.written.rows + ' ligne(s) de la Phase 1 remplies dans le classeur, avec leurs sources' : '') + '. Relisez section par section ; l’indépendance est répondue par chaque personne, la cotation par le Manager.' : p1.status === 'failed' ? 'Arrêt des vérifications : ' + (p1.error || '') : (p1.todo || 'À faire : KYC et indépendance.');
       $('kyc-go').hidden = p1.status === 'preparing';
       $('kyc-go').textContent = p1.status === 'ready' ? 'Refaire les vérifications' : 'Préparer les vérifications';
     }
     $('read-error').hidden = !o.read_error; $('read-error').textContent = o.read_error ? 'Le classeur n’a pas pu être lu : ' + o.read_error : '';
     // Re-draw the questions only when something changed and nobody is typing.
     if (first && !document.activeElement.closest('#sheets')) drawSheets(o);
+  }
+
+  // Man + machine: the rows the agents filled (with sources), grouped by section, and who read them.
+  function mayReview(role) { return ['owner', 'partner', 'manager', 'supervisor'].indexOf(role) >= 0; }
+  function agentName(owner) { return owner === 'mission-controller' ? 'Mission Controller (IA)' : 'Firm Manager (IA)'; }
+  function secId(s, k) { return (s.name + '-' + k).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 80); }
+  function agentSections(o) {
+    var out = [];
+    (o.sheets || []).forEach(function (s) {
+      var by = {};
+      s.rows.forEach(function (r) { if ((o.ai_filled || {})[s.name + '!' + r.row]) { var k = r.section || ''; by[k] = (by[k] || 0) + 1; } });
+      Object.keys(by).forEach(function (k) { out.push({ sheet: s, section: k, id: secId(s, k), count: by[k], agent: agentName(s.owner), review: (o.reviews || {})[s.name + '|' + k] || null }); });
+    });
+    return out;
   }
 
   // What THIS person has to do here, first: the Associé sees the decisions, the Manager the
@@ -279,9 +298,18 @@
       });
     });
     mine.sort(function (a, b) { return rank[a.r.authority] - rank[b.r.authority]; });
+    // Managers and above: the sections the agents filled that nobody has read yet.
+    var toRead = mayReview(role) ? agentSections(o).filter(function (x) { return !x.review; }) : [];
     var box = $('mine'); box.textContent = '';
-    $('mine-card').hidden = !mine.length;
-    $('mine-lead').textContent = ['partner', 'owner'].indexOf(role) >= 0 ? 'Les décisions qui vous reviennent, en tant qu’Associé.' : role === 'manager' ? 'Votre recommandation et votre cotation du risque.' : 'Les questions et propositions des agents qui attendent votre réponse.';
+    toRead.forEach(function (x) {
+      var a = el('a', null, 'item link-item'); a.href = '#sec-' + x.id;
+      var t = el('div', null, 't'); t.appendChild(el('span', 'À relire : ' + (x.section.trim() || x.sheet.title)));
+      t.appendChild(el('span', x.count + ' ligne(s) remplie(s) par ' + x.agent, 'meta')); a.appendChild(t);
+      a.addEventListener('click', function () { var d = document.getElementById('sec-' + x.id); if (d) { d.open = true; var p = d.parentNode; while (p && p.tagName) { if (p.tagName === 'DETAILS') p.open = true; p = p.parentNode; } } });
+      box.appendChild(a);
+    });
+    $('mine-card').hidden = !mine.length && !toRead.length;
+    $('mine-lead').textContent = ['partner', 'owner'].indexOf(role) >= 0 ? 'Les décisions qui vous reviennent, en tant qu’Associé, et ce que les agents ont rempli à relire.' : mayReview(role) ? 'Ce que les agents ont rempli, à relire ; votre recommandation et votre cotation du risque.' : 'Les questions des agents : seulement ce qu’ils n’ont pas pu trouver eux-mêmes.';
     mine.slice(0, 15).forEach(function (x) {
       var a = el('a', null, 'item link-item'); a.href = '#r-' + x.s.name + '-' + x.r.row;
       var t = el('div', null, 't'); t.appendChild(el('span', (x.r.ref ? x.r.ref + ' — ' : '') + (x.r.label || '').split(' — ')[0]));
@@ -375,11 +403,15 @@
       det.appendChild(sum);
       var sections = []; s.rows.forEach(function (r) { var k = r.section || ' '; var g = sections.find(function (x) { return x.k === k; }); if (!g) sections.push(g = { k: k, rows: [] }); g.rows.push(r); });
       sections.forEach(function (g) {
-        var sd = document.createElement('details'); sd.className = 'opp-sec'; sd.open = g.rows.some(function (r) { return r.proposal; });
+        var sd = document.createElement('details'); sd.className = 'opp-sec'; sd.id = 'sec-' + secId(s, g.k === ' ' ? '' : g.k);
+        var ai = g.rows.filter(function (r) { return (o.ai_filled || {})[s.name + '!' + r.row]; }).length;
+        var rv = (o.reviews || {})[s.name + '|' + (g.k === ' ' ? '' : g.k)] || null;
+        sd.open = g.rows.some(function (r) { return r.proposal && !(o.ai_filled || {})[s.name + '!' + r.row] && r.fields.every(function (f) { return !f.value; }); }) || (ai > 0 && !rv);
         var ss = document.createElement('summary');
         var todo = g.rows.filter(function (r) { return !r.identity && r.fields.every(function (f) { return !f.value; }); }).length;
-        ss.textContent = (g.k.trim() || 'Identification du dossier') + ' — ' + (g.rows.length - todo) + '/' + g.rows.length + ' renseignée(s)';
+        ss.textContent = (g.k.trim() || 'Identification du dossier') + ' — ' + (g.rows.length - todo) + '/' + g.rows.length + ' renseignée(s)' + (ai ? ' · ' + ai + ' par ' + agentName(s.owner) + (rv ? ' · relu' : ' · à relire') : '');
         sd.appendChild(ss);
+        if (ai) sd.appendChild(reviewBar(o, s, g.k === ' ' ? '' : g.k, ai, rv));
         g.rows.forEach(function (r) { sd.appendChild(drawRow(o, s, r)); });
         det.appendChild(sd);
       });
@@ -387,13 +419,38 @@
     });
   }
 
+  function reviewBar(o, s, section, count, rv) {
+    var bar = el('div', null, 'opp-review');
+    var role = o.viewer && o.viewer.role;
+    if (rv) { bar.appendChild(el('p', 'Relu par ' + rv.by + ' le ' + UI.dateTime(rv.at) + ' (' + rv.rows.length + ' ligne(s) remplie(s) par ' + agentName(s.owner) + ').', 'meta')); return bar; }
+    bar.appendChild(el('p', agentName(s.owner) + ' a rempli ' + count + ' ligne(s) de cette section, chacune avec sa source. Corrigez ce qui est faux (ligne par ligne), puis signez la relecture une seule fois.'));
+    if (!mayReview(role) || !s.open) { bar.appendChild(el('p', 'Relecture : un Manager ou un Associé.', 'meta')); return bar; }
+    var b = el('button', 'J’ai relu cette section', 'btn'); b.type = 'button';
+    var say = el('span', '', 'meta');
+    if (['partner', 'owner'].indexOf(role) >= 0) bar.appendChild(el('p', 'Si vous êtes l’Associé qui décidera, laissez la relecture à un Manager : celui qui relit ne peut pas décider (séparation des fonctions).', 'meta'));
+    b.addEventListener('click', function () {
+      b.disabled = true; say.textContent = 'Écriture de votre nom et de la date dans le classeur…';
+      api({ action: 'review-section', opportunity_id: o.id, sheet: s.name, section: section })
+        .then(function (r) { say.textContent = r.verified ? 'Relecture signée et vérifiée dans le classeur.' : 'Relecture enregistrée, écriture à vérifier.'; window.reloadOpportunity(); })
+        .catch(function (e) { b.disabled = false; say.textContent = msg(e); });
+    });
+    var row = el('div', null, 'btn-row'); row.appendChild(b); row.appendChild(say); bar.appendChild(row);
+    return bar;
+  }
+
   function drawRow(o, s, r) {
     var row = el('div', null, 'opp-row'); row.id = 'r-' + s.name + '-' + r.row;
     var h = el('h3'); if (r.ref) h.appendChild(el('b', r.ref)); h.appendChild(document.createTextNode(r.label || '(sans libellé)')); row.appendChild(h);
     if (r.help) row.appendChild(el('p', r.help, 'opp-help'));
-    var p = r.proposal;
+    var p = r.proposal, done = (o.ai_filled || {})[s.name + '!' + r.row];
     var inputs = {};
-    if (p) {
+    if (done) {
+      var db = el('div', null, 'opp-prop');
+      db.appendChild(el('p', 'Rempli par ' + agentName(s.owner) + ' le ' + UI.dateTime(done.at) + (done.corrected ? ' · corrigé par ' + done.corrected.by + ' le ' + UI.dateTime(done.corrected.at) : '')));
+      if (done.why) db.appendChild(el('p', 'Pourquoi : ' + done.why, 'meta'));
+      (done.sources || []).forEach(function (u) { if (/^https?:/.test(u)) { db.appendChild(UI.safeLink(u, u.slice(0, 80))); db.appendChild(document.createTextNode(' ')); } else db.appendChild(el('span', 'Source : ' + u + ' ', 'meta')); });
+      row.appendChild(db);
+    } else if (p) {
       var pb = el('div', null, 'opp-prop');
       var who = s.owner === 'mission-controller' ? 'Mission Controller' : (OM.agentName ? OM.agentName('grand-controleur') : 'Firm Manager');
       if (p.for_team) pb.appendChild(el('p', who + ' : question pour l’équipe — ' + (p.question || 'à confirmer par une personne.')));
@@ -452,6 +509,13 @@
       .then(function (body) { body.action = 'won'; body.opportunity_id = current.id; return api(body); })
       .then(function () { $('won-say').textContent = 'Confirmation enregistrée : le Mission Controller est prévenu.'; window.reloadOpportunity(); })
       .catch(function (e) { $('won-say').className = 'status error'; $('won-say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
+  $('again').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'prepare-again', opportunity_id: current.id })
+      .then(function () { $('again-say').textContent = 'Le Firm Manager travaille (quelques minutes) : rechargez ensuite la page.'; window.reloadOpportunity(); })
+      .catch(function (e) { $('again-say').textContent = msg(e); })
       .then(function () { b.disabled = false; });
   });
   $('kyc-go').addEventListener('click', function () {

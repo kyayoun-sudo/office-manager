@@ -112,6 +112,7 @@ Décision de Paul : elle précise la spec (§10 phases 1-5) pour le partage des 
    personnes elles-mêmes, réponses écrites dans le même classeur ; rempli à la main → relu.
 4. **KYC et indépendance avant la lettre de mission** ; puis le Firm Manager prépare et envoie la lettre (bloc 8, à construire).
 5. À la fin, le dossier d'acceptation va au **dossier permanent du client** (à construire).
+**Homme + machine (Paul, 2026-10-11)** : les agents écrivent directement dans le classeur tout ce qu'ils peuvent sourcer (TDR, Internet, missions et équipe du cabinet), dans les cases vides seulement, ligne signée « Préparé par : Firm Manager (IA) » / « Mission Controller (IA) » ; sans source = proposition ; ce que seule une personne sait = question ; un Manager relit une section en un clic (« J'ai relu », son nom dans « Revu par »). Jamais écrit par un agent : décisions, cotations du Manager, indépendance, « revu par ».
 Un seul fichier par opportunité ; chaque agent remplit sa partie ; les cellules de décision ne reçoivent que la décision
 d'une personne identifiée. L'interface dépend du rôle (Associé : décisions ; Manager : recommandation, cotation ; équipe :
 questions et propositions des agents).
