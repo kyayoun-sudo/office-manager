@@ -89,6 +89,7 @@
       action.last_decision = { decision: decision, note: note || null, decided_by: OM.getUserName() || null, created_at: new Date().toISOString() };
       show('Décision enregistrée : ' + LABELS[decision] + '.' + (r && r.effect ? ' ' + r.effect : ''));
       if (r && r.message_id) loadMail();
+      if (action.action_type === 'FILE_MOVE' && decision === 'approve' && !r.executed) { action.retry_needed = true; OM.api('/api/app?route=actions').then(function (data) { all = data.actions || []; renderFilters(); render(); }).catch(function (e) { show('Décision enregistrée ; actualisation échouée : ' + e.message, true); }); }
       render();
       if (r && r.needs_assignee && OM.isManager()) { var st = $('status'); st.appendChild(document.createTextNode(' ')); st.appendChild(UI.assignPicker(action.id, function () { show('Action validée et confiée.'); })); }
     }).catch(function (err) {
@@ -125,8 +126,42 @@
       done.style.margin = '0'; done.style.alignSelf = 'flex-start';
       c.appendChild(done);
       if (action.retry_needed) {
-        c.appendChild(el('p', 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
-        var retry = el('button', 'Reprendre le déplacement approuvé', 'btn'); retry.type = 'button';
+        var evidence = action.verification_evidence || {};
+        if (evidence.error_code === 'CONTENT_DUPLICATE') {
+          c.appendChild(el('p', 'Deux fichiers au contenu identique : comparez leur rôle avant de décider. Aucun fichier supprimé.', 'meta'));
+          var duplicateResult = el('p', '', 'status'); duplicateResult.setAttribute('role', 'status');
+          var duplicateButtons = [];
+          [['keep-both', 'Conserver les deux et ranger ce fichier'], ['cancel-move', 'Annuler ce déplacement'], ['trash-file', 'Mettre ce fichier à la corbeille']].forEach(function (choice) {
+            var b = el('button', choice[1], 'btn ghost'); b.type = 'button'; duplicateButtons.push(b);
+            b.addEventListener('click', function () {
+              if (choice[0] === 'trash-file' && !window.confirm('Mettre à la corbeille « ' + (action.file_name || action.summary || 'le fichier de cette proposition') + ' » ? L’autre exemplaire sera conservé.')) return;
+              duplicateButtons.forEach(function (x) { x.disabled = true; }); duplicateResult.textContent = 'Enregistrement et application de votre choix…';
+              OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve-duplicate', action_id: action.id, choice: choice[0], confirm_trash: choice[0] === 'trash-file' }) }).then(function (r) {
+                duplicateResult.textContent = r.effect;
+                if (r.executed || r.resolved) { action.retry_needed = false; duplicateButtons.forEach(function (x) { x.hidden = true; }); }
+                else duplicateButtons.forEach(function (x) { x.disabled = false; });
+              }).catch(function (e) { duplicateResult.textContent = 'Choix non appliqué : ' + e.message; duplicateButtons.forEach(function (x) { x.disabled = false; }); });
+            }); c.appendChild(b);
+          }); c.appendChild(duplicateResult);
+
+          [['Fichier à ranger', evidence.file_id], ['Fichier déjà présent', evidence.existing_file_id]].forEach(function (entry) {
+            if (!entry[1]) return;
+            var fileLink = el('a', entry[0], 'btn ghost'); fileLink.href = 'https://drive.google.com/file/d/' + encodeURIComponent(entry[1]) + '/view'; fileLink.target = '_blank'; fileLink.rel = 'noopener'; c.appendChild(fileLink);
+          });
+        }
+        c.appendChild(el('p', action.blocked_reason || 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
+        var recheck = el('button', 'Vérifier la situation dans le Drive', 'btn ghost'); recheck.type = 'button';
+        var checkResult = el('p', '', 'status'); checkResult.setAttribute('role', 'status');
+        recheck.addEventListener('click', function () {
+          recheck.disabled = true; checkResult.textContent = 'Vérification de l’emplacement actuel…';
+          OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reconcile', action_id: action.id }) }).then(function (r) {
+            checkResult.textContent = r.effect; recheck.disabled = false;
+            if (r.executed) { action.retry_needed = false; retry.hidden = true; recheck.hidden = true; }
+            else retry.hidden = !r.can_retry;
+          }).catch(function (e) { checkResult.textContent = 'Vérification échouée : ' + e.message; recheck.disabled = false; });
+        });
+        c.appendChild(recheck); c.appendChild(checkResult);
+        var retry = el('button', 'Reprendre le déplacement approuvé', 'btn'); retry.type = 'button'; retry.hidden = action.can_retry === false;
         var resultLine = el('p', '', 'status'); resultLine.setAttribute('role', 'status'); c.appendChild(resultLine);
         retry.addEventListener('click', function () {
           retry.disabled = true; retry.textContent = 'Reprise en cours…'; resultLine.textContent = 'Demande reçue : vérification et déplacement en cours…';
