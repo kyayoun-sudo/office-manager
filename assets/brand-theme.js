@@ -42,7 +42,11 @@
     getOwnerToken: function () { var s = readSession(); return (s && s.owner_token) || ''; },
     getRole: function () { var s = readSession(); return (s && s.user && s.user.role) || ''; },
     isOwner: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner'; },
-    isManager: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'manager'; },
+    isManager: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'manager' || r === 'supervisor'; },
+    // Account administration: owner, partners and the IT administrator (2026-10-10).
+    isAccountAdmin: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'it_admin'; },
+    ROLE_LABELS: { owner: 'Propriétaire du cabinet', partner: 'Associé', quality_reviewer: 'Revue qualité (EQR)', manager: 'Manager', supervisor: 'Superviseur', senior: 'Senior', auditor: 'Auditeur', secretary: 'Secrétariat / administration', it_admin: 'Responsable informatique', collaborator: 'Collaborateur (ancien rôle)' },
+    roleLabel: function (r) { return OM.ROLE_LABELS[r || OM.getRole()] || r || ''; },
     hasPersonalSession: function () { var s = readSession(); return Boolean(s && s.access_token); },
     getUserName: function () {
       var s = readSession();
@@ -159,9 +163,15 @@
     paintUser: function () {
       var name = OM.getUserName() || 'Utilisateur';
       document.querySelectorAll('[data-user-name]').forEach(function (el) { el.textContent = name; });
-      // Settings are visible to the owner and managing partners only.
-      if (!OM.isOwner()) document.querySelectorAll('.nav a[href="/parametres.html"], .nav a[href="/mise-en-service.html"]').forEach(function (a) { a.hidden = true; });
-      if (!OM.isOwner()) document.querySelectorAll('.nav a[data-partners-only]').forEach(function (a) { a.hidden = true; });
+      // Each role sees its own menu (2026-10-10: « tout le monde ne peut pas avoir la même interface »).
+      // The server refuses what a role may not do; the menu only shows what it may.
+      var role = OM.getRole();
+      if (role) document.querySelectorAll('.nav a[href]').forEach(function (a) {
+        var allowed = NAV_ROLES[a.getAttribute('href')];
+        if (allowed && allowed.indexOf(role) < 0) a.hidden = true;
+      });
+      if (!OM.isAccountAdmin()) document.querySelectorAll('.nav a[href="/parametres.html"], .nav a[href="/mise-en-service.html"]').forEach(function (a) { a.hidden = true; });
+      if (!OM.isOwner() && role !== 'quality_reviewer') document.querySelectorAll('.nav a[data-partners-only]').forEach(function (a) { a.hidden = true; });
       // The training page needs a personal session (e-mail + password).
       if (!OM.hasPersonalSession()) document.querySelectorAll('.nav a[href="/entrainement.html"]').forEach(function (a) { a.hidden = true; });
     },
@@ -229,7 +239,7 @@
     who.appendChild(menu);
     function build() {
       menu.textContent = '';
-      if (OM.isOwner()) SETTINGS.forEach(function (g) {
+      if (OM.isAccountAdmin()) SETTINGS.forEach(function (g) {
         var box = node('div', null, 'gm-group');
         var head = node('a', g[0], 'gm-head'); head.href = g[1]; box.appendChild(head);
         g[2].forEach(function (x) { var a = node('a', x[1], 'gm-link'); a.href = g[1] + '#' + x[0]; box.appendChild(a); });
@@ -411,9 +421,22 @@
     pass(document.body);
   }
   // ---- Workspace shell: icons in the rail, a menu button on small screens, tabs for long pages ----
+  // Which roles see which page in the menu (specification §55: one workspace per role).
+  var WORKERS = ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'];
+  var NAV_ROLES = {
+    '/recherche.html': WORKERS, '/mission.html': WORKERS, '/rangement.html': WORKERS, '/validations.html': WORKERS, '/messagerie.html': WORKERS, '/assistant.html': WORKERS,
+    '/opportunites.html': ['owner', 'partner', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'],
+    '/equipe.html': ['owner', 'partner', 'manager', 'supervisor'],
+    '/preparation.html': ['owner', 'partner', 'manager', 'supervisor'],
+    '/auditeur.html': ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'collaborator'],
+    '/pilotage.html': ['owner', 'partner', 'quality_reviewer'],
+    '/entrainement.html': ['owner', 'partner'],
+    '/mise-en-service.html': ['owner', 'partner', 'it_admin'], '/parametres.html': ['owner', 'partner', 'it_admin']
+  };
   var ICONS = {
     '/accueil.html': 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
     '/recherche.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5',
+    '/opportunites.html': 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4',
     '/mission.html': 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
     '/rangement.html': 'M3 6h7l2 2h9v11H3zM8 13h8',
     '/equipe.html': 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a2.5 2.5 0 1 0 0-5M3 20c0-3 3-5 6-5s6 2 6 5m2-5c2 0 4 1.5 4 4',

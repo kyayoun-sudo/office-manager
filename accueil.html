@@ -39,6 +39,13 @@
       <p class="lead">Le cockpit du cabinet : les indicateurs clés, les e-mails qui demandent une action, puis les missions et les agents. Cliquez sur un indicateur pour voir ce qu'il mesure, comment il est calculé et ce qui le compose.</p>
     </header>
 
+    <section class="card" id="myspace" aria-labelledby="h-myspace" hidden>
+      <div class="card-head"><h2 id="h-myspace">Mon espace</h2><span class="tag" id="myspace-role"></span></div>
+      <p class="lead" id="myspace-lead"></p>
+      <div class="stack" id="myspace-items"></div>
+      <div class="links" id="myspace-links"></div>
+    </section>
+
     <a class="callout" id="setup" href="/mise-en-service.html" hidden>
       <span class="callout-label">Mise en service</span>
       <span class="callout-num" id="setup-num"></span>
@@ -115,7 +122,7 @@
 <script src="/assets/screens.js"></script>
 <script>
 (function () {
-  var OM = window.OfficeManager, UI = window.OMScreens;
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
   var $ = function (id) { return document.getElementById(id); };
 
   // Statuses shown in French (same mapping as lib/mission-status.js).
@@ -305,10 +312,52 @@
     }).catch(function (e) { $('mails-status').textContent = ERR[e.code || e.message] || ('Lecture impossible : ' + e.message); }).then(function () { b.disabled = false; });
   });
 
+  // ---- Mon espace: each role opens on its own work (specification §55; Paul 2026-10-10) ----
+  var SPACES = {
+    owner: ['Le cabinet', 'Les décisions qui vous reviennent, les missions à risque, la santé du cabinet.', [['/pilotage.html', 'Tableau des associés'], ['/opportunites.html', 'Opportunités'], ['/equipe.html', 'Équipe'], ['/parametres.html', 'Comptes et rôles']]],
+    partner: ['Associé', 'Vos décisions (poursuite, acceptation, opinion), les missions à risque, vos revues.', [['/pilotage.html', 'Tableau des associés'], ['/opportunites.html', 'Opportunités'], ['/validations.html', 'À valider'], ['/equipe.html', 'Équipe']]],
+    quality_reviewer: ['Revue qualité', 'Les missions dont on vous a confié la revue qualité : jugements clés, risques significatifs, opinion proposée.', [['/pilotage.html', 'Tableau des associés'], ['/mission.html', 'Missions'], ['/auditeur.html', 'Enhanced Auditor']]],
+    manager: ['Mes revues', 'Les dossiers à revoir, vos validations, l’avancement de vos missions et les personnes qui vous rendent compte.', [['/validations.html', 'À valider'], ['/mission.html', 'Missions'], ['/equipe.html', 'Mon équipe'], ['/preparation.html', 'Préparer une mission']]],
+    supervisor: ['Supervision', 'Les missions que vous supervisez : avancement, risques, revues, constats majeurs.', [['/mission.html', 'Missions'], ['/validations.html', 'À valider'], ['/equipe.html', 'Mon équipe']]],
+    senior: ['Ma mission', 'Votre travail sur vos missions : pièces, KYC, dossiers de travail de l’équipe, questions des agents.', [['/mission.html', 'Mes missions'], ['/opportunites.html', 'Opportunités'], ['/rangement.html', 'Déposer des pièces'], ['/auditeur.html', 'Enhanced Auditor']]],
+    auditor: ['Mon travail', 'Vos missions, vos tâches et leurs échéances, les questions des agents qui vous attendent.', [['/mission.html', 'Mes missions'], ['/rangement.html', 'Déposer des pièces'], ['/auditeur.html', 'Enhanced Auditor']]],
+    collaborator: ['Mon travail', 'Vos missions, vos tâches et leurs échéances, les questions des agents qui vous attendent.', [['/mission.html', 'Mes missions'], ['/rangement.html', 'Déposer des pièces']]],
+    secretary: ['Administration', 'Dépôts et rangement, courrier, opportunités reçues, mise en forme des documents. Aucune décision professionnelle.', [['/opportunites.html', 'Déposer un TDR / AMI'], ['/rangement.html', 'Rangement'], ['/messagerie.html', 'Messagerie']]],
+    it_admin: ['Comptes et connexions', 'Les comptes, les rôles et les positions ; la connexion Google et l’état des agents. Pas les dossiers des clients.', [['/parametres.html', 'Comptes et rôles'], ['/mise-en-service.html', 'Mise en service']]]
+  };
+  function line(text, href, cls) { var a = el(href ? 'a' : 'div', null, 'item' + (href ? ' link-item' : '')); if (href) a.href = href; var t = el('div', null, 't'); t.appendChild(el('span', text)); a.appendChild(t); if (cls) a.appendChild(el('span', cls[0], cls[1])); return a; }
+  function loadMySpace() {
+    var role = OM.getRole(); var sp = SPACES[role]; if (!sp) return;
+    $('myspace').hidden = false; $('myspace-role').textContent = OM.roleLabel ? OM.roleLabel(role) : role;
+    $('h-myspace').textContent = sp[0]; $('myspace-lead').textContent = sp[1];
+    var links = $('myspace-links'); links.textContent = ''; sp[2].forEach(function (l) { var a = el('a', l[1]); a.href = l[0]; links.appendChild(a); });
+    var box = $('myspace-items'); box.textContent = '';
+    var lead = role === 'owner' || role === 'partner', mgr = role === 'manager' || role === 'supervisor';
+    if (role === 'it_admin') return;
+    // What waits for this person in the opportunities (the Associé: decisions; the team: the agents' questions).
+    OM.api('/api/app?route=opportunities').then(function (d) {
+      (d.opportunities || []).forEach(function (o) {
+        if (lead && (o.status === 'phase0' || o.status === 'go')) box.appendChild(line((o.status === 'phase0' ? 'Décision de poursuite à prendre : ' : 'En attente du client : ') + o.title, '/opportunites.html?id=' + o.id, ['Opportunité', 'tag']));
+        else if (!lead && (o.status === 'phase0' || o.status === 'phase1')) box.appendChild(line((o.status === 'phase1' ? 'KYC et indépendance à compléter : ' : 'Questions de la Phase 0 : ') + o.title, '/opportunites.html?id=' + o.id, ['Opportunité', 'tag']));
+      });
+    }).catch(function () {});
+    if (lead || mgr) OM.api('/api/app?route=coordination').then(function (c) {
+      (c.missions || []).filter(function (m) { return m.risk === 'high'; }).slice(0, 5).forEach(function (m) { box.appendChild(line('Mission à risque : ' + m.name + ' — ' + m.overdue_actions + ' action(s) en retard', '/mission.html?id=' + m.id, ['À risque', 'tag warn'])); });
+      if ((c.unassigned || []).length) box.appendChild(line((c.unassigned.length) + ' action(s) sans personne affectée', '/validations.html', ['À affecter', 'tag warn']));
+    }).catch(function () {});
+    if (!lead) OM.api('/api/app?route=my-kpi').then(function (k) {
+      if (!k || k.linked === false) return;
+      box.appendChild(line('Mes missions actives : ' + (k.missions_active ?? '–') + ' · actions ouvertes : ' + (k.actions_open ?? '–') + (k.actions_overdue ? ' · en retard : ' + k.actions_overdue : ''), '/mission.html', k.actions_overdue ? ['En retard', 'tag warn'] : null));
+    }).catch(function () {});
+  }
+
   function start() {
     var name = OM.getUserName();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
     OM.loadBranding().catch(function () {});
+    loadMySpace();
+    // The IT administrator works on accounts and connections, not on the firm's engagements.
+    if (OM.getRole() === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
     loadCockpit(); loadMails(); loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup();
   }
 

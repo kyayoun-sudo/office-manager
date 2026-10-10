@@ -134,8 +134,8 @@ test('agent initiative: proposes (never sends) one team message when due, collea
 });
 
 test('routes and page: managers validate, everyone can ask; the page states the rule', () => {
-  assert.deepEqual(ROUTES.messages.GET.userRoles, ['owner', 'partner', 'manager']);
-  assert.deepEqual(ROUTES.messages.POST.userRoles, ['owner', 'partner', 'manager', 'collaborator']);
+  assert.deepEqual(ROUTES.messages.GET.userRoles, ['owner', 'partner', 'manager', 'supervisor']);
+  assert.deepEqual(ROUTES.messages.POST.userRoles, ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator']);
   const html = readFileSync(new URL('../validations.html', import.meta.url), 'utf8');
   assert.ok(!/innerHTML/.test(html));
   assert.match(html, /uniquement aux collègues/);

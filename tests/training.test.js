@@ -249,7 +249,7 @@ test('without the firm’s direct Google access, missions wait (no attempt burnt
 
 test('routes and page: owner starts / stops / cleans up; everyone with a session sees and confirms', () => {
   assert.ok(ROUTES.training.POST.ownerOnly);
-  assert.deepEqual(ROUTES.training.GET.userRoles, ['owner', 'partner', 'manager', 'collaborator']);
+  assert.deepEqual(ROUTES.training.GET.userRoles, ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator']);
   assert.ok(ROUTES['training-confirm'].POST.userRoles);
   assert.ok(!ROUTES['training-step'].POST.public, 'the background step still needs the access code');
   const html = readFileSync(new URL('../entrainement.html', import.meta.url), 'utf8');

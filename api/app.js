@@ -96,11 +96,13 @@ const fail = (code, statusCode) => Object.assign(new Error(code), { statusCode }
 const owner = run => Object.assign(run, { ownerOnly: true });
 const open = run => Object.assign(run, { public: true });
 // Needs a personal session (Supabase access token) with one of these roles.
-const MANAGERS = ['owner', 'partner', 'manager'];
+// The role families come from lib/roles.js (2026-10-10: the firm's roles and positions).
+import { MANAGERS as ROLE_MANAGERS, WORKERS, EVERYONE, FIRM_LEAD, ACCOUNT_ADMINS, ROLE_LABELS, visiblePeople, firmSettings, saveFirmSettings } from '../lib/roles.js';
+const MANAGERS = [...ROLE_MANAGERS];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
 const lastAiDedupe = new Map();
-const ALL_ROLES = ['owner', 'partner', 'manager', 'collaborator'];
-const PARTNERS = ['owner', 'partner'];
+const ALL_ROLES = [...WORKERS];
+const PARTNERS = [...FIRM_LEAD];
 const who = req => req.account?.display_name || req.account?.email || null;
 // Results kept in Drive JSON without the heavy working data (raw mail, read files).
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
@@ -219,11 +221,19 @@ export const ROUTES = Object.freeze({
     unavailable: 'COORDINATION_UNAVAILABLE'
   },
   'team-kpi': {
-    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null); return teamKpis(orgId); }),
+    // Whose indicators: everybody for owners and partners; for a manager or a supervisor, the people who
+    // report to them directly (when the firm allows it) and themselves.
+    GET: users(MANAGERS, async (orgId, req) => {
+      await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null);
+      const k = await teamKpis(orgId); const seen = await visiblePeople(orgId, req.account);
+      if (!seen) return k;
+      const people = k.people.filter(p => seen.has(String(p.email || '').toLowerCase()));
+      return { ...k, people, scope: 'direct_reports', team: { ...k.team, people: people.length, overloaded: people.filter(p => p.load_pct > 100).length } };
+    }),
     unavailable: 'KPI_UNAVAILABLE'
   },
   'my-kpi': {
-    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => myKpis(orgId, req.account)),
+    GET: users([...EVERYONE], (orgId, req) => myKpis(orgId, req.account)),
     unavailable: 'KPI_UNAVAILABLE'
   },
   training: {
@@ -252,9 +262,22 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'READINESS_UNAVAILABLE'
   },
+  // Accounts: owner, partners and the IT administrator (personal session); each one acts as itself
+  // (only an owner makes an owner; the IT administrator never touches the partners' accounts).
   users: {
-    GET: owner((orgId) => listAccounts(orgId)),
-    POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
+    GET: users([...ACCOUNT_ADMINS], async (orgId) => ({ ...(await listAccounts(orgId)), role_labels: ROLE_LABELS })),
+    POST: users([...ACCOUNT_ADMINS], async (orgId, req) => { await logAccess(orgId, req.account, 'manage_account', String(req.body?.auth_user_id || req.body?.email || '')).catch(() => null); return manageAccount(orgId, req.body || {}, { actor: req.account }); }),
+    unavailable: 'USERS_UNAVAILABLE'
+  },
+  // The firm's settings for people (e.g. managers see the performance of their direct reports).
+  'firm-settings': {
+    GET: users([...EVERYONE], (orgId) => firmSettings(orgId)),
+    POST: users(PARTNERS, (orgId, req) => saveFirmSettings(orgId, req.body || {}, who(req))),
+    unavailable: 'SETTINGS_UNAVAILABLE'
+  },
+  // Firm Manager: roles and positions proposed from the firm's team sheet (a person confirms them).
+  'team-roles': {
+    GET: users([...ACCOUNT_ADMINS], async (orgId) => (await import('../lib/team-roles.js')).proposeTeamRoles(orgId)),
     unavailable: 'USERS_UNAVAILABLE'
   },
   // Test of the whole app on a copy of the firm — works only in a preview on a test firm.
@@ -313,8 +336,8 @@ export const ROUTES = Object.freeze({
   // Understanding the firm, then (same first scan) where every file goes.
   'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); if (req.body?.skip_tidy !== true) await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
-  'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
-  translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
+  'close-account': { POST: users([...EVERYONE], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
+  translate: { POST: users([...EVERYONE], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
   // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----
   // Which AI providers are configured (keys in Vercel; nothing secret returned).
   'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), unavailable: 'AI_UNAVAILABLE' },
@@ -356,7 +379,7 @@ export const ROUTES = Object.freeze({
       if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
       if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
       if (a === 'answer') return o.answerRow(orgId, b, req.account);
-      if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
+      if (a === 'won') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
       if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
@@ -432,7 +455,15 @@ export const ROUTES = Object.freeze({
   },
   // Management Card (owner, partners, managers): opened from a person; each opening is journaled.
   'management-card': {
-    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null); return managementCard(orgId, String(req.query?.staff_id || '')); }),
+    GET: users(MANAGERS, async (orgId, req) => {
+      await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null);
+      const seen = await visiblePeople(orgId, req.account);
+      if (seen) {
+        const [p] = await rest('office_staff_profiles?org_id=eq.' + encodeURIComponent(orgId) + '&id=eq.' + encodeURIComponent(String(req.query?.staff_id || '')) + '&select=email&limit=1').catch(() => []) || [];
+        if (!p || !seen.has(String(p.email || '').toLowerCase())) throw fail('NOT_YOUR_DIRECT_REPORT', 403);
+      }
+      return managementCard(orgId, String(req.query?.staff_id || ''));
+    }),
     POST: users(MANAGERS, (orgId, req) => {
       const b = req.body || {};
       if (b.action === 'refresh') return refreshCard(orgId, String(b.staff_id || ''), who(req));
@@ -570,11 +601,11 @@ export const ROUTES = Object.freeze({
   'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
-  'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
+  'mission-contacts': { GET: users(ALL_ROLES, (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   // The firm's people-management policy, kept in the agents' Drive memory (owner).
   // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
   // Small files through the app; large ones straight from the browser to Google (start / finish).
-  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], async (orgId, req) => {
+  drop: { POST: users(ALL_ROLES, async (orgId, req) => {
     const a = req.body?.action;
     if (a === 'start_upload') return (await import('../lib/drop-box.js')).startLargeUpload(orgId, req.body || {}, req.account, req);
     if (a === 'finish_upload') return (await import('../lib/drop-box.js')).finishLargeUpload(orgId, req.body || {}, req.account);
@@ -587,7 +618,7 @@ export const ROUTES = Object.freeze({
   // Saved → read at once by the agents (team, preferences, questionnaire answers → Équipe and Management Cards).
   'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner(async (orgId, req) => { const r = await savePeoplePolicy(req.body || {}); const read = await (await import('../lib/capabilities.js')).startCapabilityRefresh(orgId, req).catch(e => ({ error: String(e.message || e) })); return { ...r, reading: read }; }), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
-    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
+    GET: users(ALL_ROLES, (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
     unavailable: 'PERMISSIONS_UNAVAILABLE'
   },

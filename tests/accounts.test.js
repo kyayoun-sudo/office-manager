@@ -84,13 +84,13 @@ test('accounts: the last active owner cannot be removed', async () => {
   assert.ok(!two.calls.some(c => c.method === 'DELETE'), 'accounts are never deleted');
 });
 
-test('routes: login routes are public, account management is owner-only', async () => {
+test('routes: login routes are public, account management needs a personal session (owner, partners, IT administrator)', async () => {
   assert.equal(ROUTES.login.POST.public, true);
   assert.equal(ROUTES.session.POST.public, true);
-  assert.equal(ROUTES.users.GET.ownerOnly, true);
-  assert.equal(ROUTES.users.POST.ownerOnly, true);
+  assert.deepEqual(ROUTES.users.GET.userRoles, ['owner', 'partner', 'it_admin']);
+  assert.deepEqual(ROUTES.users.POST.userRoles, ['owner', 'partner', 'it_admin']);
   process.env.DEFAULT_ORG_ID = 'org-1';
-  await assert.rejects(handleApp({ method: 'GET', query: { route: 'users' }, headers: { 'x-office-manager-token': 'pilot' } }), /OWNER_ONLY/);
+  await assert.rejects(handleApp({ method: 'GET', query: { route: 'users' }, headers: { 'x-office-manager-token': 'pilot' } }), /SESSION|UNAUTHORIZED|TOKEN/);
   await assert.rejects(handleApp({ method: 'GET', query: { route: 'search' }, headers: {} }), /UNAUTHORIZED/);
 });
 

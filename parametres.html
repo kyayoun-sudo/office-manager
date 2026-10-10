@@ -62,6 +62,32 @@
       </div>
     </section>
 
+    <section class="card" id="accounts-area" aria-labelledby="h-users" hidden>
+      <h2 id="h-users">Comptes, rôles et positions</h2>
+      <p class="hint" style="margin:0">Le rôle décide de ce que la personne voit et peut faire dans l’application ; la position est son grade ou son titre au cabinet ; « rend compte à » dit qui est son responsable direct. Un compte se désactive, il ne se supprime pas. Seul un propriétaire peut nommer un propriétaire ; le responsable informatique gère les comptes mais pas ceux des associés.</p>
+      <p class="status" id="u-sql" role="status" hidden></p>
+      <div id="u-proposals-box" hidden>
+        <h3 style="margin:8px 0 4px;font-size:15px">Proposé par le Firm Manager d’après le tableau de l’équipe</h3>
+        <p class="hint" style="margin:0" id="u-proposals-note"></p>
+        <div id="u-proposals" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+      </div>
+      <h3 style="margin:8px 0 0;font-size:15px">Les comptes</h3>
+      <div id="users" class="stack" style="display:flex;flex-direction:column;gap:8px"></div>
+      <h3 style="margin:8px 0 0;font-size:15px">Ajouter une personne</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+        <div class="field"><label for="u-name">Nom</label><input id="u-name" type="text" maxlength="120"></div>
+        <div class="field"><label for="u-email">E-mail</label><input id="u-email" type="text" inputmode="email" maxlength="254"></div>
+        <div class="field"><label for="u-role">Rôle</label><select id="u-role" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)"></select></div>
+        <div class="field"><label for="u-position">Position (grade, titre)</label><input id="u-position" type="text" maxlength="120" placeholder="Ex. Senior 2, Manager confirmé"></div>
+        <div class="field"><label for="u-boss">Rend compte à</label><select id="u-boss" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)"></select></div>
+        <div class="field"><label for="u-pw">Mot de passe provisoire</label><input id="u-pw" type="text" maxlength="128" autocomplete="off" placeholder="10 caractères, lettres et chiffres"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="u-add" type="button">Créer le compte</button><span class="status" id="u-status" role="status" aria-live="polite"></span></div>
+      <div id="perf-setting" hidden style="border-top:1px solid var(--line);padding-top:12px">
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px"><input type="checkbox" id="s-reports"> <span>Un manager ou un superviseur voit les indicateurs de performance des personnes qui lui rendent compte directement (et seulement elles). Sinon, chacun ne voit que les siens ; les associés voient tout le cabinet.</span></label>
+      </div>
+    </section>
+
     <div class="row" id="owner-area" hidden>
       <div class="grow">
         <section class="card" id="google" aria-labelledby="h-google" style="border-left:4px solid var(--brand)">
@@ -196,23 +222,6 @@
           </div>
           <h3 style="margin:8px 0 0;font-size:15px">Derniers passages</h3>
           <div id="s-passes" style="display:flex;flex-direction:column;gap:6px"></div>
-        </section>
-
-        <section class="card" aria-labelledby="h-users">
-          <h2 id="h-users">Comptes du cabinet</h2>
-          <p class="hint" style="margin:0">Chaque personne se connecte avec son e-mail et son mot de passe. Propriétaire et associés-gérants : tout, y compris ces paramètres. Managers : coordination et indicateurs de l'équipe. Collaborateurs : leur travail et leurs propres indicateurs. Un compte se désactive, il ne se supprime pas.</p>
-          <div id="users" class="stack" style="display:flex;flex-direction:column;gap:8px"></div>
-          <h3 style="margin:8px 0 0;font-size:15px">Ajouter une personne</h3>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-            <div class="field"><label for="u-name">Nom</label><input id="u-name" type="text" maxlength="120"></div>
-            <div class="field"><label for="u-email">E-mail</label><input id="u-email" type="text" inputmode="email" maxlength="254"></div>
-            <div class="field"><label for="u-role">Rôle</label>
-              <select id="u-role" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)">
-                <option value="collaborator">Collaborateur</option><option value="manager">Manager</option><option value="partner">Associé-gérant</option><option value="owner">Propriétaire</option>
-              </select></div>
-            <div class="field"><label for="u-pw">Mot de passe provisoire</label><input id="u-pw" type="text" maxlength="128" autocomplete="off" placeholder="10 caractères, lettres et chiffres"></div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="u-add" type="button">Créer le compte</button><span class="status" id="u-status" role="status" aria-live="polite"></span></div>
         </section>
 
         <section class="card" aria-labelledby="h-try">
@@ -490,7 +499,7 @@
     ownerApi('agent-persona').then(function (p) {
       fillPersona(p);
       $('owner-gate').hidden = true; $('owner-area').hidden = false;
-      loadUsers(); loadSchedule(); loadGoogle(false);
+      loadSchedule(); loadGoogle(false);
     }).catch(function (err) {
       $('owner-area').hidden = true; $('owner-gate').hidden = false;
       $('owner-status').textContent = explain(err); $('owner-status').className = 'status error';
@@ -598,68 +607,125 @@
     });
   });
 
-  // ---- Accounts (owner / partner) ----
-  var ROLE_LABEL = { owner: 'Propriétaire', partner: 'Associé-gérant', manager: 'Manager', collaborator: 'Collaborateur' };
+  // ---- Accounts, roles, positions (owner, partners, IT administrator — personal session) ----
+  var ROLE_LABEL = (OM.ROLE_LABELS || {});
+  var ROLE_ORDER = ['auditor', 'senior', 'supervisor', 'manager', 'quality_reviewer', 'secretary', 'it_admin', 'partner', 'owner', 'collaborator'];
+  var accounts = [];
   Object.assign(ERRORS, {
     WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
     EMAIL_ALREADY_USED: 'Cette adresse a déjà un compte.', INVALID_EMAIL: 'Adresse e-mail invalide.',
-    INVALID_NAME: 'Indiquez le nom.', LAST_OWNER: 'Impossible : il doit rester au moins un propriétaire actif.'
+    INVALID_NAME: 'Indiquez le nom.', LAST_OWNER: 'Impossible : il doit rester au moins un propriétaire actif.',
+    ROLE_NOT_GRANTABLE: 'Vous ne pouvez pas donner ce rôle (seul un propriétaire nomme un propriétaire ; le responsable informatique ne gère pas les comptes des associés ; personne ne change son propre rôle).',
+    ROLES_SQL_NOT_INSTALLED: 'Les nouveaux rôles et positions ne sont pas encore installés dans la base : exécutez db/roles.sql dans Supabase.',
+    VALID_MANAGER_REQUIRED: 'Choisissez un responsable valide (pas la personne elle-même).', ROLE_NOT_ALLOWED: 'Réservé au propriétaire, aux associés et au responsable informatique.'
   });
   function uSay(t, e) { $('u-status').textContent = t; $('u-status').className = 'status' + (e ? ' error' : ''); }
-  function manage(body) {
-    return ownerApi('users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  function usersApi(body) { return OM.api('/api/app?route=users', body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined); }
+  var SEL = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px;background:var(--surface);width:auto;flex:0 1 200px;max-width:100%';
+  function roleSelect(value, label) {
+    var sel = document.createElement('select'); sel.setAttribute('aria-label', label); sel.style.cssText = SEL;
+    ROLE_ORDER.forEach(function (r) { if (r === 'collaborator' && value !== 'collaborator') return; sel.appendChild(new Option(ROLE_LABEL[r] || r, r)); });
+    sel.value = value || 'auditor'; return sel;
   }
+  function bossSelect(value, exceptId, label) {
+    var sel = document.createElement('select'); sel.setAttribute('aria-label', label); sel.style.cssText = SEL;
+    sel.appendChild(new Option('— personne —', ''));
+    accounts.filter(function (u) { return u.active && u.auth_user_id !== exceptId; }).forEach(function (u) { sel.appendChild(new Option(u.display_name + ' (' + (ROLE_LABEL[u.role] || u.role) + ')', u.auth_user_id)); });
+    sel.value = value || ''; return sel;
+  }
+  function small(text, label) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn ghost'; b.textContent = text; b.style.cssText = 'padding:6px 12px;min-height:36px;font-size:13px'; if (label) b.setAttribute('aria-label', label); return b; }
   function userRow(u) {
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 14px';
     var t = document.createElement('div'); t.style.cssText = 'flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px';
     var n = document.createElement('span'); n.textContent = u.display_name; n.style.fontWeight = '500';
-    var m = document.createElement('span'); m.textContent = u.email + ' · ' + (ROLE_LABEL[u.role] || u.role) + (u.active ? '' : ' · désactivé');
+    var m = document.createElement('span'); m.textContent = u.email + (u.position ? ' · ' + u.position : '') + (u.active ? '' : ' · désactivé');
     m.style.cssText = 'font-size:12px;color:var(--muted)';
     t.appendChild(n); t.appendChild(m); row.appendChild(t);
-    var role = document.createElement('select');
-    role.setAttribute('aria-label', 'Rôle de ' + u.display_name);
-    role.style.cssText = 'font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px;background:var(--surface)';
-    ['collaborator', 'manager', 'partner', 'owner'].forEach(function (r) { var o = new Option(ROLE_LABEL[r], r); role.appendChild(o); });
-    role.value = u.role;
-    role.addEventListener('change', function () {
-      manage({ action: 'set_role', auth_user_id: u.auth_user_id, role: role.value }).then(loadUsers)
-        .catch(function (err) { uSay(explain(err), true); role.value = u.role; });
-    });
+    var role = roleSelect(u.role, 'Rôle de ' + u.display_name);
+    role.addEventListener('change', function () { usersApi({ action: 'set_role', auth_user_id: u.auth_user_id, role: role.value }).then(loadUsers).catch(function (err) { uSay(explain(err), true); role.value = u.role; }); });
     row.appendChild(role);
-    var tog = document.createElement('button'); tog.type = 'button'; tog.className = 'btn ghost';
-    tog.textContent = u.active ? 'Désactiver' : 'Réactiver'; tog.style.cssText = 'padding:6px 12px;min-height:36px;font-size:13px';
-    tog.addEventListener('click', function () {
-      manage({ action: u.active ? 'deactivate' : 'reactivate', auth_user_id: u.auth_user_id }).then(loadUsers)
-        .catch(function (err) { uSay(explain(err), true); });
-    });
+    var pos = document.createElement('input'); pos.type = 'text'; pos.maxLength = 120; pos.value = u.position || ''; pos.placeholder = 'Position'; pos.setAttribute('aria-label', 'Position de ' + u.display_name); pos.style.cssText = SEL + ';flex-basis:160px';
+    pos.addEventListener('change', function () { usersApi({ action: 'set_profile', auth_user_id: u.auth_user_id, position: pos.value }).then(function () { uSay('Position enregistrée.'); u.position = pos.value; }).catch(function (err) { uSay(explain(err), true); }); });
+    row.appendChild(pos);
+    var boss = bossSelect(u.reports_to, u.auth_user_id, 'Responsable direct de ' + u.display_name);
+    boss.addEventListener('change', function () { usersApi({ action: 'set_profile', auth_user_id: u.auth_user_id, reports_to: boss.value || null }).then(function () { uSay('Responsable enregistré.'); }).catch(function (err) { uSay(explain(err), true); boss.value = u.reports_to || ''; }); });
+    row.appendChild(boss);
+    var tog = small(u.active ? 'Désactiver' : 'Réactiver');
+    tog.addEventListener('click', function () { usersApi({ action: u.active ? 'deactivate' : 'reactivate', auth_user_id: u.auth_user_id }).then(loadUsers).catch(function (err) { uSay(explain(err), true); }); });
     row.appendChild(tog);
-    var pw = document.createElement('button'); pw.type = 'button'; pw.className = 'btn ghost';
-    pw.textContent = 'Nouveau mot de passe'; pw.style.cssText = 'padding:6px 12px;min-height:36px;font-size:13px';
+    var pw = small('Nouveau mot de passe');
     pw.addEventListener('click', function () {
       var v = window.prompt('Nouveau mot de passe provisoire pour ' + u.display_name + ' (10 caractères minimum, lettres et chiffres) :');
       if (!v) return;
-      manage({ action: 'reset_password', auth_user_id: u.auth_user_id, password: v })
-        .then(function () { uSay('Mot de passe changé. Transmettez-le à la personne de vive voix.'); })
-        .catch(function (err) { uSay(explain(err), true); });
+      usersApi({ action: 'reset_password', auth_user_id: u.auth_user_id, password: v }).then(function () { uSay('Mot de passe changé. Transmettez-le à la personne de vive voix.'); }).catch(function (err) { uSay(explain(err), true); });
     });
     row.appendChild(pw);
     return row;
   }
+  // The Firm Manager's proposals from the team sheet: apply one by one (nothing applied by itself).
+  function loadProposals() {
+    OM.api('/api/app?route=team-roles').then(function (d) {
+      var list = (d.proposals || []).filter(function (p) { return p.status !== 'ok'; });
+      $('u-proposals-box').hidden = !list.length;
+      $('u-proposals-note').textContent = 'Rien n’est appliqué sans votre confirmation.' + (d.source ? ' Source : « ' + d.source + ' ».' : '');
+      var box = $('u-proposals'); box.textContent = '';
+      list.forEach(function (p) {
+        var row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--soft,#eef4f1);border-radius:10px;padding:10px 14px';
+        var t = document.createElement('div'); t.style.cssText = 'flex:1 1 260px;min-width:0;font-size:13.5px';
+        var what = p.status === 'no_account' ? 'pas encore de compte' : [p.changes.role ? 'rôle → ' + (ROLE_LABEL[p.changes.role] || p.changes.role) : '', p.changes.position ? 'position → ' + p.changes.position : '', p.changes.reports_to ? 'rend compte à ' + (p.reports_to_name || '?') : ''].filter(Boolean).join(' · ');
+        t.textContent = p.full_name + (p.title ? ' — ' + p.title : '') + ' : ' + what + (p.proposed_role_label && p.status === 'no_account' ? ' (rôle proposé : ' + p.proposed_role_label + ')' : '');
+        row.appendChild(t);
+        var go = small(p.status === 'no_account' ? 'Préparer le compte' : 'Appliquer');
+        go.addEventListener('click', function () {
+          if (p.status === 'no_account') {
+            $('u-name').value = p.full_name || ''; $('u-email').value = p.email || ''; $('u-position').value = p.title || '';
+            if (p.proposed_role) $('u-role').value = p.proposed_role; $('u-boss').value = p.proposed_reports_to || ''; $('u-pw').focus();
+            uSay('Formulaire prérempli : choisissez un mot de passe provisoire, puis « Créer le compte ».'); return;
+          }
+          var jobs = [];
+          if (p.changes.role) jobs.push(usersApi({ action: 'set_role', auth_user_id: p.account.auth_user_id, role: p.changes.role }));
+          if (p.changes.position || p.changes.reports_to) jobs.push(usersApi({ action: 'set_profile', auth_user_id: p.account.auth_user_id, position: p.changes.position || p.account.position, reports_to: p.changes.reports_to || p.account.reports_to }));
+          Promise.all(jobs).then(function () { uSay('Appliqué pour ' + p.full_name + '.'); loadUsers(); }).catch(function (err) { uSay(explain(err), true); });
+        });
+        row.appendChild(go); box.appendChild(row);
+      });
+    }).catch(function () { $('u-proposals-box').hidden = true; });
+  }
   function loadUsers() {
-    ownerApi('users').then(function (d) {
+    usersApi().then(function (d) {
+      accounts = d.users || [];
+      if (d.role_labels) ROLE_LABEL = d.role_labels;
+      $('u-sql').hidden = d.roles_installed !== false;
+      $('u-sql').textContent = ERRORS.ROLES_SQL_NOT_INSTALLED;
       var box = $('users'); box.textContent = '';
-      (d.users || []).forEach(function (u) { box.appendChild(userRow(u)); });
-      if (!(d.users || []).length) { var p = document.createElement('p'); p.textContent = 'Aucun compte.'; p.style.cssText = 'margin:0;color:var(--muted);font-size:14px'; box.appendChild(p); }
+      accounts.forEach(function (u) { box.appendChild(userRow(u)); });
+      if (!accounts.length) { var p = document.createElement('p'); p.textContent = 'Aucun compte.'; p.style.cssText = 'margin:0;color:var(--muted);font-size:14px'; box.appendChild(p); }
+      var r = $('u-role'), keep = r.value; r.textContent = ''; ROLE_ORDER.forEach(function (k) { if (k !== 'collaborator') r.appendChild(new Option(ROLE_LABEL[k] || k, k)); }); r.value = keep || 'auditor';
+      var b = $('u-boss'), keepB = b.value; b.textContent = ''; b.appendChild(new Option('— personne —', '')); accounts.filter(function (u) { return u.active; }).forEach(function (u) { b.appendChild(new Option(u.display_name, u.auth_user_id)); }); b.value = keepB || '';
+      loadProposals();
     }).catch(function (err) { uSay(explain(err), true); });
   }
   $('u-add').addEventListener('click', function () {
     $('u-add').disabled = true; uSay('Création…');
-    manage({ action: 'create', display_name: $('u-name').value.trim(), email: $('u-email').value.trim(), role: $('u-role').value, password: $('u-pw').value })
-      .then(function () { uSay('Compte créé. Transmettez le mot de passe provisoire à la personne.'); $('u-name').value = ''; $('u-email').value = ''; $('u-pw').value = ''; loadUsers(); })
+    usersApi({ action: 'create', display_name: $('u-name').value.trim(), email: $('u-email').value.trim(), role: $('u-role').value, position: $('u-position').value.trim(), reports_to: $('u-boss').value || null, password: $('u-pw').value })
+      .then(function () { uSay('Compte créé. Transmettez le mot de passe provisoire à la personne.'); ['u-name', 'u-email', 'u-pw', 'u-position'].forEach(function (k) { $(k).value = ''; }); loadUsers(); })
       .catch(function (err) { uSay(explain(err), true); })
       .then(function () { $('u-add').disabled = false; });
   });
+  function loadPerfSetting() {
+    if (!OM.isOwner()) return;
+    $('perf-setting').hidden = false;
+    OM.api('/api/app?route=firm-settings').then(function (st) { $('s-reports').checked = Boolean(st.managers_see_direct_reports); }).catch(function () {});
+    $('s-reports').addEventListener('change', function () {
+      OM.api('/api/app?route=firm-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ managers_see_direct_reports: $('s-reports').checked }) })
+        .then(function () { uSay('Réglage enregistré.'); }).catch(function (err) { uSay(explain(err), true); });
+    });
+  }
+  function openAccounts() {
+    if (!OM.isAccountAdmin || !OM.isAccountAdmin() || !OM.hasPersonalSession()) return;
+    $('accounts-area').hidden = false; loadUsers(); loadPerfSetting();
+  }
 
   function start() {
     $('user').value = OM.getUserName();
@@ -667,6 +733,9 @@
       if (b) { state.firm_name = b.firm_name; state.primary_color = b.primary_color; state.logo_data_url = b.logo_data_url; }
       $('firm').value = state.firm_name; $('hex').value = state.primary_color; render();
     }).catch(function (err) { show('Lecture impossible : ' + err.message, true); render(); });
+    openAccounts();
+    // The IT administrator manages accounts without the owner's settings.
+    if (OM.getRole() === 'it_admin') return;
     if (ownerToken()) unlock(); else $('owner-gate').hidden = false;
   }
 

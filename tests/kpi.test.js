@@ -86,8 +86,8 @@ test('security: sensitive routes need a personal session and the right role', as
   await assert.rejects(currentAccount({ headers: { authorization: 'Bearer ' + tok } }, { supabaseUser: async () => null }), /TOKEN_EXPIRED/);
   _clearAuthCache();
   await assert.rejects(currentAccount({ headers: { authorization: 'Bearer ' + tok } }, { supabaseUser: async () => ({ id: 'U1' }), fetchRows: async () => [{ role: 'manager', active: false }] }), /ACCOUNT_NOT_ALLOWED/);
-  assert.deepEqual(ROUTES['team-kpi'].GET.userRoles, ['owner', 'partner', 'manager']);
-  assert.deepEqual(ROUTES.coordination.GET.userRoles, ['owner', 'partner', 'manager']);
+  assert.deepEqual(ROUTES['team-kpi'].GET.userRoles, ['owner', 'partner', 'manager', 'supervisor']);
+  assert.deepEqual(ROUTES.coordination.GET.userRoles, ['owner', 'partner', 'manager', 'supervisor']);
   assert.ok(ROUTES['my-kpi'].GET.userRoles.includes('collaborator'));
   process.env.OFFICE_MANAGER_ACCESS_TOKEN = 'pilot';
   await assert.rejects(handleApp({ method: 'GET', query: { route: 'team-kpi' }, headers: { 'x-office-manager-token': 'pilot' } }), /USER_SESSION_REQUIRED/, 'the shared code alone is not enough');

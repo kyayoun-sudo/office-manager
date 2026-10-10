@@ -89,7 +89,7 @@ dans les secrets de la fonction avant tout redéploiement (non modifié dans le 
 | §51 Isolement des cabinets | 🟡 | RLS activé sans policy (service_role seul) ; un déploiement = un cabinet (`DEFAULT_ORG_ID`). |
 | §53-54 Secrets | ✅ | Jetons chiffrés AES-GCM ; rien dans le navigateur. |
 | §55-56 Permissions par appel d'outil, outils par agent | ❌ | Interrupteur global « autoriser les agents » seulement. |
-| §5 / §58 Rôles | ❌ | 4 rôles en base (owner, partner, manager, collaborator) ; manquent auditor, senior, supervisor, EQR, secrétaire ; pas de vue « mes missions ». |
+| §5 / §58 Rôles | 🟡 branche `amelioration` | `lib/roles.js` (source unique) : propriétaire, associé, revue qualité, manager, superviseur, senior, auditeur, secrétariat, responsable informatique (+ ancien « collaborateur ») ; position (grade) et « rend compte à » dans `office_app_users` (`db/roles.sql`) ; comptes gérés par propriétaire, associés et responsable informatique ; le Firm Manager propose rôles et positions d'après le tableau de l'équipe (`lib/team-roles.js`) ; menu et « Mon espace » de l'accueil par rôle ; un manager ne voit les indicateurs que de ses rapports directs, si le cabinet l'autorise. Manquent : rôle par mission, espaces de travail complets (Mes revues, revue qualité…). |
 | §66-70 Archivage | ❌ | `MISSION_READY_FOR_ARCHIVE` est routé vers l'Orpailleur dans le bus, mais l'archive pass n'existe pas. |
 | §57-61 Tool Gateway / MCP ChatGPT | ❌ reporté | « Mon IA », plus tard. |
 
@@ -114,7 +114,8 @@ questions et propositions des agents).
 
 ## Règles de travail
 
-- Branche de travail : `feature/white-label-desktop`. Ne pas toucher `main`, `amelioration`,
+- Branche de travail : `feature/white-label-desktop`. Les interfaces par rôle se construisent sur `amelioration`
+  (accord de Paul, 2026-10-10 ; elle reçoit d'abord `feature/white-label-desktop`). Ne pas toucher `main`,
   `fix/map-register-bridge-write` (environnement de test isolé) sans accord.
 - « EXTEND, DO NOT REBUILD » : ajouter sans casser ce qui est fait ; montrer le plan pour les gros changements.
 - Production : la promotion est faite par Paul. Ne jamais définir `OFFICE_MANAGER_TEST_RUN` en production.
