@@ -587,9 +587,34 @@
       .catch(function (err) { sSay(explain(err), true); })
       .then(function () { $('s-save').disabled = false; });
   });
+  function launchOrpailleurFromSettings(button) {
+    button.disabled = true;
+    var busyRetries = 0;
+    sSay('Orpailleur démarre. Gardez cette page ouverte pendant le rangement.');
+    function post(body) { return ownerApi('firm-knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+    function nextBatch() {
+      return post({ action: 'tidy-batch' }).then(function (r) {
+        if (r.status === 'done') { sSay('Analyse terminée : ' + (r.done || 0) + ' / ' + (r.total || r.done || 0) + ' fichiers. Les rangements proposés sont dans À valider.'); return; }
+        if (r.status === 'reader_busy') {
+          if (++busyRetries > 120) throw new Error('Le lecteur reste occupé. Progression conservée ; consultez le diagnostic.');
+          sSay('Un lot utilise déjà le lecteur. Orpailleur attend puis reprend automatiquement.');
+        } else {
+          busyRetries = 0;
+          if (r.status !== 'planning') throw new Error(r.error || 'Le rangement ne peut pas continuer : ' + r.status);
+          sSay('Orpailleur travaille : ' + (r.done || 0) + ' / ' + (r.total || 0) + ' fichiers analysés. Gardez cette page ouverte.');
+        }
+        return new Promise(function (resolve) { setTimeout(resolve, r.status === 'reader_busy' ? 5000 : 1000); }).then(nextBatch);
+      });
+    }
+    return post({ action: 'tidy', browser_batches: true }).then(function (r) {
+      if (!r.started && r.reason !== 'PASS_ALREADY_RUNNING' && r.reason !== 'FIRST_SCAN_RUNNING') throw new Error('Lancement non effectué : ' + (r.reason || 'vérifiez le scan du Drive'));
+      return nextBatch();
+    }).catch(function (err) { sSay('Orpailleur arrêté : ' + explain(err), true); }).then(function () { button.disabled = false; loadPasses(); });
+  }
   Array.prototype.forEach.call(document.querySelectorAll('[data-run]'), function (b) {
     b.addEventListener('click', function () {
       var agent = b.getAttribute('data-run');
+      if (agent === 'orpailleur') { launchOrpailleurFromSettings(b); return; }
       b.disabled = true; sSay('Passage de ' + AGENT_NAMES[agent] + ' lancé…');
       ownerApi('scheduler-run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: agent }) })
         .then(function (r) { sSay(r.failed ? 'Échec : ' + r.failed : (r.summary || 'Passage lancé.'), Boolean(r.failed)); loadPasses(); })
