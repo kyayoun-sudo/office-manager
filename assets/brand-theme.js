@@ -220,6 +220,7 @@
     me.appendChild(b);
     who.textContent = ''; who.appendChild(me);
     addBell(me);
+    setTimeout(askPopup, 1200);
     var menu = node('div', null, 'gear-menu'); menu.hidden = true; menu.id = 'gear-menu';
     who.appendChild(menu);
     function build() {
@@ -249,6 +250,67 @@
     b.addEventListener('click', function (e) { e.stopPropagation(); toggle(menu.hidden); });
     document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { toggle(false); b.focus(); } });
+  }
+  // Questions that POP UP on any page (Paul, 2026-10-11: « pop-up, pas notifications »): the person
+  // answers right there with buttons — their independence declaration, the agents' questions, the
+  // Associé's decision. « Plus tard » hides them for an hour on this device.
+  function askPopup() {
+    if (/\/(login|excel)\b/.test(location.pathname) || document.querySelector('dialog.om-ask[open]')) return;
+    var LATER = 'om_ask_later', later = {};
+    try { later = JSON.parse(sessionStorage.getItem(LATER) || '{}') || {}; } catch (e) { later = {}; }
+    var post = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
+    OM.api('/api/app?route=my-questions').then(function (r) {
+      var here = new URLSearchParams(location.search).get('id');
+      var list = ((r && r.questions) || []).filter(function (q) { return !(later[q.id] > Date.now()) && !(/opportunites/.test(location.pathname) && here === q.opportunity_id); });
+      if (!list.length) return;
+      var d = node('dialog', null, 'om-dialog om-ask'); d.setAttribute('aria-labelledby', 'om-ask-title');
+      document.body.appendChild(d);
+      var i = 0, indep = null;
+      var close = function () { d.close(); d.remove(); };
+      var snooze = function () { list.slice(i).forEach(function (q) { later[q.id] = Date.now() + 3600000; }); try { sessionStorage.setItem(LATER, JSON.stringify(later)); } catch (e) {} close(); };
+      var btn = function (label, cls, fn) { var b = node('button', label, 'btn' + (cls ? ' ' + cls : '')); b.type = 'button'; b.addEventListener('click', fn); return b; };
+      function next() { i++; indep = null; draw(); }
+      function draw() {
+        d.textContent = '';
+        if (i >= list.length) { d.appendChild(node('h2', 'Merci, c’est enregistré.')); var row0 = node('div', null, 'om-actions'); row0.appendChild(btn('Fermer', '', close)); d.appendChild(row0); return; }
+        var q = list[i], say = node('p', '', 'status');
+        d.appendChild(node('p', (list.length > 1 ? (i + 1) + ' sur ' + list.length + ' · ' : '') + q.title, 'om-ask-ctx'));
+        var fail = function (e) { say.className = 'status error'; say.textContent = { SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; }); };
+        var busy = function () { [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = true; }); say.className = 'status'; say.textContent = 'Enregistrement…'; };
+        var opts = node('div', null, 'om-actions om-ask-opts');
+        if (q.kind === 'independence') {
+          indep = indep || { k: 0, answers: {}, details: {} };
+          var iq = q.questions[indep.k];
+          if (iq) {
+            var h = node('h2', iq.label); h.id = 'om-ask-title'; d.appendChild(h);
+            d.appendChild(node('p', 'Votre déclaration d’indépendance, pour vous-même · ' + (indep.k + 1) + ' sur ' + q.questions.length));
+            var dt = node('input'); dt.type = 'text'; dt.placeholder = 'Si « Oui » : précisez en quelques mots'; dt.className = 'om-ask-note'; d.appendChild(dt);
+            ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { indep.answers[iq.ref] = v; if (dt.value.trim()) indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });
+          } else {
+            var h2 = node('h2', 'Je certifie ces réponses'); h2.id = 'om-ask-title'; d.appendChild(h2);
+            var n = Object.keys(indep.answers).filter(function (k) { return indep.answers[k] === 'Oui'; }).length;
+            d.appendChild(node('p', n ? n + ' situation(s) déclarée(s) : le Manager et l’Associé les examineront.' : 'Aucune menace déclarée.'));
+            opts.appendChild(btn('Je certifie et j’enregistre', '', function () { busy(); post({ action: 'declare', opportunity_id: q.opportunity_id, answers: indep.answers, details: indep.details, certify: true }).then(next).catch(fail); }));
+          }
+        } else {
+          var h3 = node('h2', q.question); h3.id = 'om-ask-title'; d.appendChild(h3);
+          if (q.context) q.context.split('\n').forEach(function (l) { d.appendChild(node('p', l)); });
+          var note = null;
+          if (q.note_cell && q.kind !== 'decision') { note = node('input'); note.type = 'text'; note.className = 'om-ask-note'; note.placeholder = q.options ? 'Précision (facultatif)' : 'Votre réponse, en quelques mots'; d.appendChild(note); }
+          var send = function (v) { var values = {}; if (v && q.choice_cell) values[q.choice_cell] = v; if (note && note.value.trim()) values[q.note_cell] = note.value.trim(); if (!Object.keys(values).length) { if (note) note.focus(); return; } busy(); post({ action: 'answer', opportunity_id: q.opportunity_id, sheet: q.sheet, row: q.row, values: values }).then(next).catch(fail); };
+          if (q.options) q.options.forEach(function (v) { opts.appendChild(btn(v.length > 34 ? v.slice(0, 32) + '…' : v, '', function () { send(v); })); });
+          else opts.appendChild(btn('Enregistrer', '', function () { send(null); }));
+        }
+        d.appendChild(opts);
+        var foot = node('div', null, 'om-actions');
+        foot.appendChild(btn('Plus tard', 'ghost', snooze));
+        var open = node('a', 'Voir l’opportunité', 'om-ask-link'); open.href = '/opportunites.html?id=' + encodeURIComponent(q.opportunity_id); foot.appendChild(open);
+        d.appendChild(foot); d.appendChild(say);
+        var first = d.querySelector('.om-ask-opts button'); if (first) first.focus();
+      }
+      d.addEventListener('cancel', function (e) { e.preventDefault(); snooze(); });
+      draw(); d.showModal();
+    }).catch(function () {});
   }
   // The global bell (2026-10-08): one notification per event, « lu » remembered on this device.
   function addBell(me) {

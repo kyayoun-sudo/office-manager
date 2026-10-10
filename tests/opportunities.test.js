@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -338,4 +338,21 @@ test('Office Manager writes what it knows itself; one save for many rows; each p
   assert.ok(tasks.some(t => /Décision « poursuivre »/.test(t.title)));
   assert.ok(tasks.some(t => /À relire/.test(t.title)));
   assert.equal((await opportunityTasks({ display_name: 'Awa', role: 'collaborator' }, d)).some(t => /question/.test(t.title)), false);
+});
+
+test('questions pop up for the right person: the agents\' question, the Associé\'s decision, each member\'s independence', async () => {
+  const { d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const awa = await myQuestions('org', { display_name: 'Awa', role: 'collaborator' }, d);
+  const q = awa.questions.find(x => x.kind === 'question');
+  assert.equal(q.question, 'Avez-vous communiqué une information confidentielle ?');
+  assert.deepEqual(q.options, ['Oui', 'Non', 'N-A']);
+  assert.equal(awa.questions.some(x => x.kind === 'decision'), false, 'a collaborator never gets the decision');
+  assert.equal((await myQuestions('org', { display_name: 'Kofi', role: 'collaborator' }, d)).questions.length, 0, 'someone outside the opportunity gets nothing');
+  const ama = await myQuestions('org', { display_name: 'Ama', role: 'partner' }, d);
+  const dec = ama.questions.find(x => x.kind === 'decision');
+  assert.equal(dec.choice_cell, 'D44'); assert.match(dec.context, /POURSUIVRE VERS PHASE 1/);
+  await answerRow('org', { opportunity_id: o.id, sheet: q.sheet, row: q.row, values: { [q.choice_cell]: 'Non' } }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal((await myQuestions('org', { display_name: 'Awa', role: 'collaborator' }, d)).questions.some(x => x.kind === 'question'), false, 'answered once, asked no more');
 });

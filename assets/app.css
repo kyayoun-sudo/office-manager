@@ -78,6 +78,13 @@ a{color:var(--brand-ink)}
 .om-dialog::backdrop{background:rgba(8,17,15,.55)}
 .om-dialog h2{margin:0;font-size:19px}
 .om-dialog p{margin:0;line-height:1.5;color:var(--muted);font-size:14px}
+.om-ask{max-width:520px}
+.om-ask h2{font-size:20px;line-height:1.35}
+.om-ask .om-ask-ctx{font-size:13px}
+.om-ask .om-ask-opts{flex-wrap:wrap;gap:8px;justify-content:flex-start}
+.om-ask .om-ask-opts .btn{min-width:90px}
+.om-ask .om-ask-note{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+.om-ask .om-ask-link{font-size:13px;margin-left:auto;align-self:center}
 .om-check{display:flex;gap:8px;align-items:flex-start;font-weight:500;line-height:1.45}
 .om-actions{display:flex;justify-content:flex-end;gap:8px}
 .om-dialog .btn.danger,.btn.danger{background:var(--danger);color:#fff;border:0}

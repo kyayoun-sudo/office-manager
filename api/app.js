@@ -428,6 +428,8 @@ export const ROUTES = Object.freeze({
   },
   // The global bell: notifications computed from what is recorded, one per event.
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
+  // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
+  'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/opportunities.js')).myQuestions(orgId, req.account)), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {
