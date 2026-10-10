@@ -288,14 +288,21 @@
     }
     // Tidy-up of the first scan: where each file goes.
     var t = k.tidy || {};
-    var tl = t.status === 'planning' ? 'Rangement : l’Orpailleur décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers vus.'
+    var tl = t.stalled ? '⚠ Rangement interrompu ou bloqué : aucune progression depuis ' + (t.last_progress_at ? UI.dateTime(t.last_progress_at) : 'une heure inconnue') + '. ' + (t.done || 0) + ' fichier(s) traité(s). Cliquez sur « Reprendre le rangement ».'
+      : t.status === 'planning' ? 'Rangement : l’Orpailleur décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers vus.'
       : t.status === 'done' ? 'Rangement proposé : ' + (t.moves || 0) + ' déplacement(s), ' + (t.renames || 0) + ' renommage(s) dans « À valider » ; ' + (t.questions || 0) + ' question(s) envoyée(s) pour validation aux personnes qui ont enregistré des fichiers ambigus ; ' + (t.ok || 0) + ' fichier(s) déjà bien rangés.'
       : t.status === 'failed' ? 'Le rangement a échoué : ' + (t.error || '') : 'Rangement : pas encore lancé.';
     var tp = el('p', tl, 'margin:0;font-size:14px;font-weight:600');
     b.appendChild(tp);
     if (t.status === 'done') { var av = document.createElement('a'); av.href = '/validations.html'; av.textContent = 'Ouvrir « À valider »'; b.appendChild(av); }
-    var rb = el('button', t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
-    rb.addEventListener('click', function () { rb.disabled = true; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function () { knowTimer = setTimeout(loadKnow, 4000); }).catch(function (e) { tp.textContent = msg(e); rb.disabled = false; }); });
+    var rb = el('button', t.stalled ? 'Reprendre le rangement' : t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
+    rb.addEventListener('click', function () { rb.disabled = true; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy' }) }).then(function (r) {
+      if (r.reason === 'MAPPING_INTERRUPTED') tp.textContent = 'Le scan est interrompu : reprenez-le dans Cartographie du Drive.';
+      else if (r.reason === 'MAPPING_IN_PROGRESS') tp.textContent = 'Le scan du Drive est en cours : le rangement attend sa fin.';
+      else if (r.reason === 'FIRST_SCAN_RUNNING' || r.reason === 'PASS_ALREADY_RUNNING') tp.textContent = 'Le rangement est déjà en cours.';
+      else knowTimer = setTimeout(loadKnow, 4000);
+      rb.disabled = false;
+    }).catch(function (e) { tp.textContent = msg(e); rb.disabled = false; }); });
     b.appendChild(rb);
     if (t.status === 'planning') knowTimer = setTimeout(loadKnow, 6000);
   }

@@ -68,7 +68,8 @@
   var $ = function (id) { return document.getElementById(id); };
   var AGENTS = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
   var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
-  var all = [], filter = 'all';
+  var all = [], filter = 'all', editing = false;
+  document.addEventListener('input', function (e) { if (e.target.matches('input:not([type=checkbox]), textarea')) editing = true; });
   var isOpen = function (a) { return !a.last_decision || a.last_decision.decision === 'defer'; };
   var openOnly = function () { return $('open-only').checked; };
 
@@ -83,6 +84,7 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_id: action.id, decision: decision, note: note || null, decided_by: OM.getUserName() || null })
     }).then(function (r) {
+      editing = false;
       action.last_decision = { decision: decision, note: note || null, decided_by: OM.getUserName() || null, created_at: new Date().toISOString() };
       show('Décision enregistrée : ' + LABELS[decision] + '.' + (r && r.effect ? ' ' + r.effect : ''));
       if (r && r.message_id) loadMail();
@@ -233,6 +235,7 @@
   }
 
   function loadMail() {
+    editing = false;
     if (!OM.hasPersonalSession()) { $('mail-list').textContent = ''; msay('Connectez-vous avec votre e-mail pour gérer les messages.'); return; }
     if (!OM.isManager()) { $('mail-meta').textContent = ''; return; }
     OM.api('/api/app?route=messages').then(function (d) {
@@ -265,7 +268,10 @@
       renderFilters(); render();
     }).catch(function (err) { show('Indisponible : ' + err.message, true); });
   }
-  UI.requireLogin(start);
+  UI.requireLogin(function () {
+    start();
+    setInterval(function () { if (!document.hidden && !editing && !document.querySelector('button:disabled') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) start(); }, 15000);
+  });
 })();
 </script>
 </body>

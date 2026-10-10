@@ -346,7 +346,14 @@
       (c.all || []).forEach(function (p) { names[p.email] = p.name; var o = document.createElement('option'); o.value = p.email; o.label = p.name; $('people').appendChild(o); });
     }).catch(function () {}).then(load);
   }
-  UI.requireLogin(start);
+  UI.requireLogin(function () {
+    start();
+    setInterval(function () {
+      if (document.hidden || $('mailbox').hidden || !OM.isManager()) return;
+      if ($('text').value.trim() || /INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.querySelector('button:disabled')) return;
+      load();
+    }, 15000);
+  });
 })();
 </script>
 </body>

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@openai/agents": "0.18.0",
+    "@vercel/functions": "3.9.11",
     "exceljs": "4.4.0",
     "jszip": "3.10.1",
     "mammoth": "1.13.0",
