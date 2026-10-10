@@ -221,7 +221,7 @@
   watchScan();
 
   // ---- What the Orpailleur understood of the firm ----
-  var knowTimer = null, knowData = null;
+  var knowTimer = null, knowData = null, knowDrafts = {};
   function el(tag, text, css) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (css) e.style.cssText = css; return e; }
   function knowList(title, rows, fmt) {
     var box = el('div', null, 'display:flex;flex-direction:column;gap:4px');
@@ -233,6 +233,11 @@
     return box;
   }
   function renderKnow(k) {
+    if (Object.keys(knowDrafts).length || ($('know-body').contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) {
+      knowData = k;
+      knowTimer = setTimeout(loadKnow, 6000);
+      return;
+    }
     var b = $('know-body'); b.textContent = '';
     if (k.status === 'none') { $('know-live').textContent = 'Pas encore fait : lancez le premier scan (la compréhension du cabinet suit toute seule).'; return; }
     if (k.status === 'failed') { $('know-live').textContent = 'La lecture a échoué : ' + (k.error || 'cause inconnue') + '. Cliquez sur « Relire le Drive » pour réessayer.'; return; }
@@ -259,12 +264,20 @@
         row.appendChild(el('div', qq, 'font-size:14px;font-weight:600'));
         var line = el('div', null, 'display:flex;gap:8px;flex-wrap:wrap');
         var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 2000; inp.value = answered[qq] || ''; inp.placeholder = 'Votre réponse'; inp.style.cssText = 'flex:1;min-width:220px';
+        inp.addEventListener('input', function () { knowDrafts[qq] = inp.value; });
         var btn = el('button', answered[qq] ? 'Modifier' : 'Répondre', 'btn ghost'); btn.type = 'button';
         var st = el('span', answered[qq] ? '✓ répondu' : '', 'small');
         btn.addEventListener('click', function () {
           if (!inp.value.trim()) return; btn.disabled = true;
           OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'answer', question: qq, answer: inp.value.trim(), by: OM.getUserName() || null }) })
-            .then(function () { st.textContent = '✓ enregistré dans la mémoire de l’Orpailleur'; btn.textContent = 'Modifier'; })
+            .then(function () {
+              delete knowDrafts[qq];
+              st.textContent = '✓ Réponse enregistrée. Orpailleur va la prendre en compte…';
+              btn.textContent = 'Modifier';
+              return OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'learn', skip_tidy: true }) })
+                .then(function () { knowTimer = setTimeout(loadKnow, 4000); })
+                .catch(function (e) { st.textContent = 'Réponse enregistrée ; relecture non confirmée : ' + msg(e); });
+            })
             .catch(function (e) { st.textContent = msg(e); }).then(function () { btn.disabled = false; });
         });
         line.appendChild(inp); line.appendChild(btn); row.appendChild(line); row.appendChild(st); b.appendChild(row);
