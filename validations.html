@@ -121,6 +121,24 @@
     }
 
     if (action.action_type === 'FILE_MOVE') {
+      var sourceId = action.file_id || (action.verification_evidence || {}).file_id;
+      if (sourceId) {
+        var openFile = el('a', 'Ouvrir le fichier réel', 'btn'); openFile.href = 'https://drive.google.com/file/d/' + encodeURIComponent(sourceId) + '/view'; openFile.target = '_blank'; openFile.rel = 'noopener'; c.appendChild(openFile);
+      }
+      var trashButton = el('button', 'Mettre ce fichier à la corbeille', 'btn ghost'); trashButton.type = 'button';
+      var trashResult = el('p', '', 'status'); trashResult.setAttribute('role', 'status');
+      trashButton.addEventListener('click', function () {
+        trashButton.disabled = true; trashResult.textContent = 'Vérification du fichier à supprimer…';
+        OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'inspect-file', action_id: action.id }) }).then(function (file) {
+          if (!window.confirm('Mettre à la corbeille « ' + file.name + ' » ?')) { trashButton.disabled = false; trashResult.textContent = 'Suppression annulée.'; return; }
+          trashResult.textContent = 'Mise à la corbeille en cours…';
+          return OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'trash-file', action_id: action.id, confirm_trash: true, file_name: file.name, version: file.version }) }).then(function (r) {
+            trashResult.textContent = r.effect; action.retry_needed = false;
+            Array.prototype.forEach.call(c.querySelectorAll('button,input'), function (b) { b.disabled = true; }); editing = false;
+          });
+        }).catch(function (e) { trashResult.textContent = 'Fichier non supprimé : ' + e.message; trashButton.disabled = false; });
+      }); c.appendChild(trashButton); c.appendChild(trashResult);
+
       var renameLabel = el('label', 'Nouveau nom du fichier');
       var renameInput = el('input'); renameInput.type = 'text'; renameInput.maxLength = 250; renameInput.value = action.file_name || ''; renameInput.placeholder = 'Nom complet, avec son extension'; renameInput.setAttribute('aria-label', 'Nouveau nom du fichier');
       renameLabel.appendChild(renameInput); c.appendChild(renameLabel);
@@ -145,7 +163,7 @@
           c.appendChild(el('p', 'Deux fichiers au contenu identique : comparez leur rôle avant de décider. Aucun fichier supprimé.', 'meta'));
           var duplicateResult = el('p', '', 'status'); duplicateResult.setAttribute('role', 'status');
           var duplicateButtons = [];
-          [['keep-both', 'Conserver les deux et ranger ce fichier'], ['cancel-move', 'Annuler ce déplacement'], ['trash-file', 'Mettre ce fichier à la corbeille']].forEach(function (choice) {
+          [['keep-both', 'Conserver les deux et ranger ce fichier'], ['cancel-move', 'Annuler ce déplacement']].forEach(function (choice) {
             var b = el('button', choice[1], 'btn ghost'); b.type = 'button'; duplicateButtons.push(b);
             b.addEventListener('click', function () {
               if (choice[0] === 'trash-file' && !window.confirm('Mettre à la corbeille « ' + (action.file_name || action.summary || 'le fichier de cette proposition') + ' » ? L’autre exemplaire sera conservé.')) return;
@@ -164,6 +182,21 @@
           });
         }
         c.appendChild(el('p', action.blocked_reason || 'Approuvé, mais déplacement non confirmé dans le Drive.', 'meta'));
+        if (evidence.error_code === 'SOURCE_CHANGED_REPLAN_REQUIRED') {
+          var currentMove = el('button', 'Confirmer cette destination depuis le dossier actuel', 'btn'); currentMove.type = 'button';
+          var currentResult = el('p', '', 'status'); currentResult.setAttribute('role', 'status');
+          currentMove.addEventListener('click', function () {
+            currentMove.disabled = true; currentResult.textContent = 'Vérification du fichier actuel…';
+            OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'inspect-file', action_id: action.id }) }).then(function (file) {
+              if (!window.confirm('Appliquer la proposition affichée pour « ' + file.name + ' » depuis son dossier actuel vers « ' + (action.destination || action.summary) + ' » ?')) { currentMove.disabled = false; currentResult.textContent = 'Déplacement annulé.'; return; }
+              return OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'apply-current-destination', action_id: action.id, confirm_destination: true, version: file.version }) }).then(function (r) {
+                currentResult.textContent = r.effect;
+                OM.api('/api/app?route=actions').then(function (data) { all = data.actions || []; renderFilters(); render(); show(r.effect, !r.executed); });
+              });
+            }).catch(function (e) { currentResult.textContent = 'Déplacement non appliqué : ' + e.message; currentMove.disabled = false; });
+          }); c.appendChild(currentMove); c.appendChild(currentResult);
+        }
+
         var recheck = el('button', 'Vérifier la situation dans le Drive', 'btn ghost'); recheck.type = 'button';
         var checkResult = el('p', '', 'status'); checkResult.setAttribute('role', 'status');
         recheck.addEventListener('click', function () {
