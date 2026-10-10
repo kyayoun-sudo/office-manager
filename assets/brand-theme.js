@@ -230,6 +230,8 @@
         g[2].forEach(function (x) { var a = node('a', x[1], 'gm-link'); a.href = g[1] + '#' + x[0]; box.appendChild(a); });
         menu.appendChild(box);
       });
+      // « Mon IA »: everyone can connect their own AI (warning first) — 2026-10-10.
+      var mine = node('div', null, 'gm-group'); var ma = node('a', 'Mon IA', 'gm-head'); ma.href = '/mon-ia.html'; mine.appendChild(ma); menu.appendChild(mine);
       var lang = node('div', null, 'gm-group gm-row');
       lang.appendChild(node('span', 'Langue', 'gm-label'));
       var seg = node('div', null, 'seg');
@@ -409,6 +411,7 @@
   var ICONS = {
     '/accueil.html': 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
     '/recherche.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5',
+    '/opportunites.html': 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4',
     '/mission.html': 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
     '/rangement.html': 'M3 6h7l2 2h9v11H3zM8 13h8',
     '/equipe.html': 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a2.5 2.5 0 1 0 0-5M3 20c0-3 3-5 6-5s6 2 6 5m2-5c2 0 4 1.5 4 4',

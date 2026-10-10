@@ -363,6 +363,23 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'OPPORTUNITIES_UNAVAILABLE'
   },
+  // « Mon IA »: each person may connect their own AI after accepting the warning; partners see who
+  // did and may switch it off for the whole firm.
+  'my-ai': {
+    GET: users([...ALL_ROLES], async (orgId, req) => (await import('../lib/personal-ai.js')).myAIView(orgId, req.account)),
+    POST: users([...ALL_ROLES], async (orgId, req) => {
+      const p = await import('../lib/personal-ai.js'); const b = req.body || {};
+      if (b.action === 'connect') return p.connectMyAI(orgId, req.account, b);
+      if (b.action === 'disconnect') return p.disconnectMyAI(orgId, req.account, b);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MY_AI_UNAVAILABLE'
+  },
+  'personal-ai': {
+    GET: users(PARTNERS, async (orgId) => (await import('../lib/personal-ai.js')).personalAIOverview(orgId)),
+    POST: users(PARTNERS, async (orgId, req) => (await import('../lib/personal-ai.js')).setPersonalAIAllowed(orgId, Boolean(req.body?.allowed), who(req))),
+    unavailable: 'MY_AI_UNAVAILABLE'
+  },
   'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
@@ -644,6 +661,8 @@ export async function handleApp(req) {
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
+  // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
+  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, () => run(orgId, req));
   return run(orgId, req);
 }
 

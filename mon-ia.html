@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mon IA</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .notice{background:var(--warn-bg);border:1px solid #EBD3A6;border-radius:12px;padding:16px 18px;line-height:1.55;font-size:14.5px}
+  .notice p{margin:0 0 10px}.notice p:last-child{margin:0}
+  .accept{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;font-weight:600}
+  .accept input{margin-top:3px;width:18px;height:18px}
+  .ai-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .ai-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+  .ai-form input,.ai-form select{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface);color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/opportunites.html">Opportunités</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Mon IA</h1>
+      <p class="lead">Connectez votre propre IA (Claude, ChatGPT ou Gemini) : vos demandes dans Office Manager passent d’abord par elle. Les réponses continuent quand l’IA du cabinet n’a plus de jetons, et le cabinet en consomme moins. Si votre IA ne répond pas, celle du cabinet prend le relais.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-notice">
+      <h2 id="h-notice">À lire avant de connecter votre IA</h2>
+      <div class="notice" id="notice"></div>
+      <p class="status" id="state" role="status"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-mine">
+      <h2 id="h-mine">Mes IA connectées</h2>
+      <div class="stack" id="mine"><p class="empty">Chargement…</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-add" id="add-card">
+      <h2 id="h-add">Connecter une IA</h2>
+      <div class="ai-form">
+        <label>Fournisseur<select id="provider"></select></label>
+        <label>Clé d’API personnelle<input id="key" type="password" autocomplete="off" placeholder="sk-…"></label>
+        <label>Modèle (facultatif)<input id="model" type="text" maxlength="80"></label>
+      </div>
+      <label class="accept"><input type="checkbox" id="accept"> <span>J’ai lu l’avertissement ci-dessus. Je comprends que ce que je soumets à mon IA est envoyé à son fournisseur sous ma responsabilité, et que ni le cabinet ni Office Manager n’en sont responsables.</span></label>
+      <div><button class="btn" id="go" type="button" disabled>Connecter mon IA</button></div>
+      <p class="status" id="say" role="status"></p>
+      <p class="meta">La clé est vérifiée par un court essai, puis gardée chiffrée ; elle n’est jamais réaffichée (seuls ses 4 derniers caractères). Où trouver une clé : console.anthropic.com, platform.openai.com, aistudio.google.com. Un abonnement grand public (ChatGPT Plus, Claude Pro) ne donne pas de clé d’API : il faut un compte « API » chez le fournisseur.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-firm" id="firm-card" hidden>
+      <h2 id="h-firm">Pour les associés : IA personnelles dans le cabinet</h2>
+      <label class="accept"><input type="checkbox" id="allowed"> <span>Autoriser chaque personne à connecter sa propre IA (après avoir accepté l’avertissement).</span></label>
+      <div class="stack" id="who"></div>
+      <p class="status" id="firm-say" role="status"></p>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el, $ = function (id) { return document.getElementById(id); };
+  var data = null;
+  var ERR = {
+    NOTICE_NOT_ACCEPTED: 'Cochez la case après avoir lu l’avertissement.', KEY_INVALID: 'Clé non reconnue (copiez-la entière, sans espace).',
+    PERSONAL_AI_DISABLED_BY_FIRM: 'Le cabinet n’autorise pas les IA personnelles pour l’instant.', PERSONAL_AI_SQL_NOT_INSTALLED: 'Fonction pas encore installée dans la base (db/personal-ai.sql à exécuter dans Supabase).',
+    MODEL_INVALID: 'Nom de modèle non valide.', ROLE_NOT_ALLOWED: 'Connectez-vous avec votre compte personnel (e-mail et mot de passe).', USER_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel (e-mail et mot de passe).'
+  };
+  var msg = function (e) { var m = String(e && e.message || e); if (/^KEY_REFUSED_BY_PROVIDER/.test(m)) return 'Le fournisseur a refusé la clé : ' + m.replace(/^KEY_REFUSED_BY_PROVIDER:\s*/, ''); return ERR[m] || m; };
+  var api = function (route, body) { return OM.api('/api/app?route=' + route, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined); };
+
+  function render() {
+    var n = $('notice'); n.textContent = '';
+    String(data.notice || '').split('\n\n').forEach(function (p) { n.appendChild(el('p', p)); });
+    $('state').textContent = !data.installed ? ERR.PERSONAL_AI_SQL_NOT_INSTALLED : !data.firm_allows ? ERR.PERSONAL_AI_DISABLED_BY_FIRM : '';
+    $('add-card').hidden = !data.installed || !data.firm_allows;
+    var sel = $('provider'); if (!sel.options.length) Object.keys(data.providers).forEach(function (k) { sel.appendChild(new Option(data.providers[k], k)); });
+    $('model').placeholder = data.default_models[sel.value] || '';
+    var box = $('mine'); box.textContent = '';
+    var on = (data.keys || []).filter(function (k) { return k.active; });
+    if (!on.length) box.appendChild(el('p', 'Aucune IA personnelle connectée : vos demandes utilisent l’IA du cabinet.', 'empty'));
+    on.forEach(function (k) {
+      var it = el('div', null, 'item'), t = el('div', null, 't');
+      t.appendChild(el('span', data.providers[k.provider] + ' · clé ' + (k.key_hint || '') + ' · ' + (k.model || '')));
+      t.appendChild(el('span', 'Avertissement accepté le ' + UI.dateTime(k.notice_accepted_at) + (k.notice_current ? '' : ' (ancienne version : à accepter de nouveau)') + (k.last_used_at ? ' · utilisée le ' + UI.dateTime(k.last_used_at) : ' · pas encore utilisée') + (k.last_error ? ' · dernière erreur : ' + k.last_error : ''), 'meta'));
+      it.appendChild(t);
+      var b = el('button', 'Débrancher', 'btn ghost'); b.type = 'button';
+      b.addEventListener('click', function () { b.disabled = true; api('my-ai', { action: 'disconnect', provider: k.provider }).then(load).catch(function (e) { b.disabled = false; $('say').textContent = msg(e); }); });
+      it.appendChild(b); box.appendChild(it);
+    });
+  }
+  function load() { return api('my-ai').then(function (d) { data = d; render(); }).catch(function (e) { $('mine').textContent = ''; $('mine').appendChild(el('p', msg(e), 'empty')); }); }
+  $('provider').addEventListener('change', function () { if (data) $('model').placeholder = data.default_models[this.value] || ''; });
+  $('accept').addEventListener('change', function () { $('go').disabled = !this.checked; });
+  $('go').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = 'Vérification de la clé auprès du fournisseur…';
+    api('my-ai', { action: 'connect', provider: $('provider').value, key: $('key').value.trim(), model: $('model').value.trim(), accept_notice: $('accept').checked, notice_version: data.notice_version })
+      .then(function (r) { $('say').textContent = 'Connectée (' + r.key_hint + '). Vos demandes passent maintenant d’abord par votre IA.'; $('key').value = ''; $('accept').checked = false; return load(); })
+      .catch(function (e) { $('say').className = 'status error'; $('say').textContent = msg(e); b.disabled = !$('accept').checked; });
+  });
+
+  function loadFirm() {
+    if (!OM.isOwner || !OM.isOwner()) return;
+    api('personal-ai').then(function (d) {
+      $('firm-card').hidden = false; $('allowed').checked = d.allowed;
+      var w = $('who'); w.textContent = '';
+      if (!d.connected.length) w.appendChild(el('p', 'Personne n’a connecté d’IA personnelle.', 'empty'));
+      d.connected.forEach(function (c) { w.appendChild(el('div', (c.notice_accepted_by || c.email) + ' — ' + c.provider + ' (' + (c.model || '') + ') · avertissement accepté le ' + UI.dateTime(c.notice_accepted_at) + (c.last_used_at ? ' · utilisée le ' + UI.dateTime(c.last_used_at) : ''), 'item')); });
+    }).catch(function () {});
+  }
+  $('allowed').addEventListener('change', function () {
+    api('personal-ai', { allowed: this.checked }).then(function (r) { $('firm-say').textContent = r.allowed ? 'IA personnelles autorisées.' : 'IA personnelles désactivées pour tout le cabinet : seules les IA du cabinet répondent.'; load(); })
+      .catch(function (e) { $('firm-say').textContent = msg(e); });
+  });
+
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); loadFirm(); });
+})();
+</script>
+</body>
+</html>
