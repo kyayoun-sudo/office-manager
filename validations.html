@@ -120,6 +120,20 @@
       var p = el('p', meta.join(' · '), 'meta'); p.style.margin = '0'; c.appendChild(p);
     }
 
+    if (action.action_type === 'FILE_MOVE') {
+      var renameLabel = el('label', 'Nouveau nom du fichier');
+      var renameInput = el('input'); renameInput.type = 'text'; renameInput.maxLength = 250; renameInput.value = action.file_name || ''; renameInput.placeholder = 'Nom complet, avec son extension'; renameInput.setAttribute('aria-label', 'Nouveau nom du fichier');
+      renameLabel.appendChild(renameInput); c.appendChild(renameLabel);
+      var renameButton = el('button', 'Appliquer ce nom dans le Drive', 'btn ghost'); renameButton.type = 'button';
+      var renameResult = el('p', '', 'status'); renameResult.setAttribute('role', 'status');
+      renameButton.addEventListener('click', function () {
+        if (!renameInput.value.trim()) { renameResult.textContent = 'Saisis le nouveau nom du fichier.'; return; }
+        renameButton.disabled = true; renameResult.textContent = 'Renommage en cours…';
+        OM.api('/api/app?route=actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'rename-file', action_id: action.id, new_name: renameInput.value.trim() }) }).then(function (r) {
+          renameResult.textContent = r.effect; renameButton.disabled = false; editing = false;
+        }).catch(function (e) { renameResult.textContent = 'Renommage non appliqué : ' + e.message; renameButton.disabled = false; });
+      }); c.appendChild(renameButton); c.appendChild(renameResult);
+    }
     var last = action.last_decision;
     if (last && last.decision !== 'defer') {
       var done = el('p', LABELS[last.decision] + ' le ' + UI.dateTime(last.created_at) + (last.decided_by ? ' par ' + last.decided_by : '') + (last.note ? ' — ' + last.note : ''), 'tag ' + (last.decision === 'reject' ? 'warn' : ''));
