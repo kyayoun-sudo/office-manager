@@ -29,6 +29,7 @@
   .quick .q-opts .btn{min-width:84px}
   .quick input.q-note{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
   .quick .q-done{font-size:15px;margin:0}
+  .save-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
   #all-sheets>summary{cursor:pointer;font-weight:600;padding:10px 0}
   .opp-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 12px}
   .opp-fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
@@ -145,6 +146,7 @@
 
       <p class="status error" id="read-error" hidden></p>
       <details id="all-sheets" class="card"><summary>Voir et corriger tout le classeur</summary><div id="sheets" class="stack"></div></details>
+      <div class="save-bar" id="save-bar" hidden><span id="save-count"></span><button class="btn" id="save-all" type="button">Enregistrer</button><span class="meta" id="save-say" role="status"></span></div>
     </div>
   </main>
 </div>
@@ -275,7 +277,7 @@
     }
     $('read-error').hidden = !o.read_error; $('read-error').textContent = o.read_error ? 'Le classeur n’a pas pu être lu : ' + o.read_error : '';
     // Re-draw the questions only when something changed and nobody is typing.
-    if (first && !document.activeElement.closest('#sheets')) drawSheets(o);
+    if (first && !document.activeElement.closest('#sheets') && !Object.keys(pending).length) drawSheets(o);
   }
 
   // Man + machine: the rows the agents filled (with sources), grouped by section, and who read them.
@@ -500,7 +502,7 @@
     var bar = el('div', null, 'opp-review');
     var role = o.viewer && o.viewer.role;
     if (rv) { bar.appendChild(el('p', 'Relu par ' + rv.by + ' le ' + UI.dateTime(rv.at) + ' (' + rv.rows.length + ' ligne(s) remplie(s) par ' + agentName(s.owner) + ').', 'meta')); return bar; }
-    bar.appendChild(el('p', agentName(s.owner) + ' a rempli ' + count + ' ligne(s) de cette section, chacune avec sa source. Corrigez ce qui est faux (ligne par ligne), puis signez la relecture une seule fois.'));
+    bar.appendChild(el('p', agentName(s.owner) + ' a rempli ' + count + ' ligne(s) de cette section, chacune avec sa source. Corrigez ce qui est faux, enregistrez, puis signez la relecture une seule fois.'));
     if (!mayReview(role) || !s.open) { bar.appendChild(el('p', 'Relecture : un Manager ou un Associé.', 'meta')); return bar; }
     var b = el('button', 'J’ai relu cette section', 'btn'); b.type = 'button';
     var say = el('span', '', 'meta');
@@ -522,10 +524,10 @@
     var p = r.proposal, done = (o.ai_filled || {})[s.name + '!' + r.row];
     var inputs = {};
     if (done) {
-      var db = el('div', null, 'opp-prop');
-      db.appendChild(el('p', 'Rempli par ' + agentName(s.owner) + ' le ' + UI.dateTime(done.at) + (done.corrected ? ' · corrigé par ' + done.corrected.by + ' le ' + UI.dateTime(done.corrected.at) : '')));
-      if (done.why) db.appendChild(el('p', 'Pourquoi : ' + done.why, 'meta'));
-      (done.sources || []).forEach(function (u) { if (/^https?:/.test(u)) { db.appendChild(UI.safeLink(u, u.slice(0, 80))); db.appendChild(document.createTextNode(' ')); } else db.appendChild(el('span', 'Source : ' + u + ' ', 'meta')); });
+      // One quiet line: who filled it and from what (the full reasons stay in the journal).
+      var db = el('p', null, 'opp-locked');
+      db.appendChild(document.createTextNode(agentName(s.owner) + (done.corrected ? ', corrigé par ' + done.corrected.by : '') + ' · source : '));
+      (done.sources || []).slice(0, 3).forEach(function (u, i) { if (i) db.appendChild(document.createTextNode(', ')); if (/^https?:/.test(u)) db.appendChild(UI.safeLink(u, u.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40))); else db.appendChild(document.createTextNode(u)); });
       row.appendChild(db);
     } else if (p) {
       var pb = el('div', null, 'opp-prop');
@@ -555,25 +557,29 @@
     });
     row.appendChild(grid);
     if (!s.open) return row;
-    var bar = el('div', null, 'btn-row');
-    if (p && !p.for_team && Object.keys(p.values).length) {
-      var take = el('button', 'Reprendre la proposition', 'btn ghost'); take.type = 'button';
-      take.addEventListener('click', function () { Object.keys(p.values).forEach(function (c) { if (inputs[c]) inputs[c].value = p.values[c]; }); take.dataset.used = '1'; });
-      bar.appendChild(take);
-    }
-    var save = el('button', 'Enregistrer dans le classeur', 'btn'); save.type = 'button';
-    var say = el('span', '', 'meta');
-    save.addEventListener('click', function () {
+    // No save button per row: every change is kept aside and saved once, with « Enregistrer » at the bottom.
+    var key = s.name + '!' + r.row, used = false;
+    var track = function () {
       var values = {}; Object.keys(inputs).forEach(function (c) { var f = r.fields.find(function (x) { return x.cell === c; }); if (inputs[c].value !== (f.value || '')) values[c] = inputs[c].value; });
-      if (!Object.keys(values).length) { say.textContent = 'Rien de changé.'; return; }
-      save.disabled = true; say.textContent = 'Écriture…';
-      api({ action: 'answer', opportunity_id: o.id, sheet: s.name, row: r.row, values: values, from_proposal: Boolean(bar.querySelector('[data-used]')) })
-        .then(function (res) { say.textContent = res.verified ? 'Écrit dans le classeur et vérifié.' : 'Écrit, vérification à refaire.'; r.fields.forEach(function (f) { if (values[f.cell] !== undefined) f.value = values[f.cell]; }); })
-        .catch(function (e) { say.textContent = msg(e); say.className = 'meta warn-text'; })
-        .then(function () { save.disabled = false; });
-    });
-    bar.appendChild(save); bar.appendChild(say); row.appendChild(bar);
+      if (Object.keys(values).length) pending[key] = { sheet: s.name, row: r.row, values: values, from_proposal: used }; else delete pending[key];
+      drawSaveBar();
+    };
+    Object.keys(inputs).forEach(function (c) { inputs[c].addEventListener('input', track); inputs[c].addEventListener('change', track); });
+    if (p && !p.for_team && Object.keys(p.values).length) {
+      var bar = el('div', null, 'btn-row');
+      var take = el('button', 'Reprendre la proposition', 'btn ghost'); take.type = 'button';
+      take.addEventListener('click', function () { Object.keys(p.values).forEach(function (c) { if (inputs[c]) inputs[c].value = p.values[c]; }); used = true; track(); });
+      bar.appendChild(take); row.appendChild(bar);
+    }
     return row;
+  }
+
+  // One « Enregistrer » for the whole workbook, at the bottom, always in view while something changed.
+  var pending = {};
+  function drawSaveBar() {
+    var n = Object.keys(pending).length, bar = $('save-bar');
+    bar.hidden = !n;
+    $('save-count').textContent = n === 1 ? '1 ligne modifiée' : n + ' lignes modifiées';
   }
 
   $('won-file').addEventListener('change', function () { wonFile = this.files[0] || null; });
@@ -586,6 +592,15 @@
       .then(function (body) { body.action = 'won'; body.opportunity_id = current.id; return api(body); })
       .then(function () { $('won-say').textContent = 'Confirmation enregistrée : le Mission Controller est prévenu.'; window.reloadOpportunity(); })
       .catch(function (e) { $('won-say').className = 'status error'; $('won-say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
+  $('save-all').addEventListener('click', function () {
+    var rows = Object.keys(pending).map(function (k) { return pending[k]; });
+    if (!rows.length) return;
+    var b = this; b.disabled = true; $('save-say').textContent = 'Écriture dans le classeur…';
+    api({ action: 'answer-rows', opportunity_id: current.id, rows: rows })
+      .then(function (r) { pending = {}; drawSaveBar(); $('save-say').textContent = ''; window.reloadOpportunity(); })
+      .catch(function (e) { $('save-say').textContent = msg(e); })
       .then(function () { b.disabled = false; });
   });
   $('again').addEventListener('click', function () {

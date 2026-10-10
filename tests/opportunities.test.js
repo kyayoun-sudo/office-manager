@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -193,8 +193,8 @@ test('Firm Manager: TDR read, filed with the workbook in the opportunity folder,
   const w = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C59' }, { sheet: '01_OPPORTUNITE', cell: 'C7' }, { sheet: '02_PHASE_0', cell: 'E23' }, { sheet: '02_PHASE_0', cell: 'K23' }]);
   assert.equal(w['01_OPPORTUNITE!C59'], '≈ 12 milliards FCFA (source : EF 2025)');
   assert.equal(w['01_OPPORTUNITE!C7'], 'Firm Manager (IA)');
-  assert.equal(w['02_PHASE_0!E23'], '');
-  assert.deepEqual(Object.keys(o.ai_filled), ['01_OPPORTUNITE!59']);
+  assert.match(w['02_PHASE_0!E23'], /missions du cabinet/, 'the conflict search is a fact Office Manager knows: written, not the unsourced proposal');
+  assert.deepEqual(Object.keys(o.ai_filled).sort(), ['01_OPPORTUNITE!59', '02_PHASE_0!23']);
   assert.equal(o.ai_filled['01_OPPORTUNITE!59'].verified, true);
   assert.equal(o.conflicts.matches.length, 1, 'the earlier mission of the same client is found');
   assert.ok(audits.some(a => a.action_type === 'OPPORTUNITY_FILED'));
@@ -308,7 +308,7 @@ test('man + machine: agents write only into empty cells; a Manager signs the rev
   const o = await run(opportunity.id, d);
   const section = (await describeWorkbook(drive.files.get(o.workbook.id).buffer)).sheets[0].rows.find(r => r.row === 59).section || '';
   await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
-  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '02_PHASE_0', section: 'PROCÉDURES DE LA PHASE 0' }, { display_name: 'Moussa', role: 'manager' }, d), /NOTHING_TO_REVIEW/);
+  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '02_PHASE_0', section: 'CONCLUSION PHASE 0' }, { display_name: 'Moussa', role: 'manager' }, d), /NOTHING_TO_REVIEW/);
   const r = await reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Moussa Manager', role: 'manager' }, d);
   assert.equal(r.verified, true);
   const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]);
@@ -319,4 +319,23 @@ test('man + machine: agents write only into empty cells; a Manager signs the rev
   const again = await run(o.id, d);
   assert.equal(again.status, 'phase0');
   assert.equal((await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]))['01_OPPORTUNITE!C9'], 'Moussa Manager');
+});
+
+test('Office Manager writes what it knows itself; one save for many rows; each person gets their tasks in the bell', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  // The conflict search done in the firm's missions is written without asking anyone (row 23 of the test template).
+  const v = await readCells(drive.files.get(o.workbook.id).buffer, ['E23', 'F23', 'K23'].map(cell => ({ sheet: '02_PHASE_0', cell })));
+  assert.match(v['02_PHASE_0!E23'], /missions du cabinet.*Audit SOCIETE IVOIRIENNE TEST 2024/);
+  assert.equal(v['02_PHASE_0!F23'], 'Oui');
+  assert.equal(v['02_PHASE_0!K23'], 'Firm Manager (IA)');
+  // Several answers, one save.
+  const r = await answerRows('org', { opportunity_id: o.id, rows: [{ sheet: '02_PHASE_0', row: 24, values: { F24: 'Oui' } }, { sheet: '01_OPPORTUNITE', row: 36, values: { C36: 'AO 2026/015 bis' } }] }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal(r.rows, 2); assert.equal(r.verified, true);
+  // The bell: the Associé is asked for the decision; the person who dropped the TDR sees nothing left to answer.
+  const tasks = await opportunityTasks({ display_name: 'Ama', role: 'partner' }, d);
+  assert.ok(tasks.some(t => /Décision « poursuivre »/.test(t.title)));
+  assert.ok(tasks.some(t => /À relire/.test(t.title)));
+  assert.equal((await opportunityTasks({ display_name: 'Awa', role: 'collaborator' }, d)).some(t => /question/.test(t.title)), false);
 });
