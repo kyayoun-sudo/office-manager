@@ -338,6 +338,29 @@ export const ROUTES = Object.freeze({
     unavailable: 'ENGAGEMENT_UNAVAILABLE'
   },
   'engagement-step': { POST: (orgId, req) => engagementStep(orgId, req, req.body || {}), unavailable: 'ENGAGEMENT_UNAVAILABLE' },
+  // Opportunities (2026-10-10): a TDR / AMI deposited → Firm Manager reads, files, fills the firm's
+  // acceptance workbook and prepares Phase 0; the client's confirmation → Mission Controller (KYC,
+  // independence) in the same workbook. People answer; only the Associé decides.
+  opportunities: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const o = await import('../lib/opportunities.js');
+      return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const o = await import('../lib/opportunities.js'); const b = req.body || {}; const a = b.action;
+      if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
+      if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
+      if (a === 'answer') return o.answerRow(orgId, b, req.account);
+      if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
+      if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
+      if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
+      if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'OPPORTUNITIES_UNAVAILABLE'
+  },
+  'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
     GET: users(MANAGERS, async () => light(await submissionState())),

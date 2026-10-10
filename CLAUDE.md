@@ -43,7 +43,8 @@ Supabase cron (office-manager-unified-scheduler, */5)
 | Mail connector | fils, envoi réel, Message ID | `lib/agent-mail.js` (client = brouillon validé dans « À valider ») |
 | Control plane (petite mémoire) | statuts, liens, décisions, audit | Supabase `office_*` (`db/*.sql`), `lib/audit-log.js` |
 | Workflow authority | l'IA propose, l'humain valide, puis exécution | `office_action_queue` + `lib/action-decisions.js` + `lib/action-executor.js` (« À valider ») |
-| Firm Manager (Firm Intelligence) | portefeuille, personnes, capacité, KPI, staffing proposé | `agents/index.js`, `lib/people-*.js`, `lib/capabilities.js`, `lib/firm-members.js`, `lib/cockpit.js` |
+| Firm Manager (Firm Intelligence) | portefeuille, personnes, capacité, KPI, staffing proposé, **opportunités (TDR/AMI → Phase 0)** | `agents/index.js`, `lib/people-*.js`, `lib/capabilities.js`, `lib/firm-members.js`, `lib/cockpit.js`, `lib/opportunities.js` + `opportunites.html` |
+| Classeur d'acceptation du cabinet | LA trace des Phases 0-1 (fiche, Phase 0, KYC, indépendance, conclusion) : structure lue dans le modèle lui-même, écriture cellule par cellule | `lib/acceptance-workbook.js` |
 | Mission Controller (Mission Intelligence) | cycle de vie d'une mission, PBC, échéances, gates | `lib/mission-*.js`, `lib/engagement-prep.js` |
 | Enhanced Auditor (Audit Intelligence) | risques, WP, preuves, revue — ne signe jamais | `lib/enhanced-auditor.js`, `lib/auditor-plus.js` |
 | Orpailleur (Document Intelligence) | Detect → Read → Understand → Attach → Name → File → Verify → Remember | `lib/tidy-plan.js` (le cerveau), `lib/orpailleur-ask.js`, `lib/orpailleur-journal.js`, `lib/mapping-scan.js` |
@@ -77,7 +78,7 @@ dans les secrets de la fonction avant tout redéploiement (non modifié dans le 
 | §1-3 Données chez le cabinet, référence d'abord | ✅ | Drive/Gmail restent la source ; base = ids, liens, statuts, décisions. |
 | §5-7 Changements, curseur, fallback | 🟡 | Par date (`changedSince`), pas encore curseur `changes.list` ni webhook Drive. |
 | §8-10 Connecteurs abstraits | 🟡 | `drive-adapter` + `agent-mail` ; certains modules appellent encore Google directement ; pas de connecteur agenda. |
-| §11-14 Event bus + idempotence | 🟡 brique 1 posée | `office_events` + `lib/event-bus.js`. Événements actifs : `DOCUMENT_CLASSIFIED`, `NEEDS_HUMAN_CLASSIFICATION`, `POSSIBLE_DUPLICATE` (Orpailleur → Mission Controller, `lib/mission-events.js`). Les autres agents restent à brancher. |
+| §11-14 Event bus + idempotence | 🟡 brique 1 posée | `office_events` + `lib/event-bus.js`. Événements actifs : `DOCUMENT_CLASSIFIED`, `NEEDS_HUMAN_CLASSIFICATION`, `POSSIBLE_DUPLICATE` (Orpailleur → Mission Controller, `lib/mission-events.js`), `OPPORTUNITY_WON` (Firm Manager → Mission Controller, 2026-10-10). Les autres agents restent à brancher. |
 | §15-16 Workflow engine, gates | ❌ | « À valider » sépare déjà proposition et autorité ; pas encore d'étapes/gates de mission. |
 | §17-23 Petites mémoires d'agents | 🟡 | Existent (MEMORY/AGENTS, TIDY_STATE, checkpoint Supabase), champs pas encore alignés sur la spec. |
 | §24 Zone `_OFFICE_MANAGER` par mission | 🟡 | Mémoire client/mission existe ; pas encore MISSION_STATE / DECISION_LOG / ARCHIVE_MANIFEST par mission. |
@@ -91,6 +92,25 @@ dans les secrets de la fonction avant tout redéploiement (non modifié dans le 
 | §5 / §58 Rôles | ❌ | 4 rôles en base (owner, partner, manager, collaborator) ; manquent auditor, senior, supervisor, EQR, secrétaire ; pas de vue « mes missions ». |
 | §66-70 Archivage | ❌ | `MISSION_READY_FOR_ARCHIVE` est routé vers l'Orpailleur dans le bus, mais l'archive pass n'existe pas. |
 | §57-61 Tool Gateway / MCP ChatGPT | ❌ reporté | « Mon IA », plus tard. |
+
+## Workflow validé par Paul (2026-10-10) — de l'opportunité au lancement de la mission
+
+Décision de Paul : elle précise la spec (§10 phases 1-5) pour le partage des rôles. Code : `lib/opportunities.js`.
+1. **Trois entrées** pour un TDR / AMI : déposé sur la page « Opportunités », reçu par mail (connexion à faire),
+   ou déposé dans le Drive (la ronde du Firm Manager le signale sur la page ; une personne crée l'opportunité).
+2. **Firm Manager** : lit le document (contenu, pas le nom) ; ouvre le dossier de l'opportunité sous le dossier que le
+   modèle désigne (`03_APPELS_OFFRES_ET_PROPOSITIONS`) ; y range le TDR (vérifié, jamais écrasé) ; y copie le classeur
+   d'acceptation sous le nom que le modèle donne (`TATY_WP_PH0-1_[CLIENT]_[REFERENCE].xlsx`) ; remplit la fiche
+   (onglet 01) ; prépare la Phase 0 (propositions sourcées, questions pour l'équipe). Décision « poursuivre » : l'Associé seul
+   (jamais le préparateur ni le réviseur). Paul a demandé explicitement que le Firm Manager range le TDR et crée ce dossier.
+3. **Lettre de confirmation du client** → rangée dans le dossier → événement `OPPORTUNITY_WON` → **Mission Controller** :
+   « faire le KYC et l'indépendance » (onglet 03), vérifications publiques sourcées, l'indépendance est répondue par les
+   personnes elles-mêmes, réponses écrites dans le même classeur ; rempli à la main → relu.
+4. **KYC et indépendance avant la lettre de mission** ; puis le Firm Manager prépare et envoie la lettre (bloc 8, à construire).
+5. À la fin, le dossier d'acceptation va au **dossier permanent du client** (à construire).
+Un seul fichier par opportunité ; chaque agent remplit sa partie ; les cellules de décision ne reçoivent que la décision
+d'une personne identifiée. L'interface dépend du rôle (Associé : décisions ; Manager : recommandation, cotation ; équipe :
+questions et propositions des agents).
 
 ## Règles de travail
 
