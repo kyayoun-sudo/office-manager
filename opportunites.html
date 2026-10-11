@@ -428,7 +428,7 @@
 
   // ---- Phase 2: the team proposed by the Firm Manager, validated by a manager or the Associé;
   // ---- Phase 3: each member's own independence declaration ----
-  var TROLES = ['Associé', 'Manager', 'Superviseur', 'Senior', 'Auditeur', 'Spécialiste'];
+  var TROLES = ['Partner', 'Manager', 'Superviseur', 'Senior', 'Auditeur', 'Spécialiste'];
   function drawTeam(o, role) {
     var t = o.team || null, mgr = ['owner', 'partner', 'manager', 'supervisor'].indexOf(role) >= 0;
     var show = Boolean(t) || ['go', 'won', 'phase1'].indexOf(o.status) >= 0;
@@ -497,7 +497,7 @@
   }
   var teamDraft = {}, teamEdit = {};
   function input(ph) { var x = document.createElement('input'); x.type = 'text'; x.placeholder = ph; x.setAttribute('aria-label', ph); return x; }
-  function roleSelect(v) { var sel = document.createElement('select'); TROLES.forEach(function (r) { sel.appendChild(new Option(r, r)); }); sel.value = TROLES.indexOf(v) >= 0 ? v : 'Auditeur'; sel.setAttribute('aria-label', 'Rôle'); return sel; }
+  function roleSelect(v) { var sel = document.createElement('select'); TROLES.forEach(function (r) { sel.appendChild(new Option(r, r)); }); v = /Associ/i.test(v || '') ? 'Partner' : v; sel.value = TROLES.indexOf(v) >= 0 ? v : 'Auditeur'; sel.setAttribute('aria-label', 'Rôle'); return sel; }
   function proposeBtn(o, t) {
     var again = el('button', t ? 'Refaire la proposition' : 'Proposer l’équipe', t ? 'btn ghost' : 'btn'); again.type = 'button';
     again.addEventListener('click', function () { again.disabled = true; delete teamDraft[o.id]; api({ action: 'propose-team', opportunity_id: o.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { again.disabled = false; $('team-say').textContent = msg(e); }); });
@@ -663,7 +663,7 @@
     }
     if (!r.may_fill) {
       var filled = r.fields.filter(function (f) { return f.value; });
-      row.appendChild(el('p', filled.length ? filled.map(function (f) { return (f.header ? f.header + ' : ' : '') + f.value; }).join(' · ') : (r.authority === 'partner' ? 'En attente de la décision de l’Associé.' : 'En attente du Manager.'), 'opp-locked'));
+      row.appendChild(el('p', filled.length ? filled.map(function (f) { return (f.header ? f.header + ' : ' : '') + f.value; }).join(' · ') : (r.decider ? 'Réservé à ' + r.decider + '.' : r.authority === 'partner' ? 'En attente de la décision de l’Associé.' : 'En attente du Manager.'), 'opp-locked'));
       return row;
     }
     var grid = el('div', null, 'opp-fields');

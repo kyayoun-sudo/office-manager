@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -421,4 +421,21 @@ test('the team is ours: specialists searched in the country, externals added, th
   await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'Cabinet Énergie CI', role: 'Spécialiste', external: true, speciality: 'Stocks pétroliers', source: 'https://example.org' }] }, { display_name: 'Moussa', role: 'manager' }, d);
   const r = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'A. Senior', email: 'senior@cab.ci' }, d);
   assert.equal(r.all_declared, true, 'the external specialist does not block: their written declaration is obtained outside the app');
+});
+
+test('who decides: the business-development Associé named in Paramètres; the mission Manager rates; the mission Partner accepts', async () => {
+  const { d } = await setup();
+  const d2 = { ...d, fetchRows: async (path, opts) => String(path).startsWith('office_firm_settings') ? [{ settings: { business_partner: { name: 'Ama Associée' } } }] : d.fetchRows(path, opts) };
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d2);
+  const o = await run(opportunity.id, d2);
+  await assert.rejects(answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Kofi Partner', role: 'partner' }, d2), /NOT_THE_DECIDING_PARTNER/);
+  assert.equal((await myQuestions('org', { display_name: 'Kofi Partner', role: 'partner' }, d2)).questions.some(q => q.kind === 'decision'), false, 'another Associé does not get the decision');
+  assert.ok((await myQuestions('org', { display_name: 'Ama Associée', role: 'partner' }, d2)).questions.some(q => q.kind === 'decision'));
+  assert.equal((await answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Ama Associée', role: 'partner' }, d2)).status, 'go');
+  // Phase 1 / sheet 04: the validated team's Manager and Partner.
+  const team = { status: 'validated', members: [{ name: 'K. Manager', role: 'Manager' }, { name: 'P. Partner', role: 'Partner' }] };
+  const sheet = { name: '03_PHASE_1', title: 'PHASE 1' }, rating = { label: 'Risque KYC', fields: [{ header: 'Cotation proposée' }] }, accept = { label: "DÉCISION DE L'ASSOCIÉ", fields: [] };
+  assert.equal(deciderOf({ team }, sheet, rating, {}).who[0].name, 'K. Manager');
+  assert.equal(deciderOf({ team }, { name: '04_CONCLUSION', title: 'Synthèse et décision' }, accept, {}).who[0].name, 'P. Partner');
+  assert.equal(deciderOf({}, sheet, rating, {}), null, 'no team yet: any Manager may');
 });

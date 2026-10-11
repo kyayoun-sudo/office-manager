@@ -349,6 +349,7 @@ export const ROUTES = Object.freeze({
   opportunities: {
     GET: users(ALL_ROLES, async (orgId, req) => {
       const o = await import('../lib/opportunities.js');
+      if (req.query?.settings) return o.opportunitySettingsView(orgId);
       return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
@@ -359,6 +360,7 @@ export const ROUTES = Object.freeze({
       if (a === 'answer-rows') return o.answerRows(orgId, b, req.account, { req });
       if (a === 'review-section') return o.reviewSection(orgId, b, req.account);
       if (a === 'prepare-again') return o.prepareAgain(orgId, req, b, req.account);
+      if (a === 'settings') return o.saveOpportunitySettings(orgId, b, req.account);
       if (a === 'remove') return o.removeOpportunity(orgId, b, req.account, { req });
       if (a === 'not-duplicate') return o.notDuplicate(orgId, req, b, req.account);
       if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
