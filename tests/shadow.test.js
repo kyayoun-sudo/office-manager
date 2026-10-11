@@ -27,7 +27,7 @@ test('Shadow: one lesson per problem (new evidence merges), human corrections ap
 test('Shadow: experiment current vs candidate, Firm Manager review, owner approval → new version; rollback', async () => {
   const s = await import('../lib/shadow.js');
   const st = store();
-  const d = { updateJsonFile: st.updateJsonFile, drive: st.drive, folder: 'om', baseInstructions: async () => 'Tu es l’Orpailleur.', audit: async () => ({}),
+  const d = { updateJsonFile: st.updateJsonFile, drive: st.drive, folder: 'om', baseInstructions: async () => 'Tu es le Mission Controller.', audit: async () => ({}),
     env: { ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'm' },
     ai: async (order, args) => {
       if (/examinateur/.test(args.instructions)) return { provider: 'anthropic', text: JSON.stringify({ pass: /LEÇONS APPRISES/.test(lastAnswer), score: 90, why: 'ok' }) };
@@ -35,17 +35,17 @@ test('Shadow: experiment current vs candidate, Firm Manager review, owner approv
       lastAnswer = args.instructions; return { provider: 'anthropic', text: 'réponse' };
     } };
   let lastAnswer = '';
-  await st.updateJsonFile('x', () => { const lab = s.emptyLab(); s.mergeLesson(lab, { agent: 'orpailleur', category: 'dedup', lesson: 'Chercher le TDR dans le registre avant toute création', rule: 'Un TDR révisé met à jour l’opportunité existante', type: 'firm_rule',
+  await st.updateJsonFile('x', () => { const lab = s.emptyLab(); s.mergeLesson(lab, { agent: 'mission-controller', category: 'dedup', lesson: 'Chercher le TDR dans le registre avant toute création', rule: 'Un TDR révisé met à jour l’opportunité existante', type: 'firm_rule',
     future_test: { name: 't', scenario: 'TDR + version révisée', expected: 'une seule opportunité' }, confidence: 'moyenne' }); return lab; });
-  const exp = await s.runExperiment('org', 'orpailleur', d);
+  const exp = await s.runExperiment('org', 'mission-controller', d);
   assert.equal(exp.status, 'awaiting_owner'); assert.equal(exp.baseline.golden, 0); assert.equal(exp.candidate.golden, 100); assert.equal(exp.review.opinion, 'favorable');
   const r = await s.decide('org', { experiment_id: exp.id, decision: 'approve' }, 'Paul', d);
   assert.equal(r.version, '1.1');
   let lab = st.get();
-  assert.equal(lab.lessons[0].status, 'active'); assert.equal(lab.agents.orpailleur.versions[0].approver, 'Paul');
+  assert.equal(lab.lessons[0].status, 'active'); assert.equal(lab.agents['mission-controller'].versions[0].approver, 'Paul');
   assert.ok(lab.usage[new Date().toISOString().slice(0, 10)].runs >= 3);   // its calls are counted apart
   await assert.rejects(() => s.decide('org', { experiment_id: exp.id, decision: 'approve' }, 'Paul', d), /EXPERIMENT_NOT_PENDING/);
-  const back = await s.rollback('org', 'orpailleur', 'Paul', d);
+  const back = await s.rollback('org', 'mission-controller', 'Paul', d);
   assert.equal(back.version, '1.0'); lab = st.get(); assert.equal(lab.lessons[0].status, 'superseded');
 });
 

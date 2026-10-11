@@ -53,7 +53,7 @@ Supabase cron (office-manager-unified-scheduler, */5)
 | « Mon IA » | chaque personne peut connecter sa propre IA (clé chiffrée, avertissement versionné accepté) ; ses demandes l'essaient d'abord, l'IA du cabinet prend le relais ; les associés peuvent l'interdire | `lib/personal-ai.js` (crochet en tête de `firstAvailable`), `mon-ia.html`, `db/personal-ai.sql` |
 | Veille des appels d'offres (Firm Manager) | reprise du Tender Desk EYNOWA : passage quotidien (recherche web, date limite vérifiée, équipe tirée des CV réels, Bid / No Bid sur 100, entreprises à approcher, pipeline Excel vérifié, rapport en 5 sections aux associés et BDM) ; un associé décide de suivre ; le BDM obtient le TDR, crée l'opportunité (liée), enregistre dépôt et résultat ; indicateurs et charge de travail à partir des dates ; offre perdue → revue de Shadow validée par un associé | `lib/tender-watch.js`, `veille.html`, route `tenders` / `tender-step`, mémoire `OFFICE_MANAGER_TENDERS.json`, réglages `office_firm_settings.settings.tender_watch` |
 | Droits (permissions) | postes types d'un cabinet, niveaux (aucun → administrer), matrice écrans × rôles réglable par les associés, actions sensibles, règles automatiques (`can()`), plafond de l'IA = préparer | `lib/permissions.js`, Paramètres → Droits, route `permissions`, `office_firm_settings.settings.permissions` |
-| Shadow | labo d'apprentissage, leçons validées par un humain ; **propose du code** pour tous les agents et lui-même (branche + PR en brouillon, jamais fusionnée ni déployée par lui ; garde-fous intouchables) | `lib/shadow.js`, `lib/shadow-code.js`, `lib/shadow-guard.js` (vu par les associés et le responsable informatique — 2026-10-11 ; les associés décident ; onglet « Code » d'Entraînement ; connexion `SHADOW_GITHUB_TOKEN`) ; questionnaire hebdomadaire à tous (agents + préférences de travail) |
+| Shadow | labo d'apprentissage, leçons validées par un humain ; **propose du code** pour tous les agents et lui-même (branche + PR en brouillon, jamais fusionnée ni déployée par lui ; garde-fous intouchables) | `lib/shadow.js`, `lib/shadow-code.js`, `lib/shadow-guard.js` (vu par les associés et le responsable informatique — 2026-10-11 ; les associés décident ; onglet « Code » d'Entraînement ; connexion `SHADOW_GITHUB_TOKEN`) ; questionnaire hebdomadaire à tous (agents + préférences de travail) ; **objectif final de chaque agent, Shadow compris** (`lib/agent-goals.js`) ; observation du vrai travail et enquêtes sur les causes, bonnes pratiques web, lecture du code, PR (`lib/shadow-investigate.js`, route `shadow-investigate-step`) ; examen de rangement de l'Orpailleur sur son vrai cerveau, notation sans IA (`lib/shadow-filing-exam.js`, aussi utilisé par la campagne de 5 jours et par les expériences) |
 
 **Mémoires** — petite mémoire structurée dans Office Manager, grande mémoire documentaire chez le cabinet :
 - Orpailleur : mémoire complète `OFFICE_MANAGER_TIDY_STATE.json` dans `00_TATY_AI_MANAGER/MEMORY`
@@ -149,6 +149,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - **Shadow** : vu seulement par les associés et le responsable informatique ; revue des offres perdues (causes, améliorations) =
   proposition, validée par un associé (devient une leçon du Firm Manager), transmise au BDM seulement si l'associé le choisit ;
   Shadow pose à tous des questions sur les agents et les préférences de travail (questionnaire hebdomadaire).
+
+## Shadow entraîne vers l'objectif final (Paul, 2026-10-11)
+- Constat : Shadow ne connaissait pas le but des agents, ne voyait pas les corrections faites à l'Orpailleur (réponses aux
+  questions, destinations / noms changés, fichiers non décidés, passages partiels), testait l'Orpailleur avec le prompt de
+  l'agent de discussion au lieu de son cerveau de rangement, et la campagne fictive le notait sur un exercice d'audit générique.
+- Désormais : `lib/agent-goals.js` = l'objectif final, les résultats mesurables, les interdits, les pratiques de référence et le
+  code de chaque agent (à tenir aligné sur la spécification) ; Shadow juge chaque problème comme un écart à cet objectif ;
+  observe le vrai travail ; fait chaque jour l'examen de rangement de l'Orpailleur (cerveau réel `TIDY_INSTRUCTIONS`, Drive
+  fictif, notation déterministe) et une enquête (agent le plus loin de son objectif, chacun au moins une fois par semaine,
+  Shadow compris) : preuves + bonnes pratiques (web, sources) + code → causes, leçons (en attente d'une personne), tests,
+  et une pull request en brouillon quand la cause est dans le code. On peut lui poser une question (« pourquoi l'Orpailleur
+  ne fait pas X ? ») dans Entraînement → Objectifs et enquêtes. Il ne fusionne ni ne déploie jamais.
 
 ## Règles de travail
 

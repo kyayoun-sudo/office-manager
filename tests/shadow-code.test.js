@@ -55,7 +55,7 @@ test('Shadow code: proposal → its own branch and a DRAFT pull request (never m
   await assert.rejects(requestCodeChange('org', {}, { agent: 'root' }, 'Paul', d), /UNKNOWN_AGENT/);
   assert.equal(fired[0].proposal_id, r.id);
   const out = await codeStep('org', {}, { proposal_id: r.id }, d);
-  assert.equal(out.status, 'pr_open');
+  assert.equal(out.status, 'pr_open', JSON.stringify(out));
   const pr = calls.find(c => c.url === '/pulls');
   assert.equal(pr.body.draft, true);
   assert.equal(pr.body.base, 'feature/white-label-desktop');
@@ -77,7 +77,8 @@ test('Shadow code: proposal → its own branch and a DRAFT pull request (never m
   const ai2 = async () => ({ provider: 'anthropic', text: JSON.stringify({ summary: 's', edits: [{ file: 'lib/shadow.js', find: "x = 0.9 ? 'file'", replace: "x = 0.95 ? 'file'" }] }) });
   const o2 = await codeStep('org', {}, { proposal_id: r2.id }, { ...d2, ai: ai2, readSource: async () => "export const lab = 1;\nconst x = 0.9 ? 'file' : 2;\n" });
   assert.equal(o2.status, 'ready_without_github');
-  assert.deepEqual(AGENT_FILES.shadow, ['lib/shadow.js'], 'Shadow improves itself, never its guard rails');
+  assert.deepEqual(AGENT_FILES.shadow, ['lib/shadow.js', 'lib/shadow-investigate.js', 'lib/shadow-filing-exam.js'], 'Shadow improves itself (its lab, its investigations, its exam), never its guard rails');
+  assert.ok(AGENT_FILES.shadow.every(f => !isGuardedFile(f)) && isGuardedFile('lib/shadow-guard.js'));
 });
 
 test('Shadow code: an edit that breaks the code is refused (syntax), recurrent problems trigger one proposal a day', async () => {

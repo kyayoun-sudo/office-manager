@@ -152,10 +152,14 @@ test('5-day campaign: missions created on the Drive, real missions picked up, gr
 
   await run();
   const day1 = w.tables.office_training_cases.filter(c => c.day === 1);
-  assert.ok(day1.every(c => c.status === 'graded' && c.score > 0 && c.drive_folder_id), JSON.stringify(day1.map(c => [c.status, c.error])));
+  assert.ok(day1.filter(c => c.agent_key !== 'orpailleur').every(c => c.status === 'graded' && c.score > 0 && c.drive_folder_id), JSON.stringify(day1.map(c => [c.status, c.error])));
+  // The Orpailleur is graded on its real job: the filing exam, its filing brain, no AI examiner (2026-10-11).
+  const orp = day1.find(c => c.agent_key === 'orpailleur');
+  assert.ok(orp.status === 'graded' && Number.isFinite(orp.score) && orp.grade.exam === true, JSON.stringify([orp.status, orp.error]));
+  assert.ok(w.calls.some(c => c.agentKey === 'orpailleur' && c.instructions.includes('EXAMEN (laboratoire Shadow)')));
   assert.equal(w.d && w.drive.nodes.filter(x => x.parents.includes(root)).length, 4, 'four mission folders in the training folder');
   assert.ok(w.calls.some(c => c.agentKey === 'training-examiner'), 'Claude examines');
-  assert.ok(w.calls.filter(c => c.agentKey !== 'training-examiner').every(c => c.input.includes('MISSION FICTIVE')), 'the agent reads the Drive files');
+  assert.ok(w.calls.filter(c => !['training-examiner', 'orpailleur'].includes(c.agentKey)).every(c => c.input.includes('MISSION FICTIVE')), 'the agent reads the Drive files');
   // The key is never sent to the agent under test.
   assert.ok(w.calls.filter(c => c.agentKey !== 'training-examiner').every(c => !c.input.includes('GRILLE')));
 

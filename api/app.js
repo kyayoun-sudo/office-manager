@@ -147,6 +147,9 @@ export const ROUTES = Object.freeze({
       // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
       if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
       if (b.action === 'code-close') return (await import('../lib/shadow-code.js')).closeCodeProposal(orgId, { id: b.id, reason: b.reason }, who(req) || 'propriétaire');
+      // An investigation (with a question: « pourquoi l'Orpailleur ne fait pas X ? ») or the filing exam now.
+      if (b.action === 'investigate') { const { AGENT_GOALS } = await import('../lib/agent-goals.js'); if (!AGENT_GOALS[b.agent]) throw fail('UNKNOWN_AGENT', 400); await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { agent: b.agent, question: String(b.question || '').slice(0, 600) }); return { started: true }; }
+      if (b.action === 'exam') { await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { exam: true }); return { started: true }; }
       if (b.action === 'decide') return s.decide(orgId, b, who(req));
       if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
       if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
@@ -183,6 +186,8 @@ export const ROUTES = Object.freeze({
   },
   'tender-step': { POST: async (orgId, req) => (await import('../lib/tender-watch.js')).tenderStep(orgId, req, req.body || {}), unavailable: 'TENDERS_UNAVAILABLE' },
   'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
+  // Shadow's background investigations and exams (2026-10-11).
+  'shadow-investigate-step': { POST: async (orgId, req) => (await import('../lib/shadow-investigate.js')).investigateStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   'shadow-survey': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).answerSurvey(req.body || {}, req.account)),

@@ -127,9 +127,10 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 
       <section class="card" aria-labelledby="h-shadow" id="shadow-card" hidden>
         <h2 id="h-shadow">Shadow — le laboratoire d'apprentissage</h2>
-        <p class="small">Shadow observe le travail réel et les entraînements, les erreurs et vos corrections, en tire des leçons courtes, les teste sur des cas permanents (golden tests), et vous propose les changements importants. Il ne travaille jamais sur une vraie mission, n'écrit à personne et ne touche pas au Drive. Les leçons sûres (un fait prouvé, une correction de l'équipe) s'appliquent tout de suite ; le reste attend votre décision. Aucun agent ne peut s'accorder plus de droits.</p>
+        <p class="small">Shadow connaît l’objectif final de chaque agent (lui compris) et mesure l’écart : examen de rangement de l’Orpailleur sur son vrai cerveau, corrections faites par l’équipe, passages incomplets, enquêtes sur les causes (consignes, données, code), bonnes pratiques internationales, propositions de code en pull request que vous relisez. Il observe le travail réel et les entraînements, les erreurs et vos corrections, en tire des leçons courtes, les teste sur des cas permanents (golden tests), et vous propose les changements importants. Il ne travaille jamais sur une vraie mission, n'écrit à personne et ne touche pas au Drive. Les leçons sûres (un fait prouvé, une correction de l'équipe) s'appliquent tout de suite ; le reste attend votre décision. Aucun agent ne peut s'accorder plus de droits.</p>
         <div class="chips" id="sh-tabs" role="tablist" aria-label="Shadow">
           <button type="button" class="chip" data-p="overview" aria-pressed="true">Vue générale</button>
+          <button type="button" class="chip" data-p="goals" aria-pressed="false">Objectifs et enquêtes</button>
           <button type="button" class="chip" data-p="perf" aria-pressed="false">Performance</button>
           <button type="button" class="chip" data-p="problems" aria-pressed="false">Problèmes</button>
           <button type="button" class="chip" data-p="lessons" aria-pressed="false">Leçons</button>
@@ -379,6 +380,46 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       ].forEach(function (p) { dl.appendChild(el('dt', p[0])); dl.appendChild(el('dd', String(p[1]))); });
       b.appendChild(dl);
       var row = el('div', null, 'btn-row'); row.appendChild(btn('Lancer un passage maintenant', 'btn', function () { act({ action: 'run' }, 'Passage fait.'); })); b.appendChild(row);
+    }
+    if (panel === 'goals') {
+      var form = el('div', null, 'stack');
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Agent');
+      Object.keys(data.goals || {}).forEach(function (k) { sel.appendChild(new Option(data.goals[k].label, k)); });
+      var qn = document.createElement('textarea'); qn.placeholder = 'Votre question (facultatif) : « Pourquoi l’Orpailleur ne range pas les relevés bancaires ? »'; qn.setAttribute('aria-label', 'Question à Shadow'); qn.style.cssText = 'font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;min-height:60px';
+      var r0 = el('div', null, 'btn-row');
+      r0.appendChild(sel);
+      r0.appendChild(btn('Enquêter', 'btn', function () { act({ action: 'investigate', agent: sel.value, question: qn.value.trim() }, 'Shadow enquête (quelques minutes) : rechargez cet onglet ensuite.'); }));
+      r0.appendChild(btn('Examen de rangement de l’Orpailleur maintenant', null, function () { act({ action: 'exam' }, 'Examen lancé : le résultat arrive dans une minute ou deux.'); }));
+      form.appendChild(qn); form.appendChild(r0); b.appendChild(form);
+      Object.keys(data.goals || {}).forEach(function (k) {
+        var g = data.goals[k], a = (data.agents || {})[k] || {}, s = a.scores || {};
+        var box = el('div', null, 'stack');
+        box.appendChild(el('p', g.purpose, 'small'));
+        var ul = el('ul'); g.outcomes.forEach(function (o) { ul.appendChild(el('li', o.label + ' — mesure : ' + o.measure)); }); box.appendChild(ul);
+        box.appendChild(el('p', 'Pratiques de référence : ' + g.practices.join(' ; '), 'small'));
+        var scoreLine = Object.keys(s).filter(function (x) { return s[x] != null && x !== 'cas'; }).map(function (x) { return x.replace(/_/g, ' ') + ' ' + s[x] + (/^(examen|rangement)/.test(x) ? '/100' : ' %'); }).join(' · ');
+        b.appendChild(item(g.label, scoreLine || 'pas encore de mesure', box));
+      });
+      var ex = (data.exams || []).filter(function (e) { return !e.experiment; })[0];
+      if (ex) {
+        b.appendChild(el('h3', 'Dernier examen de rangement de l’Orpailleur : ' + ex.score + '/100 (' + UI.dateTime(ex.at) + ', ' + ex.lessons + ' leçon(s) appliquée(s))'));
+        b.appendChild(UI.table(['Cas', 'Décision', 'Note', 'Ce qui manque', 'Attendu'], ex.results.map(function (r) { return [r.id + ' ' + (r.name || ''), (r.action || '—') + (r.destination ? ' → ' + r.destination : '') + (r.new_name ? ' « ' + r.new_name + ' »' : ''), r.score, r.notes.join(' ; '), r.expected]; })));
+      }
+      (data.investigations || []).forEach(function (inv) {
+        var box = el('div', null, 'stack');
+        if (inv.question) box.appendChild(el('p', 'Question : ' + inv.question, 'small'));
+        if (inv.answer) box.appendChild(el('p', 'Réponse : ' + inv.answer));
+        if (inv.summary) box.appendChild(el('p', inv.summary, 'small'));
+        (inv.gaps || []).forEach(function (gp) {
+          box.appendChild(el('p', '• [' + gp.outcome + '] ' + gp.symptom + ' — cause (' + gp.cause_type + ', confiance ' + gp.confidence + ') : ' + gp.root_cause + (gp.code_ref ? ' — ' + gp.code_ref.file : '') +
+            ' → ' + (gp.fix.kind === 'code' ? 'code : ' + gp.fix.code_change : gp.fix.kind === 'lesson' ? 'leçon : ' + gp.fix.lesson : gp.fix.kind === 'test' ? 'test : ' + (gp.fix.test ? gp.fix.test.name : '') : (gp.fix.action || gp.fix.lesson || gp.fix.kind)), 'small'));
+        });
+        if ((inv.practices_applied || []).length) box.appendChild(el('p', 'Bonnes pratiques : ' + inv.practices_applied.join(' ; '), 'small'));
+        if ((inv.practices && inv.practices.sources || []).length) { var src = el('p', 'Sources : ', 'small'); inv.practices.sources.slice(0, 6).forEach(function (x, i) { if (i) src.appendChild(document.createTextNode(' · ')); src.appendChild(UI.safeLink(x.url, x.title || x.url)); }); box.appendChild(src); }
+        if (inv.code) box.appendChild(el('p', 'Proposition de code : ' + inv.code + ' (voir l’onglet Code)', 'small'));
+        b.appendChild(item('Enquête ' + NAME(inv.agent) + ' — ' + UI.dateTime(inv.at), (inv.gaps || []).length + ' écart(s) à l’objectif · ' + inv.evidence_count + ' observation(s) du vrai travail', box));
+      });
+      if (!(data.investigations || []).length) b.appendChild(el('p', 'Aucune enquête encore : Shadow en fait une par jour (l’agent le plus loin de son objectif, chacun au moins une fois par semaine, lui compris).', 'empty'));
     }
     if (panel === 'perf') {
       Object.keys(data.agents).forEach(function (k) {
