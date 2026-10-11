@@ -118,6 +118,19 @@ Un seul fichier par opportunité ; chaque agent remplit sa partie ; les cellules
 d'une personne identifiée. L'interface dépend du rôle (Associé : décisions ; Manager : recommandation, cotation ; équipe :
 questions et propositions des agents).
 
+## Fiabilité de l'Orpailleur (2026-10-11, diagnostic demandé par Paul)
+- « Vu » ≠ « traité » : un fichier sans décision de l'IA est redemandé une fois, puis gardé (`undecided`, 3 essais) ; jamais « vu ».
+  Un passage avec des fichiers non lus ou non décidés finit `outcome: partial`, jamais `complete`.
+- Une proposition identique existante est expliquée (en attente / bloquée / refusée par une personne = jamais refaite) ;
+  une proposition exécutée puis le fichier remis ailleurs → nouvelle proposition (nouvelle génération de clé).
+- Fichier à la corbeille ou disparu → ses propositions ouvertes sont fermées (`FILE_TRASHED`).
+- « Lancer / reprendre » après le premier scan = passage des changements (jamais un rescan complet, mémoire gardée) ;
+  rescan complet seulement sur demande explicite (`full`).
+- Réconciliation des métadonnées bornée (fichiers déjà traités d'abord, puis une tranche tournante ; 25 s max).
+- Plusieurs lots par appel sous le même verrou (moins d'appels en chaîne : cause des HTTP 508) ; verrou de lecture 4 min.
+- Statut de `office_action_queue` : jamais `cancelled` (c'est un `work_state`) — cause du PostgreSQL 23514.
+- L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
+
 ## Règles de travail
 
 - Branche de travail : `feature/white-label-desktop`. Ne pas toucher `main`, `amelioration`,

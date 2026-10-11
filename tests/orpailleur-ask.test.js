@@ -113,7 +113,9 @@ test('not read = not sure: an unreadable file stays in « À valider » even if 
 test('same name at the destination: both versions kept, anomaly reported; the move is verified in Drive', async () => {
   const { executeDecision } = await import('../lib/action-executor.js');
   const moved = [];
-  const td = { nameTaken: async (p, n) => p === 'dest' && n === 'GL.xlsx', move: async (...a) => moved.push(a), getFile: async () => ({ id: 'f', name: 'GL (version ' + new Date().toISOString().slice(0, 10) + ').xlsx', parents: ['dest'] }), binEmptyFolder: async () => ({ binned: false }) };
+  // The Drive as it really is: in its loose folder before the move, at the destination after it.
+  const td = { nameTaken: async (p, n) => p === 'dest' && n === 'GL.xlsx', move: async (...a) => moved.push(a),
+    getFile: async () => moved.length ? { id: 'f', name: 'GL (version ' + new Date().toISOString().slice(0, 10) + ').xlsx', parents: ['dest'] } : { id: 'f', name: 'GL.xlsx', parents: ['loose'] }, binEmptyFolder: async () => ({ binned: false }) };
   const patches = [];
   const fetchRows = async (path, o = {}) => { if (o.method === 'PATCH') patches.push(JSON.parse(o.body)); return path.includes('status=in.(proposed') ? [{ id: 'a1' }] : []; };
   const r = await executeDecision('org', { id: 'a1', action_type: 'FILE_MOVE', payload: { file_id: 'f', file_name: 'GL.xlsx', from_parent: 'loose', to_parent: 'dest', to_name: '/dest' } }, 'approve', 'Paul', { fetchRows, tidyDrive: td });
