@@ -38,6 +38,11 @@
   .opp-locked{font-size:12.5px;color:var(--muted)}
   #team-card select,#team-card input:not([type=checkbox]){width:auto;max-width:100%;font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
   #team-card input[type=checkbox]{width:18px;height:18px}
+  .team-add{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0}
+  .team-add input,.team-add select{flex:1 1 180px}
+  .team-spec{border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+  .team-spec h3{font-size:15px;margin:4px 0}
+  .spec-gap{padding:4px 0 8px}
   .team-checks{margin:6px 0 0;padding-left:0;list-style:none;font-size:13px;line-height:1.5;color:var(--muted)}
   .team-checks .miss{color:var(--danger, #A33)}
 </style>
@@ -434,48 +439,121 @@
     $('team-lead').textContent = !t ? 'Le Firm Manager propose l’équipe avec la Phase 0 : chaque poste exigé par le TDR, confronté aux CV du cabinet et à la charge de chacun ; un manager ou l’Associé la valide ; chaque membre fait ensuite sa déclaration d’indépendance.'
       : t.status === 'failed' ? 'Arrêt : ' + (t.error === 'NO_TEAM_DATA' ? 'aucune personne du cabinet connue (Équipe et CV).' : t.error)
       : t.status === 'validated' ? 'Validée par ' + (t.validated_by || '?') + ' le ' + UI.dateTime(t.validated_at) + '. Déclarations d’indépendance : ' + t.members.filter(function (m) { return (o.declarations || {})[(m.email || m.name).toLowerCase()]; }).length + '/' + t.members.length + '.'
-      : t.status === 'proposed' ? 'Proposition du Firm Manager, poste par poste, d’après les CV : ✓ exigence remplie, ✗ non remplie, ? le CV ne le dit pas. Décochez, changez le rôle, ajoutez une personne, puis validez.' : t.status === 'proposing' ? 'Le Firm Manager lit les exigences du TDR et les CV du cabinet…' : '';
+      : t.status === 'proposed' ? 'Proposition du Firm Manager, poste par poste, d’après les CV : ✓ exigence remplie, ✗ non remplie, ? le CV ne le dit pas. Retirez, changez le rôle, ajoutez quelqu’un du cabinet ou un spécialiste externe, puis validez : l’équipe reste la vôtre.' : t.status === 'proposing' ? 'Le Firm Manager lit les exigences du TDR et les CV du cabinet…' : '';
+    // The team is ours: the Firm Manager proposes, but a Manager or the Associé can keep, remove, add
+    // anyone from the firm, add an external specialist, or have specialists searched in the country.
     var box = $('team-list'); box.textContent = '';
-    var rows = [];
-    var list = t && t.status === 'validated' ? t.members : (t && t.proposed) || [];
-    list.forEach(function (m) {
-      var it = el('div', null, 'item'), tt = el('div', null, 't');
-      tt.appendChild(el('span', m.name + (m.role ? ' — ' + m.role : '')));
-      var dec = (o.declarations || {})[(m.email || m.name).toLowerCase()];
-      tt.appendChild(el('span', t.status === 'validated' ? (dec ? 'Indépendance déclarée le ' + UI.dateTime(dec.at) + (dec.threats.length ? ' — ' + dec.threats.length + ' situation(s) à examiner : ' + dec.threats.join(' ; ') : ' — aucune menace') : 'Déclaration d’indépendance attendue') : (m.requirement ? 'Poste du TDR : ' + m.requirement + ' · ' : '') + (m.why || '') + (m.load_pct != null ? ' · charge ' + m.load_pct + ' %' : ''), 'meta'));
-      if (t.status !== 'validated' && m.checks && m.checks.length) {
-        var ck = el('ul', null, 'team-checks');
-        m.checks.forEach(function (c) { ck.appendChild(el('li', (c.met === true ? '✓ ' : c.met === false ? '✗ ' : '? ') + c.criterion + (c.evidence ? ' — ' + c.evidence : ''), c.met === false ? 'miss' : '')); });
-        tt.appendChild(ck);
-      }
-      it.appendChild(tt);
-      if (t.status === 'proposed' && mgr) {
-        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; cb.setAttribute('aria-label', 'Garder ' + m.name);
-        var sel = document.createElement('select'); TROLES.forEach(function (r) { sel.appendChild(new Option(r, r)); }); sel.value = TROLES.indexOf(m.role) >= 0 ? m.role : 'Auditeur'; sel.setAttribute('aria-label', 'Rôle de ' + m.name);
-        it.appendChild(sel); it.appendChild(cb); rows.push({ m: m, cb: cb, sel: sel });
-      } else if (dec && dec.threats.length) it.appendChild(el('span', 'À examiner', 'tag warn'));
-      box.appendChild(it);
-    });
-    ((t && t.gaps) || []).forEach(function (g) { box.appendChild(el('div', 'Manque : ' + g.requirement + (g.why ? ' — ' + g.why : ''), 'item')); });
     var act = $('team-actions'); act.textContent = '';
-    if (mgr && t && t.status === 'proposed') {
-      var extraName = document.createElement('input'); extraName.placeholder = 'Ajouter une personne (nom)'; extraName.setAttribute('aria-label', 'Ajouter une personne');
-      var extraRole = document.createElement('select'); TROLES.forEach(function (r) { extraRole.appendChild(new Option(r, r)); }); extraRole.value = 'Auditeur'; extraRole.setAttribute('aria-label', 'Rôle de la personne ajoutée');
-      var ok = el('button', 'Valider l’équipe', 'btn'); ok.type = 'button';
-      ok.addEventListener('click', function () {
-        var members = rows.filter(function (x) { return x.cb.checked; }).map(function (x) { return { name: x.m.name, email: x.m.email, role: x.sel.value }; });
-        if (extraName.value.trim()) members.push({ name: extraName.value.trim(), role: extraRole.value });
-        ok.disabled = true;
-        api({ action: 'validate-team', opportunity_id: o.id, members: members }).then(function () { $('team-say').textContent = 'Équipe validée : les noms sont écrits dans la fiche du classeur, chaque membre est invité à sa déclaration d’indépendance.'; window.reloadOpportunity(); })
-          .catch(function (e) { ok.disabled = false; $('team-say').textContent = msg(e); });
+    var editing = mgr && t && t.status !== 'proposing' && (t.status !== 'validated' || teamEdit[o.id]);
+    if (editing && !teamDraft[o.id]) teamDraft[o.id] = (t.status === 'validated' ? t.members : (t.proposed || [])).map(function (m) { return Object.assign({}, m); });
+    if (!editing) {
+      ((t && t.status === 'validated' ? t.members : (t && t.proposed) || [])).forEach(function (m) { box.appendChild(memberItem(o, t, m, null)); });
+      ((t && t.status !== 'validated' && t.gaps) || []).forEach(function (g) { box.appendChild(el('div', 'Manque : ' + g.requirement + (g.why ? ' — ' + g.why : ''), 'item')); });
+      if (mgr && t && t.status === 'validated') { var edit = el('button', 'Modifier l’équipe', 'btn ghost'); edit.type = 'button'; edit.addEventListener('click', function () { teamEdit[o.id] = true; drawTeam(o, role); }); act.appendChild(edit); }
+      if (mgr && (!t || t.status === 'failed')) act.appendChild(proposeBtn(o, t));
+      return drawMyDeclaration(o, t);
+    }
+    var draft = teamDraft[o.id];
+    var redraw = function () { drawTeam(o, role); };
+    draft.forEach(function (m, i) { box.appendChild(memberItem(o, t, m, function () { draft.splice(i, 1); redraw(); })); });
+    if (!draft.length) box.appendChild(el('p', 'Personne dans l’équipe pour l’instant : ajoutez quelqu’un ci-dessous.', 'empty'));
+    // Add someone from the firm.
+    var addFirm = el('div', null, 'team-add');
+    var who = document.createElement('select'); who.setAttribute('aria-label', 'Personne du cabinet'); who.appendChild(new Option('Ajouter quelqu’un du cabinet…', ''));
+    (o.firm_people || []).filter(function (p) { return !draft.some(function (m) { return m.name === p.name; }); }).forEach(function (p) { who.appendChild(new Option(p.name + (p.title ? ' — ' + p.title : '') + (p.load_pct != null ? ' (charge ' + p.load_pct + ' %)' : ''), p.name)); });
+    var whoRole = roleSelect('Auditeur');
+    var addOne = el('button', 'Ajouter', 'btn ghost'); addOne.type = 'button';
+    addOne.addEventListener('click', function () { var p = (o.firm_people || []).find(function (x) { return x.name === who.value; }); if (!p) { who.focus(); return; } draft.push({ name: p.name, email: p.email, role: whoRole.value, load_pct: p.load_pct }); redraw(); });
+    addFirm.appendChild(who); addFirm.appendChild(whoRole); addFirm.appendChild(addOne); box.appendChild(addFirm);
+    // Add an external specialist by hand.
+    var addExt = el('div', null, 'team-add');
+    var exName = input('Spécialiste externe : nom'), exRole = input('Spécialité / rôle'), exContact = input('Contact (facultatif)');
+    var addX = el('button', 'Ajouter', 'btn ghost'); addX.type = 'button';
+    addX.addEventListener('click', function () { if (!exName.value.trim()) { exName.focus(); return; } draft.push({ name: exName.value.trim(), role: 'Spécialiste', speciality: exRole.value.trim(), contact: exContact.value.trim(), external: true }); redraw(); });
+    addExt.appendChild(exName); addExt.appendChild(exRole); addExt.appendChild(exContact); addExt.appendChild(addX); box.appendChild(addExt);
+    // Posts nobody covers: search specialists in the country (web, with sources), add the right one.
+    var needs = ((t && t.gaps) || []).map(function (g) { return g.requirement; });
+    Object.keys((t && t.specialists) || {}).forEach(function (k) { if (needs.indexOf(k) < 0) needs.push(k); });
+    var spec = el('div', null, 'team-spec');
+    spec.appendChild(el('h3', 'Spécialistes à trouver'));
+    needs.forEach(function (gap) { spec.appendChild(specialistBlock(o, t, gap, draft, redraw)); });
+    var free = el('div', null, 'team-add'), need = input('Autre besoin (ex. expert en évaluation des stocks pétroliers)');
+    var go = el('button', 'Chercher dans le pays', 'btn ghost'); go.type = 'button';
+    go.addEventListener('click', function () { if (!need.value.trim()) { need.focus(); return; } searchSpecialists(o, need.value.trim(), go); });
+    free.appendChild(need); free.appendChild(go); spec.appendChild(free);
+    box.appendChild(spec);
+    var ok = el('button', 'Valider l’équipe', 'btn'); ok.type = 'button';
+    ok.addEventListener('click', function () {
+      if (!draft.length) { $('team-say').textContent = 'Ajoutez au moins une personne.'; return; }
+      ok.disabled = true;
+      api({ action: 'validate-team', opportunity_id: o.id, members: draft.map(function (m) { return { name: m.name, email: m.email || null, role: m.role, external: Boolean(m.external), speciality: m.speciality || null, contact: m.contact || null, source: m.source || null }; }) })
+        .then(function () { delete teamDraft[o.id]; delete teamEdit[o.id]; $('team-say').textContent = 'Équipe validée : les noms sont écrits dans la fiche du classeur ; chaque membre du cabinet reçoit sa déclaration d’indépendance.'; window.reloadOpportunity(); })
+        .catch(function (e) { ok.disabled = false; $('team-say').textContent = msg(e); });
+    });
+    act.appendChild(ok);
+    if (t.status !== 'validated') act.appendChild(proposeBtn(o, t));
+    else { var cancel = el('button', 'Annuler', 'btn ghost'); cancel.type = 'button'; cancel.addEventListener('click', function () { delete teamDraft[o.id]; delete teamEdit[o.id]; redraw(); }); act.appendChild(cancel); }
+    drawMyDeclaration(o, t);
+  }
+  var teamDraft = {}, teamEdit = {};
+  function input(ph) { var x = document.createElement('input'); x.type = 'text'; x.placeholder = ph; x.setAttribute('aria-label', ph); return x; }
+  function roleSelect(v) { var sel = document.createElement('select'); TROLES.forEach(function (r) { sel.appendChild(new Option(r, r)); }); sel.value = TROLES.indexOf(v) >= 0 ? v : 'Auditeur'; sel.setAttribute('aria-label', 'Rôle'); return sel; }
+  function proposeBtn(o, t) {
+    var again = el('button', t ? 'Refaire la proposition' : 'Proposer l’équipe', t ? 'btn ghost' : 'btn'); again.type = 'button';
+    again.addEventListener('click', function () { again.disabled = true; delete teamDraft[o.id]; api({ action: 'propose-team', opportunity_id: o.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { again.disabled = false; $('team-say').textContent = msg(e); }); });
+    return again;
+  }
+  function memberItem(o, t, m, onRemove) {
+    var it = el('div', null, 'item'), tt = el('div', null, 't');
+    tt.appendChild(el('span', m.name + (m.role ? ' — ' + m.role : '') + (m.external ? ' (externe)' : '')));
+    var dec = (o.declarations || {})[(m.email || m.name).toLowerCase()];
+    var meta = t && t.status === 'validated' && !onRemove
+      ? (m.external ? 'Spécialiste externe' + (m.speciality ? ' : ' + m.speciality : '') + ' — à contacter ; déclaration d’indépendance écrite à obtenir' + (m.contact ? ' · ' + m.contact : '') : dec ? 'Indépendance déclarée le ' + UI.dateTime(dec.at) + (dec.threats.length ? ' — ' + dec.threats.length + ' situation(s) à examiner : ' + dec.threats.join(' ; ') : ' — aucune menace') : 'Déclaration d’indépendance attendue')
+      : [m.requirement ? 'Poste du TDR : ' + m.requirement : '', m.speciality || '', m.why || '', m.load_pct != null ? 'charge ' + m.load_pct + ' %' : '', m.contact || ''].filter(Boolean).join(' · ');
+    if (meta) tt.appendChild(el('span', meta, 'meta'));
+    if (m.checks && m.checks.length && !(t && t.status === 'validated' && !onRemove)) {
+      var ck = el('ul', null, 'team-checks');
+      m.checks.forEach(function (c) { ck.appendChild(el('li', (c.met === true ? '✓ ' : c.met === false ? '✗ ' : '? ') + c.criterion + (c.evidence ? ' — ' + c.evidence : ''), c.met === false ? 'miss' : '')); });
+      tt.appendChild(ck);
+    }
+    it.appendChild(tt);
+    if (onRemove) {
+      var sel = roleSelect(m.role); sel.addEventListener('change', function () { m.role = sel.value; });
+      var rm = el('button', 'Retirer', 'btn ghost'); rm.type = 'button'; rm.setAttribute('aria-label', 'Retirer ' + m.name); rm.addEventListener('click', onRemove);
+      it.appendChild(sel); it.appendChild(rm);
+    } else if (dec && dec.threats.length) it.appendChild(el('span', 'À examiner', 'tag warn'));
+    return it;
+  }
+  function specialistBlock(o, t, gap, draft, redraw) {
+    var b = el('div', null, 'spec-gap'), found = ((t && t.specialists) || {})[gap];
+    var head = el('div', null, 'team-add'); head.appendChild(el('span', 'Manque : ' + gap));
+    var go = el('button', found ? 'Chercher à nouveau' : 'Chercher des spécialistes dans le pays', 'btn ghost'); go.type = 'button';
+    go.addEventListener('click', function () { searchSpecialists(o, gap, go); });
+    head.appendChild(go); b.appendChild(head);
+    if (found) {
+      if (!found.list.length) b.appendChild(el('p', found.error ? 'Recherche impossible : ' + found.error : 'Aucun spécialiste trouvé avec une source fiable.', 'meta'));
+      found.list.forEach(function (s) {
+        var it = el('div', null, 'item'), tt = el('div', null, 't');
+        tt.appendChild(el('span', s.name + (s.speciality ? ' — ' + s.speciality : '') + (s.country ? ' · ' + s.country : '')));
+        tt.appendChild(el('span', [s.experience, s.why, s.contact ? 'Contact public : ' + s.contact : ''].filter(Boolean).join(' · '), 'meta'));
+        if (s.source) tt.appendChild(UI.safeLink(s.source, 'Source'));
+        it.appendChild(tt);
+        var already = draft.some(function (m) { return m.name === s.name; });
+        var add = el('button', already ? 'Dans l’équipe' : 'Ajouter à l’équipe', 'btn ghost'); add.type = 'button'; add.disabled = already;
+        add.addEventListener('click', function () { draft.push({ name: s.name, role: 'Spécialiste', speciality: s.speciality || gap, contact: s.contact || null, source: s.source || null, external: true }); redraw(); });
+        it.appendChild(add); b.appendChild(it);
       });
-      act.appendChild(extraName); act.appendChild(extraRole); act.appendChild(ok);
+      b.appendChild(el('p', 'Personne n’a été contacté. Vérifiez la source avant de les appeler.', 'meta'));
     }
-    if (mgr && (!t || t.status === 'failed' || t.status === 'proposed')) {
-      var again = el('button', t ? 'Refaire la proposition' : 'Proposer l’équipe', t ? 'btn ghost' : 'btn'); again.type = 'button';
-      again.addEventListener('click', function () { again.disabled = true; api({ action: 'propose-team', opportunity_id: o.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { again.disabled = false; $('team-say').textContent = msg(e); }); });
-      act.appendChild(again);
-    }
+    return b;
+  }
+  function searchSpecialists(o, gap, btn) {
+    btn.disabled = true; $('team-say').textContent = 'Recherche de spécialistes « ' + gap + ' » (une à deux minutes)…';
+    api({ action: 'find-specialists', opportunity_id: o.id, gap: gap })
+      .then(function () { $('team-say').textContent = ''; window.reloadOpportunity(); })
+      .catch(function (e) { btn.disabled = false; $('team-say').textContent = msg(e); });
+  }
+  function drawMyDeclaration(o, t) {
     // My own declaration (team members only).
     var mine = o.viewer && o.viewer.in_team && t && t.status === 'validated';
     $('indep-card').hidden = !mine || Boolean(o.my_declaration);

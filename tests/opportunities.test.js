@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -408,4 +408,17 @@ test('a possible duplicate carries on when its twin is removed, or when a person
   await notDuplicate('org', {}, { opportunity_id: c.id }, { display_name: 'Awa', role: 'collaborator' }, d);
   c = await run(c.id, d);
   assert.equal(c.status, 'phase0');
+});
+
+test('the team is ours: specialists searched in the country, externals added, they never block the declarations', async () => {
+  const { d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const searchSpecialists = async (org, input) => ({ web: true, specialists: [{ name: 'Cabinet Énergie CI', speciality: 'Stocks pétroliers', country: input.country || 'CI', source: 'https://example.org' }] });
+  await assert.rejects(findSpecialists('org', { opportunity_id: o.id, gap: 'Expert stocks' }, { display_name: 'Awa', role: 'collaborator' }, { ...d, searchSpecialists }), /MANAGER_ONLY/);
+  const f = await findSpecialists('org', { opportunity_id: o.id, gap: 'Expert stocks' }, { display_name: 'Moussa', role: 'manager' }, { ...d, searchSpecialists });
+  assert.equal(f.list[0].name, 'Cabinet Énergie CI');
+  await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'Cabinet Énergie CI', role: 'Spécialiste', external: true, speciality: 'Stocks pétroliers', source: 'https://example.org' }] }, { display_name: 'Moussa', role: 'manager' }, d);
+  const r = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'A. Senior', email: 'senior@cab.ci' }, d);
+  assert.equal(r.all_declared, true, 'the external specialist does not block: their written declaration is obtained outside the app');
 });
