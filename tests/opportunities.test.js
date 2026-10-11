@@ -271,13 +271,14 @@ test('Phase 2 then 3: « poursuivre » → the Firm Manager proposes the team; a
   const { d, fired } = await setup();
   const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
   const o = await run(opportunity.id, d);
-  fired.length = 0;
-  await answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Ama Associée', role: 'partner' }, { ...d, req: { headers: { host: 'x' } } });
-  assert.equal(fired[0].path, '/api/app?route=opportunity-team-step', 'the team is proposed right after « poursuivre »');
-  const ai = async () => ({ provider: 'fake', text: JSON.stringify({ team: [{ name: 'A. Senior', role: 'Senior', why: 'secteur distribution, 40 % de charge' }, { name: 'Inconnu Externe', role: 'Manager', why: 'x' }], gaps: [{ requirement: 'Expert IFRS 17', why: 'personne au cabinet' }] }) });
+  // The team is part of the bid: proposed with the Phase 0 (the TDR's key personnel against the CVs), before the decision.
+  assert.equal(o.team.status, 'proposing');
+  assert.ok(fired.some(f => f.path === '/api/app?route=opportunity-team-step'));
+  const ai = async () => ({ provider: 'fake', text: JSON.stringify({ team: [{ name: 'A. Senior', role: 'Senior', requirement: 'Chef de mission', why: 'secteur distribution, 40 % de charge', checks: [{ criterion: '10 ans d’expérience', met: true, evidence: 'CV : 12 ans' }, { criterion: 'Expert-comptable diplômé', met: null, evidence: 'non indiqué' }] }, { name: 'Inconnu Externe', role: 'Manager', why: 'x' }], gaps: [{ requirement: 'Expert IFRS 17', why: 'personne au cabinet' }] }) });
   const t = await teamStep('org', {}, { opportunity_id: o.id }, { ...d, ai, capabilityContext: async () => ({ people: [{ kind: 'employee', full_name: 'A. Senior', email: 'senior@cab.ci', title: 'Senior', load_pct: 40 }] }) });
   assert.equal(t.team.status, 'proposed');
   assert.deepEqual(t.team.proposed.map(m => m.name), ['A. Senior'], 'nobody outside the firm is proposed');
+  assert.deepEqual(t.team.proposed[0].checks.map(c => c.met), [true, null], 'each requirement of the post checked against the CV');
   assert.equal(t.team.gaps.length, 1);
   await assert.rejects(validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', role: 'Senior' }] }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
   await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'K. Manager', email: 'km@cab.ci', role: 'Manager' }] }, { display_name: 'Ama Associée', role: 'partner' }, d);
@@ -355,4 +356,18 @@ test('questions pop up for the right person: the agents\' question, the Associé
   assert.equal(dec.choice_cell, 'D44'); assert.match(dec.context, /POURSUIVRE VERS PHASE 1/);
   await answerRow('org', { opportunity_id: o.id, sheet: q.sheet, row: q.row, values: { [q.choice_cell]: 'Non' } }, { display_name: 'Awa', role: 'collaborator' }, d);
   assert.equal((await myQuestions('org', { display_name: 'Awa', role: 'collaborator' }, d)).questions.some(x => x.kind === 'question'), false, 'answered once, asked no more');
+});
+
+test('nobody is asked for a Drive link: the fiche facts missing in the workbook are written again when the page opens', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const f = drive.files.get(o.workbook.id);
+  f.buffer = await writeCells(f.buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C56', value: '' }, { sheet: '01_OPPORTUNITE', cell: 'C35', value: '' }]);
+  const view = await opportunityView('org', o.id, { display_name: 'Awa', role: 'collaborator' }, d);
+  const fiche = view.sheets.find(s => s.name === '01_OPPORTUNITE');
+  assert.match(fiche.rows.find(r => r.row === 56).fields[0].value, /^https:\/\/drive\//);
+  assert.equal(fiche.rows.find(r => r.row === 35).fields[0].value, 'SOCIÉTÉ IVOIRIENNE TEST');
+  const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C56' }]);
+  assert.match(back['01_OPPORTUNITE!C56'], /^https:\/\/drive\//);
 });

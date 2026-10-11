@@ -38,6 +38,8 @@
   .opp-locked{font-size:12.5px;color:var(--muted)}
   #team-card select,#team-card input:not([type=checkbox]){width:auto;max-width:100%;font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
   #team-card input[type=checkbox]{width:18px;height:18px}
+  .team-checks{margin:6px 0 0;padding-left:0;list-style:none;font-size:13px;line-height:1.5;color:var(--muted)}
+  .team-checks .miss{color:var(--danger, #A33)}
 </style>
 </head>
 <body>
@@ -317,8 +319,9 @@
         else if (p && !done && Object.keys(p.values || {}).length) q.push({ kind: 'confirm', s: s, r: r, p: p, order: 2 });
       });
     });
+    if (mayReview(role) && o.team && o.team.status === 'proposed') q.push({ kind: 'team', order: 2.5 });
     if (mayReview(role)) agentSections(o).filter(function (x) { return !x.review && x.sheet.open; }).forEach(function (x) { q.push({ kind: 'review', x: x, order: 3 }); });
-    q.forEach(function (it) { it.id = it.kind === 'review' ? 'rev:' + it.x.id : it.s.name + '!' + it.r.row; });
+    q.forEach(function (it) { it.id = it.kind === 'review' ? 'rev:' + it.x.id : it.kind === 'team' ? 'team' : it.s.name + '!' + it.r.row; });
     return q.sort(function (a, b) { return (skipped[a.id] || 0) - (skipped[b.id] || 0) || a.order - b.order; });
   }
   function drawMine(o, role) {
@@ -341,6 +344,20 @@
     };
     var later = function () { var b = el('button', 'Plus tard', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { skipped[it.id] = (skipped[it.id] || 0) + 1; drawMine(o, role); }); return b; };
 
+    if (it.kind === 'team') {
+      var t = o.team;
+      box.appendChild(el('h3', 'Valider l’équipe proposée'));
+      box.appendChild(el('p', t.proposed.length + ' personne(s) proposée(s) d’après les exigences du TDR et les CV' + (t.gaps && t.gaps.length ? ' · ' + t.gaps.length + ' poste(s) non couvert(s) au cabinet' : ''), 'q-ctx'));
+      var tl = el('div', null, 'q-ai'), tu = el('ul');
+      t.proposed.forEach(function (m) { var miss = (m.checks || []).filter(function (c) { return c.met === false; }).length; tu.appendChild(el('li', m.name + ' — ' + (m.requirement || m.role) + (miss ? ' · ' + miss + ' exigence(s) non remplie(s)' : ''))); });
+      (t.gaps || []).forEach(function (g) { tu.appendChild(el('li', 'Manque : ' + g.requirement)); });
+      tl.appendChild(tu); box.appendChild(tl);
+      var trow = el('div', null, 'q-opts');
+      var go = el('button', 'Voir le détail et valider', 'btn'); go.type = 'button';
+      go.addEventListener('click', function () { var c = $('team-card'); if (c) c.scrollIntoView({ behavior: 'smooth' }); });
+      trow.appendChild(go); trow.appendChild(later()); box.appendChild(trow);
+      return;
+    }
     if (it.kind === 'review') {
       var x = it.x;
       box.appendChild(el('h3', 'Relire : ' + (x.section.trim() || x.sheet.title)));
@@ -409,10 +426,10 @@
     if (!show) { $('indep-card').hidden = true; return; }
     var ST = { proposing: 'Le Firm Manager propose…', proposed: 'Proposée — à valider', validated: 'Validée', failed: 'Proposition impossible' };
     $('team-status').textContent = t ? (ST[t.status] || t.status) : 'À proposer';
-    $('team-lead').textContent = !t ? 'Après « poursuivre », le Firm Manager propose l’équipe (compétences, expérience, charge, disponibilité) ; un manager ou l’Associé la valide ; chaque membre fait ensuite sa déclaration d’indépendance.'
+    $('team-lead').textContent = !t ? 'Le Firm Manager propose l’équipe avec la Phase 0 : chaque poste exigé par le TDR, confronté aux CV du cabinet et à la charge de chacun ; un manager ou l’Associé la valide ; chaque membre fait ensuite sa déclaration d’indépendance.'
       : t.status === 'failed' ? 'Arrêt : ' + (t.error === 'NO_TEAM_DATA' ? 'aucune personne du cabinet connue (Équipe et CV).' : t.error)
       : t.status === 'validated' ? 'Validée par ' + (t.validated_by || '?') + ' le ' + UI.dateTime(t.validated_at) + '. Déclarations d’indépendance : ' + t.members.filter(function (m) { return (o.declarations || {})[(m.email || m.name).toLowerCase()]; }).length + '/' + t.members.length + '.'
-      : t.status === 'proposed' ? 'Proposition du Firm Manager : décochez, changez le rôle, ajoutez une personne, puis validez.' : '';
+      : t.status === 'proposed' ? 'Proposition du Firm Manager, poste par poste, d’après les CV : ✓ exigence remplie, ✗ non remplie, ? le CV ne le dit pas. Décochez, changez le rôle, ajoutez une personne, puis validez.' : t.status === 'proposing' ? 'Le Firm Manager lit les exigences du TDR et les CV du cabinet…' : '';
     var box = $('team-list'); box.textContent = '';
     var rows = [];
     var list = t && t.status === 'validated' ? t.members : (t && t.proposed) || [];
@@ -420,7 +437,12 @@
       var it = el('div', null, 'item'), tt = el('div', null, 't');
       tt.appendChild(el('span', m.name + (m.role ? ' — ' + m.role : '')));
       var dec = (o.declarations || {})[(m.email || m.name).toLowerCase()];
-      tt.appendChild(el('span', t.status === 'validated' ? (dec ? 'Indépendance déclarée le ' + UI.dateTime(dec.at) + (dec.threats.length ? ' — ' + dec.threats.length + ' situation(s) à examiner : ' + dec.threats.join(' ; ') : ' — aucune menace') : 'Déclaration d’indépendance attendue') : (m.why || '') + (m.load_pct != null ? ' · charge ' + m.load_pct + ' %' : ''), 'meta'));
+      tt.appendChild(el('span', t.status === 'validated' ? (dec ? 'Indépendance déclarée le ' + UI.dateTime(dec.at) + (dec.threats.length ? ' — ' + dec.threats.length + ' situation(s) à examiner : ' + dec.threats.join(' ; ') : ' — aucune menace') : 'Déclaration d’indépendance attendue') : (m.requirement ? 'Poste du TDR : ' + m.requirement + ' · ' : '') + (m.why || '') + (m.load_pct != null ? ' · charge ' + m.load_pct + ' %' : ''), 'meta'));
+      if (t.status !== 'validated' && m.checks && m.checks.length) {
+        var ck = el('ul', null, 'team-checks');
+        m.checks.forEach(function (c) { ck.appendChild(el('li', (c.met === true ? '✓ ' : c.met === false ? '✗ ' : '? ') + c.criterion + (c.evidence ? ' — ' + c.evidence : ''), c.met === false ? 'miss' : '')); });
+        tt.appendChild(ck);
+      }
       it.appendChild(tt);
       if (t.status === 'proposed' && mgr) {
         var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true; cb.setAttribute('aria-label', 'Garder ' + m.name);
