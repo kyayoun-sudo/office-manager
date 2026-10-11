@@ -88,6 +88,16 @@
       </div>
     </section>
 
+    <section class="card" id="rights-area" aria-labelledby="h-rights" hidden>
+      <h2 id="h-rights">Droits : qui voit quel écran, à quel niveau</h2>
+      <p class="hint" style="margin:0">Chaque rôle a un niveau par écran : aucun, voir, préparer, revoir, approuver, signer, administrer. « Seulement ses missions » limite le niveau aux missions où la personne a une fonction. Les associés ajustent ces droits pour le cabinet ; personne ne peut monter le niveau de son propre rôle, et le responsable informatique n’ouvre jamais les dossiers des clients. Les règles automatiques (ci-dessous) retirent un droit même quand la matrice le donne. Les agents IA ne dépassent jamais « préparer ».</p>
+      <div id="rights-matrix" style="overflow-x:auto"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn" id="rights-save" type="button">Enregistrer les droits</button><button class="btn ghost" id="rights-reset" type="button">Revenir aux droits par défaut</button><span class="status" id="rights-status" role="status" aria-live="polite"></span></div>
+      <details><summary style="cursor:pointer;font-weight:600;padding:6px 0">Actions sensibles : qui prépare, qui décide</summary><div id="rights-actions"></div></details>
+      <details><summary style="cursor:pointer;font-weight:600;padding:6px 0">Règles automatiques</summary><ul id="rights-rules" style="margin:6px 0;padding-left:18px;line-height:1.6"></ul></details>
+      <details><summary style="cursor:pointer;font-weight:600;padding:6px 0">Postes d’un cabinet et rôle donné par défaut</summary><div id="rights-positions"></div></details>
+    </section>
+
     <div class="row" id="owner-area" hidden>
       <div class="grow">
         <section class="card" id="google" aria-labelledby="h-google" style="border-left:4px solid var(--brand)">
@@ -641,7 +651,7 @@
 
   // ---- Accounts, roles, positions (owner, partners, IT administrator — personal session) ----
   var ROLE_LABEL = (OM.ROLE_LABELS || {});
-  var ROLE_ORDER = ['auditor', 'senior', 'supervisor', 'manager', 'quality_reviewer', 'secretary', 'it_admin', 'partner', 'owner', 'collaborator'];
+  var ROLE_ORDER = ['auditor', 'senior', 'supervisor', 'manager', 'bdm', 'quality_reviewer', 'secretary', 'it_admin', 'partner', 'owner', 'collaborator'];
   var accounts = [];
   Object.assign(ERRORS, {
     WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
@@ -824,6 +834,62 @@
       .then(function () { b.disabled = false; });
   });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(load, 800); }); else setTimeout(load, 800);
+})();
+</script>
+<script>
+// Paramètres → Droits (2026-10-11): the matrix screens × roles, adjustable by the partners.
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el, $ = function (id) { return document.getElementById(id); };
+  if (!OM || !OM.hasPersonalSession || !OM.hasPersonalSession()) return;
+  var role = OM.getRole(); if (['owner', 'partner', 'it_admin'].indexOf(role) < 0) return;
+  var data = null, changes = {};
+  var ERR = { NO_SELF_ELEVATION: 'Vous ne pouvez pas monter le niveau de votre propre rôle.', PARTNERS_ONLY: 'Seuls les associés modifient les droits.', ROLES_SQL_NOT_INSTALLED: 'Installez d’abord db/roles.sql dans Supabase.' };
+  function say(t, bad) { $('rights-status').textContent = t || ''; $('rights-status').className = 'status' + (bad ? ' error' : ''); }
+  function cellValue(c) { return c.level + (c.mine ? '*' : ''); }
+  function render() {
+    var editable = role === 'owner' || role === 'partner';
+    var box = $('rights-matrix'); box.textContent = '';
+    var t = document.createElement('table'), head = document.createElement('tr');
+    head.appendChild(el('th', 'Écran'));
+    data.roles.forEach(function (r) { head.appendChild(el('th', data.role_labels[r] || r)); });
+    var th = document.createElement('thead'); th.appendChild(head); t.appendChild(th);
+    var tb = document.createElement('tbody');
+    Object.keys(data.screens).forEach(function (s) {
+      var tr = document.createElement('tr'); tr.appendChild(el('th', data.screens[s].label));
+      data.roles.forEach(function (r) {
+        var td = document.createElement('td'), c = data.matrix[r][s];
+        if (!editable) { td.textContent = data.level_labels[c.level] + (c.mine ? ' (ses missions)' : ''); tr.appendChild(td); return; }
+        var sel = document.createElement('select'); sel.setAttribute('aria-label', data.screens[s].label + ' — ' + (data.role_labels[r] || r));
+        sel.style.cssText = 'font:inherit;font-size:13px;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--surface)';
+        data.levels.forEach(function (l) { sel.appendChild(new Option(data.level_labels[l], l)); if (l !== 'none' && l !== 'admin') sel.appendChild(new Option(data.level_labels[l] + ' (ses missions)', l + '*')); });
+        sel.value = cellValue(c);
+        if (r === 'it_admin' && ['acceptance', 'mission', 'engagement_letter', 'pbc', 'workpapers', 'documents', 'quality', 'billing', 'tenders', 'opportunities'].indexOf(s) >= 0) sel.disabled = true;
+        sel.addEventListener('change', function () { changes[r + '|' + s] = { role: r, screen: s, value: sel.value }; say(Object.keys(changes).length + ' changement(s) à enregistrer.'); });
+        td.appendChild(sel); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); box.appendChild(t);
+    $('rights-save').hidden = $('rights-reset').hidden = !editable;
+    $('rights-actions').textContent = '';
+    $('rights-actions').appendChild(UI.table(['Action', 'Prépare', 'Décide', 'L’IA peut', 'Règles'], Object.keys(data.actions).map(function (k) {
+      var a = data.actions[k], lab = function (xs) { return xs.map(function (x) { return x === '*self' ? 'la personne elle-même' : (data.role_labels[x] || x); }).join(', ') || '—'; };
+      return [a.label, lab(a.prepare), lab(a.decide), a.ai, a.rules.map(function (r) { return data.rules[r]; }).join(' ')];
+    })));
+    $('rights-rules').textContent = ''; Object.keys(data.rules).forEach(function (k) { $('rights-rules').appendChild(el('li', data.rules[k])); });
+    $('rights-positions').textContent = '';
+    $('rights-positions').appendChild(UI.table(['Poste', 'Famille', 'Niveau', 'Rôle par défaut'], data.positions.map(function (p) { return [p.label, p.family, p.level == null ? '—' : p.level, data.role_labels[p.role] || p.role]; })));
+  }
+  function load() { return OM.api('/api/app?route=permissions').then(function (d) { if (!d.matrix) return; data = d; changes = {}; $('rights-area').hidden = false; render(); }).catch(function () {}); }
+  function save(body) {
+    say('Enregistrement…');
+    OM.api('/api/app?route=permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function () { try { window.sessionStorage.removeItem('officeManagerMyRights'); } catch (e) { /* no storage */ } say('Droits enregistrés.'); return load(); })
+      .catch(function (e) { say(ERR[e.message] || e.message, true); });
+  }
+  $('rights-save').addEventListener('click', function () { var list = Object.keys(changes).map(function (k) { return changes[k]; }); if (!list.length) { say('Aucun changement.'); return; } save({ changes: list }); });
+  $('rights-reset').addEventListener('click', function () { if (window.confirm('Revenir aux droits par défaut pour tous les rôles ?')) save({ reset: true, changes: [] }); });
+  load();
 })();
 </script>
 </body>

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veille des appels d’offres</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .td-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+  .td-card h3{margin:0;font-size:16px;line-height:1.4}
+  .td-meta{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+  .td-reco{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.5}
+  .td-reco p{margin:0 0 4px}
+  .td-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .td-actions select,.td-actions input{font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+  .td-shadow{border-left:3px solid var(--brand);padding:8px 12px;font-size:14px;line-height:1.5}
+  .td-shadow p,.td-shadow ul{margin:0 0 6px}
+  .score{font-weight:800}
+  details>summary{cursor:pointer;font-size:13.5px;color:var(--muted);padding:4px 0}
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .settings-grid textarea{min-height:110px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/veille.html" aria-current="page">Veille des appels d’offres</a>
+    <a href="/opportunites.html">Opportunités</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/equipe.html">Équipe</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/messagerie.html">Messagerie</a>
+    <a href="/assistant.html">Assistant</a>
+    <a href="/entrainement.html">Entraînement</a>
+    <a href="/mise-en-service.html">Mise en service</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Veille des appels d’offres</h1>
+      <p class="lead">Chaque jour, la veille cherche les appels d’offres dans vos zones, vérifie leur date limite et propose une équipe tirée de vos CV. Un associé décide de suivre ou non ; le Business Development Manager obtient le TDR, crée l’opportunité, puis enregistre le dépôt et le résultat.</p>
+    </header>
+
+    <section class="kpis" id="kpis" aria-label="Indicateurs"></section>
+
+    <section class="card" aria-labelledby="h-list">
+      <h2 id="h-list">Appels d’offres</h2>
+      <div class="chips" id="filters" role="group" aria-label="Filtrer"></div>
+      <div class="stack" id="list"><p class="empty">Chargement…</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-load">
+      <h2 id="h-load">Charge de travail</h2>
+      <p class="meta" id="load-lead"></p>
+      <div id="load"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-companies">
+      <h2 id="h-companies">Entreprises à approcher</h2>
+      <p class="meta">Entreprises qui s’implantent dans vos zones. Aucun contact n’est pris sans votre validation.</p>
+      <div id="companies"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-runs">
+      <h2 id="h-runs">Passages de la veille</h2>
+      <div class="td-actions"><button class="btn ghost" id="run" type="button">Lancer la veille maintenant</button><span class="status" id="run-say" role="status" aria-live="polite"></span></div>
+      <div id="runs"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-settings" id="settings-card" hidden>
+      <h2 id="h-settings">Réglages de la veille</h2>
+      <p class="meta">Les associés règlent ce que la veille cherche et qui décide. Les destinataires du rapport sont les associés et les Business Development Managers du cabinet, plus les adresses ajoutées ici (du cabinet seulement).</p>
+      <div class="settings-grid">
+        <div class="field"><label for="s-zones">Pays et zones (un par ligne)</label><textarea id="s-zones"></textarea></div>
+        <div class="field"><label for="s-types">Types de missions (un par ligne)</label><textarea id="s-types"></textarea></div>
+        <div class="field"><label for="s-sources">Sources à consulter (une par ligne)</label><textarea id="s-sources"></textarea></div>
+      </div>
+      <div class="settings-grid">
+        <div class="field"><label for="s-deciders">Qui décide de suivre un avis</label>
+          <select id="s-deciders"><option value="partners">N’importe quel associé</option><option value="business_partner">L’associé du développement commercial (Opportunités)</option><option value="named">Les personnes nommées ci-dessous</option></select></div>
+        <div class="field"><label for="s-named">Personnes nommées (e-mails, un par ligne)</label><textarea id="s-named" style="min-height:60px"></textarea></div>
+        <div class="field"><label for="s-extra">Autres destinataires du rapport (e-mails du cabinet)</label><textarea id="s-extra" style="min-height:60px"></textarea></div>
+      </div>
+      <div class="settings-grid">
+        <div class="field"><label for="s-min">Montant minimum (facultatif)</label><input id="s-min" type="number" min="0" step="1"></div>
+        <div class="field"><label for="s-hour">Heure du passage quotidien</label><input id="s-hour" type="number" min="5" max="20"></div>
+        <div class="field"><label for="s-prep">Jours de préparation d’une offre (par défaut)</label><input id="s-prep" type="number" min="1" max="60"></div>
+      </div>
+      <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="s-enabled"> Veille quotidienne active</label>
+      <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="s-companies"> Chercher aussi les entreprises à approcher</label>
+      <div class="td-actions"><button class="btn" id="s-save" type="button">Enregistrer</button><span class="status" id="s-say" role="status" aria-live="polite"></span></div>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var ERR = {
+    ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas cette action.', NOT_THE_NAMED_DECIDER: 'Le cabinet a nommé d’autres personnes pour décider.', DECLINE_REASON_REQUIRED: 'Choisissez une raison.',
+    FOLLOW_DECISION_FIRST: 'Un associé doit d’abord décider de suivre cet avis.', SUBMISSION_FIRST: 'Enregistrez d’abord le dépôt de l’offre.', TENDER_ALREADY_IN_PROGRESS: 'Cet avis est déjà en cours.',
+    OUTCOME_REQUIRED: 'Choisissez le résultat.', NO_REVIEW_TO_DECIDE: 'Pas de revue à valider.', ROLES_SQL_NOT_INSTALLED: 'Installez d’abord db/roles.sql dans Supabase.',
+    WEB_RESEARCH_UNAVAILABLE: 'Aucune IA avec recherche web n’est configurée.'
+  };
+  var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || ERR[m.split(':')[0]] || m; };
+  var api = function (body) { return OM.api('/api/app?route=tenders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
+  var FILTERS = [['decide', 'À décider', ['new']], ['followed', 'Suivis', ['followed', 'tdr', 'opportunity']], ['submitted', 'Déposés', ['submitted']], ['results', 'Résultats', ['won', 'lost', 'no_follow']], ['watch', 'À surveiller', ['watch']], ['all', 'Tout', null]];
+  var filter = 'decide', data = null;
+  var focus = new URLSearchParams(location.search).get('id');
+  var money = function (n) { return n == null ? '' : Number(n).toLocaleString('fr-FR'); };
+
+  function kpi(label, value, small) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', value == null ? '–' : String(value))); if (small) k.appendChild(el('small', small)); return k; }
+  function paintKpis(k) {
+    var box = $('kpis'); box.textContent = '';
+    box.appendChild(kpi('Avis reçus', k.received));
+    box.appendChild(kpi('Suivis', k.followed, k.rates.selection == null ? '' : k.rates.selection + ' % des avis'));
+    box.appendChild(kpi('Offres déposées', k.submitted, k.missed_deadlines ? k.missed_deadlines + ' date(s) limite manquée(s)' : ''));
+    box.appendChild(kpi('Gagnées', k.won, k.rates.success == null ? 'taux de succès : pas encore de résultat' : 'taux de succès ' + k.rates.success + ' %'));
+    box.appendChild(kpi('Délai de décision', k.delays_days.received_to_decision == null ? null : k.delays_days.received_to_decision + ' j', 'de la réception à la décision'));
+    box.appendChild(kpi('TDR → dépôt', k.delays_days.tdr_to_submission == null ? null : k.delays_days.tdr_to_submission + ' j', k.delays_days.margin_before_deadline == null ? '' : 'marge avant la date limite : ' + k.delays_days.margin_before_deadline + ' j'));
+  }
+
+  function paintFilters() {
+    var box = $('filters'); box.textContent = '';
+    FILTERS.forEach(function (f) {
+      var n = data.tenders.filter(function (t) { return !f[2] || f[2].indexOf(t.stage) >= 0; }).length;
+      var c = el('button', f[1] + ' (' + n + ')', 'chip'); c.type = 'button'; c.setAttribute('aria-pressed', String(filter === f[0]));
+      c.addEventListener('click', function () { filter = f[0]; paintFilters(); paintList(); }); box.appendChild(c);
+    });
+  }
+
+  function act(btn, body, say, after) {
+    btn.disabled = true; say.className = 'status'; say.textContent = '…';
+    return api(body).then(function (r) { say.textContent = 'Enregistré.'; if (after) after(r); else load(); })
+      .catch(function (e) { say.className = 'status error'; say.textContent = msg(e); }).then(function () { btn.disabled = false; });
+  }
+
+  function card(t) {
+    var c = el('article', null, 'td-card'); if (t.id === focus) c.style.borderColor = 'var(--brand)';
+    var h = el('h3', t.title); c.appendChild(h);
+    var tag = el('span', t.stage_label, 'tag' + (t.stage === 'watch' || t.stage === 'expired' ? ' neutral' : '')); h.appendChild(document.createTextNode(' ')); h.appendChild(tag);
+    c.appendChild(el('p', [t.buyer, t.country, t.mission_type, t.reference ? 'réf. ' + t.reference : '', t.funder ? 'financement : ' + t.funder : ''].filter(Boolean).join(' · '), 'td-meta'));
+    var dl = el('p', null, 'td-meta');
+    dl.appendChild(document.createTextNode('Date limite : ' + (t.deadline || 'inconnue') + (t.verified ? ' (vérifiée' : ' (non vérifiée — jamais recommandée')));
+    if (t.deadline_source) { dl.appendChild(document.createTextNode(' sur ')); dl.appendChild(UI.safeLink(t.deadline_source, 'la source')); }
+    dl.appendChild(document.createTextNode(')' + (t.status_note ? ' · ' + t.status_note : '') + ' · reçu le ' + UI.date(t.received_at)));
+    c.appendChild(dl);
+    if (t.summary) c.appendChild(el('p', t.summary, 'td-meta'));
+    var r = t.recommendation;
+    if (r) {
+      var box = el('div', null, 'td-reco');
+      var p = el('p'); p.appendChild(el('span', r.bid + ' · ', 'score')); p.appendChild(el('span', r.score + '/100', 'score')); p.appendChild(document.createTextNode(' — ' + r.why + ' (recommandation du Firm Manager : l’associé décide)')); box.appendChild(p);
+      box.appendChild(el('p', 'Chef de file proposé : ' + (r.lead || 'à désigner') + ' · équipe : ' + (r.team.map(function (m) { return m.name + ' (' + m.role + ')'; }).join(', ') || '—')));
+      if (r.missing.length) box.appendChild(el('p', 'À chercher chez des experts partenaires : ' + r.missing.join(', ')));
+      box.appendChild(el('p', 'Préparation estimée : ' + r.prep_days + ' j' + (r.mission_days ? ' · mission si gagnée : ' + r.mission_days + ' j' : '')));
+      if (r.compliance.length) { var dt = el('details'); dt.appendChild(el('summary', 'Matrice de conformité (' + r.compliance.length + ')')); dt.appendChild(UI.table(['Exigence', 'Statut', 'Par'], r.compliance.map(function (x) { return [x.requirement, x.status, x.by]; }))); box.appendChild(dt); }
+      c.appendChild(box);
+    }
+    if (t.decision) c.appendChild(el('p', (t.decision.follow ? 'Suivi' : 'Écarté : ' + t.decision.reason) + ' — ' + t.decision.by + ', ' + UI.date(t.decision.at), 'td-meta'));
+    if (t.source_url) { var src = el('p', null, 'td-meta'); src.appendChild(UI.safeLink(t.source_url, 'Voir l’avis')); c.appendChild(src); }
+
+    var a = el('div', null, 'td-actions'), say = el('span', '', 'status'); say.setAttribute('role', 'status');
+    var role = data.me.role, bdmLike = ['bdm', 'owner', 'partner'].indexOf(role) >= 0;
+    if (['new', 'watch', 'declined'].indexOf(t.stage) >= 0 && data.me.may_decide) {
+      var yes = el('button', 'On suit', 'btn'); yes.type = 'button';
+      yes.addEventListener('click', function () { act(yes, { action: 'decide', id: t.id, follow: true }, say); });
+      var why = document.createElement('select'); why.setAttribute('aria-label', 'Raison');
+      why.appendChild(new Option('Raison si on ne suit pas…', ''));
+      data.decline_reasons.forEach(function (x) { why.appendChild(new Option(x, x)); });
+      var no = el('button', 'On ne suit pas', 'btn ghost'); no.type = 'button';
+      no.addEventListener('click', function () { act(no, { action: 'decide', id: t.id, follow: false, reason: why.value }, say); });
+      a.appendChild(yes);
+      if (t.stage !== 'declined') { a.appendChild(why); a.appendChild(no); }
+      if (data.workload && t.recommendation) c.appendChild(el('p', 'Avant de décider : ' + data.workload.bids_in_preparation + ' offre(s) déjà en préparation (' + data.workload.prep_days + ' j) et ' + data.workload.probable_mission_days + ' j de missions probables (voir « Charge de travail »).', 'td-meta'));
+    } else if (t.stage === 'new' && !data.me.may_decide) a.appendChild(el('span', 'En attente de la décision d’un associé.', 'meta'));
+    if (t.stage === 'followed' && bdmLike) {
+      var tdr = el('button', 'TDR obtenu → créer l’opportunité', 'btn'); tdr.type = 'button';
+      tdr.addEventListener('click', function () { act(tdr, { action: 'tdr', id: t.id }, say, function (res) { location.href = res.create_opportunity; }); });
+      a.appendChild(tdr);
+    }
+    if (t.stage === 'tdr' && bdmLike) { var go = el('a', 'Créer l’opportunité avec le TDR', 'btn'); go.href = '/opportunites.html?tender=' + encodeURIComponent(t.id); a.appendChild(go); }
+    if (t.opportunity_id) { var op = el('a', 'Ouvrir l’opportunité', 'btn ghost'); op.href = '/opportunites.html?id=' + encodeURIComponent(t.opportunity_id); a.appendChild(op); }
+    if (['tdr', 'opportunity'].indexOf(t.stage) >= 0 && bdmLike) {
+      var d = document.createElement('input'); d.type = 'date'; d.setAttribute('aria-label', 'Date de dépôt'); d.value = new Date().toISOString().slice(0, 10);
+      var amt = document.createElement('input'); amt.type = 'number'; amt.min = '0'; amt.placeholder = 'Montant proposé'; amt.setAttribute('aria-label', 'Montant proposé');
+      var sub = el('button', 'Offre déposée', 'btn ghost'); sub.type = 'button';
+      sub.addEventListener('click', function () { act(sub, { action: 'submitted', id: t.id, date: d.value, amount: amt.value }, say); });
+      a.appendChild(d); a.appendChild(amt); a.appendChild(sub);
+    }
+    if (t.submitted_at) c.appendChild(el('p', 'Déposée le ' + UI.date(t.submitted_at) + (t.amount_proposed ? ' · ' + money(t.amount_proposed) + ' ' + (t.currency || '') : ''), 'td-meta'));
+    if (t.stage === 'submitted' && bdmLike) {
+      var out = document.createElement('select'); out.setAttribute('aria-label', 'Résultat');
+      [['', 'Résultat…'], ['won', 'Gagné'], ['lost', 'Perdu'], ['no_follow', 'Sans suite']].forEach(function (x) { out.appendChild(new Option(x[1], x[0])); });
+      var rs = document.createElement('input'); rs.placeholder = 'Motif communiqué'; rs.setAttribute('aria-label', 'Motif');
+      var win = document.createElement('input'); win.placeholder = 'Cabinet retenu'; win.setAttribute('aria-label', 'Cabinet retenu');
+      var wp = document.createElement('input'); wp.type = 'number'; wp.placeholder = 'Son prix'; wp.setAttribute('aria-label', 'Prix du cabinet retenu');
+      var rb = el('button', 'Enregistrer le résultat', 'btn ghost'); rb.type = 'button';
+      rb.addEventListener('click', function () { act(rb, { action: 'result', id: t.id, outcome: out.value, reason: rs.value, winner: win.value, winner_price: wp.value }, say); });
+      [out, rs, win, wp, rb].forEach(function (x) { a.appendChild(x); });
+    }
+    if (t.result) c.appendChild(el('p', 'Résultat : ' + (data.stage_labels[t.result.outcome] || t.result.outcome) + (t.result.reason ? ' — ' + t.result.reason : '') + (t.result.winner ? ' · retenu : ' + t.result.winner : '') + (t.result.winner_price ? ' (' + money(t.result.winner_price) + ')' : ''), 'td-meta'));
+    var sr = t.shadow_review;
+    if (sr) {
+      var s = el('div', null, 'td-shadow');
+      if (sr.status === 'shared') {
+        s.appendChild(el('p', 'Recommandation validée par un associé pour les prochaines offres :'));
+        var ul = el('ul'); (sr.improvements || []).forEach(function (x) { ul.appendChild(el('li', x)); }); s.appendChild(ul);
+      } else if (sr.status === 'pending') {
+        s.appendChild(el('p', 'Shadow n’a pas encore revu cette offre perdue' + (sr.error ? ' (' + sr.error + ')' : '') + '.'));
+        if (data.me.sees_shadow) { var rr = el('button', 'Lancer la revue de Shadow', 'btn ghost'); rr.type = 'button'; rr.addEventListener('click', function () { act(rr, { action: 'review-run', id: t.id }, say); }); s.appendChild(rr); }
+      } else {
+        s.appendChild(el('p', 'Shadow — pourquoi nous n’avons pas été retenus (' + (sr.status === 'proposed' ? 'proposition à valider' : sr.status === 'validated' ? 'validé par ' + sr.decided_by : 'rejeté par ' + sr.decided_by) + ', confiance ' + sr.confidence + ') :'));
+        var cu = el('ul'); (sr.causes || []).forEach(function (x) { cu.appendChild(el('li', x.cause + (x.fact ? ' — ' + x.fact : ''))); }); s.appendChild(cu);
+        s.appendChild(el('p', 'Améliorer : ' + (sr.improvements || []).join(' ; ')));
+        if (sr.status === 'proposed') {
+          var share = document.createElement('input'); share.type = 'checkbox'; share.id = 'share-' + t.id;
+          var lab = el('label', ' Transmettre au BDM comme recommandation'); lab.htmlFor = share.id; lab.insertBefore(share, lab.firstChild);
+          var ok = el('button', 'Valider (devient une leçon)', 'btn'); ok.type = 'button'; ok.addEventListener('click', function () { act(ok, { action: 'review-decide', id: t.id, accept: true, share: share.checked }, say); });
+          var ko = el('button', 'Rejeter', 'btn ghost'); ko.type = 'button'; ko.addEventListener('click', function () { act(ko, { action: 'review-decide', id: t.id, accept: false }, say); });
+          var row = el('div', null, 'td-actions'); [lab, ok, ko].forEach(function (x) { row.appendChild(x); }); s.appendChild(row);
+        }
+      }
+      c.appendChild(s);
+    }
+    a.appendChild(say); c.appendChild(a);
+    if (t.history && t.history.length) { var hd = el('details'); hd.appendChild(el('summary', 'Historique (' + t.history.length + ')')); var hl = el('ul'); t.history.forEach(function (x) { hl.appendChild(el('li', UI.dateTime(x.at) + ' — ' + x.what)); }); hd.appendChild(hl); c.appendChild(hd); }
+    return c;
+  }
+
+  function paintList() {
+    var f = FILTERS.filter(function (x) { return x[0] === filter; })[0];
+    var list = data.tenders.filter(function (t) { return !f[2] || f[2].indexOf(t.stage) >= 0 || t.id === focus; });
+    var box = $('list'); box.textContent = '';
+    if (!list.length) box.appendChild(el('p', filter === 'decide' ? 'Rien à décider pour l’instant.' : 'Aucun appel d’offres ici.', 'empty'));
+    list.forEach(function (t) { box.appendChild(card(t)); });
+  }
+
+  function paintLoad(w) {
+    $('load-lead').textContent = w.bids_in_preparation + ' offre(s) en préparation (' + w.prep_days + ' j), ' + w.submitted_pending + ' offre(s) déposée(s) en attente, soit ' + w.probable_mission_days + ' j de missions probables (taux de succès retenu : ' + w.success_rate_used + ' %).';
+    var box = $('load'); box.textContent = '';
+    if (!w.per_person.length) { box.appendChild(el('p', 'Aucune personne engagée sur une offre pour l’instant.', 'empty')); return; }
+    box.appendChild(UI.table(['Personne', 'Offres en préparation', 'Jours de préparation', 'Jours de mission probables', 'Charge actuelle'], w.per_person.map(function (p) { return [p.name, p.bids, p.prep_days, p.probable_days, p.load_pct == null ? '' : p.load_pct + ' %']; })));
+  }
+
+  function paintCompanies(list) {
+    var box = $('companies'); box.textContent = '';
+    if (!list.length) { box.appendChild(el('p', 'Aucune pour l’instant.', 'empty')); return; }
+    box.appendChild(UI.table(['Entreprise', 'Origine → pays', 'Ce qui se passe', 'Besoin probable', 'Source'], list.map(function (c) { return [c.name, [c.origin, c.country].filter(Boolean).join(' → '), c.event, c.need, c.source ? UI.safeLink(c.source, 'source') : '']; })));
+  }
+
+  function paintRuns(d) {
+    var box = $('runs'); box.textContent = '';
+    if (d.running) box.appendChild(el('p', 'Passage en cours (' + d.running.stage + '), lancé ' + UI.dateTime(d.running.at) + '.', 'meta'));
+    if (!d.runs.length) { box.appendChild(el('p', 'Aucun passage encore.', 'empty')); return; }
+    box.appendChild(UI.table(['Jour', 'Trouvés', 'Nouveaux', 'Mis à jour', 'Excel vérifié', 'Rapport envoyé'], d.runs.map(function (r) {
+      return [r.day, r.search ? r.search.found : '', r.search ? r.search.new : '', r.search ? r.search.updated : '', r.pipeline ? (r.pipeline.verified ? (r.pipeline.url ? UI.safeLink(r.pipeline.url, 'oui') : 'oui') : 'non') : '',
+        r.error ? 'arrêt : ' + r.error : r.mail ? (r.mail.sent ? 'oui (' + r.mail.to.length + ' personne(s))' : 'non : ' + r.mail.reason) : ''];
+    })));
+  }
+
+  function lines(v) { return (v || []).join('\n'); }
+  function paintSettings(s) {
+    if (!data.me.may_settings) return;
+    $('settings-card').hidden = false;
+    $('s-zones').value = lines(s.zones); $('s-types').value = lines(s.mission_types); $('s-sources').value = lines(s.sources);
+    $('s-deciders').value = s.deciders || 'partners'; $('s-named').value = lines(s.named_deciders); $('s-extra').value = lines(s.extra_recipients);
+    $('s-min').value = s.min_amount || ''; $('s-hour').value = s.hour || 7; $('s-prep').value = s.prep_days_default || 5;
+    $('s-enabled').checked = s.enabled !== false; $('s-companies').checked = s.companies !== false;
+  }
+  $('s-save').addEventListener('click', function () {
+    act(this, { action: 'settings', zones: $('s-zones').value, mission_types: $('s-types').value, sources: $('s-sources').value, deciders: $('s-deciders').value, named_deciders: $('s-named').value,
+      extra_recipients: $('s-extra').value, min_amount: $('s-min').value, hour: $('s-hour').value, prep_days_default: $('s-prep').value, enabled: $('s-enabled').checked, companies: $('s-companies').checked }, $('s-say'));
+  });
+  $('run').addEventListener('click', function () {
+    var b = this; act(b, { action: 'run' }, $('run-say'), function (r) { $('run-say').textContent = r.started ? 'La veille travaille : comptez quelques minutes.' : r.skipped === 'ALREADY_RUNNING' ? 'Un passage est déjà en cours.' : String(r.skipped || ''); setTimeout(load, 4000); });
+  });
+
+  function load() {
+    OM.api('/api/app?route=tenders').then(function (d) {
+      data = d;
+      if (focus) { var t = d.tenders.filter(function (x) { return x.id === focus; })[0]; if (t) filter = 'all'; }
+      paintKpis(d.kpis); paintFilters(); paintList(); paintLoad(d.workload); paintCompanies(d.companies); paintRuns(d); paintSettings(d.settings);
+    }).catch(function (e) { UI.fail($('list'), { message: msg(e) }); });
+  }
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });
+})();
+</script>
+</body>
+</html>

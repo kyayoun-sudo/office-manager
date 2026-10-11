@@ -1,6 +1,7 @@
 # Office Manager AI — à lire avant toute modification
 
-Projet de Paul KOMENAN (cabinet TATY & Associés). Ce fichier est la mémoire de projet de Claude :
+Projet de Paul KOMENAN (cabinet TATY & Associés, premier cabinet utilisateur). **Le produit est pour tous les cabinets
+(Paul, 2026-10-11)** : rien de propre à TATY dans le code ; ce qui varie se règle dans Paramètres. Ce fichier est la mémoire de projet de Claude :
 il est lu au début de chaque session. La pensée générale du produit est dans `docs/architecture/` et
 **ne doit jamais être modifiée par du code** : on consolide l'existant, on ne reconstruit pas.
 
@@ -50,7 +51,9 @@ Supabase cron (office-manager-unified-scheduler, */5)
 | Orpailleur (Document Intelligence) | Detect → Read → Understand → Attach → Name → File → Verify → Remember | `lib/tidy-plan.js` (le cerveau), `lib/orpailleur-ask.js`, `lib/orpailleur-journal.js`, `lib/mapping-scan.js` |
 | Sika | honoraires, factures, encaissements (annoncé ≠ vérifié) | passages `sika` dans `lib/agent-passes.js` |
 | « Mon IA » | chaque personne peut connecter sa propre IA (clé chiffrée, avertissement versionné accepté) ; ses demandes l'essaient d'abord, l'IA du cabinet prend le relais ; les associés peuvent l'interdire | `lib/personal-ai.js` (crochet en tête de `firstAvailable`), `mon-ia.html`, `db/personal-ai.sql` |
-| Shadow | labo d'apprentissage, leçons validées par un humain ; **propose du code** pour tous les agents et lui-même (branche + PR en brouillon, jamais fusionnée ni déployée par lui ; garde-fous intouchables) | `lib/shadow.js`, `lib/shadow-code.js`, `lib/shadow-guard.js` (propriétaire seulement, onglet « Code » d'Entraînement ; connexion `SHADOW_GITHUB_TOKEN`) |
+| Veille des appels d'offres (Firm Manager) | reprise du Tender Desk EYNOWA : passage quotidien (recherche web, date limite vérifiée, équipe tirée des CV réels, Bid / No Bid sur 100, entreprises à approcher, pipeline Excel vérifié, rapport en 5 sections aux associés et BDM) ; un associé décide de suivre ; le BDM obtient le TDR, crée l'opportunité (liée), enregistre dépôt et résultat ; indicateurs et charge de travail à partir des dates ; offre perdue → revue de Shadow validée par un associé | `lib/tender-watch.js`, `veille.html`, route `tenders` / `tender-step`, mémoire `OFFICE_MANAGER_TENDERS.json`, réglages `office_firm_settings.settings.tender_watch` |
+| Droits (permissions) | postes types d'un cabinet, niveaux (aucun → administrer), matrice écrans × rôles réglable par les associés, actions sensibles, règles automatiques (`can()`), plafond de l'IA = préparer | `lib/permissions.js`, Paramètres → Droits, route `permissions`, `office_firm_settings.settings.permissions` |
+| Shadow | labo d'apprentissage, leçons validées par un humain ; **propose du code** pour tous les agents et lui-même (branche + PR en brouillon, jamais fusionnée ni déployée par lui ; garde-fous intouchables) | `lib/shadow.js`, `lib/shadow-code.js`, `lib/shadow-guard.js` (vu par les associés et le responsable informatique — 2026-10-11 ; les associés décident ; onglet « Code » d'Entraînement ; connexion `SHADOW_GITHUB_TOKEN`) ; questionnaire hebdomadaire à tous (agents + préférences de travail) |
 
 **Mémoires** — petite mémoire structurée dans Office Manager, grande mémoire documentaire chez le cabinet :
 - Orpailleur : mémoire complète `OFFICE_MANAGER_TIDY_STATE.json` dans `00_TATY_AI_MANAGER/MEMORY`
@@ -90,7 +93,7 @@ dans les secrets de la fonction avant tout redéploiement (non modifié dans le 
 | §51 Isolement des cabinets | 🟡 | RLS activé sans policy (service_role seul) ; un déploiement = un cabinet (`DEFAULT_ORG_ID`). |
 | §53-54 Secrets | ✅ | Jetons chiffrés AES-GCM ; rien dans le navigateur. |
 | §55-56 Permissions par appel d'outil, outils par agent | ❌ | Interrupteur global « autoriser les agents » seulement. |
-| §5 / §58 Rôles | 🟡 branche `amelioration` | `lib/roles.js` (source unique) : propriétaire, associé, revue qualité, manager, superviseur, senior, auditeur, secrétariat, responsable informatique (+ ancien « collaborateur ») ; position (grade) et « rend compte à » dans `office_app_users` (`db/roles.sql`) ; comptes gérés par propriétaire, associés et responsable informatique ; le Firm Manager propose rôles et positions d'après le tableau de l'équipe (`lib/team-roles.js`) ; menu et « Mon espace » de l'accueil par rôle ; un manager ne voit les indicateurs que de ses rapports directs, si le cabinet l'autorise. Manquent : rôle par mission, espaces de travail complets (Mes revues, revue qualité…). |
+| §5 / §58 Rôles | 🟡 branche `amelioration` | `lib/roles.js` (source unique) : propriétaire, associé, revue qualité, **Business Development Manager (`bdm`, 2026-10-11)**, manager, superviseur, senior, auditeur, secrétariat, responsable informatique (+ ancien « collaborateur ») ; position (grade) et « rend compte à » dans `office_app_users` (`db/roles.sql`) ; comptes gérés par propriétaire, associés et responsable informatique ; le Firm Manager propose rôles et positions d'après le tableau de l'équipe (`lib/team-roles.js`) ; menu et « Mon espace » de l'accueil par rôle ; un manager ne voit les indicateurs que de ses rapports directs, si le cabinet l'autorise. Droits (2026-10-11) : `lib/permissions.js` — matrice écrans × rôles (menu filtré, réglable dans Paramètres → Droits), actions sensibles et règles automatiques via `can()` (utilisé par la veille et les droits ; les anciennes routes gardent leurs familles de rôles, à migrer route par route). Manquent : rôles cabinet ISQM 1 et fonctions de mission enregistrés sur les personnes (définis dans `lib/permissions.js`, pas encore stockés), espaces de travail complets (Mes revues, revue qualité…). |
 | §66-70 Archivage | ❌ | `MISSION_READY_FOR_ARCHIVE` est routé vers l'Orpailleur dans le bus, mais l'archive pass n'existe pas. |
 | §57-61 Tool Gateway / MCP ChatGPT | ❌ reporté | « Mon IA », plus tard. |
 
@@ -130,6 +133,22 @@ questions et propositions des agents).
 - Plusieurs lots par appel sous le même verrou (moins d'appels en chaîne : cause des HTTP 508) ; verrou de lecture 4 min.
 - Statut de `office_action_queue` : jamais `cancelled` (c'est un `work_state`) — cause du PostgreSQL 23514.
 - L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
+
+## Décisions du 2026-10-11 — postes, droits, veille des appels d'offres
+Document de conception : « Office Manager AI — Postes, rôles et droits d'accès » (Claude Docs).
+- **Trois couches** : rôle (poste), rôles cabinet (ISQM 1, cumulables), fonction sur la mission ; les règles automatiques
+  retirent un droit (préparateur ≠ approbateur, indépendance d'abord, EQR hors équipe et 2 ans de délai, ordre des étapes,
+  signature = qualification, personne n'élève ses propres droits). Les agents IA ne dépassent jamais « préparer ».
+- **BDM** (`bdm`) : reçoit les appels d'offres, prépare les propositions, réalise aussi des missions (ses droits sur une mission
+  viennent de sa fonction sur elle).
+- **Veille des appels d'offres** (reprise du Tender Desk EYNOWA, généralisé à tous les cabinets) : l'agent envoie les avis au BDM
+  et aux associés ; un associé décide (réglable : tout associé / associé du développement commercial / personnes nommées) ;
+  le BDM cherche le TDR et crée l'opportunité ; on mesure date de l'avis, de décision, du TDR, du dépôt, du résultat ; combien
+  reçus, suivis, déposés, gagnés ; la charge de travail s'en sert. Jamais de candidature ni de contact sans validation humaine ;
+  le rapport ne part qu'aux personnes du cabinet, `SENT` seulement avec l'id Gmail ; Excel non vérifié = non joint.
+- **Shadow** : vu seulement par les associés et le responsable informatique ; revue des offres perdues (causes, améliorations) =
+  proposition, validée par un associé (devient une leçon du Firm Manager), transmise au BDM seulement si l'associé le choisit ;
+  Shadow pose à tous des questions sur les agents et les préférences de travail (questionnaire hebdomadaire).
 
 ## Règles de travail
 

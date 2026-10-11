@@ -353,7 +353,9 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 (function () {
   var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
   var $ = function (id) { return document.getElementById(id); };
-  if (!OM || !OM.isOwner || !OM.isOwner()) return;
+  // Shadow is seen by the partners and the IT administrator (Paul, 2026-10-11); only the partners decide.
+  var itAdmin = OM && OM.getRole && OM.getRole() === 'it_admin';
+  if (!OM || !OM.isOwner || !(OM.isOwner() || itAdmin)) return;
   $('shadow-card').hidden = false;
   var NAME = function (k) { return OM.agentName ? OM.agentName(k) : k; };
   var TYPE = { professional_rule: 'Règle professionnelle', firm_rule: 'Règle du cabinet', experience_lesson: 'Leçon d’expérience', hypothesis: 'Hypothèse' };
@@ -364,7 +366,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
   function say(t) { $('sh-status').textContent = t || ''; }
   function item(title, meta, extra) { var it = el('div', null, 'item'); var t = el('div', null, 't'); t.appendChild(el('span', title)); if (meta) t.appendChild(el('span', meta, 'meta')); it.appendChild(t); if (extra) it.appendChild(extra); return it; }
   function btn(label, cls, fn) { var b = el('button', label, cls || 'btn ghost'); b.type = 'button'; b.addEventListener('click', fn); return b; }
-  function act(body, done) { say('…'); api(body).then(function (r) { say(done || 'Fait.'); return load(); }).catch(function (e) { say(e.message); }); }
+  function act(body, done) { say('…'); api(body).then(function (r) { say(done || 'Fait.'); return load(); }).catch(function (e) { say(e.message === 'PARTNERS_ONLY' ? 'Seuls les associés décident ici : vous voyez Shadow en lecture.' : e.message); }); }
   function render() {
     var b = $('sh-body'); b.textContent = ''; if (!data) return;
     if (panel === 'overview') {

@@ -37,6 +37,12 @@
       safeSet(window.sessionStorage, LEGACY_TOKEN_KEY, s.pilot_token);
     },
     getToken: function () { var s = readSession(); return s ? s.pilot_token : ''; },
+    // This person's screens and levels (cached for the session; refreshed at login).
+    myRights: function () {
+      var KEY = 'officeManagerMyRights', role = OM.getRole();
+      try { var c = JSON.parse(window.sessionStorage.getItem(KEY) || 'null'); if (c && c.role === role && Date.now() - c.at < 600000) return Promise.resolve(c.mine); } catch (e) { /* no storage */ }
+      return OM.api('/api/app?route=permissions').then(function (d) { try { window.sessionStorage.setItem(KEY, JSON.stringify({ role: role, at: Date.now(), mine: d.mine })); } catch (e) { /* no storage */ } return d.mine; }).catch(function () { return null; });
+    },
     // Kept for compatibility with older page code; the login page replaces it.
     setToken: function () {},
     getOwnerToken: function () { var s = readSession(); return (s && s.owner_token) || ''; },
@@ -45,7 +51,7 @@
     isManager: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'manager' || r === 'supervisor'; },
     // Account administration: owner, partners and the IT administrator (2026-10-10).
     isAccountAdmin: function () { var r = OM.getRole(); return r === 'owner' || r === 'partner' || r === 'it_admin'; },
-    ROLE_LABELS: { owner: 'Propriétaire du cabinet', partner: 'Associé', quality_reviewer: 'Revue qualité (EQR)', manager: 'Manager', supervisor: 'Superviseur', senior: 'Senior', auditor: 'Auditeur', secretary: 'Secrétariat / administration', it_admin: 'Responsable informatique', collaborator: 'Collaborateur (ancien rôle)' },
+    ROLE_LABELS: { owner: 'Propriétaire du cabinet', partner: 'Associé', quality_reviewer: 'Revue qualité (EQR)', bdm: 'Business Development Manager', manager: 'Manager', supervisor: 'Superviseur', senior: 'Senior', auditor: 'Auditeur', secretary: 'Secrétariat / administration', it_admin: 'Responsable informatique', collaborator: 'Collaborateur (ancien rôle)' },
     roleLabel: function (r) { return OM.ROLE_LABELS[r || OM.getRole()] || r || ''; },
     hasPersonalSession: function () { var s = readSession(); return Boolean(s && s.access_token); },
     getUserName: function () {
@@ -174,6 +180,8 @@
       if (!OM.isOwner() && role !== 'quality_reviewer') document.querySelectorAll('.nav a[data-partners-only]').forEach(function (a) { a.hidden = true; });
       // The training page needs a personal session (e-mail + password).
       if (!OM.hasPersonalSession()) document.querySelectorAll('.nav a[href="/entrainement.html"]').forEach(function (a) { a.hidden = true; });
+      // The firm's own rights (Paramètres → Droits, 2026-10-11): pages its matrix closes for this role.
+      if (OM.hasPersonalSession()) OM.myRights().then(function (m) { (m && m.hidden_pages || []).forEach(function (p) { document.querySelectorAll('.nav a[href="' + p + '"]').forEach(function (a) { if (a.getAttribute('aria-current') !== 'page') a.hidden = true; }); }); });
     },
 
     applyBranding: function (b) {
@@ -486,21 +494,23 @@
   }
   // ---- Workspace shell: icons in the rail, a menu button on small screens, tabs for long pages ----
   // Which roles see which page in the menu (specification §55: one workspace per role).
-  var WORKERS = ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'];
+  var WORKERS = ['owner', 'partner', 'quality_reviewer', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'];
   var NAV_ROLES = {
     '/recherche.html': WORKERS, '/mission.html': WORKERS, '/rangement.html': WORKERS, '/validations.html': WORKERS, '/messagerie.html': WORKERS, '/assistant.html': WORKERS,
-    '/opportunites.html': ['owner', 'partner', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'],
+    '/opportunites.html': ['owner', 'partner', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'collaborator'],
     '/equipe.html': ['owner', 'partner', 'manager', 'supervisor'],
     '/preparation.html': ['owner', 'partner', 'manager', 'supervisor'],
-    '/auditeur.html': ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor', 'collaborator'],
+    '/auditeur.html': ['owner', 'partner', 'quality_reviewer', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'collaborator'],
     '/pilotage.html': ['owner', 'partner', 'quality_reviewer'],
-    '/entrainement.html': ['owner', 'partner'],
+    '/entrainement.html': ['owner', 'partner', 'it_admin'],
+    '/veille.html': ['owner', 'partner', 'bdm'],
     '/mise-en-service.html': ['owner', 'partner', 'it_admin'], '/parametres.html': ['owner', 'partner', 'it_admin']
   };
   var ICONS = {
     '/accueil.html': 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
     '/recherche.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5',
     '/opportunites.html': 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4',
+    '/veille.html': 'M3 11h3l3-6 4 14 3-8h5',
     '/mission.html': 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
     '/rangement.html': 'M3 6h7l2 2h9v11H3zM8 13h8',
     '/equipe.html': 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a2.5 2.5 0 1 0 0-5M3 20c0-3 3-5 6-5s6 2 6 5m2-5c2 0 4 1.5 4 4',
@@ -521,6 +531,9 @@
     // Setup and settings live in the settings wheel at the bottom of the menu.
     nav.querySelectorAll('a[href="/parametres.html"], a[href="/mise-en-service.html"]').forEach(function (a) { if (a.getAttribute('aria-current') !== 'page') a.remove(); else a.classList.add('in-wheel'); });
     // Pages added on 2026-10-08, placed in every page's menu from here (one place to maintain).
+    // The tender watch (2026-10-11), placed just before « Opportunités » on every page.
+    var opp = nav.querySelector('a[href="/opportunites.html"]');
+    if (opp && !nav.querySelector('a[href="/veille.html"]')) { var w = document.createElement('a'); w.href = '/veille.html'; w.textContent = 'Veille des appels d’offres'; if (location.pathname === '/veille.html') w.setAttribute('aria-current', 'page'); opp.parentNode.insertBefore(w, opp); }
     var after = nav.querySelector('a[href="/assistant.html"]');
     [['/preparation.html', 'Préparer une mission'], ['/auditeur.html', 'Enhanced Auditor'], ['/pilotage.html', 'Tableau des associés', true]].forEach(function (x) {
       if (nav.querySelector('a[href="' + x[0] + '"]') || !after) return;

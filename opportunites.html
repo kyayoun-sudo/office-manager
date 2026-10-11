@@ -199,7 +199,7 @@
     if (!picked && !link) { $('say').textContent = ERR.TDR_REQUIRED; return; }
     var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = picked ? 'Envoi du document…' : 'Envoi…';
     (picked ? upload(picked) : Promise.resolve({ file_ids: UI.driveIds(link) }))
-      .then(function (body) { body.action = 'create'; body.notes = $('notes').value.trim(); return api(body); })
+      .then(function (body) { body.action = 'create'; body.notes = $('notes').value.trim(); if (fromTender) body.tender_id = fromTender; return api(body); })
       .then(function (r) {
         if (r.duplicate) { $('say').textContent = 'Ce document a déjà ouvert une opportunité.'; location.href = '/opportunites.html?id=' + r.opportunity.id; return; }
         location.href = '/opportunites.html?id=' + r.opportunity.id;
@@ -755,8 +755,11 @@
       .then(function () { b.disabled = false; });
   });
 
+  // Opened from the tender watch (« TDR obtenu → créer l'opportunité »): the new opportunity is linked to it.
+  var fromTender = new URLSearchParams(location.search).get('tender');
   function start() {
     OM.loadBranding().catch(function () {});
+    if (fromTender) { $('notes').value = 'Appel d’offres suivi depuis la veille (décision de l’associé).'; $('say').textContent = 'Déposez le TDR complet de l’appel d’offres suivi : l’opportunité sera liée à la veille.'; }
     var id = new URLSearchParams(location.search).get('id');
     if (id) loadDetail(id); else loadList();
   }

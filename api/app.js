@@ -87,6 +87,10 @@ import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from
 //   POST /api/app?route=training-step              next unit of training work (background chain)
 //   GET  /api/app?route=messages                   agent's messages to colleagues — MANAGERS (personal session)
 //   POST /api/app?route=messages {action}          propose (any account) | decide approve/reject (owner, partner, manager)
+//   GET  /api/app?route=permissions                screens × roles, actions and rules (everyone: their own; partners: all)
+//   POST /api/app?route=permissions {changes}      partners adjust the defaults (never their own role upwards)
+//   GET  /api/app?route=tenders                    tender watch: tenders, indicators, workload (BDM, partners)
+//   POST /api/app?route=tenders {action}           run | decide | tdr | submitted | result | review-decide | review-run | settings
 //   GET  /api/app?route=readiness                  "Mise en service": every link of the chain checked — OWNER ONLY
 //   POST /api/app?route=readiness {action}         mapping-pass (full Drive mapping by the Orpailleur) — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -97,7 +101,7 @@ const owner = run => Object.assign(run, { ownerOnly: true });
 const open = run => Object.assign(run, { public: true });
 // Needs a personal session (Supabase access token) with one of these roles.
 // The role families come from lib/roles.js (2026-10-10: the firm's roles and positions).
-import { MANAGERS as ROLE_MANAGERS, WORKERS, EVERYONE, FIRM_LEAD, ACCOUNT_ADMINS, ROLE_LABELS, visiblePeople, firmSettings, saveFirmSettings } from '../lib/roles.js';
+import { MANAGERS as ROLE_MANAGERS, WORKERS, EVERYONE, FIRM_LEAD, ACCOUNT_ADMINS, BUSINESS_DEV, SHADOW_VIEWERS, ROLE_LABELS, visiblePeople, firmSettings, saveFirmSettings } from '../lib/roles.js';
 const MANAGERS = [...ROLE_MANAGERS];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
 const lastAiDedupe = new Map();
@@ -132,10 +136,13 @@ export const ROUTES = Object.freeze({
   // « rangement automatique » switch.
   // One question about a real situation, for the Management Cards (managers answer).
   // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
+  // Shadow is seen by the partners and the IT administrator (Paul, 2026-10-11); the partners decide on
+  // lessons and experiments; code proposals may also be asked by the IT administrator.
   shadow: {
-    GET: owner(async () => (await import('../lib/shadow.js')).labView()),
-    POST: owner(async (orgId, req) => {
+    GET: users([...SHADOW_VIEWERS], async () => (await import('../lib/shadow.js')).labView()),
+    POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
+      if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
       if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
       // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
       if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
@@ -150,6 +157,31 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'SHADOW_UNAVAILABLE'
   },
+  // Permissions (2026-10-11): screens × roles and sensitive actions; the firm's lead adjusts the defaults.
+  permissions: {
+    GET: users([...EVERYONE], async (orgId, req) => (await import('../lib/permissions.js')).permissionsView(orgId, req.account)),
+    POST: users([...FIRM_LEAD], async (orgId, req) => (await import('../lib/permissions.js')).savePermissions(orgId, req.body || {}, req.account)),
+    unavailable: 'PERMISSIONS_UNAVAILABLE'
+  },
+  // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
+  // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
+  tenders: {
+    GET: users([...BUSINESS_DEV], async (orgId, req) => (await import('../lib/tender-watch.js')).tendersView(orgId, req.account)),
+    POST: users([...BUSINESS_DEV], async (orgId, req) => {
+      const t = await import('../lib/tender-watch.js'); const b = req.body || {}; const a = b.action;
+      if (a === 'run') return t.startTenderWatch(orgId, req, { force: true, by: who(req) });
+      if (a === 'decide') return t.decideTender(orgId, b, req.account);
+      if (a === 'tdr') return t.markTdr(orgId, b, req.account);
+      if (a === 'submitted') return t.recordSubmission(orgId, b, req.account);
+      if (a === 'result') return t.recordResult(orgId, req, b, req.account);
+      if (a === 'review-decide') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.decideLossReview(orgId, b, req.account); }
+      if (a === 'review-run') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.reviewLoss(orgId, String(b.id || '')); }
+      if (a === 'settings') return t.saveWatchSettings(orgId, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'TENDERS_UNAVAILABLE'
+  },
+  'tender-step': { POST: async (orgId, req) => (await import('../lib/tender-watch.js')).tenderStep(orgId, req, req.body || {}), unavailable: 'TENDERS_UNAVAILABLE' },
   'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   'shadow-survey': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
