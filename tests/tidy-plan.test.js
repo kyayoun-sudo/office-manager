@@ -61,7 +61,8 @@ test('first-scan tidy-up: the AI decides; moves/renames go to « À valider », 
       { file_id: 'lm', action: 'move_rename', to_folder_id: 'D1', new_name: 'LM_CAC_IvoireLogistique_2026.pdf', reason: 'lettre de mission CAC 2026' },
       { file_id: 'amb', action: 'ask', question: 'À quelle mission correspond ce document ?' },
       { file_id: 'okf', action: 'ok' }] }) }; },
-    fetchRows: async (path, o = {}) => { if (o.method === 'POST') actions.push(JSON.parse(o.body)[0]); return []; },
+    // Like Supabase: an inserted row is returned (an ignored duplicate returns nothing).
+    fetchRows: async (path, o = {}) => { if (o.method === 'POST') { const r = JSON.parse(o.body)[0]; actions.push(r); return [{ id: 'act' + actions.length, ...r }]; } return []; },
     proposeMessage: async (org, m) => { messages.push(m); return { id: 'm1' }; },
     getMeta: async () => ({ lastModifyingUser: { emailAddress: 'Yao@taty.info' } }),
     askDeps: { members: [{ full_name: 'Yao', email: 'yao@taty.info' }], reviewFolderId: null, tidyDrive: { canWrite: () => false } } };
@@ -95,7 +96,7 @@ test('a work programme loose under 01_CLIENTS_ET_MISSIONS: read, its mission fol
   const actions = []; let input = '';
   const d = { drive, folder: 'MEM', fire: async () => true, readText: async () => ({ text: 'Programme de travail — Nova Distribution — CAC exercice 2026' }),
     runAI: async (o) => { input = o.input; return { text: JSON.stringify({ decisions: [{ file_id: 'p1', action: 'create_and_move', create_parent_id: 'CM', create_names: ['Nova Distribution', 'CAC_2026'], new_name: 'PROGRAMME_CAC_NovaDistribution_2026.txt', reason: 'programme de travail CAC 2026 de Nova Distribution' }] }) }; },
-    fetchRows: async (p, o = {}) => { if (o.method === 'POST') actions.push(JSON.parse(o.body)[0]); return []; } };
+    fetchRows: async (p, o = {}) => { if (o.method === 'POST') { const r = JSON.parse(o.body)[0]; actions.push(r); return [{ id: 'act' + actions.length, ...r }]; } return []; } };
   await startTidyPlan('org', {}, d);
   const st = await tidyPlanStep('org', {}, d);
   assert.match(input, /Nova Distribution — CAC exercice 2026/, 'the content is read');

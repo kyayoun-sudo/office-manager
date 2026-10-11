@@ -224,6 +224,13 @@
           <div id="s-passes" style="display:flex;flex-direction:column;gap:6px"></div>
         </section>
 
+        <section class="card" aria-labelledby="h-bp" id="bp-card">
+          <h2 id="h-bp">Opportunités : qui décide</h2>
+          <p class="hint" style="margin:0">L’Associé responsable du développement commercial reçoit seul la décision « poursuivre / ne pas poursuivre » de chaque opportunité (Phase 0), en pop-up et sur la page. Ensuite, la recommandation et la cotation reviennent au Manager de l’équipe validée, la décision d’acceptation au Partner de l’équipe.</p>
+          <div class="field"><label for="bp-name">Associé responsable du développement commercial</label><input id="bp-name" type="text" list="bp-people" maxlength="120" placeholder="Choisir dans la liste du cabinet"><datalist id="bp-people"></datalist></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="bp-save" type="button">Enregistrer</button><span class="status" id="bp-status" role="status" aria-live="polite"></span></div>
+        </section>
+
         <section class="card" aria-labelledby="h-try">
           <h2 id="h-try">Essayer</h2>
           <div class="field"><label for="try-topic">Sujet du message à l'équipe</label><input id="try-topic" type="text" maxlength="300" placeholder="Ex. Rappeler que les pièces Nova Services sont attendues vendredi"></div>
@@ -596,9 +603,34 @@
       .catch(function (err) { sSay(explain(err), true); })
       .then(function () { $('s-save').disabled = false; });
   });
+  function launchOrpailleurFromSettings(button) {
+    button.disabled = true;
+    var busyRetries = 0;
+    sSay('Orpailleur démarre. Gardez cette page ouverte pendant le rangement.');
+    function post(body) { return ownerApi('firm-knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+    function nextBatch() {
+      return post({ action: 'tidy-batch' }).then(function (r) {
+        if (r.status === 'done') { sSay('Analyse terminée : ' + (r.done || 0) + ' / ' + (r.total || r.done || 0) + ' fichiers. Les rangements proposés sont dans À valider.'); return; }
+        if (r.status === 'reader_busy') {
+          if (++busyRetries > 120) throw new Error('Le lecteur reste occupé. Progression conservée ; consultez le diagnostic.');
+          sSay('Un lot utilise déjà le lecteur. Orpailleur attend puis reprend automatiquement.');
+        } else {
+          busyRetries = 0;
+          if (r.status !== 'planning') throw new Error(r.error || 'Le rangement ne peut pas continuer : ' + r.status);
+          sSay('Orpailleur travaille : ' + (r.done || 0) + ' / ' + (r.total || 0) + ' fichiers analysés. Gardez cette page ouverte.');
+        }
+        return new Promise(function (resolve) { setTimeout(resolve, r.status === 'reader_busy' ? 5000 : 1000); }).then(nextBatch);
+      });
+    }
+    return post({ action: 'tidy', browser_batches: true }).then(function (r) {
+      if (!r.started && r.reason !== 'PASS_ALREADY_RUNNING' && r.reason !== 'FIRST_SCAN_RUNNING') throw new Error('Lancement non effectué : ' + (r.reason || 'vérifiez le scan du Drive'));
+      return nextBatch();
+    }).catch(function (err) { sSay('Orpailleur arrêté : ' + explain(err), true); }).then(function () { button.disabled = false; loadPasses(); });
+  }
   Array.prototype.forEach.call(document.querySelectorAll('[data-run]'), function (b) {
     b.addEventListener('click', function () {
       var agent = b.getAttribute('data-run');
+      if (agent === 'orpailleur') { launchOrpailleurFromSettings(b); return; }
       b.disabled = true; sSay('Passage de ' + AGENT_NAMES[agent] + ' lancé…');
       ownerApi('scheduler-run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: agent }) })
         .then(function (r) { sSay(r.failed ? 'Échec : ' + r.failed : (r.summary || 'Passage lancé.'), Boolean(r.failed)); loadPasses(); })
@@ -768,6 +800,30 @@
       .catch(function (e) { $('names-status').textContent = e.message; });
   });
   load();
+})();
+</script>
+<script>
+// « Opportunités : qui décide » — the business-development Associé, chosen from the firm's people.
+(function () {
+  var OM = window.OfficeManager, $ = function (id) { return document.getElementById(id); }, people = [];
+  if (!OM || !$('bp-card')) return;
+  var say = function (m, err) { $('bp-status').textContent = m; $('bp-status').className = 'status' + (err ? ' error' : ''); };
+  function load() {
+    OM.api('/api/app?route=opportunities&settings=1').then(function (r) {
+      people = r.firm_people || []; var dl = $('bp-people'); dl.textContent = '';
+      people.forEach(function (p) { var o = document.createElement('option'); o.value = p.name; if (p.title) o.label = p.title; dl.appendChild(o); });
+      $('bp-name').value = (r.business_partner && r.business_partner.name) || '';
+    }).catch(function () {});
+  }
+  $('bp-save').addEventListener('click', function () {
+    var name = $('bp-name').value.trim(), p = people.find(function (x) { return x.name === name; });
+    var b = this; b.disabled = true;
+    OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'settings', business_partner: name ? { name: name, email: (p && p.email) || null } : null }) })
+      .then(function (r) { say(r.business_partner ? 'Enregistré : ' + r.business_partner.name + ' reçoit les décisions de Phase 0.' : 'Personne n’est désigné : tout Associé peut décider.'); })
+      .catch(function (e) { say({ PARTNERS_ONLY: 'Réservé aux associés et au propriétaire.', FIRM_SETTINGS_SQL_NOT_INSTALLED: 'Réglage pas encore installé dans la base (db/personal-ai.sql à exécuter dans Supabase).' }[e.message] || e.message, true); })
+      .then(function () { b.disabled = false; });
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(load, 800); }); else setTimeout(load, 800);
 })();
 </script>
 </body>

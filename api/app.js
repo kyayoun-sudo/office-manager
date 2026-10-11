@@ -327,7 +327,8 @@ export const ROUTES = Object.freeze({
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
-      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
+      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req, req.body.browser_batches === true ? { resume: true, fire: async () => true } : {});
+      if (req.body?.action === 'tidy-batch') return tidyPlanStep(orgId, req, { noLoop: true });
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
       throw fail('UNKNOWN_ACTION', 400);
     }),
@@ -372,14 +373,25 @@ export const ROUTES = Object.freeze({
   opportunities: {
     GET: users(ALL_ROLES, async (orgId, req) => {
       const o = await import('../lib/opportunities.js');
+      if (req.query?.settings) return o.opportunitySettingsView(orgId);
       return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const o = await import('../lib/opportunities.js'); const b = req.body || {}; const a = b.action;
       if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
       if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
-      if (a === 'answer') return o.answerRow(orgId, b, req.account);
-      if (a === 'won') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
+      if (a === 'answer') return o.answerRow(orgId, b, req.account, { req });
+      if (a === 'answer-rows') return o.answerRows(orgId, b, req.account, { req });
+      if (a === 'review-section') return o.reviewSection(orgId, b, req.account);
+      if (a === 'prepare-again') return o.prepareAgain(orgId, req, b, req.account);
+      if (a === 'settings') return o.saveOpportunitySettings(orgId, b, req.account);
+      if (a === 'remove') return o.removeOpportunity(orgId, b, req.account, { req });
+      if (a === 'not-duplicate') return o.notDuplicate(orgId, req, b, req.account);
+      if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
+      if (a === 'validate-team') return o.validateTeam(orgId, b, req.account);
+      if (a === 'find-specialists') return o.findSpecialists(orgId, b, req.account);
+      if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
+      if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
       if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
@@ -387,7 +399,25 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'OPPORTUNITIES_UNAVAILABLE'
   },
+  // « Mon IA »: each person may connect their own AI after accepting the warning; partners see who
+  // did and may switch it off for the whole firm.
+  'my-ai': {
+    GET: users([...ALL_ROLES], async (orgId, req) => (await import('../lib/personal-ai.js')).myAIView(orgId, req.account)),
+    POST: users([...ALL_ROLES], async (orgId, req) => {
+      const p = await import('../lib/personal-ai.js'); const b = req.body || {};
+      if (b.action === 'connect') return p.connectMyAI(orgId, req.account, b);
+      if (b.action === 'disconnect') return p.disconnectMyAI(orgId, req.account, b);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MY_AI_UNAVAILABLE'
+  },
+  'personal-ai': {
+    GET: users(PARTNERS, async (orgId) => (await import('../lib/personal-ai.js')).personalAIOverview(orgId)),
+    POST: users(PARTNERS, async (orgId, req) => (await import('../lib/personal-ai.js')).setPersonalAIAllowed(orgId, Boolean(req.body?.allowed), who(req))),
+    unavailable: 'MY_AI_UNAVAILABLE'
+  },
   'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-team-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).teamStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
@@ -443,6 +473,8 @@ export const ROUTES = Object.freeze({
   },
   // The global bell: notifications computed from what is recorded, one per event.
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
+  // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
+  'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/opportunities.js')).myQuestions(orgId, req.account)), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {
@@ -692,6 +724,8 @@ export async function handleApp(req) {
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
+  // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
+  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, () => run(orgId, req));
   return run(orgId, req);
 }
 

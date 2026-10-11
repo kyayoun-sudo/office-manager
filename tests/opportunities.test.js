@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -74,7 +74,7 @@ function fakeDrive(template) {
     downloadBuffer: async id => files.get(id).buffer,
     findFilesByExactName: async (name, parent) => [...files.values()].filter(f => f.name === name && (f.parents || []).includes(parent)).map(f => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime })),
     createBinary: async ({ name, parentId, buffer, mimeType }) => add({ name, parents: [parentId], buffer, mimeType }),
-    updateBinary: async (id, { buffer, expectedModifiedTime }) => { const f = files.get(id); if (expectedModifiedTime && f.modifiedTime !== expectedModifiedTime) throw new Error('MEMORY_CONFLICT'); f.buffer = buffer; f.modifiedTime = 't' + (++clock); return { modifiedTime: f.modifiedTime }; },
+    updateBinary: async (id, { buffer, expectedModifiedTime }) => { const f = files.get(id); if (!expectedModifiedTime) throw new Error('EXPECTED_MODIFIED_TIME_REQUIRED'); if (f.modifiedTime !== expectedModifiedTime) throw new Error('MEMORY_CONFLICT'); f.buffer = buffer; f.modifiedTime = 't' + (++clock); return { modifiedTime: f.modifiedTime }; },
     copyFile: async (id, name, parent) => { const src = files.get(id); return add({ name, parents: [parent], buffer: Buffer.from(src.buffer), mimeType: src.mimeType }); },
     changedSince: async () => [...files.values()].map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, webViewLink: f.webViewLink })),
     readText: async id => ({ text: String(files.get(id)?.buffer || '') })
@@ -188,6 +188,14 @@ test('Firm Manager: TDR read, filed with the workbook in the opportunity folder,
   assert.deepEqual(Object.keys(o.proposals).sort(), ['01_OPPORTUNITE!59', '02_PHASE_0!23', '02_PHASE_0!24']);
   assert.deepEqual(o.proposals['02_PHASE_0!23'].values, { E23: 'Aucune mission au même nom', F23: 'Oui' });
   assert.equal(o.proposals['02_PHASE_0!24'].for_team, true);
+  // Man + machine: the sourced answer is written straight into the workbook, signed by the agent; the
+  // unsourced one stays a proposal (its cells empty); the question stays a question.
+  const w = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C59' }, { sheet: '01_OPPORTUNITE', cell: 'C7' }, { sheet: '02_PHASE_0', cell: 'E23' }, { sheet: '02_PHASE_0', cell: 'K23' }]);
+  assert.equal(w['01_OPPORTUNITE!C59'], '≈ 12 milliards FCFA (source : EF 2025)');
+  assert.equal(w['01_OPPORTUNITE!C7'], 'Firm Manager (IA)');
+  assert.match(w['02_PHASE_0!E23'], /missions du cabinet/, 'the conflict search is a fact Office Manager knows: written, not the unsourced proposal');
+  assert.deepEqual(Object.keys(o.ai_filled).sort(), ['01_OPPORTUNITE!59', '02_PHASE_0!23']);
+  assert.equal(o.ai_filled['01_OPPORTUNITE!59'].verified, true);
   assert.equal(o.conflicts.matches.length, 1, 'the earlier mission of the same client is found');
   assert.ok(audits.some(a => a.action_type === 'OPPORTUNITY_FILED'));
   // The same file never opens a second opportunity.
@@ -224,6 +232,11 @@ test('people answer, only the Associé decides (never the preparer), then the cl
   const k = await kycStep('org', {}, { opportunity_id: o.id }, d);
   assert.equal(k.phase1.status, 'ready', k.phase1.error);
   assert.deepEqual(Object.keys(k.phase1.proposals).sort(), ['03_PHASE_1!61']);
+  // Sourced KYC facts are already in the workbook; independence never is (each person answers).
+  const kw = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '03_PHASE_1', cell: 'H61' }, { sheet: '03_PHASE_1', cell: 'D76' }]);
+  assert.equal(kw['03_PHASE_1!H61'], 'Non');
+  assert.equal(kw['03_PHASE_1!D76'], '');
+  assert.ok(k.ai_filled['03_PHASE_1!61']);
   await answerRow('org', { opportunity_id: o.id, sheet: '03_PHASE_1', row: 61, values: k.phase1.proposals['03_PHASE_1!61'].values, from_proposal: true }, senior, d);
   wb = drive.files.get(o.workbook.id).buffer;
   assert.equal((await readCells(wb, [{ sheet: '03_PHASE_1', cell: 'H61' }]))['03_PHASE_1!H61'], 'Non');
@@ -252,4 +265,177 @@ test('Firm Manager round: a TDR dropped in the opportunities folder is signalled
   const r = await opportunityRound('org', d);
   assert.equal(r.new_tdr, 1);
   assert.equal((await opportunityRound('org', d)).new_tdr, 0);
+});
+
+test('Phase 2 then 3: « poursuivre » → the Firm Manager proposes the team; a manager validates; each member declares their own independence', async () => {
+  const { d, fired } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(opportunity.id, d);
+  // The team is part of the bid: proposed with the Phase 0 (the TDR's key personnel against the CVs), before the decision.
+  assert.equal(o.team.status, 'proposing');
+  assert.ok(fired.some(f => f.path === '/api/app?route=opportunity-team-step'));
+  const ai = async () => ({ provider: 'fake', text: JSON.stringify({ team: [{ name: 'A. Senior', role: 'Senior', requirement: 'Chef de mission', why: 'secteur distribution, 40 % de charge', checks: [{ criterion: '10 ans d’expérience', met: true, evidence: 'CV : 12 ans' }, { criterion: 'Expert-comptable diplômé', met: null, evidence: 'non indiqué' }] }, { name: 'Inconnu Externe', role: 'Manager', why: 'x' }], gaps: [{ requirement: 'Expert IFRS 17', why: 'personne au cabinet' }] }) });
+  const t = await teamStep('org', {}, { opportunity_id: o.id }, { ...d, ai, capabilityContext: async () => ({ people: [{ kind: 'employee', full_name: 'A. Senior', email: 'senior@cab.ci', title: 'Senior', load_pct: 40 }] }) });
+  assert.equal(t.team.status, 'proposed');
+  assert.deepEqual(t.team.proposed.map(m => m.name), ['A. Senior'], 'nobody outside the firm is proposed');
+  assert.deepEqual(t.team.proposed[0].checks.map(c => c.met), [true, null], 'each requirement of the post checked against the CV');
+  assert.equal(t.team.gaps.length, 1);
+  await assert.rejects(validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', role: 'Senior' }] }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'K. Manager', email: 'km@cab.ci', role: 'Manager' }] }, { display_name: 'Ama Associée', role: 'partner' }, d);
+  await assert.rejects(declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'Quelqu’un', email: 'other@cab.ci' }, d), /NOT_IN_TEAM/);
+  await assert.rejects(declareIndependence('org', { opportunity_id: o.id, answers: {}, certify: true }, { email: 'senior@cab.ci' }, d), /ANSWER_ALL_QUESTIONS/);
+  const a = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Oui' }, details: { 'C.01': 'actions de la société' }, certify: true }, { display_name: 'A. Senior', email: 'senior@cab.ci' }, d);
+  assert.deepEqual([a.threats.length, a.all_declared], [1, false]);
+  const b = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'K. Manager', email: 'km@cab.ci' }, d);
+  assert.equal(b.all_declared, true);
+  // Section C of the workbook now says what the people declared, threat by threat; the conclusion stays empty (the Manager's).
+  const c = await readCells(d.drive.files.get(t.workbook.id).buffer, [{ sheet: '03_PHASE_1', cell: 'D76' }, { sheet: '03_PHASE_1', cell: 'I76' }]);
+  assert.equal(c['03_PHASE_1!D76'], 'A. Senior : actions de la société');
+  assert.equal(c['03_PHASE_1!I76'], '');
+  const view = await opportunityView('org', o.id, { display_name: 'A. Senior', email: 'senior@cab.ci', role: 'senior' }, d);
+  assert.equal(view.viewer.in_team, true); assert.equal(view.my_declaration.threats.length, 1);
+  assert.deepEqual(view.independence_questions, [{ ref: 'C.01', label: 'Intérêts financiers' }], 'the questions are the threats of the firm\'s own sheet');
+});
+
+test('man + machine: agents write only into empty cells; a Manager signs the review of a section once', async () => {
+  const st = await describeWorkbook(await buildTemplate());
+  const props = { '02_PHASE_0!23': { values: { E23: 'Aucune mission', F23: 'Oui' }, sources: ['missions du cabinet'], why: 'recherche' }, '02_PHASE_0!24': { values: {}, for_team: true, sources: [] } };
+  const kept = agentWrites(st, props, { '02_PHASE_0!E23': 'Réponse de Awa' }, 'firm-manager');
+  assert.deepEqual(kept.writes.map(w => w.cell).sort(), ['D7', 'F23', 'K23', 'L23'], 'a person\'s answer is never overwritten');
+  assert.equal(kept.writes.find(w => w.cell === 'K23').value, 'Firm Manager (IA)');
+  const unsourced = agentWrites(st, { '02_PHASE_0!23': { values: { E23: 'x' }, sources: [] } }, {}, 'firm-manager');
+  assert.equal(unsourced.writes.length, 0, 'without a source it stays a proposal');
+  const decision = agentWrites(st, {}, {}, 'firm-manager', [{ sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }]);
+  assert.equal(decision.writes.length, 0, 'an agent never writes a decision');
+
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(opportunity.id, d);
+  const section = (await describeWorkbook(drive.files.get(o.workbook.id).buffer)).sheets[0].rows.find(r => r.row === 59).section || '';
+  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await assert.rejects(reviewSection('org', { opportunity_id: o.id, sheet: '02_PHASE_0', section: 'CONCLUSION PHASE 0' }, { display_name: 'Moussa', role: 'manager' }, d), /NOTHING_TO_REVIEW/);
+  const r = await reviewSection('org', { opportunity_id: o.id, sheet: '01_OPPORTUNITE', section }, { display_name: 'Moussa Manager', role: 'manager' }, d);
+  assert.equal(r.verified, true);
+  const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]);
+  assert.equal(back['01_OPPORTUNITE!C9'], 'Moussa Manager', 'every section the agent filled is read: the sheet is signed « revu par »');
+  // Phase 0 done again (new facts): the Firm Manager is asked again; cells already filled stay as they are.
+  await assert.rejects(prepareAgain('org', {}, { opportunity_id: o.id }, { display_name: 'Awa', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  assert.equal((await prepareAgain('org', {}, { opportunity_id: o.id }, { display_name: 'Moussa', role: 'manager' }, d)).status, 'running');
+  const again = await run(o.id, d);
+  assert.equal(again.status, 'phase0');
+  assert.equal((await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C9' }]))['01_OPPORTUNITE!C9'], 'Moussa Manager');
+});
+
+test('Office Manager writes what it knows itself; one save for many rows; each person gets their tasks in the bell', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  // The conflict search done in the firm's missions is written without asking anyone (row 23 of the test template).
+  const v = await readCells(drive.files.get(o.workbook.id).buffer, ['E23', 'F23', 'K23'].map(cell => ({ sheet: '02_PHASE_0', cell })));
+  assert.match(v['02_PHASE_0!E23'], /missions du cabinet.*Audit SOCIETE IVOIRIENNE TEST 2024/);
+  assert.equal(v['02_PHASE_0!F23'], 'Oui');
+  assert.equal(v['02_PHASE_0!K23'], 'Firm Manager (IA)');
+  // Several answers, one save.
+  const r = await answerRows('org', { opportunity_id: o.id, rows: [{ sheet: '02_PHASE_0', row: 24, values: { F24: 'Oui' } }, { sheet: '01_OPPORTUNITE', row: 36, values: { C36: 'AO 2026/015 bis' } }] }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal(r.rows, 2); assert.equal(r.verified, true);
+  // The bell: the Associé is asked for the decision; the person who dropped the TDR sees nothing left to answer.
+  const tasks = await opportunityTasks({ display_name: 'Ama', role: 'partner' }, d);
+  assert.ok(tasks.some(t => /Décision « poursuivre »/.test(t.title)));
+  assert.ok(tasks.some(t => /À relire/.test(t.title)));
+  assert.equal((await opportunityTasks({ display_name: 'Awa', role: 'collaborator' }, d)).some(t => /question/.test(t.title)), false);
+});
+
+test('questions pop up for the right person: the agents\' question, the Associé\'s decision, each member\'s independence', async () => {
+  const { d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const awa = await myQuestions('org', { display_name: 'Awa', role: 'collaborator' }, d);
+  const q = awa.questions.find(x => x.kind === 'question');
+  assert.equal(q.question, 'Avez-vous communiqué une information confidentielle ?');
+  assert.deepEqual(q.options, ['Oui', 'Non', 'N-A']);
+  assert.equal(awa.questions.some(x => x.kind === 'decision'), false, 'a collaborator never gets the decision');
+  assert.equal((await myQuestions('org', { display_name: 'Kofi', role: 'collaborator' }, d)).questions.length, 0, 'someone outside the opportunity gets nothing');
+  const ama = await myQuestions('org', { display_name: 'Ama', role: 'partner' }, d);
+  const dec = ama.questions.find(x => x.kind === 'decision');
+  assert.equal(dec.choice_cell, 'D44'); assert.match(dec.context, /POURSUIVRE VERS PHASE 1/);
+  await answerRow('org', { opportunity_id: o.id, sheet: q.sheet, row: q.row, values: { [q.choice_cell]: 'Non' } }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal((await myQuestions('org', { display_name: 'Awa', role: 'collaborator' }, d)).questions.some(x => x.kind === 'question'), false, 'answered once, asked no more');
+});
+
+test('nobody is asked for a Drive link: the fiche facts missing in the workbook are written again when the page opens', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const f = drive.files.get(o.workbook.id);
+  f.buffer = await writeCells(f.buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C56', value: '' }, { sheet: '01_OPPORTUNITE', cell: 'C35', value: '' }]);
+  const view = await opportunityView('org', o.id, { display_name: 'Awa', role: 'collaborator' }, d);
+  const fiche = view.sheets.find(s => s.name === '01_OPPORTUNITE');
+  assert.match(fiche.rows.find(r => r.row === 56).fields[0].value, /^https:\/\/drive\//);
+  assert.equal(fiche.rows.find(r => r.row === 35).fields[0].value, 'SOCIÉTÉ IVOIRIENNE TEST');
+  const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C56' }]);
+  assert.match(back['01_OPPORTUNITE!C56'], /^https:\/\/drive\//);
+});
+
+test('an opportunity can be removed from the application; nothing is deleted in the Drive', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  await assert.rejects(removeOpportunity('org', { opportunity_id: o.id }, { display_name: 'Kofi', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  const r = await removeOpportunity('org', { opportunity_id: o.id, reason: 'test' }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal(r.status, 'removed');
+  assert.ok(drive.files.get(o.workbook.id) && drive.files.get(o.folder.id) && drive.files.get(o.tdr_files[0].id), 'the TDR, folder and workbook stay');
+  assert.equal((await listOpportunities('org', d)).opportunities.length, 0);
+  assert.equal((await myQuestions('org', { display_name: 'Ama', role: 'partner' }, d)).questions.length, 0);
+  // The same TDR can open a new opportunity again.
+  assert.notEqual((await createOpportunity('org', {}, { file_ids: [o.tdr_files[0].id] }, null, d)).duplicate, true);
+});
+
+test('a possible duplicate carries on when its twin is removed, or when a person says it is not one', async () => {
+  const { d } = await setup();
+  const first = await createOpportunity('org', {}, { name: 'TDR1.pdf', base64: Buffer.from('a').toString('base64') }, { display_name: 'Awa' }, d);
+  const a = await run(first.opportunity.id, d);
+  const second = await createOpportunity('org', {}, { name: 'TDR2.pdf', base64: Buffer.from('b').toString('base64') }, { display_name: 'Awa' }, d);
+  let b = await run(second.opportunity.id, d);
+  assert.equal(b.status, 'duplicate');
+  await removeOpportunity('org', { opportunity_id: a.id }, { display_name: 'Awa', role: 'manager' }, d);
+  b = await run(b.id, d);
+  assert.equal(b.status, 'phase0', 'the twin removed: the one left goes on by itself');
+  // Or a person says it is not a duplicate.
+  const third = await createOpportunity('org', {}, { name: 'TDR3.pdf', base64: Buffer.from('c').toString('base64') }, { display_name: 'Awa' }, d);
+  let c = await run(third.opportunity.id, d);
+  assert.equal(c.status, 'duplicate');
+  await assert.rejects(notDuplicate('org', {}, { opportunity_id: c.id }, { display_name: 'Kofi', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await notDuplicate('org', {}, { opportunity_id: c.id }, { display_name: 'Awa', role: 'collaborator' }, d);
+  c = await run(c.id, d);
+  assert.equal(c.status, 'phase0');
+});
+
+test('the team is ours: specialists searched in the country, externals added, they never block the declarations', async () => {
+  const { d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const searchSpecialists = async (org, input) => ({ web: true, specialists: [{ name: 'Cabinet Énergie CI', speciality: 'Stocks pétroliers', country: input.country || 'CI', source: 'https://example.org' }] });
+  await assert.rejects(findSpecialists('org', { opportunity_id: o.id, gap: 'Expert stocks' }, { display_name: 'Awa', role: 'collaborator' }, { ...d, searchSpecialists }), /MANAGER_ONLY/);
+  const f = await findSpecialists('org', { opportunity_id: o.id, gap: 'Expert stocks' }, { display_name: 'Moussa', role: 'manager' }, { ...d, searchSpecialists });
+  assert.equal(f.list[0].name, 'Cabinet Énergie CI');
+  await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'A. Senior', email: 'senior@cab.ci', role: 'Senior' }, { name: 'Cabinet Énergie CI', role: 'Spécialiste', external: true, speciality: 'Stocks pétroliers', source: 'https://example.org' }] }, { display_name: 'Moussa', role: 'manager' }, d);
+  const r = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'A. Senior', email: 'senior@cab.ci' }, d);
+  assert.equal(r.all_declared, true, 'the external specialist does not block: their written declaration is obtained outside the app');
+});
+
+test('who decides: the business-development Associé named in Paramètres; the mission Manager rates; the mission Partner accepts', async () => {
+  const { d } = await setup();
+  const d2 = { ...d, fetchRows: async (path, opts) => String(path).startsWith('office_firm_settings') ? [{ settings: { business_partner: { name: 'Ama Associée' } } }] : d.fetchRows(path, opts) };
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d2);
+  const o = await run(opportunity.id, d2);
+  await assert.rejects(answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Kofi Partner', role: 'partner' }, d2), /NOT_THE_DECIDING_PARTNER/);
+  assert.equal((await myQuestions('org', { display_name: 'Kofi Partner', role: 'partner' }, d2)).questions.some(q => q.kind === 'decision'), false, 'another Associé does not get the decision');
+  assert.ok((await myQuestions('org', { display_name: 'Ama Associée', role: 'partner' }, d2)).questions.some(q => q.kind === 'decision'));
+  assert.equal((await answerRow('org', { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } }, { display_name: 'Ama Associée', role: 'partner' }, d2)).status, 'go');
+  // Phase 1 / sheet 04: the validated team's Manager and Partner.
+  const team = { status: 'validated', members: [{ name: 'K. Manager', role: 'Manager' }, { name: 'P. Partner', role: 'Partner' }] };
+  const sheet = { name: '03_PHASE_1', title: 'PHASE 1' }, rating = { label: 'Risque KYC', fields: [{ header: 'Cotation proposée' }] }, accept = { label: "DÉCISION DE L'ASSOCIÉ", fields: [] };
+  assert.equal(deciderOf({ team }, sheet, rating, {}).who[0].name, 'K. Manager');
+  assert.equal(deciderOf({ team }, { name: '04_CONCLUSION', title: 'Synthèse et décision' }, accept, {}).who[0].name, 'P. Partner');
+  assert.equal(deciderOf({}, sheet, rating, {}), null, 'no team yet: any Manager may');
 });

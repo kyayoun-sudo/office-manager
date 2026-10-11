@@ -49,6 +49,7 @@ Supabase cron (office-manager-unified-scheduler, */5)
 | Enhanced Auditor (Audit Intelligence) | risques, WP, preuves, revue — ne signe jamais | `lib/enhanced-auditor.js`, `lib/auditor-plus.js` |
 | Orpailleur (Document Intelligence) | Detect → Read → Understand → Attach → Name → File → Verify → Remember | `lib/tidy-plan.js` (le cerveau), `lib/orpailleur-ask.js`, `lib/orpailleur-journal.js`, `lib/mapping-scan.js` |
 | Sika | honoraires, factures, encaissements (annoncé ≠ vérifié) | passages `sika` dans `lib/agent-passes.js` |
+| « Mon IA » | chaque personne peut connecter sa propre IA (clé chiffrée, avertissement versionné accepté) ; ses demandes l'essaient d'abord, l'IA du cabinet prend le relais ; les associés peuvent l'interdire | `lib/personal-ai.js` (crochet en tête de `firstAvailable`), `mon-ia.html`, `db/personal-ai.sql` |
 | Shadow | labo d'apprentissage, leçons validées par un humain ; **propose du code** pour tous les agents et lui-même (branche + PR en brouillon, jamais fusionnée ni déployée par lui ; garde-fous intouchables) | `lib/shadow.js`, `lib/shadow-code.js`, `lib/shadow-guard.js` (propriétaire seulement, onglet « Code » d'Entraînement ; connexion `SHADOW_GITHUB_TOKEN`) |
 
 **Mémoires** — petite mémoire structurée dans Office Manager, grande mémoire documentaire chez le cabinet :
@@ -103,14 +104,32 @@ Décision de Paul : elle précise la spec (§10 phases 1-5) pour le partage des 
    d'acceptation sous le nom que le modèle donne (`TATY_WP_PH0-1_[CLIENT]_[REFERENCE].xlsx`) ; remplit la fiche
    (onglet 01) ; prépare la Phase 0 (propositions sourcées, questions pour l'équipe). Décision « poursuivre » : l'Associé seul
    (jamais le préparateur ni le réviseur). Paul a demandé explicitement que le Firm Manager range le TDR et crée ce dossier.
+2b. **Équipe (spec phase 2, avant le KYC)** : après « poursuivre », le Firm Manager propose l'équipe (personnes du cabinet
+   seulement, choix expliqués, manques signalés) ; un manager ou l'Associé la valide ; chaque membre fait ensuite sa propre
+   déclaration d'indépendance (menaces de la section indépendance du classeur).
 3. **Lettre de confirmation du client** → rangée dans le dossier → événement `OPPORTUNITY_WON` → **Mission Controller** :
    « faire le KYC et l'indépendance » (onglet 03), vérifications publiques sourcées, l'indépendance est répondue par les
    personnes elles-mêmes, réponses écrites dans le même classeur ; rempli à la main → relu.
 4. **KYC et indépendance avant la lettre de mission** ; puis le Firm Manager prépare et envoie la lettre (bloc 8, à construire).
 5. À la fin, le dossier d'acceptation va au **dossier permanent du client** (à construire).
+**Homme + machine (Paul, 2026-10-11)** : les agents écrivent directement dans le classeur tout ce qu'ils peuvent sourcer (TDR, Internet, missions et équipe du cabinet), dans les cases vides seulement, ligne signée « Préparé par : Firm Manager (IA) » / « Mission Controller (IA) » ; sans source = proposition ; ce que seule une personne sait = question ; un Manager relit une section en un clic (« J'ai relu », son nom dans « Revu par »). Jamais écrit par un agent : décisions, cotations du Manager, indépendance, « revu par ». Ce qu'Office Manager sait lui-même (registre des prospects = la page Opportunités, date et origine, recherche de conflits, fiche remplie, transmission à l'Associé) est écrit sans IA. Écran : une question courte à la fois (« À faire maintenant ») ; le classeur complet est replié, avec un seul « Enregistrer » en bas ; chaque personne reçoit ses questions en pop-up sur n'importe quelle page (déclaration d'indépendance une question à la fois, questions des agents, décision de l'Associé), répondues dans la fenêtre ; « Plus tard » = 1 h ; la cloche garde la liste.
+**Qui décide (Paul, 2026-10-11)** : la décision « poursuivre » de Phase 0 → seul l'Associé responsable du développement commercial désigné dans Paramètres (`office_firm_settings.settings.business_partner`) ; recommandation et cotation (Phase 1) → le Manager de l'équipe validée ; décision d'acceptation (onglet 04) → le Partner de l'équipe validée. Sans personne désignée, toute personne de ce rang. Les rôles et écrans par rôle restent à définir avec la liste que Paul enverra.
 Un seul fichier par opportunité ; chaque agent remplit sa partie ; les cellules de décision ne reçoivent que la décision
 d'une personne identifiée. L'interface dépend du rôle (Associé : décisions ; Manager : recommandation, cotation ; équipe :
 questions et propositions des agents).
+
+## Fiabilité de l'Orpailleur (2026-10-11, diagnostic demandé par Paul)
+- « Vu » ≠ « traité » : un fichier sans décision de l'IA est redemandé une fois, puis gardé (`undecided`, 3 essais) ; jamais « vu ».
+  Un passage avec des fichiers non lus ou non décidés finit `outcome: partial`, jamais `complete`.
+- Une proposition identique existante est expliquée (en attente / bloquée / refusée par une personne = jamais refaite) ;
+  une proposition exécutée puis le fichier remis ailleurs → nouvelle proposition (nouvelle génération de clé).
+- Fichier à la corbeille ou disparu → ses propositions ouvertes sont fermées (`FILE_TRASHED`).
+- « Lancer / reprendre » après le premier scan = passage des changements (jamais un rescan complet, mémoire gardée) ;
+  rescan complet seulement sur demande explicite (`full`).
+- Réconciliation des métadonnées bornée (fichiers déjà traités d'abord, puis une tranche tournante ; 25 s max).
+- Plusieurs lots par appel sous le même verrou (moins d'appels en chaîne : cause des HTTP 508) ; verrou de lecture 4 min.
+- Statut de `office_action_queue` : jamais `cancelled` (c'est un `work_state`) — cause du PostgreSQL 23514.
+- L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
 
 ## Règles de travail
 

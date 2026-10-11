@@ -47,8 +47,10 @@ test('Orpailleur continues an unfinished pass instead of starting again', async 
   assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].status, 'planning');
   assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].done, 1);
   assert.deepEqual(fired, ['/api/app?route=tidy-plan-step']);
+  // A second launch while it runs does not start a second worker (no double action); progress kept.
   const r2 = await startTidyPlan('org', {}, { drive, folder: 'om', fire: async () => {} });
-  assert.equal(r2.resumed, true);
+  assert.equal(r2.started, false); assert.equal(r2.reason, 'PASS_ALREADY_RUNNING');
+  assert.equal(store['OFFICE_MANAGER_TIDY_STATE.json'].done, 1);
 });
 
 test('an emptied folder goes to the bin after a move; the top folders and the memory are protected', async () => {
