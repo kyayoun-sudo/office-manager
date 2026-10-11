@@ -140,6 +140,9 @@ questions et propositions des agents).
   `tidy-stop` de `firm-knowledge`, tracé `TIDY_STOPPED`) → statut `stopped` ; le lot en cours finit ses fichiers (un pas en cours
   n'écrase jamais l'arrêt), rien d'autre ne démarre ; les passages planifiés ne relancent pas (`STOPPED_BY_PERSON`) ; « Reprendre »
   continue là où il s'est arrêté, mémoire gardée.
+- **Heures de l'Orpailleur réglables** (2026-10-11, produit pour tous les cabinets) : Paramètres → Horaires des agents, champ
+  « Orpailleur — heures de passage » (`orpailleur_times`, 1 à 6 heures, défaut 08:00 / 12:00 / 20:00). Rien ne part tant que
+  « Activer les passages automatiques » n'est pas coché, et sans le planificateur Supabase (`db/scheduler-cron.sql`).
 - L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
 
 - **Ses propres fichiers ne sont jamais à ranger** (Paul, 2026-10-11 : « arrêter, après chaque passage, de demander s'il doit mettre

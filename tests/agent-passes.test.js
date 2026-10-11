@@ -9,10 +9,14 @@ import { ROUTES } from '../api/app.js';
 const sched = { enabled: true, timezone: 'Africa/Abidjan', controller_times: ['09:00', '16:00'], sika_weekday: 5, sika_time: '09:00' };
 const at = iso => new Date(iso); // Abidjan = UTC
 
-test('schedule: Orpailleur is fixed at 08:00, 12:00, 20:00; owner sets the rest', () => {
+test('schedule: every firm sets its Orpailleur times (08:00, 12:00, 20:00 by default) and the rest', () => {
   const s = validateSchedule({ enabled: true, timezone: 'Africa/Abidjan', controller_times: '16:00, 09:00', sika_weekday: 5, sika_time: '10:30', orpailleur_times: ['03:00'] });
   assert.deepEqual(s.controller_times, ['09:00', '16:00']);
-  assert.deepEqual(s.orpailleur_times, ['08:00', '12:00', '20:00'], 'the Orpailleur times cannot be changed');
+  assert.deepEqual(s.orpailleur_times, ['03:00'], 'the firm chooses');
+  assert.deepEqual(validateSchedule({ controller_times: '09:00' }).orpailleur_times, ['08:00', '12:00', '20:00'], 'default');
+  assert.throws(() => validateSchedule({ controller_times: '09:00', orpailleur_times: '7h' }), /INVALID_ORPAILLEUR_TIMES/);
+  assert.deepEqual(dueSlots({ ...s }, at('2026-10-07T03:30:00Z')).map(x => x.agent), ['orpailleur'], 'its own time triggers it');
+  assert.equal(nextPasses(s, at('2026-10-07T04:00:00Z')).orpailleur.time, '03:00');
   assert.throws(() => validateSchedule({ controller_times: '25:00' }), /INVALID_CONTROLLER_TIMES/);
   assert.throws(() => validateSchedule({ controller_times: '09:00', timezone: 'Mars/Olympus' }), /INVALID_TIMEZONE/);
   assert.throws(() => validateSchedule({ controller_times: '09:00', sika_weekday: 8 }), /INVALID_SIKA_DAY/);

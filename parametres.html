@@ -216,6 +216,8 @@
                 <option value="Africa/Lubumbashi">Lubumbashi (UTC+2)</option><option value="Europe/Paris">Paris</option>
                 <option value="Europe/Budapest">Budapest</option><option value="UTC">UTC</option>
               </select></div>
+            <div class="field"><label for="s-orp">Orpailleur — heures de passage</label>
+              <input id="s-orp" type="text" class="mono" maxlength="60" placeholder="08:00, 12:00, 20:00"></div>
             <div class="field"><label for="s-ctrl">Grand Contrôleur — heures de passage</label>
               <input id="s-ctrl" type="text" class="mono" maxlength="60" placeholder="09:00, 16:00"></div>
             <div class="field"><label for="s-sika-day">Sika — jour (une fois par semaine)</label>
@@ -225,7 +227,7 @@
               </select></div>
             <div class="field"><label for="s-sika-time">Sika — heure</label><input id="s-sika-time" type="time" class="mono"></div>
           </div>
-          <p class="hint" style="margin:0"><strong>Orpailleur :</strong> trois passages par jour, à <span class="mono">08:00</span>, <span class="mono">12:00</span> et <span class="mono">20:00</span> (règle du cabinet). À chaque passage, il reprend la date du précédent et contrôle les fichiers créés, déposés ou modifiés depuis, en français comme en anglais.</p>
+          <p class="hint" style="margin:0"><strong>Orpailleur :</strong> à chacune de ses heures (jusqu’à 6 par jour), il reprend la date du passage précédent et contrôle les fichiers créés, déposés ou modifiés depuis — ou continue le premier scan s’il n’est pas fini. <strong>Rien ne part tant que « Activer les passages automatiques » n’est pas coché.</strong></p>
           <p class="meta" id="s-next" style="margin:0"></p>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <button class="btn" id="s-save" type="button">Enregistrer les horaires</button>
@@ -571,7 +573,7 @@
   // ---- Agent schedule (owner) ----
   var AGENT_NAMES = { orpailleur: 'Orpailleur', 'grand-controleur': 'Grand Contrôleur', sika: 'Sika' };
   Object.assign(ERRORS, {
-    INVALID_TIMEZONE: 'Fuseau horaire invalide.', INVALID_CONTROLLER_TIMES: 'Heures du Grand Contrôleur invalides (format 09:00, 6 maximum).',
+    INVALID_TIMEZONE: 'Fuseau horaire invalide.', INVALID_CONTROLLER_TIMES: 'Heures du Grand Contrôleur invalides (format 09:00, 6 maximum).', INVALID_ORPAILLEUR_TIMES: 'Heures de l’Orpailleur invalides (format 08:00, 6 maximum).',
     INVALID_SIKA_DAY: 'Jour de Sika invalide.', INVALID_SIKA_TIME: 'Heure de Sika invalide.'
   });
   function sSay(t, e) { $('s-status').textContent = t; $('s-status').className = 'status' + (e ? ' error' : ''); }
@@ -588,6 +590,7 @@
     if (!Array.prototype.some.call($('s-tz').options, function (o) { return o.value === sc.timezone; })) $('s-tz').appendChild(new Option(sc.timezone, sc.timezone));
     $('s-tz').value = sc.timezone;
     $('s-ctrl').value = (sc.controller_times || []).join(', ');
+    $('s-orp').value = (sc.orpailleur_times || []).join(', ');
     $('s-sika-day').value = String(sc.sika_weekday || 5);
     $('s-sika-time').value = sc.sika_time || '09:00';
     showNext(sc.next);
@@ -615,7 +618,7 @@
   $('s-save').addEventListener('click', function () {
     $('s-save').disabled = true; sSay('Enregistrement…');
     ownerApi('agent-schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      enabled: $('s-enabled').checked, timezone: $('s-tz').value, controller_times: $('s-ctrl').value,
+      enabled: $('s-enabled').checked, timezone: $('s-tz').value, controller_times: $('s-ctrl').value, orpailleur_times: $('s-orp').value,
       sika_weekday: Number($('s-sika-day').value), sika_time: $('s-sika-time').value, updated_by: OM.getUserName() || null
     }) }).then(function (sc) { fillSchedule(sc); sSay(sc.enabled ? 'Horaires enregistrés. Passages automatiques activés.' : 'Horaires enregistrés (passages automatiques désactivés).'); })
       .catch(function (err) { sSay(explain(err), true); })
