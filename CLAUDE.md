@@ -166,10 +166,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Le Drive est celui choisi dans Paramètres, aperçu compris : plus de repli silencieux sur `TATY_SHARED_DRIVE_ID` (seulement si
   `OFFICE_MANAGER_ALLOW_ENV_DRIVE=true`). En aperçu, `TATY_SHARED_DRIVE_ID` / `TEST_SOURCE_DRIVE_ID` ne servent plus que de garde-fou
   d'écriture (jamais dans le vrai Drive).
-- Fermer l'espace (dernier propriétaire) : Google retiré, tous les comptes fermés, rien supprimé. L'ancien propriétaire se
-  reconnecte → **nouvel espace** : missions précédentes archivées (statut `archived`), choix du Drive oublié (à refaire), les
-  autres comptes attendent un rôle ; `office_firm_settings.settings.space` (generation, closed_by, previous_drive…). Un nouveau
-  venu ne peut pas rouvrir un espace fermé (sauf `FIRST_OWNER_EMAILS`). Code : `lib/accounts.js` (`reopenSpace`, `mayReopen`).
+- **Fermer = effacer (Paul, 2026-10-11 : « quand je ferme mon compte, toutes les données du cabinet partent ; quand je recrée
+  un compte, je remplis ce qu'il y a à remplir »)**. Le dernier propriétaire coche « fermer et effacer » et tape `EFFACER` :
+  `lib/firm-purge.js` → essai à blanc (sans `db/purge.sql` installé, RIEN n'est effacé : `PURGE_SQL_NOT_INSTALLED`), mémoire des
+  agents dans le Drive à la corbeille (seulement les fichiers des agents : `OFFICE_MANAGER_*`, `SHADOW_LAB.json`, journal,
+  `MEMORY` / `AGENTS` / `CLIENTS`, jamais la racine), Google déconnecté, toutes les lignes `office_*` / `orpailleur_*` / `taty_*`
+  du cabinet (fonction SQL `office_purge_firm`, confirmation `EFFACER <org_id>`, service_role seulement ; `office_organizations`
+  gardée), comptes de connexion supprimés sauf s'ils appartiennent à un autre cabinet. **Les documents du cabinet dans son Drive
+  ne sont jamais touchés** (exception assumée au principe 9 : ce sont les données d'Office Manager, effacées à la demande
+  explicite du propriétaire). Ensuite, la première personne qui crée un compte est propriétaire d'un espace vierge → « Démarrer ».
+- Un espace fermé avant cette règle (comptes inactifs) : connexion → `FIRM_CLOSED` → la page de connexion demande `EFFACER` →
+  route `firm-restart` (`restartFirm` : identité revérifiée, ancien propriétaire ou `FIRST_OWNER_EMAILS`, son compte de connexion
+  gardé) → effacement → propriétaire d'un espace vierge → « Démarrer ». Un nouveau venu ne peut jamais prendre l'espace.
 
 ## Règles de travail
 

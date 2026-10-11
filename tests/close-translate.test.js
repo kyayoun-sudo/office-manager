@@ -10,11 +10,12 @@ test('close account: typed e-mail required; the last owner must confirm closing 
   const fetchRows = async (path, opts) => { calls.push([path, opts]); return path.includes('role=eq.owner') ? [{ auth_user_id: me.auth_user_id }] : []; };
   await assert.rejects(closeOwnAccount('org', me, { confirm: 'x@y.z' }, { fetchRows }), /CONFIRM_WITH_YOUR_EMAIL/);
   await assert.rejects(closeOwnAccount('org', me, { confirm: 'PAUL@taty.info' }, { fetchRows }), /LAST_OWNER_CLOSES_FIRM/);
-  let revoked = false;
-  const out = await closeOwnAccount('org', me, { confirm: 'paul@taty.info', close_firm: true }, { fetchRows, disconnectGoogle: async () => { revoked = true; } });
-  assert.deepEqual(out, { closed: true, firm_closed: true });
-  assert.ok(revoked);
-  assert.ok(calls.some(([p, o]) => o?.method === 'PATCH' && o.body.includes('"active":false')));
+  // The last owner ERASES the space (2026-10-11), only with « EFFACER » typed.
+  await assert.rejects(closeOwnAccount('org', me, { confirm: 'paul@taty.info', close_firm: true }, { fetchRows, purgeFirm: async () => { throw new Error('must not'); } }), /TYPE_EFFACER_TO_CONFIRM/);
+  let purged = null;
+  const out = await closeOwnAccount('org', me, { confirm: 'paul@taty.info', close_firm: true, confirm_erase: 'effacer' }, { fetchRows, purgeFirm: async (org, who) => { purged = [org, who.email]; return { erased: true }; } });
+  assert.equal(out.firm_closed, true); assert.equal(out.erased, true);
+  assert.deepEqual(purged, ['org', me.email]);
 });
 
 test('close account: a collaborator closes only their own account', async () => {

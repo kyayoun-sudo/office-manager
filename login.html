@@ -36,6 +36,13 @@
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
         Continuer avec Google</button>
     <p class="status" id="google-status" role="status" aria-live="polite"></p>
+    <section id="restart-box" hidden style="border:1px solid var(--line);border-left:4px solid var(--danger);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-size:17px">Cet espace a été fermé</h2>
+      <p style="margin:0;font-size:14px;line-height:1.5">Pour recommencer à zéro, toutes les anciennes données d’Office Manager de ce cabinet sont effacées (missions, personnes, réglages, connexion Google, mémoire des agents, autres comptes). Les documents du cabinet dans son Drive restent. Vous devenez le propriétaire d’un espace vierge et vous remplissez la configuration.</p>
+      <div class="field"><label for="restart-word">Tapez EFFACER pour recommencer à zéro</label><input id="restart-word" type="text" autocomplete="off"></div>
+      <button class="btn" type="button" id="restart-btn">Effacer et recommencer</button>
+      <p class="status" id="restart-status" role="status" aria-live="polite"></p>
+    </section>
     <details class="more" id="pw-box">
       <summary>Se connecter avec un e-mail et un mot de passe</summary>
     <div class="or" id="or-line" hidden><span>ou</span></div>
@@ -115,8 +122,16 @@
     TEST_MODE_REAL_ORG_NOT_DECLARED: 'Aperçu de test mal configuré (cabinet réel non déclaré).',
     LOGIN_UNAVAILABLE: 'La connexion par e-mail n\u2019est pas encore activée sur le serveur (table des comptes à créer dans Supabase). Utilisez le code d\u2019accès ci-dessous.',
     BOOTSTRAP_UNAVAILABLE: 'Création impossible : la table des comptes n\u2019existe pas encore dans Supabase (fichier db/app-users.sql à appliquer).',
-    SUPABASE_SERVER_CONFIG_MISSING: 'Configuration Supabase manquante sur le serveur.'
+    SUPABASE_SERVER_CONFIG_MISSING: 'Configuration Supabase manquante sur le serveur.',
+    FIRM_CLOSED: 'Cet espace a été fermé : pour recommencer à zéro, confirmez ci-dessus.', TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer.', FIRM_NOT_CLOSED: 'L’espace est de nouveau ouvert : connectez-vous normalement.',
+    SESSION_EXPIRED: 'La connexion Google a expiré : recommencez avec « Continuer avec Google ».', PURGE_SQL_NOT_INSTALLED: 'L’effacement n’est pas encore installé dans Supabase (db/purge.sql) : rien n’a été effacé.'
   };
+  // A closed space (2026-10-11): its former owner restarts it from zero, with the same identity.
+  var restartWith = null;
+  function offerRestart(creds) {
+    restartWith = creds; $('restart-box').hidden = false; $('restart-word').focus();
+    $('restart-box').scrollIntoView({ block: 'center' });
+  }
   function say(id, text, isError) { $(id).textContent = text; $(id).className = 'status' + (isError ? ' error' : ''); }
   function next() {
     var n = new URLSearchParams(location.search).get('next') || '/accueil.html';
@@ -158,7 +173,7 @@
       if (after === '/demarrer.html' && session.user && session.user.role === 'owner') { OM.saveSession(session); location.replace('/demarrer.html'); return; }
       enter(session);
     })
-      .catch(function (err) { say('google-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); });
+      .catch(function (err) { if (err.message === 'FIRM_CLOSED') offerRestart({ refresh_token: h.get('refresh_token') }); say('google-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); });
   })();
 
   $('show-pw').addEventListener('change', function () { $('password').type = this.checked ? 'text' : 'password'; });
@@ -169,7 +184,7 @@
     if (!email || !password) { say('login-status', 'Renseignez votre e-mail et votre mot de passe.', true); return; }
     $('login-btn').disabled = true; say('login-status', 'Connexion…');
     post('login', { email: email, password: password }).then(enter)
-      .catch(function (err) { say('login-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); $('password').value = ''; $('password').focus(); })
+      .catch(function (err) { if (err.message === 'FIRM_CLOSED') { offerRestart({ email: email, password: password }); say('login-status', MESSAGES.FIRM_CLOSED, true); return; } say('login-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); $('password').value = ''; $('password').focus(); })
       .then(function () { $('login-btn').disabled = false; });
   });
 
@@ -224,7 +239,7 @@
         say('signup-status', 'Compte créé. Il sera actif dès que le propriétaire vous aura donné un rôle. Vous êtes le propriétaire ? Cliquez sur « Je suis le propriétaire du cabinet ».');
         $('o-email').value = $('s-email').value.trim();
       })
-      .catch(function (err) { say('signup-status', MESSAGES[err.message] || 'Création impossible pour le moment.', true); });
+      .catch(function (err) { if (err.message === 'FIRM_CLOSED') { offerRestart({ email: $('s-email').value.trim(), password: $('s-pw').value }); say('signup-status', MESSAGES.FIRM_CLOSED, true); return; } say('signup-status', MESSAGES[err.message] || 'Création impossible pour le moment.', true); });
   });
   $('claim-link').addEventListener('click', function () { $('claim-form').hidden = !$('claim-form').hidden; if (!$('claim-form').hidden) ($('o-email').value ? $('o-pw') : $('o-email')).focus(); });
   $('claim-form').addEventListener('submit', function (e) {
@@ -234,6 +249,14 @@
       { 'x-office-manager-owner-token': $('o-code').value.trim() })
       .then(enter)
       .catch(function (err) { say('claim-status', MESSAGES[err.message] || 'Impossible pour le moment.', true); });
+  });
+
+  $('restart-btn').addEventListener('click', function () {
+    if (!restartWith) return;
+    var b = this; b.disabled = true; say('restart-status', 'Effacement de l’ancien espace… (cela peut prendre une minute)');
+    post('firm-restart', Object.assign({ confirm: $('restart-word').value }, restartWith))
+      .then(function (r) { OM.saveSession(r.session); location.replace('/demarrer.html'); })
+      .catch(function (err) { say('restart-status', MESSAGES[err.message] || ('Impossible : ' + err.message), true); b.disabled = false; });
   });
 
   $('email').focus();

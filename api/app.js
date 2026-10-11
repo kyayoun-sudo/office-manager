@@ -6,7 +6,7 @@ import { smartSearch } from '../lib/smart-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount } from '../lib/accounts.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount, restartFirm } from '../lib/accounts.js';
 import { translateTexts } from '../lib/translate-ui.js';
 import { providersStatus } from '../lib/ai-plus.js';
 import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityReport, capabilityContext } from '../lib/capabilities.js';
@@ -374,6 +374,8 @@ export const ROUTES = Object.freeze({
   // Understanding the firm, then (same first scan) where every file goes.
   'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); if (req.body?.skip_tidy !== true) await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
+  // A space closed earlier: its former owner restarts it from zero (identity re-checked, « EFFACER » typed).
+  'firm-restart': { POST: open((orgId, req) => restartFirm(orgId, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
   'close-account': { POST: users([...EVERYONE], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
   translate: { POST: users([...EVERYONE], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
   // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----

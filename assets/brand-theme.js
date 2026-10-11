@@ -389,12 +389,19 @@
     var s = readSession() || {}, email = (s.user && s.user.email) || '';
     var d = node('dialog', null, 'om-dialog');
     d.appendChild(node('h2', 'Fermer mon compte'));
-    d.appendChild(node('p', 'Votre accès à l’application s’arrête. Rien n’est supprimé : le Drive du cabinet reste tel quel et un propriétaire peut réactiver votre compte.'));
-    var owner = OM.getRole() === 'owner', firm = null;
+    d.appendChild(node('p', 'Votre accès à l’application s’arrête ; un propriétaire peut réactiver votre compte. Le Drive du cabinet reste tel quel.'));
+    var owner = OM.getRole() === 'owner', firm = null, erase = null;
     if (owner) {
       var lab = node('label', null, 'om-check'); firm = node('input'); firm.type = 'checkbox';
-      lab.appendChild(firm); lab.appendChild(document.createTextNode(' Si je suis le dernier propriétaire : fermer aussi l’espace du cabinet. L’accès Google est retiré, les agents s’arrêtent, tous les comptes sont fermés ; rien n’est supprimé. Pour repartir de zéro, reconnectez-vous simplement : nouvel espace, anciennes missions archivées, vous choisissez à nouveau le Drive.'));
+      lab.appendChild(firm); lab.appendChild(document.createTextNode(' Je suis le dernier propriétaire : fermer et EFFACER l’espace du cabinet.'));
       d.appendChild(lab);
+      // Erasing the space (Paul, 2026-10-11: « quand je ferme mon compte, toutes les données du cabinet partent »).
+      var warn = node('div', null, 'om-erase'); warn.hidden = true;
+      warn.appendChild(node('p', 'Seront effacés, sans retour : les missions, opportunités, personnes, rôles, décisions, réglages, la connexion Google et le choix du Drive, la veille, le journal, les comptes de connexion de tout le cabinet, et la mémoire des agents dans le Drive (mise à la corbeille du Drive). Restent : les documents du cabinet dans son Drive.'));
+      warn.appendChild(node('p', 'Ensuite, créez un compte : vous serez le propriétaire d’un espace vierge et vous remplirez la configuration (compte, Google, Drive).'));
+      var ef = node('div', null, 'field'); var el2 = node('label', 'Tapez EFFACER pour confirmer'); erase = node('input'); erase.type = 'text'; erase.id = 'close-erase'; erase.autocomplete = 'off'; el2.htmlFor = 'close-erase';
+      ef.appendChild(el2); ef.appendChild(erase); warn.appendChild(ef); d.appendChild(warn);
+      firm.addEventListener('change', function () { warn.hidden = !firm.checked; go.textContent = firm.checked ? 'Fermer et effacer le cabinet' : 'Fermer mon compte'; });
     }
     var f = node('div', null, 'field'); var l = node('label', 'Pour confirmer, tapez votre e-mail' + (email ? ' (' + email + ')' : '')); var inp = node('input'); inp.type = 'email'; inp.id = 'close-confirm'; l.htmlFor = 'close-confirm';
     f.appendChild(l); f.appendChild(inp); d.appendChild(f);
@@ -404,11 +411,11 @@
     var go = node('button', 'Fermer mon compte', 'btn danger'); go.type = 'button';
     go.addEventListener('click', function () {
       go.disabled = true; msg.className = 'status'; msg.textContent = 'Fermeture…';
-      OM.api('/api/app?route=close-account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: inp.value, close_firm: Boolean(firm && firm.checked) }) })
+      OM.api('/api/app?route=close-account', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: inp.value, close_firm: Boolean(firm && firm.checked), confirm_erase: erase ? erase.value : '' }) })
         .then(function () { OM.forget(false); location.replace(LOGIN_PAGE); })
         .catch(function (e) {
           go.disabled = false; msg.className = 'status error';
-          msg.textContent = { CONFIRM_WITH_YOUR_EMAIL: 'L’e-mail tapé ne correspond pas à votre compte.', LAST_OWNER_CLOSES_FIRM: 'Vous êtes le dernier propriétaire : cochez la case pour fermer aussi l’espace du cabinet, ou nommez d’abord un autre propriétaire.', USER_SESSION_REQUIRED: 'Reconnectez-vous avec Google ou votre e-mail pour fermer votre compte.' }[e.message] || e.message;
+          msg.textContent = { CONFIRM_WITH_YOUR_EMAIL: 'L’e-mail tapé ne correspond pas à votre compte.', LAST_OWNER_CLOSES_FIRM: 'Vous êtes le dernier propriétaire : cochez la case pour fermer et effacer l’espace du cabinet, ou nommez d’abord un autre propriétaire.', TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer l’effacement du cabinet.', PURGE_SQL_NOT_INSTALLED: 'L’effacement n’est pas encore installé dans Supabase (db/purge.sql) : rien n’a été effacé.', USER_SESSION_REQUIRED: 'Reconnectez-vous avec Google ou votre e-mail pour fermer votre compte.' }[e.message] || e.message;
         });
     });
     row.appendChild(cancel); row.appendChild(go); d.appendChild(row);

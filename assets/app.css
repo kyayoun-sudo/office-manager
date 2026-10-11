@@ -76,6 +76,8 @@ a{color:var(--brand-ink)}
 .om-dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:24px;max-width:460px;width:calc(100% - 32px);display:flex;flex-direction:column;gap:12px}
 .om-dialog:not([open]){display:none}
 .om-dialog::backdrop{background:rgba(8,17,15,.55)}
+.om-erase{border-left:3px solid var(--danger);padding:4px 0 4px 12px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
+.om-erase p{margin:0}
 .om-dialog h2{margin:0;font-size:19px}
 .om-dialog p{margin:0;line-height:1.5;color:var(--muted);font-size:14px}
 .om-ask{max-width:520px}
