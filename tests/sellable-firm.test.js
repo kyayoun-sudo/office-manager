@@ -64,3 +64,17 @@ test('a new firm kit: its own identifier and fresh secrets, owner addresses, sch
   assert.ok(!a.cron.includes('VOTRE'));
   assert.match(renderKit(a), /https:\/\/a\.vercel\.app\/oauth\/google\/callback/);
 });
+
+test('a team member’s home: only their missions and their open tasks', async () => {
+  const { myKpis } = await import('../lib/kpi.js');
+  const fetchRows = async path => {
+    if (path.startsWith('office_staff_profiles')) return [{ id: 's1', full_name: 'Aya', email: 'aya@c.ci' }, { id: 's2', full_name: 'Ben', email: 'ben@c.ci' }];
+    if (path.startsWith('office_missions')) return [{ id: 'm1', name: 'Nova 2026', status: 'fieldwork' }, { id: 'm2', name: 'Autre', status: 'fieldwork' }];
+    if (path.startsWith('office_mission_assignments')) return [{ office_mission_id: 'm1', staff_profile_id: 's1', mission_role: 'auditeur' }, { office_mission_id: 'm2', staff_profile_id: 's2' }];
+    if (path.startsWith('office_action_queue')) return [{ id: 'a1', assigned_staff_profile_id: 's1', summary: 'Relancer', office_mission_id: 'm1', due_at: '2020-01-01' }, { id: 'a2', assigned_staff_profile_id: 's2', summary: 'Pas à moi' }];
+    return [];
+  };
+  const k = await myKpis('org', { email: 'AYA@c.ci' }, fetchRows);
+  assert.deepEqual(k.missions.map(m => [m.id, m.my_role]), [['m1', 'auditeur']]);
+  assert.deepEqual(k.open_actions.map(a => [a.id, a.overdue, a.mission]), [['a1', true, 'Nova 2026']]);
+});

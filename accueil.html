@@ -36,7 +36,7 @@
 
     <header class="page-head">
       <h1 id="hello">Bonjour</h1>
-      <p class="lead">Le cockpit du cabinet : les indicateurs clés, les e-mails qui demandent une action, puis les missions et les agents. Cliquez sur un indicateur pour voir ce qu'il mesure, comment il est calculé et ce qui le compose.</p>
+      <p class="lead" id="page-lead">Le cockpit du cabinet : les indicateurs clés, les e-mails qui demandent une action, puis les missions et les agents. Cliquez sur un indicateur pour voir ce qu'il mesure, comment il est calculé et ce qui le compose.</p>
     </header>
 
     <section class="card" id="myspace" aria-labelledby="h-myspace" hidden>
@@ -44,6 +44,15 @@
       <p class="lead" id="myspace-lead"></p>
       <div class="stack" id="myspace-items"></div>
       <div class="links" id="myspace-links"></div>
+    </section>
+
+    <section class="card" id="mywork" aria-labelledby="h-mywork" hidden>
+      <div class="card-head"><h2 id="h-mywork">Mon travail</h2><span class="meta" id="mywork-meta"></span></div>
+      <div id="mywork-kpis" class="kpis"></div>
+      <h3 class="kd-sub">Mes missions</h3>
+      <div id="mywork-missions" class="stack"><p class="empty">Chargement…</p></div>
+      <h3 class="kd-sub">Mes tâches ouvertes</h3>
+      <div id="mywork-actions" class="stack"><p class="empty">Chargement…</p></div>
     </section>
 
     <a class="callout" id="setup" href="/mise-en-service.html" hidden>
@@ -61,7 +70,7 @@
     <p class="status" id="search-status" role="status" aria-live="polite"></p>
     <div id="search-results" class="stack"></div>
 
-    <section aria-labelledby="h-cockpit" class="cockpit">
+    <section aria-labelledby="h-cockpit" class="cockpit" id="cockpit-section">
       <div class="card-head"><h2 id="h-cockpit">Indicateurs clés</h2><span class="meta" id="cockpit-at"></span></div>
       <div id="cockpit" class="kpis cockpit-grid"><p class="empty">Chargement…</p></div>
     </section>
@@ -87,31 +96,31 @@
 
     <div class="row">
       <div class="grow">
-        <section class="card" aria-labelledby="h-missions">
+        <section class="card" aria-labelledby="h-missions" id="missions-card">
           <div class="card-head"><h2 id="h-missions">Missions</h2><a href="/mission.html">Tout voir</a></div>
           <div id="missions" class="stack"><p class="empty">Chargement…</p></div>
         </section>
-        <section class="card" aria-labelledby="h-runs">
+        <section class="card" aria-labelledby="h-runs" id="runs-card">
           <h2 id="h-runs">Dernières demandes aux agents</h2>
           <div id="runs" class="stack"><p class="empty">Chargement…</p></div>
         </section>
       </div>
       <aside class="side">
-        <a class="callout" href="/validations.html">
+        <a class="callout" href="/validations.html" id="pending-card">
           <span class="callout-label">À valider par vous</span>
           <span class="callout-num" id="pending">–</span>
           <span class="callout-text">L'agent propose, vous décidez. Rien ne part sans votre accord.</span>
         </a>
-        <section class="card" aria-labelledby="h-passes">
+        <section class="card" aria-labelledby="h-passes" id="passes-card">
           <h2 id="h-passes">Passages des agents</h2>
           <div id="passes" class="stack"><p class="empty">Chargement…</p></div>
         </section>
-        <section class="card" aria-labelledby="h-next">
+        <section class="card" aria-labelledby="h-next" id="shortcuts">
           <h2 id="h-next">Raccourcis</h2>
           <a href="/recherche.html">Recherche avancée</a>
           <a href="/assistant.html">Poser une question aux agents</a>
-          <a href="/rangement.html">Ranger le Drive</a>
-          <a href="/parametres.html">Nom, logo et couleurs du cabinet</a>
+          <a href="/rangement.html" data-lead-only>Ranger le Drive</a>
+          <a href="/parametres.html" data-lead-only>Nom, logo et couleurs du cabinet</a>
         </section>
       </aside>
     </div>
@@ -346,20 +355,70 @@
       (c.missions || []).filter(function (m) { return m.risk === 'high'; }).slice(0, 5).forEach(function (m) { box.appendChild(line('Mission à risque : ' + m.name + ' — ' + m.overdue_actions + ' action(s) en retard', '/mission.html?id=' + m.id, ['À risque', 'tag warn'])); });
       if ((c.unassigned || []).length) box.appendChild(line((c.unassigned.length) + ' action(s) sans personne affectée', '/validations.html', ['À affecter', 'tag warn']));
     }).catch(function () {});
-    if (!lead) OM.api('/api/app?route=my-kpi').then(function (k) {
-      if (!k || k.linked === false) return;
-      box.appendChild(line('Mes missions actives : ' + (k.missions_active ?? '–') + ' · actions ouvertes : ' + (k.actions_open ?? '–') + (k.actions_overdue ? ' · en retard : ' + k.actions_overdue : ''), '/mission.html', k.actions_overdue ? ['En retard', 'tag warn'] : null));
-    }).catch(function () {});
+    // (A team member's own figures are in « Mon travail », just below.)
   }
 
+  // ---- One home per role (2026-10-11, Paul: « tout le monde a la même présentation de l'accueil, ce n'est pas normal ») ----
+  // Associés / propriétaire: the firm's cockpit. Managers, superviseurs, revue qualité: the cockpit of the work they lead.
+  // Everyone else (senior, auditeur, BDM, secrétariat…): their own work — their missions, their tasks — not the firm's.
+  var LEADS = ['owner', 'partner'], MANAGE = ['manager', 'supervisor', 'quality_reviewer'];
+  var LEADS_TEXT = {
+    owner: 'Le cabinet : les indicateurs clés, les décisions qui vous reviennent, les e-mails à traiter, les missions et les agents. Cliquez sur un indicateur pour voir ce qu’il mesure et ce qui le compose.',
+    partner: 'Vos décisions, les missions à risque et les indicateurs du cabinet. Cliquez sur un indicateur pour voir ce qu’il mesure et ce qui le compose.',
+    manager: 'Vos revues, vos validations, l’avancement des missions et les personnes qui vous rendent compte.',
+    supervisor: 'Les missions que vous supervisez : avancement, risques, revues.',
+    quality_reviewer: 'Les missions dont on vous a confié la revue qualité.',
+    senior: 'Votre travail : vos missions, vos tâches et leurs échéances, les questions des agents qui vous attendent.',
+    auditor: 'Votre travail : vos missions, vos tâches et leurs échéances, les questions des agents qui vous attendent.',
+    collaborator: 'Votre travail : vos missions, vos tâches et leurs échéances.',
+    bdm: 'Les appels d’offres retenus par les associés, vos propositions en cours, et vos missions.',
+    secretary: 'Dépôts, rangement, courrier et opportunités reçues — et vos tâches.'
+  };
+  function hide(id) { var n = $(id); if (n) n.hidden = true; }
+  function loadMyWork() {
+    $('mywork').hidden = false;
+    OM.api('/api/app?route=my-kpi').then(function (k) {
+      var kb = $('mywork-kpis'), mb = $('mywork-missions'), ab = $('mywork-actions'); kb.textContent = ''; mb.textContent = ''; ab.textContent = '';
+      if (!k || k.linked === false) { mb.appendChild(el('p', (k && k.message) || 'Votre compte n’est relié à aucune fiche de l’équipe.', 'empty')); ab.textContent = ''; return; }
+      [['Missions actives', k.missions_active], ['Tâches ouvertes', k.actions_open], ['En retard', k.actions_overdue], ['Charge planifiée', (k.load_pct ?? 0) + ' %']].forEach(function (x) {
+        var d = el('div', null, 'kpi'); d.appendChild(el('span', x[0])); d.appendChild(el('strong', String(x[1] ?? '–'))); kb.appendChild(d);
+      });
+      (k.signals || []).forEach(function (sg) { kb.appendChild(el('p', sg.text, sg.level === 'warn' ? 'status error' : 'meta')); });
+      if (!(k.missions || []).length) mb.appendChild(el('p', 'Aucune mission ne vous est affectée pour le moment.', 'empty'));
+      (k.missions || []).forEach(function (m) {
+        var a = el('a', null, 'item link-item'); a.href = '/mission.html?id=' + encodeURIComponent(m.id);
+        var t = el('div', null, 't'); t.appendChild(el('span', m.name || m.mission_code || 'Mission'));
+        t.appendChild(el('span', [m.my_role, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · '), 'meta')); a.appendChild(t);
+        if (m.status) a.appendChild(el('span', STATUS_FR[String(m.status).toLowerCase()] || m.status, 'tag'));
+        mb.appendChild(a);
+      });
+      if (!(k.open_actions || []).length) ab.appendChild(el('p', 'Aucune tâche ouverte.', 'empty'));
+      (k.open_actions || []).forEach(function (x) {
+        var a = el(x.mission_id ? 'a' : 'div', null, 'item' + (x.mission_id ? ' link-item' : '')); if (x.mission_id) a.href = '/mission.html?id=' + encodeURIComponent(x.mission_id);
+        var t = el('div', null, 't'); t.appendChild(el('span', UI.plain(x.summary || 'Tâche').slice(0, 160)));
+        t.appendChild(el('span', [x.mission, x.due_at ? 'échéance ' + UI.dateTime(x.due_at) : 'sans échéance'].filter(Boolean).join(' · '), 'meta')); a.appendChild(t);
+        if (x.overdue) a.appendChild(el('span', 'En retard', 'tag warn'));
+        ab.appendChild(a);
+      });
+    }).catch(function (e) { UI.fail($('mywork-missions'), e); });
+  }
   function start() {
-    var name = OM.getUserName();
+    var name = OM.getUserName(), role = OM.getRole();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
+    if (LEADS_TEXT[role]) $('page-lead').textContent = LEADS_TEXT[role];
     OM.loadBranding().catch(function () {});
     loadMySpace();
     // The IT administrator works on accounts and connections, not on the firm's engagements.
-    if (OM.getRole() === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
-    loadCockpit(); loadMails(); loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup();
+    if (role === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
+    var lead = LEADS.indexOf(role) >= 0, manage = MANAGE.indexOf(role) >= 0;
+    if (!lead) document.querySelectorAll('#shortcuts [data-lead-only]').forEach(function (a) { a.hidden = true; });
+    if (lead) { loadCockpit(); loadMails(); loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup(); return; }
+    if (manage) { loadCockpit(); loadMails(); loadMissions(); loadPending(); hide('runs-card'); hide('passes-card'); return; }
+    // Team members: their own work only.
+    ['cockpit-section', 'missions-card', 'runs-card', 'passes-card'].forEach(hide);
+    loadMyWork(); loadPending();
+    $('pending-card').querySelector('.callout-label').textContent = 'À valider';
+    $('pending-card').querySelector('.callout-text').textContent = 'Ce que les agents vous ont préparé ou vous demandent.';
   }
 
   // Owner: reminder of what is still missing for everything to work together.

@@ -156,6 +156,14 @@ questions et propositions des agents).
   bloque plus (`existingMemoryRequired()` : seulement le dossier réglé côté serveur du pilote) ; sans dossier « … AI MANAGER », la
   maison `00_OFFICE_MANAGER_AI/MEMORY` est créée une fois (`findAtelier(…, { create: true })` dans `ensureMemoryHome`).
 
+## Accueil par rôle (Paul, 2026-10-11 : « tout le monde a la même présentation de l'accueil, ce n'est pas normal »)
+- `accueil.html` : propriétaire / associé = cockpit du cabinet complet (indicateurs, e-mails, missions, demandes aux agents,
+  passages, mise en service) ; manager / superviseur / revue qualité = cockpit, e-mails, missions, « À valider » (sans journal des
+  agents) ; senior, auditeur, BDM, secrétariat = « Mon travail » (leurs missions, leurs tâches ouvertes et leurs échéances, leur
+  charge) au lieu du cockpit et de toutes les missions ; responsable informatique = comptes et mise en service. Texte d'en-tête et
+  raccourcis selon le rôle. `myKpis` renvoie `missions` et `open_actions` de la personne. Reste à faire : `/api/missions` renvoie
+  encore toutes les missions à tout compte connecté (à filtrer par fonction sur la mission, spec §58).
+
 ## Décisions du 2026-10-11 — postes, droits, veille des appels d'offres
 Document de conception : « Office Manager AI — Postes, rôles et droits d'accès » (Claude Docs).
 - **Trois couches** : rôle (poste), rôles cabinet (ISQM 1, cumulables), fonction sur la mission ; les règles automatiques
