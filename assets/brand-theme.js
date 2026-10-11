@@ -393,7 +393,7 @@
     var owner = OM.getRole() === 'owner', firm = null;
     if (owner) {
       var lab = node('label', null, 'om-check'); firm = node('input'); firm.type = 'checkbox';
-      lab.appendChild(firm); lab.appendChild(document.createTextNode(' Si je suis le dernier propriétaire : fermer aussi l’espace du cabinet (l’accès Google est retiré, les agents s’arrêtent).'));
+      lab.appendChild(firm); lab.appendChild(document.createTextNode(' Si je suis le dernier propriétaire : fermer aussi l’espace du cabinet. L’accès Google est retiré, les agents s’arrêtent, tous les comptes sont fermés ; rien n’est supprimé. Pour repartir de zéro, reconnectez-vous simplement : nouvel espace, anciennes missions archivées, vous choisissez à nouveau le Drive.'));
       d.appendChild(lab);
     }
     var f = node('div', null, 'field'); var l = node('label', 'Pour confirmer, tapez votre e-mail' + (email ? ' (' + email + ')' : '')); var inp = node('input'); inp.type = 'email'; inp.id = 'close-confirm'; l.htmlFor = 'close-confirm';

@@ -75,9 +75,12 @@ test('test mode: no silent fallback to the real firm files, and only a TEST mail
   try {
     Object.assign(process.env, { VERCEL_ENV: 'preview' });
     delete process.env.TATY_SHARED_DRIVE_ID; delete process.env.TATY_MASTER_SHEET_ID;
-    assert.throws(() => configuredDriveId(), /TEST_MODE_DRIVE_ID_NOT_SET/);
+    assert.throws(() => configuredDriveId(), /FIRM_DRIVE_NOT_CHOSEN/);
     assert.throws(() => masterSheetId(), /TEST_MODE_DRIVE_ID_NOT_SET/);
+    // A server setting is never used silently: the firm chooses its Drive in Paramètres (2026-10-11).
     process.env.TATY_SHARED_DRIVE_ID = 'TESTDRIVE';
+    assert.throws(() => configuredDriveId(), /FIRM_DRIVE_NOT_CHOSEN/);
+    process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = 'true';
     assert.equal(configuredDriveId(), 'TESTDRIVE');
   } finally {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];

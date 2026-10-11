@@ -162,6 +162,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   et une pull request en brouillon quand la cause est dans le code. On peut lui poser une question (« pourquoi l'Orpailleur
   ne fait pas X ? ») dans Entraînement → Objectifs et enquêtes. Il ne fusionne ni ne déploie jamais.
 
+## Simple pour tout cabinet : se connecter, connecter le Drive (Paul, 2026-10-11)
+- Le Drive est celui choisi dans Paramètres, aperçu compris : plus de repli silencieux sur `TATY_SHARED_DRIVE_ID` (seulement si
+  `OFFICE_MANAGER_ALLOW_ENV_DRIVE=true`). En aperçu, `TATY_SHARED_DRIVE_ID` / `TEST_SOURCE_DRIVE_ID` ne servent plus que de garde-fou
+  d'écriture (jamais dans le vrai Drive).
+- Fermer l'espace (dernier propriétaire) : Google retiré, tous les comptes fermés, rien supprimé. L'ancien propriétaire se
+  reconnecte → **nouvel espace** : missions précédentes archivées (statut `archived`), choix du Drive oublié (à refaire), les
+  autres comptes attendent un rôle ; `office_firm_settings.settings.space` (generation, closed_by, previous_drive…). Un nouveau
+  venu ne peut pas rouvrir un espace fermé (sauf `FIRST_OWNER_EMAILS`). Code : `lib/accounts.js` (`reopenSpace`, `mayReopen`).
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
