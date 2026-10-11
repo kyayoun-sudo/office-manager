@@ -98,7 +98,7 @@ test("mission controller owns the mission-level tools", () => {
 
 test("no operational tool was lost in the split", () => {
   const before = [
-    "get_team_directory", "read_taty_master_sheet", "get_mission_controls",
+    "get_team_directory", "read_master_sheet", "get_mission_controls",
     "upsert_confirmed_planning_assignment", "sync_validated_programme_assignments",
     "refresh_capacity_calendar", "find_available_staff", "refresh_kpi_snapshot",
     "create_or_update_mission_pbc", "inspect_pbc_checklist",

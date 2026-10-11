@@ -117,9 +117,9 @@
             <span class="hint" id="g-drive-now"></span></div>
           <div class="field" style="max-width:640px"><label for="g-home">Mémoire des agents (avec « Tout mon Google Drive ») : dans quel Drive partagé du cabinet ?</label>
             <select id="g-home" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 12px;min-height:44px;background:var(--surface)"></select>
-            <span class="hint">Sa mémoire principale : le dossier existant dont le nom dit « AI … office manager » (ex. TATY_AI_office manager) est repris tel quel ; sinon un dossier « 00_OFFICE_MANAGER » est créé. Carte du Drive, registre, ce que les agents ont compris du cabinet, politique des personnes : tout y est, mis à jour sans doublon.</span>
+            <span class="hint">Sa mémoire principale : le dossier existant dont le nom dit « AI … office manager » (ex. 00_OFFICE_MANAGER) est repris tel quel ; sinon un dossier « 00_OFFICE_MANAGER » est créé. Carte du Drive, registre, ce que les agents ont compris du cabinet, politique des personnes : tout y est, mis à jour sans doublon.</span>
             <label for="g-memory" style="margin-top:6px">Ou collez le lien du dossier mémoire (facultatif)</label>
-            <input id="g-memory" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/… (TATY_AI_office manager)"></div>
+            <input id="g-memory" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/…"></div>
           <div class="stack" style="gap:6px">
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost" id="g-allow" type="button">Autoriser les agents</button>
             <span class="hint" id="g-allow-state">Lire le Drive, lire les documents utiles et utiliser l’IA. Les envois passent toujours par « À valider ».</span></div></div>
@@ -165,11 +165,11 @@
 
         <section class="card" aria-labelledby="h-mail">
           <h2 id="h-mail">E-mail de l'agent</h2>
-          <div class="field"><label for="agent-name">Nom de l'agent (affiché dans les e-mails)</label><input id="agent-name" type="text" maxlength="80" placeholder="Ex. Office Manager TATY"></div>
-          <div class="field"><label for="sender">Adresse d'envoi de l'agent</label><input id="sender" type="text" maxlength="254" placeholder="Ex. assistant@taty.info"></div>
-          <div class="field"><label for="reply-to">Adresse de réponse (facultatif)</label><input id="reply-to" type="text" maxlength="254" placeholder="Ex. hit@taty.info"></div>
-          <div class="field"><label for="aliases">Alias de l'agent — un par ligne (10 maximum)</label><textarea id="aliases" class="mono" rows="3" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="office@taty.info&#10;pbc@taty.info"></textarea></div>
-          <div class="field"><label for="domains">Domaines du cabinet — un par ligne</label><textarea id="domains" class="mono" rows="2" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="taty.info"></textarea>
+          <div class="field"><label for="agent-name">Nom de l'agent (affiché dans les e-mails)</label><input id="agent-name" type="text" maxlength="80" placeholder="Ex. Office Manager du cabinet"></div>
+          <div class="field"><label for="sender">Adresse d'envoi de l'agent</label><input id="sender" type="text" maxlength="254" placeholder="Ex. assistant@votre-cabinet.com"></div>
+          <div class="field"><label for="reply-to">Adresse de réponse (facultatif)</label><input id="reply-to" type="text" maxlength="254" placeholder="Ex. contact@votre-cabinet.com"></div>
+          <div class="field"><label for="aliases">Alias de l'agent — un par ligne (10 maximum)</label><textarea id="aliases" class="mono" rows="3" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="office@votre-cabinet.com&#10;pbc@votre-cabinet.com"></textarea></div>
+          <div class="field"><label for="domains">Domaines du cabinet — un par ligne</label><textarea id="domains" class="mono" rows="2" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:10px 12px" placeholder="votre-cabinet.com"></textarea>
             <span class="hint">Seules les adresses de ces domaines sont traitées comme des collègues. Par défaut : le domaine de l'adresse d'envoi.</span></div>
         </section>
 
@@ -244,7 +244,7 @@
         <section class="card" aria-labelledby="h-try">
           <h2 id="h-try">Essayer</h2>
           <div class="field"><label for="try-topic">Sujet du message à l'équipe</label><input id="try-topic" type="text" maxlength="300" placeholder="Ex. Rappeler que les pièces Nova Services sont attendues vendredi"></div>
-          <div class="field"><label for="try-to">Destinataires (facultatif, adresses du cabinet uniquement)</label><input id="try-to" type="text" list="try-people" maxlength="500" placeholder="samira@taty.info, yannick@taty.info"><datalist id="try-people"></datalist></div>
+          <div class="field"><label for="try-to">Destinataires (facultatif, adresses du cabinet uniquement)</label><input id="try-to" type="text" list="try-people" maxlength="500" placeholder="prenom@votre-cabinet.com"><datalist id="try-people"></datalist></div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="try-btn" type="button">Rédiger un message test</button><button class="btn" id="try-send" type="button" hidden>Envoyer pour validation</button><span class="hint" id="try-hint">Enregistrez d'abord. Rien n'est envoyé sans validation dans « À valider ».</span></div>
           <div id="try-out" style="white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px;line-height:1.55" hidden></div>
         </section>
@@ -362,7 +362,7 @@
     INVALID_SENDER_EMAIL: 'Adresse d’envoi invalide.', INVALID_REPLY_TO: 'Adresse de réponse invalide.',
     INVALID_ALIASES: 'Un alias est invalide (10 maximum).', ALIAS_OUTSIDE_FIRM_DOMAINS: 'Un alias n’appartient pas aux domaines du cabinet.',
     SENDER_OUTSIDE_FIRM_DOMAINS: 'L’adresse d’envoi n’appartient pas aux domaines du cabinet.',
-    INVALID_INTERNAL_DOMAINS: 'Un domaine du cabinet est invalide (ex. taty.info).',
+    INVALID_INTERNAL_DOMAINS: 'Un domaine du cabinet est invalide (ex. votre-cabinet.com).',
     RECIPIENT_OUTSIDE_FIRM: 'Un destinataire n’est pas une adresse du cabinet : l’agent ne parle en nouchi qu’aux collègues.',
     INTERNAL_DOMAINS_NOT_CONFIGURED: 'Renseignez et enregistrez d’abord l’adresse d’envoi ou les domaines du cabinet.',
     TOPIC_REQUIRED: 'Indiquez le sujet du message.',
@@ -377,7 +377,7 @@
     MEMORY_FOLDER_NOT_VISIBLE: 'Ce dossier mémoire n’est pas visible par le compte Google connecté.', HOME_DRIVE_REQUIRED: 'Choisissez le Drive partagé qui gardera la mémoire des agents.', DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Lien non reconnu : copiez l’adresse du Drive partagé depuis Google Drive.', GOOGLE_NOT_CONNECTED: 'Connectez d’abord Google.',
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Le compte Google connecté ne voit pas ce Drive : ajoutez-le comme membre du Drive partagé.',
     DRIVE_MUST_BE_SHARED_DRIVE: 'Ce dossier est dans « Mon Drive » : il faut un Drive partagé du cabinet.',
-    TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
+    TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le Drive réel du cabinet reste protégé : collez un Drive de test.'
   };
   function explain(err) { return ERRORS[err.message] || err.message; }
 

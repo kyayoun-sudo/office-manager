@@ -574,8 +574,8 @@ begin
       'instruction','Le questionnaire de préférences de travail ne détermine jamais l éligibilité ni l affectation. Il sert à préparer le briefing, la communication, les checkpoints et le feedback.'
     ),
     jsonb_build_object(
-      'algorithm_version','taty_safe_staffing_v2',
-      'profile_source','Questionnaire TATY préférences de travail 2026-10 + données opérationnelles Supabase',
+      'algorithm_version','safe_staffing_v2',
+      'profile_source','Questionnaire de préférences de travail du cabinet + données opérationnelles Supabase',
       'guardrail','Aucune décision RH sensible ou affectation automatique fondée sur un profil psychologique. Validation humaine obligatoire.',
       'generated_at',now()
     ),

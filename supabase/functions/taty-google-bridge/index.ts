@@ -9,7 +9,10 @@ import {
   updateBinaryFileAction
 } from "./binary-files.ts";
 
-const DRIVE_ID = Deno.env.get("TATY_SHARED_DRIVE_ID") || "0AOuBC85x_FJSUk9PVA";
+// Any firm can install the product (Paul, 2026-10-11): no Drive of a particular firm is written here. The bridge
+// works on the Drive its deployment names (OFFICE_MANAGER_DRIVE_ID, or the older TATY_SHARED_DRIVE_ID alias);
+// without it, every Drive action answers DRIVE_NOT_CONFIGURED instead of touching another firm's Drive.
+const DRIVE_ID = Deno.env.get("OFFICE_MANAGER_DRIVE_ID") || Deno.env.get("TATY_SHARED_DRIVE_ID") || "";
 const JOB_SECRET = Deno.env.get("ORPAILLEUR_JOB_SECRET") || "";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -268,6 +271,7 @@ Deno.serve(async req => {
 
     const body = await req.json();
     const action = String(body?.action || "");
+    if (!DRIVE_ID) return json({ error: "DRIVE_NOT_CONFIGURED", detail: "Set OFFICE_MANAGER_DRIVE_ID for this function" }, 409);
 
     if (action === "status") {
       const drive = await gjson(

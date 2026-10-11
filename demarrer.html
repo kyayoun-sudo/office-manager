@@ -80,7 +80,7 @@ body{background:var(--bg,#F4F5F3)}
     ACCOUNT_PENDING: 'Le cabinet a déjà un propriétaire : votre compte attend qu’il vous donne un rôle.', FIRM_CLOSED: 'Cet espace a été fermé. Ouvrez la page de connexion, connectez-vous avec le même compte, puis tapez EFFACER pour recommencer à zéro.',
     GOOGLE_CLIENT_NOT_CONFIGURED: 'La connexion Google n’est pas encore activée sur ce serveur.', HOME_DRIVE_REQUIRED: 'Choisissez le Drive partagé qui gardera la mémoire des agents.', DRIVE_LINK_NOT_A_FOLDER: 'Ce lien est un fichier : collez le lien d’un dossier (ou d’un Drive partagé).', DRIVE_LINK_INVALID: 'Adresse non reconnue : copiez l’adresse du Drive partagé depuis Google Drive.',
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Votre compte Google ne voit pas ce Drive.', DRIVE_MUST_BE_SHARED_DRIVE: 'Il faut un Drive partagé du cabinet (pas « Mon Drive »).',
-    GOOGLE_NOT_CONNECTED: 'Connectez d’abord votre Google (étape 2).', TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le vrai Drive TATY reste protégé : collez le Drive de test.'
+    GOOGLE_NOT_CONNECTED: 'Connectez d’abord votre Google (étape 2).', TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le Drive réel du cabinet reste protégé : collez un Drive de test.'
   };
   var msg = function (e) { var m = String(e && e.message || e); return M[m] || m; };
   function post(route, body, headers) {

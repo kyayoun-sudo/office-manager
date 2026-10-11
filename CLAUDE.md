@@ -179,6 +179,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   route `firm-restart` (`restartFirm` : identité revérifiée, ancien propriétaire ou `FIRST_OWNER_EMAILS`, son compte de connexion
   gardé) → effacement → propriétaire d'un espace vierge → « Démarrer ». Un nouveau venu ne peut jamais prendre l'espace.
 
+## Installable par n'importe quel cabinet (Paul, 2026-10-11 : « ce n'est pas une application pour TATY »)
+- Aucun nom, Drive, fichier ni cabinet de TATY n'est utilisé par défaut. Les identifiants de fichiers réels du premier cabinet
+  pilote (fichier maître, liste PBC, registre) ne servent que si son propre déploiement le dit (`OFFICE_MANAGER_PILOT_LEGACY_IDS=true`) ;
+  sinon l'outil dit ce qui manque (`FIRM_FILE_NOT_CONFIGURED`, `MASTER_SHEET_NOT_CONFIGURED`). Variables génériques d'abord
+  (`MASTER_SHEET_ID`, `PBC_MASTER_FILE_ID`…), `TATY_*` = anciens alias.
+- Le pont Supabase `taty-google-bridge` (nom historique) n'a plus de Drive ni de cabinet par défaut : secrets `OFFICE_MANAGER_DRIVE_ID`
+  (ou l'alias `TATY_SHARED_DRIVE_ID`) et `DEFAULT_ORG_ID` obligatoires, sinon `DRIVE_NOT_CONFIGURED`. **Avant de le redéployer pour
+  TATY, vérifier que ces deux secrets sont réglés dans Supabase.**
+- Ce qui s'affiche vient des données : nom du compte connecté, Drive partagés du compte Google connecté, nom de l'application réglé
+  dans la marque du cabinet. Nouvel outil de l'IA : `read_master_sheet` (ex-`read_taty_master_sheet`).
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
