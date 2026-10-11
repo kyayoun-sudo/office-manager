@@ -134,6 +134,14 @@ questions et propositions des agents).
 - Statut de `office_action_queue` : jamais `cancelled` (c'est un `work_state`) — cause du PostgreSQL 23514.
 - L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
 
+- **Ses propres fichiers ne sont jamais à ranger** (Paul, 2026-10-11 : « arrêter, après chaque passage, de demander s'il doit mettre
+  l'audit log et la mémoire ») : `lib/agent-files.js` (`isAgentOwnFile` : nom — mémoire, journal, `AUDIT_LOG`, Shadow —, chemin dans
+  la maison des agents, ou parent = maison / mémoire, jamais la racine du Drive ; `A_RANGER` reste à ranger). Utilisé par
+  `tidyCandidates`, le passage des changements et la purge.
+- **Mémoire absente = créée** (Paul, 2026-10-11) : sur un Drive choisi dans Paramètres, `OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY` ne
+  bloque plus (`existingMemoryRequired()` : seulement le dossier réglé côté serveur du pilote) ; sans dossier « … AI MANAGER », la
+  maison `00_OFFICE_MANAGER_AI/MEMORY` est créée une fois (`findAtelier(…, { create: true })` dans `ensureMemoryHome`).
+
 ## Décisions du 2026-10-11 — postes, droits, veille des appels d'offres
 Document de conception : « Office Manager AI — Postes, rôles et droits d'accès » (Claude Docs).
 - **Trois couches** : rôle (poste), rôles cabinet (ISQM 1, cumulables), fonction sur la mission ; les règles automatiques
