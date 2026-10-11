@@ -104,6 +104,7 @@
         <div class="links" id="opp-links"></div>
         <dl class="facts" id="opp-facts"></dl>
         <details class="opp-journal"><summary class="meta">Journal des agents</summary><ul class="joblog" id="opp-log"></ul></details>
+        <div class="btn-row" id="remove-row" hidden><button class="btn ghost" id="remove" type="button">Retirer cette opportunité</button><span class="meta" id="remove-say"></span></div>
       </section>
 
       <section class="card" aria-labelledby="h-mine" id="mine-card" hidden>
@@ -168,7 +169,7 @@
     TEAM_REQUIRED: 'Gardez au moins une personne.', TEAM_ALREADY_VALIDATED: 'L’équipe est déjà validée.', TEAM_NOT_VALIDATED: 'L’équipe n’est pas encore validée.', NO_TEAM_DATA: 'Aucune personne du cabinet connue (Équipe et CV).'
   };
   var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || m; };
-  var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC / indépendance', duplicate: 'Doublon possible', failed: 'Arrêt' };
+  var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC / indépendance', duplicate: 'Doublon possible', failed: 'Arrêt', removed: 'Retirée' };
   var api = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
   var b64 = function (file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); };
 
@@ -269,6 +270,7 @@
     drawMine(o, role);
     drawTeam(o, role);
     $('again-row').hidden = !(o.status === 'phase0' && mayReview(role));
+    $('remove-row').hidden = o.status === 'removed' || !(mayReview(role) || (o.viewer && o.viewer.name && o.viewer.name === o.created_by));
     var p1 = o.phase1;
     $('kyc-card').hidden = !p1 && o.status !== 'won';
     if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il ouvre le KYC et l’indépendance dans le classeur (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
@@ -624,6 +626,15 @@
       .then(function (r) { pending = {}; drawSaveBar(); $('save-say').textContent = ''; window.reloadOpportunity(); })
       .catch(function (e) { $('save-say').textContent = msg(e); })
       .then(function () { b.disabled = false; });
+  });
+  // Two clicks: « Retirer », then « Oui, retirer ». Nothing is deleted in the Drive.
+  $('remove').addEventListener('click', function () {
+    var b = this;
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Oui, retirer'; $('remove-say').textContent = 'Elle disparaît de la liste et des questions. Le TDR, le dossier et le classeur restent dans le Drive.'; return; }
+    b.disabled = true;
+    api({ action: 'remove', opportunity_id: current.id })
+      .then(function () { location.href = '/opportunites.html'; })
+      .catch(function (e) { b.disabled = false; $('remove-say').textContent = msg(e); });
   });
   $('again').addEventListener('click', function () {
     var b = this; b.disabled = true;

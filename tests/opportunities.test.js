@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -370,4 +370,18 @@ test('nobody is asked for a Drive link: the fiche facts missing in the workbook 
   assert.equal(fiche.rows.find(r => r.row === 35).fields[0].value, 'SOCIÉTÉ IVOIRIENNE TEST');
   const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '01_OPPORTUNITE', cell: 'C56' }]);
   assert.match(back['01_OPPORTUNITE!C56'], /^https:\/\/drive\//);
+});
+
+test('an opportunity can be removed from the application; nothing is deleted in the Drive', async () => {
+  const { drive, d } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  await assert.rejects(removeOpportunity('org', { opportunity_id: o.id }, { display_name: 'Kofi', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  const r = await removeOpportunity('org', { opportunity_id: o.id, reason: 'test' }, { display_name: 'Awa', role: 'collaborator' }, d);
+  assert.equal(r.status, 'removed');
+  assert.ok(drive.files.get(o.workbook.id) && drive.files.get(o.folder.id) && drive.files.get(o.tdr_files[0].id), 'the TDR, folder and workbook stay');
+  assert.equal((await listOpportunities('org', d)).opportunities.length, 0);
+  assert.equal((await myQuestions('org', { display_name: 'Ama', role: 'partner' }, d)).questions.length, 0);
+  // The same TDR can open a new opportunity again.
+  assert.notEqual((await createOpportunity('org', {}, { file_ids: [o.tdr_files[0].id] }, null, d)).duplicate, true);
 });
