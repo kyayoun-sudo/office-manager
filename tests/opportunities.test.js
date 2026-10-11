@@ -288,6 +288,10 @@ test('Phase 2 then 3: « poursuivre » → the Firm Manager proposes the team; a
   assert.deepEqual([a.threats.length, a.all_declared], [1, false]);
   const b = await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: 'K. Manager', email: 'km@cab.ci' }, d);
   assert.equal(b.all_declared, true);
+  // Section C of the workbook now says what the people declared, threat by threat; the conclusion stays empty (the Manager's).
+  const c = await readCells(d.drive.files.get(t.workbook.id).buffer, [{ sheet: '03_PHASE_1', cell: 'D76' }, { sheet: '03_PHASE_1', cell: 'I76' }]);
+  assert.equal(c['03_PHASE_1!D76'], 'A. Senior : actions de la société');
+  assert.equal(c['03_PHASE_1!I76'], '');
   const view = await opportunityView('org', o.id, { display_name: 'A. Senior', email: 'senior@cab.ci', role: 'senior' }, d);
   assert.equal(view.viewer.in_team, true); assert.equal(view.my_declaration.threats.length, 1);
   assert.deepEqual(view.independence_questions, [{ ref: 'C.01', label: 'Intérêts financiers' }], 'the questions are the threats of the firm\'s own sheet');

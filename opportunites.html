@@ -131,7 +131,7 @@
 
       <section class="card" aria-labelledby="h-won" id="won-card" hidden>
         <h2 id="h-won">Le client a confirmé</h2>
-        <p class="meta">Déposez la lettre de confirmation (ou d’attribution) du client, ou collez son lien. Elle est rangée dans le dossier de l’opportunité et le Mission Controller est prévenu : il ouvre le KYC et l’indépendance.</p>
+        <p class="meta">Déposez la lettre de confirmation (ou d’attribution) du client, ou collez son lien. Elle est rangée dans le dossier de l’opportunité et le Mission Controller fait aussitôt le KYC du client.</p>
         <input id="won-file" type="file">
         <div class="field"><label for="won-link">Ou le lien Drive de la lettre</label><input id="won-link" type="text"></div>
         <div><button class="btn" id="won-send" type="button">Enregistrer la confirmation</button></div>
@@ -139,7 +139,7 @@
       </section>
 
       <section class="card" aria-labelledby="h-kyc" id="kyc-card" hidden>
-        <h2 id="h-kyc">Mission Controller — KYC et indépendance</h2>
+        <h2 id="h-kyc">KYC du client — Mission Controller</h2>
         <p class="lead" id="kyc-lead"></p>
         <div><button class="btn" id="kyc-go" type="button">Préparer les vérifications</button></div>
         <p class="status" id="kyc-say" role="status"></p>
@@ -169,7 +169,7 @@
     TEAM_REQUIRED: 'Gardez au moins une personne.', TEAM_ALREADY_VALIDATED: 'L’équipe est déjà validée.', TEAM_NOT_VALIDATED: 'L’équipe n’est pas encore validée.', NO_TEAM_DATA: 'Aucune personne du cabinet connue (Équipe et CV).'
   };
   var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || m; };
-  var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC / indépendance', duplicate: 'Doublon possible', failed: 'Arrêt', removed: 'Retirée' };
+  var STATUS = { running: 'En cours', phase0: 'Phase 0', go: 'Poursuivre', stop: 'Arrêtée', won: 'Retenue', phase1: 'KYC du client', duplicate: 'Doublon possible', failed: 'Arrêt', removed: 'Retirée' };
   var api = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
   var b64 = function (file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); };
 
@@ -273,9 +273,9 @@
     $('remove-row').hidden = o.status === 'removed' || !(mayReview(role) || (o.viewer && o.viewer.name && o.viewer.name === o.created_by));
     var p1 = o.phase1;
     $('kyc-card').hidden = !p1 && o.status !== 'won';
-    if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il ouvre le KYC et l’indépendance dans le classeur (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
+    if (!p1 && o.status === 'won') { $('kyc-lead').textContent = 'Message envoyé au Mission Controller : il fait le KYC du client (au plus tard à sa prochaine ronde).'; $('kyc-go').hidden = true; }
     if (p1) {
-      $('kyc-lead').textContent = p1.status === 'preparing' ? 'Vérifications en cours (registre, sanctions, personnes exposées, presse, conflits)…' : p1.status === 'ready' ? 'Vérifications faites le ' + UI.dateTime(p1.prepared_at) + (p1.written ? ' : ' + p1.written.rows + ' ligne(s) de la Phase 1 remplies dans le classeur, avec leurs sources' : '') + '. Relisez section par section ; l’indépendance est répondue par chaque personne, la cotation par le Manager.' : p1.status === 'failed' ? 'Arrêt des vérifications : ' + (p1.error || '') : (p1.todo || 'À faire : KYC et indépendance.');
+      $('kyc-lead').textContent = p1.status === 'preparing' ? 'Vérifications en cours (registre, sanctions, personnes exposées, presse, conflits)…' : p1.status === 'ready' ? 'Vérifications faites le ' + UI.dateTime(p1.prepared_at) + (p1.written ? ' : ' + p1.written.rows + ' ligne(s) de la Phase 1 remplies dans le classeur, avec leurs sources' : '') + '. Il ne reste que ses questions (dans « À faire maintenant ») et la cotation du Manager. L’indépendance est à part : chaque membre de l’équipe la déclare pour lui-même.' : p1.status === 'failed' ? 'Arrêt des vérifications : ' + (p1.error || '') : (p1.todo || 'À faire : KYC du client.');
       $('kyc-go').hidden = p1.status === 'preparing';
       $('kyc-go').textContent = p1.status === 'ready' ? 'Refaire les vérifications' : 'Préparer les vérifications';
     }
@@ -500,9 +500,10 @@
   function drawSheets(o) {
     var box = $('sheets'); box.textContent = '';
     (o.sheets || []).forEach(function (s, i) {
+      if (!s.open) return; // a step not open yet (KYC before the client confirms) is not shown greyed out
       var card = el('section', null, 'card');
       var det = document.createElement('details'); det.className = 'opp-sheet'; det.open = false;
-      var sum = document.createElement('summary'); sum.textContent = s.title + (s.open ? '' : ' — s’ouvre quand le client a confirmé');
+      var sum = document.createElement('summary'); sum.textContent = s.title;
       det.appendChild(sum);
       var sections = []; s.rows.forEach(function (r) { var k = r.section || ' '; var g = sections.find(function (x) { return x.k === k; }); if (!g) sections.push(g = { k: k, rows: [] }); g.rows.push(r); });
       sections.forEach(function (g) {
