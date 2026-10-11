@@ -148,7 +148,10 @@ questions et propositions des agents).
 - **Ses propres fichiers ne sont jamais à ranger** (Paul, 2026-10-11 : « arrêter, après chaque passage, de demander s'il doit mettre
   l'audit log et la mémoire ») : `lib/agent-files.js` (`isAgentOwnFile` : nom — mémoire, journal, `AUDIT_LOG`, Shadow —, chemin dans
   la maison des agents, ou parent = maison / mémoire, jamais la racine du Drive ; `A_RANGER` reste à ranger). Utilisé par
-  `tidyCandidates`, le passage des changements et la purge.
+  `tidyCandidates`, le passage des changements et la purge. **Aussi « Comprendre le cabinet »** (`lib/firm-learning.js`, cause réelle de la
+  question répétée : l'IA voyait `AUDIT LOGS` / `MEMORY` dans l'arborescence et posait une question au propriétaire, reposée tant
+  qu'elle était ouverte) : dossiers des agents retirés de l'arborescence et des lectures, consigne explicite, questions sur leur
+  espace (`isAgentTopic`) jamais posées ni affichées ; `askMissing` ne questionne ni ne déplace jamais un fichier des agents.
 - **Mémoire absente = créée** (Paul, 2026-10-11) : sur un Drive choisi dans Paramètres, `OFFICE_MANAGER_REQUIRE_EXISTING_MEMORY` ne
   bloque plus (`existingMemoryRequired()` : seulement le dossier réglé côté serveur du pilote) ; sans dossier « … AI MANAGER », la
   maison `00_OFFICE_MANAGER_AI/MEMORY` est créée une fois (`findAtelier(…, { create: true })` dans `ensureMemoryHome`).

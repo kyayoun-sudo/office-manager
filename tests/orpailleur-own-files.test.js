@@ -41,3 +41,24 @@ test('a Drive with no « … AI MANAGER » folder: the agents’ home and its ME
   assert.equal(a.manager.created, true);
   assert.equal(a.name, 'MEMORY');
 });
+
+test('« Comprendre le cabinet » never sees the agents’ folders nor asks about the audit log', async () => {
+  const { folderOutline, firmKnowledge } = await import('../lib/firm-learning.js');
+  const F = 'application/vnd.google-apps.folder';
+  const out = folderOutline([{ mimeType: F, path: '01_CLIENTS' }, { mimeType: F, path: '00_OFFICE_MANAGER_AI' }, { mimeType: F, path: '00_OFFICE_MANAGER_AI/AUDIT LOGS' },
+    { mimeType: F, path: 'AUDIT LOGS' }, { mimeType: F, path: '00_CABINET_AI_MANAGER/MEMORY' }, { mimeType: F, path: 'A_RANGER' }]);
+  assert.deepEqual(out.split('\n'), ['01_CLIENTS', 'A_RANGER']);
+  const state = { status: 'applied', questions: ['Où dois-je placer le dossier AUDIT LOGS ?', 'Qui est l’associé de la mission Nova 2026 ?'], open_questions: ['Faut-il garder la mémoire des agents dans MEMORY ?'] };
+  const drive = { findFilesByExactName: async () => [{ id: 'k' }], downloadBuffer: async () => Buffer.from(JSON.stringify(state)) };
+  const k = await firmKnowledge({ drive, folder: 'm' });
+  assert.deepEqual(k.questions, ['Qui est l’associé de la mission Nova 2026 ?']);
+  assert.deepEqual(k.open_questions, []);
+});
+
+test('the Orpailleur never asks (nor moves to review) one of the agents’ files', async () => {
+  const { askMissing } = await import('../lib/orpailleur-ask.js');
+  let moved = false;
+  const r = await askMissing('org', { id: 'a', name: 'AUDIT_LOG', path: '(dossier hors carte)/AUDIT_LOG', parents: ['X'] }, { question: 'Où ranger ?' }, {},
+    { whoToAsk: async () => ({ email: 'p@c.ci' }), tidyDrive: { move: async () => { moved = true; } }, reviewFolderId: 'R' });
+  assert.equal(r.skipped, 'AGENT_OWN_FILE'); assert.equal(moved, false);
+});
