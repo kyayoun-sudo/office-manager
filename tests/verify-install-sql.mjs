@@ -6,7 +6,7 @@ import { TABLES } from '../lib/readiness.js';
 const sql = readFileSync(new URL('../db/INSTALL_TOUT.sql', import.meta.url), 'utf8');
 assert.equal(sql, buildInstallSql(), 'db/INSTALL_TOUT.sql is out of date: run node scripts/build-install-sql.mjs');
 const db = new PGlite();
-await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
+await db.exec('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;');
 await db.exec(sql); await db.exec(sql); // twice: safe to re-run
 for (const [t] of TABLES) {
   const r = (await db.query(`select to_regclass('public.${t}') is not null as ok, has_table_privilege('anon','public.${t}','SELECT') as anon`)).rows[0];

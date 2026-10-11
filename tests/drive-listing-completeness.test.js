@@ -6,7 +6,7 @@ test("bridge listing refuses ambiguous cap and incomplete replies", async () => 
   const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]])), original=globalThis.fetch;
   try {
     keys.forEach(k=>delete process.env[k]);
-    Object.assign(process.env,{SUPABASE_URL:"https://synthetic.invalid",SUPABASE_SERVICE_ROLE_KEY:"test",ORPAILLEUR_JOB_SECRET:"test"});
+    Object.assign(process.env,{SUPABASE_URL:"https://synthetic.invalid",SUPABASE_SERVICE_ROLE_KEY:"test",ORPAILLEUR_JOB_SECRET:"test",GOOGLE_BRIDGE_FALLBACK:"true"});
     let response={files:[{id:"A"}]};
     globalThis.fetch=async (url,init)=>{assert.equal(JSON.parse(init.body).action,"list_children");return Response.json(response);};
     assert.deepEqual(await listDriveChildren("folder"),[{id:"A"}]);

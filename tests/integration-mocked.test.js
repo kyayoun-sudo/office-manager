@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 process.env.SUPABASE_URL = "https://supabase.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
 process.env.ORPAILLEUR_JOB_SECRET = "job-secret";
+process.env.GOOGLE_BRIDGE_FALLBACK = "true";
 delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 delete process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 

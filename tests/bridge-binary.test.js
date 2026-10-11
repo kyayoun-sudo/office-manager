@@ -265,6 +265,7 @@ test("memory files: one size limit shared by write (bridge) and read (google-dri
 process.env.SUPABASE_URL = "https://supabase.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
 process.env.ORPAILLEUR_JOB_SECRET = "job-secret";
+process.env.GOOGLE_BRIDGE_FALLBACK = "true";
 process.env.TATY_SHARED_DRIVE_ID = DRIVE_ID;
 process.env.OFFICE_MANAGER_MEMORY_FOLDER_ID = "ROOT";
 process.env.OFFICE_MANAGER_ALLOW_ENV_DRIVE = "true"; // legacy server-configured Drive, explicitly allowed

@@ -49,3 +49,18 @@ test('« Repartir de zéro »: owner only, EFFACER required, owner kept as owner
   }), /PURGE_SQL_NOT_INSTALLED/);
   assert.equal(none.length, 0);
 });
+
+test('a new firm kit: its own identifier and fresh secrets, owner addresses, scheduler SQL filled in', async () => {
+  const { newFirmKit, renderKit } = await import('../scripts/new-firm.mjs');
+  assert.throws(() => newFirmKit({ url: 'https://a.vercel.app' }), /OWNER_REQUIRED/);
+  assert.throws(() => newFirmKit({ url: 'http://a', owners: ['x@y.ci'] }), /URL_REQUIRED/);
+  const a = newFirmKit({ name: 'A', url: 'https://a.vercel.app/', owners: ['Associe@A.ci'] });
+  const b = newFirmKit({ name: 'B', url: 'https://b.vercel.app', owners: ['p@b.ci'] });
+  const env = k => Object.fromEntries(k.env.map(([n, v]) => [n, v]));
+  assert.notEqual(a.orgId, b.orgId);
+  assert.notEqual(env(a).OWNER_APPROVAL_SECRET, env(b).OWNER_APPROVAL_SECRET, 'never the same secret for two firms');
+  assert.equal(env(a).FIRST_OWNER_EMAILS, 'associe@a.ci');
+  assert.ok(a.cron.includes('https://a.vercel.app/api/app?route=scheduler-tick') && a.cron.includes(env(a).OFFICE_MANAGER_SCHEDULER_SECRET));
+  assert.ok(!a.cron.includes('VOTRE'));
+  assert.match(renderKit(a), /https:\/\/a\.vercel\.app\/oauth\/google\/callback/);
+});

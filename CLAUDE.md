@@ -90,7 +90,7 @@ dans les secrets de la fonction avant tout redéploiement (non modifié dans le 
 | §28-32 Gmail push, thread mapping PBC | ❌ | Lecture des mails étiquetés par passage ; pas de watch Gmail ni de mapping fil → PBC. |
 | §34-35 Orpailleur, incertitude | ✅ | Lecture réelle (PDF, scans), question ciblée, 00_A_REVOIR_AGENT, vérification Drive, doublons. |
 | §38-41 Sign-off | 🟡 | Lié à la version (date de modification) et à l'ouverture du fichier ; pas de révision/hash ni détection auto de modification après signature. |
-| §51 Isolement des cabinets | 🟡 | RLS activé sans policy (service_role seul) ; un déploiement = un cabinet (`DEFAULT_ORG_ID`). |
+| §51-52 Isolement des cabinets | ✅ essai | Un cabinet = un projet Supabase + un projet Vercel, même code (`DEFAULT_ORG_ID`) ; RLS sans politique (service_role seul), sauf l'autorisation des agents (propriétaire / associé du cabinet). Recette : `docs/INSTALLER_UN_CABINET.md`, `scripts/new-firm.mjs`. |
 | §53-54 Secrets | ✅ | Jetons chiffrés AES-GCM ; rien dans le navigateur. |
 | §55-56 Permissions par appel d'outil, outils par agent | ❌ | Interrupteur global « autoriser les agents » seulement. |
 | §5 / §58 Rôles | 🟡 branche `amelioration` | `lib/roles.js` (source unique) : propriétaire, associé, revue qualité, **Business Development Manager (`bdm`, 2026-10-11)**, manager, superviseur, senior, auditeur, secrétariat, responsable informatique (+ ancien « collaborateur ») ; position (grade) et « rend compte à » dans `office_app_users` (`db/roles.sql`) ; comptes gérés par propriétaire, associés et responsable informatique ; le Firm Manager propose rôles et positions d'après le tableau de l'équipe (`lib/team-roles.js`) ; menu et « Mon espace » de l'accueil par rôle ; un manager ne voit les indicateurs que de ses rapports directs, si le cabinet l'autorise. Droits (2026-10-11) : `lib/permissions.js` — matrice écrans × rôles (menu filtré, réglable dans Paramètres → Droits), actions sensibles et règles automatiques via `can()` (utilisé par la veille et les droits ; les anciennes routes gardent leurs familles de rôles, à migrer route par route). Manquent : rôles cabinet ISQM 1 et fonctions de mission enregistrés sur les personnes (définis dans `lib/permissions.js`, pas encore stockés), espaces de travail complets (Mes revues, revue qualité…). |
@@ -185,6 +185,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `drive_id` et ne s'affichent pas pour un autre Drive. Nom de la fonction pont configurable : `GOOGLE_BRIDGE_FUNCTION`
   (par défaut `taty-google-bridge`, le nom déployé ; un nouveau cabinet peut la déployer sous un nom neutre).
 - « Fichiers de travail » (Équipe) = temps réellement passé dans les fichiers Excel des missions, mesuré par le panneau Excel.
+
+## Essai avec 4 cabinets (Paul, 2026-10-11 : « est-ce qu'on peut régler définitivement ? »)
+- **Un cabinet = une installation** (spec §52 « Private Tenant ») : projet Supabase + projet Vercel propres, même dépôt / branche.
+  Recette unique : `docs/INSTALLER_UN_CABINET.md` ; `node scripts/new-firm.mjs --name … --url … --owner …` donne l'identifiant,
+  des secrets neufs propres au cabinet et le SQL du planificateur rempli (`FIRST_OWNER_EMAILS` obligatoire).
+- **Socle de la base** : les tables de base (cabinet, adhésions, autorisation des agents, agents, missions, équipe, affectations,
+  « À valider », inventaire du Drive…) n'existaient que dans la base du pilote. `db/base.sql` (1re partie de `db/INSTALL_TOUT.sql`,
+  21 parties dont memory, mission-plans, workfiles, people-intelligence, inspection-reader-leases) les crée sur un Supabase vide.
+  Relançable sur une base existante : rien n'est remplacé (vue, fonction `private.office_role`, politiques et déclencheur créés
+  seulement s'ils manquent). **Toute nouvelle colonne lue par le code doit être ajoutée au SQL** : `tests/schema-coverage.test.js`
+  installe la base vide et échoue sinon.
+- Pont Google `taty-google-bridge` : repli seulement si `GOOGLE_BRIDGE_FALLBACK=true` (ou `OFFICE_MANAGER_PILOT_LEGACY_IDS=true`).
+- Mise en service (`lib/readiness.js`) vérifie aussi les tables de base.
+- Fournisseurs (vérifié le 2026-10-11) : Vercel Hobby = non commercial → Pro ; Supabase gratuit = 2 projets, pause après 1 semaine
+  → Pro ; client OAuth Google « En production » (en test, autorisation de 7 jours ; non vérifié = avertissement + 100 utilisateurs à vie).
 
 ## Installable par n'importe quel cabinet (Paul, 2026-10-11 : « ce n'est pas une application pour TATY »)
 - Aucun nom, Drive, fichier ni cabinet de TATY n'est utilisé par défaut. Les identifiants de fichiers réels du premier cabinet
