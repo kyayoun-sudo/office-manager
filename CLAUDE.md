@@ -132,6 +132,10 @@ questions et propositions des agents).
 - Réconciliation des métadonnées bornée (fichiers déjà traités d'abord, puis une tranche tournante ; 25 s max).
 - Plusieurs lots par appel sous le même verrou (moins d'appels en chaîne : cause des HTTP 508) ; verrou de lecture 4 min.
 - Statut de `office_action_queue` : jamais `cancelled` (c'est un `work_state`) — cause du PostgreSQL 23514.
+- **Premier scan = tout le Drive** (Paul, 2026-10-11 : « à quel moment le scan du cabinet finit ? ») : une tranche lit au plus
+  `MAX_FILES` (1 500) fichiers, les plus probables d'abord ; il ne se déclare fini (`first_scan_done`) que quand `firstScanLeft`
+  est vide ; sinon `first_scan_remaining` et le passage suivant (planifié ou « Reprendre ») continue le premier scan
+  (`FIRST_SCAN_CONTINUES`, `first_scan_round`) au lieu de ne regarder que les changements. Affiché dans Mise en service.
 - L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
 
 - **Ses propres fichiers ne sont jamais à ranger** (Paul, 2026-10-11 : « arrêter, après chaque passage, de demander s'il doit mettre

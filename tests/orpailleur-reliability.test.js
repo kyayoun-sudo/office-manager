@@ -77,3 +77,19 @@ test('a file gone to the bin: its open proposals are closed, nothing is proposed
   assert.ok(patches.some(p => /payload->>file_id=eq.f1/.test(p.path) && p.body.status === 'rejected' && p.body.verification_evidence.error_code === 'FILE_TRASHED'));
   assert.equal(st.moves, 0);
 });
+
+test('the first scan ends only when the whole Drive is covered: a round left files → the next pass continues it', async () => {
+  const { firstScanLeft } = await import('../lib/tidy-plan.js');
+  const more = [...items, { id: 'f2', name: 'Contrat.pdf', mimeType: 'application/pdf', path: '/Drive/Contrat.pdf', parents: ['ROOT'] }, { id: 'f3', name: 'x.pdf', mimeType: 'application/pdf', path: '/Drive/x.pdf', parents: ['ROOT'] }];
+  assert.deepEqual(firstScanLeft(more, { seen: { f1: 't' }, undecided: { f3: { attempts: 1 } } }).map(i => i.id), ['f2'], 'decided, undecided and waiting files are not « left »');
+  const drive = fakeDrive([json('OFFICE_MANAGER_SCAN_STATE.json', { items: more, status: 'done' }),
+    json('OFFICE_MANAGER_TIDY_STATE.json', { status: 'done', mode: 'first-scan', first_scan_remaining: 2, last_pass_at: '2026-10-10T00:00:00Z', seen: { f1: 't' }, first_scan_round: 1 })]);
+  const { startChangesPass } = await import('../lib/tidy-plan.js');
+  const r = await startChangesPass('org', {}, base({ drive, fetchRows: async () => [], changedSince: async () => [], driveId: null, loadCheckpoint: async () => null, checkAnswers: async () => [] }));
+  assert.equal(r.reason, 'FIRST_SCAN_CONTINUES');
+  const st = state(drive);
+  assert.equal(st.mode, 'first-scan');
+  assert.deepEqual(st.list.sort(), ['f2', 'f3'], 'only what the first round did not cover');
+  assert.equal(st.first_scan_round, 2);
+  assert.deepEqual(st.seen, { f1: 't' }, 'memory kept');
+});

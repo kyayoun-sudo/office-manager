@@ -290,8 +290,9 @@
     // Tidy-up of the first scan: where each file goes.
     var t = k.tidy || {};
     var tl = t.stalled ? '⚠ Rangement interrompu ou bloqué : aucune progression depuis ' + (t.last_progress_at ? UI.dateTime(t.last_progress_at) : 'une heure inconnue') + '. ' + (t.done || 0) + ' fichier(s) traité(s). Cliquez sur « Reprendre le rangement ».'
-      : t.status === 'planning' ? 'Rangement : l’Orpailleur décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers vus.'
-      : t.status === 'done' ? 'Rangement proposé : ' + (t.moves || 0) + ' déplacement(s), ' + (t.renames || 0) + ' renommage(s) dans « À valider » ; ' + (t.questions || 0) + ' question(s) envoyée(s) pour validation aux personnes qui ont enregistré des fichiers ambigus ; ' + (t.ok || 0) + ' fichier(s) déjà bien rangés.'
+      : t.status === 'planning' ? 'Rangement : l’Orpailleur lit et décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers de cette tranche' + (t.first_scan_round > 1 ? ' (tranche ' + t.first_scan_round + ')' : '') + '.'
+      : t.status === 'done' ? (t.first_scan_done ? '✓ Premier scan du cabinet terminé le ' + UI.dateTime(t.first_scan_done) + ' : tout le Drive a été lu. Ensuite, seuls les fichiers nouveaux ou modifiés sont lus, aux heures des passages. '
+        : t.first_scan_remaining ? 'Premier scan pas encore fini : ' + t.first_scan_remaining + ' fichier(s) du Drive restent à lire ; la suite part au prochain passage (ou « Reprendre le rangement »). ' : '') + 'Rangement proposé : ' + (t.moves || 0) + ' déplacement(s), ' + (t.renames || 0) + ' renommage(s) dans « À valider » ; ' + (t.questions || 0) + ' question(s) envoyée(s) pour validation aux personnes qui ont enregistré des fichiers ambigus ; ' + (t.ok || 0) + ' fichier(s) déjà bien rangés.'
       : t.status === 'failed' ? 'Le rangement a échoué : ' + (t.error || '') : 'Rangement : pas encore lancé.';
     var tp = el('p', tl, 'margin:0;font-size:14px;font-weight:600');
     b.appendChild(tp);
