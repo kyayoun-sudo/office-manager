@@ -264,7 +264,7 @@
     (o.tdr_files || []).forEach(function (f) { if (f.url) links.appendChild(UI.safeLink(f.url, f.name || 'TDR')); });
     if (o.won && o.won.letter && o.won.letter.url) links.appendChild(UI.safeLink(o.won.letter.url, 'Lettre de confirmation'));
     var facts = $('opp-facts'); facts.textContent = '';
-    [['Client', o.client], ['Référence', o.reference], ['Document', o.kind], ['Date limite', o.deadline && UI.date(o.deadline)], ['Questions à clarifier', (o.open_questions || []).join(' ; ')],
+    [['Client', o.client], ['Référence', o.reference], ['Registre des prospects', 'OM-' + String(o.id || '').slice(0, 8).toUpperCase() + ' (tenu par le Firm Manager)'], ['Document', o.kind], ['Date limite', o.deadline && UI.date(o.deadline)], ['Questions à clarifier', (o.open_questions || []).join(' ; ')],
      ['Conflits (missions du cabinet)', o.conflicts ? (o.conflicts.matches.length ? o.conflicts.matches.map(function (m) { return m.mission + ' (' + m.status + ')'; }).join(' ; ') : 'aucune mission au même nom') : null]]
       .forEach(function (f) { if (!f[1]) return; facts.appendChild(el('dt', f[0])); facts.appendChild(el('dd', f[1])); });
     var log = $('opp-log'); log.textContent = '';
@@ -623,6 +623,21 @@
     return bar;
   }
 
+  // A field that names someone of the firm: chosen from the firm's list (with « Autre… » to type a name).
+  function personField(r, f) {
+    var l = String(r.label || '').split(' — ')[0], h = f.header || '';
+    return /^(Collaborateur ayant re|Personne charg|Associ[ée] responsable|Manager pressenti|Senior pressenti|Superviseur pressenti|Nom du Manager)/i.test(l) || (/^(Pr[ée]par[ée] par|Revu[e]? par)/i.test(h) && !/^(Pr[ée]par[ée] par|Revu par)$/i.test(l));
+  }
+  // The firm's list as suggestions: pick a name, or type one that is not in the list.
+  function peopleSelect(o, value) {
+    if (!document.getElementById('firm-people')) {
+      var dl = document.createElement('datalist'); dl.id = 'firm-people';
+      (o.firm_people || []).forEach(function (p) { var op = document.createElement('option'); op.value = p.name; if (p.title) op.label = p.title; dl.appendChild(op); });
+      document.body.appendChild(dl);
+    }
+    var inp = document.createElement('input'); inp.type = 'text'; inp.setAttribute('list', 'firm-people'); inp.value = value; inp.placeholder = 'Choisir dans la liste du cabinet';
+    return inp;
+  }
   function drawRow(o, s, r) {
     var row = el('div', null, 'opp-row'); row.id = 'r-' + s.name + '-' + r.row;
     var h = el('h3'); if (r.ref) h.appendChild(el('b', r.ref)); h.appendChild(document.createTextNode(r.label || '(sans libellé)')); row.appendChild(h);
@@ -657,6 +672,7 @@
       var inp;
       if (f.options && f.options.length) { inp = document.createElement('select'); inp.appendChild(el('option', '—')); inp.options[0].value = ''; f.options.forEach(function (v) { var op = el('option', v); op.value = v; inp.appendChild(op); }); inp.value = f.value || ''; }
       else if (f.type === 'date') { inp = document.createElement('input'); inp.type = 'date'; inp.value = /^\d{4}-\d{2}-\d{2}$/.test(f.value) ? f.value : ''; }
+      else if (personField(r, f) && (o.firm_people || []).length) inp = peopleSelect(o, f.value || '');
       else { inp = document.createElement('textarea'); inp.rows = 1; inp.value = f.value || ''; }
       inp.disabled = !r.may_fill || !s.open;
       inputs[f.cell] = inp; lab.appendChild(inp); grid.appendChild(lab);
