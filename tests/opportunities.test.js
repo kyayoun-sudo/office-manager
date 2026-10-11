@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -388,4 +388,24 @@ test('an opportunity can be removed from the application; nothing is deleted in 
   assert.equal((await myQuestions('org', { display_name: 'Ama', role: 'partner' }, d)).questions.length, 0);
   // The same TDR can open a new opportunity again.
   assert.notEqual((await createOpportunity('org', {}, { file_ids: [o.tdr_files[0].id] }, null, d)).duplicate, true);
+});
+
+test('a possible duplicate carries on when its twin is removed, or when a person says it is not one', async () => {
+  const { d } = await setup();
+  const first = await createOpportunity('org', {}, { name: 'TDR1.pdf', base64: Buffer.from('a').toString('base64') }, { display_name: 'Awa' }, d);
+  const a = await run(first.opportunity.id, d);
+  const second = await createOpportunity('org', {}, { name: 'TDR2.pdf', base64: Buffer.from('b').toString('base64') }, { display_name: 'Awa' }, d);
+  let b = await run(second.opportunity.id, d);
+  assert.equal(b.status, 'duplicate');
+  await removeOpportunity('org', { opportunity_id: a.id }, { display_name: 'Awa', role: 'manager' }, d);
+  b = await run(b.id, d);
+  assert.equal(b.status, 'phase0', 'the twin removed: the one left goes on by itself');
+  // Or a person says it is not a duplicate.
+  const third = await createOpportunity('org', {}, { name: 'TDR3.pdf', base64: Buffer.from('c').toString('base64') }, { display_name: 'Awa' }, d);
+  let c = await run(third.opportunity.id, d);
+  assert.equal(c.status, 'duplicate');
+  await assert.rejects(notDuplicate('org', {}, { opportunity_id: c.id }, { display_name: 'Kofi', role: 'collaborator' }, d), /MANAGER_ONLY/);
+  await notDuplicate('org', {}, { opportunity_id: c.id }, { display_name: 'Awa', role: 'collaborator' }, d);
+  c = await run(c.id, d);
+  assert.equal(c.status, 'phase0');
 });

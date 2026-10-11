@@ -104,6 +104,7 @@
         <div class="links" id="opp-links"></div>
         <dl class="facts" id="opp-facts"></dl>
         <details class="opp-journal"><summary class="meta">Journal des agents</summary><ul class="joblog" id="opp-log"></ul></details>
+        <div class="btn-row" id="dup-row" hidden><button class="btn" id="not-dup" type="button">Ce n’est pas un doublon, continuer</button><a id="dup-link" href="#">Voir l’autre opportunité</a><span class="meta" id="dup-say"></span></div>
         <div class="btn-row" id="remove-row" hidden><button class="btn ghost" id="remove" type="button">Retirer cette opportunité</button><span class="meta" id="remove-say"></span></div>
       </section>
 
@@ -270,6 +271,8 @@
     drawMine(o, role);
     drawTeam(o, role);
     $('again-row').hidden = !(o.status === 'phase0' && mayReview(role));
+    $('dup-row').hidden = o.status !== 'duplicate';
+    if (o.duplicate_of) $('dup-link').href = '/opportunites.html?id=' + encodeURIComponent(o.duplicate_of);
     $('remove-row').hidden = o.status === 'removed' || !(mayReview(role) || (o.viewer && o.viewer.name && o.viewer.name === o.created_by));
     var p1 = o.phase1;
     $('kyc-card').hidden = !p1 && o.status !== 'won';
@@ -627,6 +630,12 @@
       .then(function (r) { pending = {}; drawSaveBar(); $('save-say').textContent = ''; window.reloadOpportunity(); })
       .catch(function (e) { $('save-say').textContent = msg(e); })
       .then(function () { b.disabled = false; });
+  });
+  $('not-dup').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'not-duplicate', opportunity_id: current.id })
+      .then(function () { $('dup-say').textContent = 'Le Firm Manager reprend : dossier, classeur, Phase 0.'; window.reloadOpportunity(); })
+      .catch(function (e) { b.disabled = false; $('dup-say').textContent = msg(e); });
   });
   // Two clicks: « Retirer », then « Oui, retirer ». Nothing is deleted in the Drive.
   $('remove').addEventListener('click', function () {
