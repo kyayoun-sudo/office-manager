@@ -74,7 +74,7 @@ function fakeDrive(template) {
     downloadBuffer: async id => files.get(id).buffer,
     findFilesByExactName: async (name, parent) => [...files.values()].filter(f => f.name === name && (f.parents || []).includes(parent)).map(f => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime })),
     createBinary: async ({ name, parentId, buffer, mimeType }) => add({ name, parents: [parentId], buffer, mimeType }),
-    updateBinary: async (id, { buffer, expectedModifiedTime }) => { const f = files.get(id); if (expectedModifiedTime && f.modifiedTime !== expectedModifiedTime) throw new Error('MEMORY_CONFLICT'); f.buffer = buffer; f.modifiedTime = 't' + (++clock); return { modifiedTime: f.modifiedTime }; },
+    updateBinary: async (id, { buffer, expectedModifiedTime }) => { const f = files.get(id); if (!expectedModifiedTime) throw new Error('EXPECTED_MODIFIED_TIME_REQUIRED'); if (f.modifiedTime !== expectedModifiedTime) throw new Error('MEMORY_CONFLICT'); f.buffer = buffer; f.modifiedTime = 't' + (++clock); return { modifiedTime: f.modifiedTime }; },
     copyFile: async (id, name, parent) => { const src = files.get(id); return add({ name, parents: [parent], buffer: Buffer.from(src.buffer), mimeType: src.mimeType }); },
     changedSince: async () => [...files.values()].map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, webViewLink: f.webViewLink })),
     readText: async id => ({ text: String(files.get(id)?.buffer || '') })
