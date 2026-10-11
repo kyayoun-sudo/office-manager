@@ -178,6 +178,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Un espace fermé avant cette règle (comptes inactifs) : connexion → `FIRM_CLOSED` → la page de connexion demande `EFFACER` →
   route `firm-restart` (`restartFirm` : identité revérifiée, ancien propriétaire ou `FIRST_OWNER_EMAILS`, son compte de connexion
   gardé) → effacement → propriétaire d'un espace vierge → « Démarrer ». Un nouveau venu ne peut jamais prendre l'espace.
+- **Vendable à d'autres cabinets (Paul, 2026-10-11)** : Paramètres → « Repartir de zéro » (propriétaire, `EFFACER`, route
+  `firm-reset`, `resetFirm` : même effacement, le propriétaire reste propriétaire d'un espace vierge). Plus de « code propriétaire »
+  à taper : les routes propriétaire acceptent la session personnelle du propriétaire (ou d'un associé). Les vues d'équipe
+  (`lib/kpi.js`) ignorent les missions archivées / annulées ; les compétences (`OFFICE_MANAGER_CAPABILITIES.json`) portent le
+  `drive_id` et ne s'affichent pas pour un autre Drive. Nom de la fonction pont configurable : `GOOGLE_BRIDGE_FUNCTION`
+  (par défaut `taty-google-bridge`, le nom déployé ; un nouveau cabinet peut la déployer sous un nom neutre).
+- « Fichiers de travail » (Équipe) = temps réellement passé dans les fichiers Excel des missions, mesuré par le panneau Excel.
 
 ## Installable par n'importe quel cabinet (Paul, 2026-10-11 : « ce n'est pas une application pour TATY »)
 - Aucun nom, Drive, fichier ni cabinet de TATY n'est utilisé par défaut. Les identifiants de fichiers réels du premier cabinet

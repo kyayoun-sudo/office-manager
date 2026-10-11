@@ -88,6 +88,13 @@
       </div>
     </section>
 
+    <section class="card" id="reset-area" aria-labelledby="h-reset" hidden style="border-left:4px solid var(--danger)">
+      <h2 id="h-reset">Repartir de zéro</h2>
+      <p class="hint" style="margin:0">Efface toutes les données du cabinet dans Office Manager : missions, opportunités, personnes et comptes, rôles, décisions, réglages, connexion Google et choix du Drive, veille, journal, et la mémoire des agents dans le Drive (mise à la corbeille du Drive). Les documents du cabinet dans son Drive restent. Vous gardez votre compte et vous refaites la configuration : Google, puis le Drive.</p>
+      <div class="field" style="max-width:320px"><label for="reset-word">Tapez EFFACER pour confirmer</label><input id="reset-word" type="text" autocomplete="off"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn danger" id="reset-go" type="button">Effacer et recommencer</button><span class="status" id="reset-status" role="status" aria-live="polite"></span></div>
+    </section>
+
     <section class="card" id="rights-area" aria-labelledby="h-rights" hidden>
       <h2 id="h-rights">Droits : qui voit quel écran, à quel niveau</h2>
       <p class="hint" style="margin:0">Chaque rôle a un niveau par écran : aucun, voir, préparer, revoir, approuver, signer, administrer. « Seulement ses missions » limite le niveau aux missions où la personne a une fonction. Les associés ajustent ces droits pour le cabinet ; personne ne peut monter le niveau de son propre rôle, et le responsable informatique n’ouvre jamais les dossiers des clients. Les règles automatiques (ci-dessous) retirent un droit même quand la matrice le donne. Les agents IA ne dépassent jamais « préparer ».</p>
@@ -778,7 +785,8 @@
     openAccounts();
     // The IT administrator manages accounts without the owner's settings.
     if (OM.getRole() === 'it_admin') return;
-    if (ownerToken()) unlock(); else $('owner-gate').hidden = false;
+    // The owner and the partners, connected with their own account, need no code (2026-10-11).
+    if (ownerToken() || (OM.isOwner() && OM.hasPersonalSession())) unlock(); else $('owner-gate').hidden = false;
   }
 
   $('connect').addEventListener('click', function () { OM.setToken($('token').value); $('login').hidden = true; start(); });
@@ -890,6 +898,23 @@
   $('rights-save').addEventListener('click', function () { var list = Object.keys(changes).map(function (k) { return changes[k]; }); if (!list.length) { say('Aucun changement.'); return; } save({ changes: list }); });
   $('rights-reset').addEventListener('click', function () { if (window.confirm('Revenir aux droits par défaut pour tous les rôles ?')) save({ reset: true, changes: [] }); });
   load();
+})();
+</script>
+<script>
+// « Repartir de zéro » for the owner (2026-10-11).
+(function () {
+  var OM = window.OfficeManager, $ = function (id) { return document.getElementById(id); };
+  if (!OM || OM.getRole() !== 'owner' || !OM.hasPersonalSession()) return;
+  $('reset-area').hidden = false;
+  var E = { TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer.', PURGE_SQL_NOT_INSTALLED: 'L’effacement n’est pas encore installé dans Supabase (db/purge.sql ou db/INSTALL_TOUT.sql) : rien n’a été effacé.', OWNER_ONLY: 'Réservé au propriétaire du cabinet.' };
+  $('reset-go').addEventListener('click', function () {
+    var b = this, st = $('reset-status');
+    if (String($('reset-word').value).trim().toUpperCase() !== 'EFFACER') { st.textContent = E.TYPE_EFFACER_TO_CONFIRM; st.className = 'status error'; return; }
+    b.disabled = true; st.className = 'status'; st.textContent = 'Effacement en cours… (cela peut prendre une minute)';
+    OM.api('/api/app?route=firm-reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: $('reset-word').value }) })
+      .then(function () { try { sessionStorage.clear(); } catch (e) { /* none */ } location.replace('/demarrer.html'); })
+      .catch(function (e) { b.disabled = false; st.className = 'status error'; st.textContent = E[e.message] || ('Impossible : ' + e.message); });
+  });
 })();
 </script>
 </body>
