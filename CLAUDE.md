@@ -164,9 +164,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 ## Règles de travail
 
-- Branche de travail : `feature/white-label-desktop`. Les interfaces par rôle se construisent sur `amelioration`
-  (accord de Paul, 2026-10-10 ; elle reçoit d'abord `feature/white-label-desktop`). Ne pas toucher `main`,
-  `fix/map-register-bridge-write` (environnement de test isolé) sans accord.
+- Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
+  toi »). `amelioration` a reçu le même travail le 2026-10-11 (rôles, droits, veille, Shadow) ; elle n'est plus la branche
+  de construction. Ne pas toucher `main`, `fix/map-register-bridge-write` (environnement de test isolé) sans accord.
 - « EXTEND, DO NOT REBUILD » : ajouter sans casser ce qui est fait ; montrer le plan pour les gros changements.
 - Production : la promotion est faite par Paul. Ne jamais définir `OFFICE_MANAGER_TEST_RUN` en production.
 - Ne jamais taper un mot de passe, lire ou déchiffrer un secret. Pas de contournement d'un blocage de sécurité.
