@@ -293,12 +293,20 @@
       : t.status === 'planning' ? 'Rangement : l’Orpailleur lit et décide de la place de chaque fichier… ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichiers de cette tranche' + (t.first_scan_round > 1 ? ' (tranche ' + t.first_scan_round + ')' : '') + '.'
       : t.status === 'done' ? (t.first_scan_done ? '✓ Premier scan du cabinet terminé le ' + UI.dateTime(t.first_scan_done) + ' : tout le Drive a été lu. Ensuite, seuls les fichiers nouveaux ou modifiés sont lus, aux heures des passages. '
         : t.first_scan_remaining ? 'Premier scan pas encore fini : ' + t.first_scan_remaining + ' fichier(s) du Drive restent à lire ; la suite part au prochain passage (ou « Reprendre le rangement »). ' : '') + 'Rangement proposé : ' + (t.moves || 0) + ' déplacement(s), ' + (t.renames || 0) + ' renommage(s) dans « À valider » ; ' + (t.questions || 0) + ' question(s) envoyée(s) pour validation aux personnes qui ont enregistré des fichiers ambigus ; ' + (t.ok || 0) + ' fichier(s) déjà bien rangés.'
+      : t.status === 'stopped' ? '■ Rangement arrêté' + (t.stopped_by ? ' par ' + t.stopped_by : '') + (t.stopped_at ? ' le ' + UI.dateTime(t.stopped_at) : '') + ' : ' + (t.done || 0) + (t.total ? ' / ' + t.total : '') + ' fichier(s) traité(s), gardés. Il ne reprend que sur « Reprendre le rangement ».'
       : t.status === 'failed' ? 'Le rangement a échoué : ' + (t.error || '') : 'Rangement : pas encore lancé.';
     var tp = el('p', tl, 'margin:0;font-size:14px;font-weight:600');
     b.appendChild(tp);
     if (tidyBatchActive) b.appendChild(el('p', 'Reprise par lots : gardez cette page ouverte jusqu’à la fin. Chaque lot reprend la progression enregistrée.', 'small'));
     if (t.status === 'done') { var av = document.createElement('a'); av.href = '/validations.html'; av.textContent = 'Ouvrir « À valider »'; b.appendChild(av); }
-    var rb = el('button', t.stalled ? 'Reprendre le rangement' : t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
+    if (t.status === 'planning' || tidyBatchActive) {
+      var sb = el('button', '■ Arrêter le rangement', 'btn danger'); sb.type = 'button';
+      sb.addEventListener('click', function () { clearTimeout(knowTimer); sb.disabled = true; tidyBatchActive = false; tp.textContent = 'Arrêt demandé : le lot en cours finit ses fichiers, puis plus rien ne démarre…';
+        OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy-stop' }) })
+          .then(function () { knowTimer = setTimeout(loadKnow, 1500); }).catch(function (e) { tp.textContent = 'L’arrêt a échoué : ' + msg(e); sb.disabled = false; }); });
+      b.appendChild(sb);
+    }
+    var rb = el('button', t.stalled || t.status === 'stopped' ? 'Reprendre le rangement' : t.status === 'done' ? 'Relancer le rangement (avec vos réponses)' : 'Ranger maintenant', 'btn ghost'); rb.type = 'button';
     rb.addEventListener('click', function () { clearTimeout(knowTimer); rb.disabled = true; rb.textContent = 'Demande en cours…'; tp.textContent = 'Demande de reprise du rangement en cours…'; OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy', browser_batches: true }) }).then(function (r) {
       if (r.reason === 'MAPPING_INTERRUPTED') tp.textContent = 'Le scan est interrompu : reprenez-le dans Cartographie du Drive.';
       else if (r.reason === 'MAPPING_IN_PROGRESS') tp.textContent = 'Le scan du Drive est en cours : le rangement attend sa fin.';
@@ -317,7 +325,7 @@
     tidyBatchBusy = true;
     OM.api('/api/app?route=firm-knowledge', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'tidy-batch' }) }).then(function (r) {
       tidyBatchBusy = false;
-      if (r.status === 'done') { tidyBatchActive = false; loadKnow(); return; }
+      if (r.status === 'done' || r.status === 'stopped') { tidyBatchActive = false; loadKnow(); return; }
       if (r.status !== 'planning' && r.status !== 'reader_busy') { tidyBatchActive = false; $('know-live').textContent = 'Rangement arrêté : ' + (r.error || r.status || 'réponse inconnue'); return; }
       loadKnow();
       setTimeout(runTidyBatch, r.status === 'reader_busy' ? 5000 : 1000);

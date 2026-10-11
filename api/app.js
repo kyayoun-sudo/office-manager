@@ -32,7 +32,7 @@ import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
 import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
-import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/tidy-plan.js';
+import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion, stopTidy } from '../lib/tidy-plan.js';
 import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
 import { dropFile } from '../lib/drop-box.js';
 import { peopleBrief } from '../lib/people-brief.js';
@@ -366,6 +366,7 @@ export const ROUTES = Object.freeze({
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req, req.body.browser_batches === true ? { resume: true, fire: async () => true } : {});
       if (req.body?.action === 'tidy-batch') return tidyPlanStep(orgId, req, { noLoop: true });
+      if (req.body?.action === 'tidy-stop') return stopTidy(orgId, req.account?.display_name || req.account?.email || req.body?.by || 'propriétaire');
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
       throw fail('UNKNOWN_ACTION', 400);
     }),

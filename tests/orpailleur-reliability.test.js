@@ -93,3 +93,25 @@ test('the first scan ends only when the whole Drive is covered: a round left fil
   assert.equal(st.first_scan_round, 2);
   assert.deepEqual(st.seen, { f1: 't' }, 'memory kept');
 });
+
+test('« Arrêter »: the pass stops, what was done is kept, scheduled passes do not restart it, « Reprendre » does', async () => {
+  const { stopTidy, startChangesPass } = await import('../lib/tidy-plan.js');
+  const running = { status: 'planning', mode: 'first-scan', started_at: 's', list: ['f1'], total: 1, done: 0, seen: { old: 't' }, moves: 0, renames: 0, questions: 0, ok: 0, updated_at: new Date().toISOString() };
+  const drive = fakeDrive([json('OFFICE_MANAGER_SCAN_STATE.json', { items, status: 'done' }), json('OFFICE_MANAGER_TIDY_STATE.json', running)]);
+  const audits = [];
+  const r = await stopTidy('org', 'Paul', { drive, folder: 'MEM', audit: async (o, e) => { audits.push(e); } });
+  assert.equal(r.stopped, true);
+  assert.equal(state(drive).status, 'stopped'); assert.equal(state(drive).stopped_by, 'Paul');
+  assert.equal(audits[0].action_type, 'TIDY_STOPPED', 'traced');
+  assert.equal((await stopTidy('org', 'Paul', { drive, folder: 'MEM', audit: async () => {} })).stopped, false, 'nothing running');
+  // A step does nothing once stopped.
+  const st = await tidyPlanStep('org', {}, base({ drive, fetchRows: async () => [], runAI: async () => { throw new Error('must not read'); } , noLoop: true }));
+  assert.equal(st.status, 'stopped');
+  // The scheduled pass does not restart it…
+  const sched = await startChangesPass('org', {}, base({ drive, fetchRows: async () => [], changedSince: async () => [], driveId: null, loadCheckpoint: async () => null }));
+  assert.equal(sched.reason, 'STOPPED_BY_PERSON'); assert.equal(state(drive).status, 'stopped');
+  // …« Reprendre » does, from where it stopped, memory kept.
+  const again = await startTidyPlan('org', {}, base({ drive, fetchRows: async () => [], resume: true }));
+  assert.equal(again.resumed, true);
+  assert.equal(state(drive).status, 'planning'); assert.deepEqual(state(drive).seen, { old: 't' });
+});

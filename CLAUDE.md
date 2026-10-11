@@ -136,6 +136,10 @@ questions et propositions des agents).
   `MAX_FILES` (1 500) fichiers, les plus probables d'abord ; il ne se déclare fini (`first_scan_done`) que quand `firstScanLeft`
   est vide ; sinon `first_scan_remaining` et le passage suivant (planifié ou « Reprendre ») continue le premier scan
   (`FIRST_SCAN_CONTINUES`, `first_scan_round`) au lieu de ne regarder que les changements. Affiché dans Mise en service.
+- **Bouton « Arrêter »** (Paul, 2026-10-11) : Paramètres (à côté de « Orpailleur ») et Mise en service ; `stopTidy` (action
+  `tidy-stop` de `firm-knowledge`, tracé `TIDY_STOPPED`) → statut `stopped` ; le lot en cours finit ses fichiers (un pas en cours
+  n'écrase jamais l'arrêt), rien d'autre ne démarre ; les passages planifiés ne relancent pas (`STOPPED_BY_PERSON`) ; « Reprendre »
+  continue là où il s'est arrêté, mémoire gardée.
 - L'humain peut choisir de mettre un doublon à la corbeille (confirmation explicite, Paul 2026-10-11).
 
 - **Ses propres fichiers ne sont jamais à ranger** (Paul, 2026-10-11 : « arrêter, après chaque passage, de demander s'il doit mettre

@@ -234,6 +234,7 @@
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <span class="hint">Lancer un passage maintenant :</span>
             <button class="btn ghost" type="button" data-run="orpailleur" style="padding:6px 12px;min-height:36px;font-size:13px">Orpailleur</button>
+            <button class="btn danger" type="button" id="orp-stop" style="padding:6px 12px;min-height:36px;font-size:13px" title="Arrêter le rangement en cours (ce qui est fait est gardé)">■ Arrêter l’Orpailleur</button>
             <button class="btn ghost" type="button" data-run="grand-controleur" style="padding:6px 12px;min-height:36px;font-size:13px">Grand Contrôleur</button>
             <button class="btn ghost" type="button" data-run="sika" style="padding:6px 12px;min-height:36px;font-size:13px">Sika</button>
           </div>
@@ -620,13 +621,23 @@
       .catch(function (err) { sSay(explain(err), true); })
       .then(function () { $('s-save').disabled = false; });
   });
+  // « Arrêter » : le lot en cours finit ses fichiers, rien d'autre ne démarre ; « Orpailleur » reprend là où il s'est arrêté.
+  var orpStopped = false;
+  $('orp-stop').addEventListener('click', function () {
+    var b = $('orp-stop'); b.disabled = true; orpStopped = true; sSay('Arrêt demandé…');
+    ownerApi('firm-knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'tidy-stop', by: OM.getUserName() || null }) })
+      .then(function (r) { sSay(r.stopped ? 'Orpailleur arrêté après ' + (r.done || 0) + (r.total ? ' / ' + r.total : '') + ' fichier(s). Ce qui est fait est gardé ; le bouton « Orpailleur » reprend là où il s’est arrêté. Les passages automatiques ne le relancent pas.' : 'Aucun rangement en cours à arrêter.'); loadPasses(); })
+      .catch(function (err) { orpStopped = false; sSay(explain(err), true); })
+      .then(function () { b.disabled = false; });
+  });
   function launchOrpailleurFromSettings(button) {
-    button.disabled = true;
+    button.disabled = true; orpStopped = false;
     var busyRetries = 0;
     sSay('Orpailleur démarre. Gardez cette page ouverte pendant le rangement.');
     function post(body) { return ownerApi('firm-knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
     function nextBatch() {
       return post({ action: 'tidy-batch' }).then(function (r) {
+        if (r.status === 'stopped' || orpStopped) { sSay('Orpailleur arrêté. Ce qui est fait est gardé ; « Orpailleur » reprend là où il s’est arrêté.'); return; }
         if (r.status === 'done') { sSay('Analyse terminée : ' + (r.done || 0) + ' / ' + (r.total || r.done || 0) + ' fichiers. Les rangements proposés sont dans À valider.'); return; }
         if (r.status === 'reader_busy') {
           if (++busyRetries > 120) throw new Error('Le lecteur reste occupé. Progression conservée ; consultez le diagnostic.');
