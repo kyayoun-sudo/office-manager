@@ -279,6 +279,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
      reproductible (graine) ; critères de risque par le code ; pièce rangée `PIECES_<CYCLE>/<CODE>/<CODE>_<S01>_…` sous le dossier
      des WP ; l'Enhanced Auditor lit la pièce et PROPOSE (autorisation « Autoriser les agents » exigée) ; PASS = preuve,
      EXCEPTION = explication ; résultats écrits dans le WP sans écraser une case remplie par quelqu'un ; soumission.
+  **Shadow améliore l'Enhanced Auditor (Paul, 2026-10-12)** : objectif de l'Enhanced Auditor = « permettre à l'auditeur d'aller plus vite,
+  d'être meilleur et de faire de meilleurs audits » (`lib/agent-goals.js` : speed, agreement, first_time_right, coverage, evidence, method) ;
+  Shadow observe son vrai travail (`enhancedAuditorSignals` : propositions contredites, temps pièce → décision, procédures renvoyées,
+  populations non rapprochées, cases du WP remplies à la main) ; ses enquêtes peuvent proposer une meilleure méthode ou un meilleur modèle
+  de fiche Excel (correction `method`, inspirée des bonnes pratiques web) = leçon en attente d'un associé / manager, jamais appliquée seule,
+  jamais un changement des SOP.
   Suivant : revues requises par la mission (Senior → Manager → Superviseur → Associé) signées sur la version du WP, renvoi au
   préparateur (statut `returned`), conclusion Senior du cycle (checklist 6 points), IA de revue par rôle.
   dans le WP), conclusion Senior, revues requises signées sur la version.

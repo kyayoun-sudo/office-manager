@@ -137,3 +137,13 @@ test('submitted only when complete; the results and the conclusion are written i
   const mine = await P.myProcedures('org', ali, d);
   assert.deepEqual(mine.procedures.map(p => [p.code, p.status]), [['ACH-03', 'submitted'], ['ACH-08', 'to_do']], 'ACH-02 is Sam’s');
 });
+
+test('Shadow sees the Enhanced Auditor’s real work: proposals the auditor contradicted, speed, returned procedures, hand-filled cells', async () => {
+  const { enhancedAuditorSignals } = await import('../lib/shadow-investigate.js');
+  const rows = [{ id: 'w1', procedure_code: 'ACH-03', status: 'returned', updated_at: '2026-10-12T10:00:00Z', population: { status: 'DIFFERENCE', difference: 12, checked_at: '2026-10-12T08:00:00Z' }, wp_sync: { conflicts: ['F9'], at: '2026-10-12T09:00:00Z' },
+    items: [{ sample_id: 'S01', result: 'EXCEPTION', comment: 'pas de visa', decided_at: '2026-10-12T09:10:00Z', followed_ai: false, ai: { proposed_result: 'PASS', reason: 'montant conforme' }, evidence: [{ at: '2026-10-12T09:00:00Z' }] }] }];
+  const s = enhancedAuditorSignals(rows);
+  assert.deepEqual(s.map(x => x.outcome).sort(), ['agreement', 'evidence', 'first_time_right', 'method', 'speed']);
+  assert.match(s.find(x => x.outcome === 'speed').text, /10 min/);
+  assert.match(s.find(x => x.outcome === 'agreement').text, /l’IA proposait PASS .* l’auditeur a retenu EXCEPTION — pas de visa/);
+});
