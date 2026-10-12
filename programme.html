@@ -157,7 +157,8 @@
           var tr = el('tr'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!p.active; cb.setAttribute('aria-label', 'Faire ' + p.code);
           cb.addEventListener('change', function () { p.active = cb.checked; paintCycles(); });
           var td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
-          tr.appendChild(el('td', p.code)); tr.appendChild(el('td', p.title));
+          var tdc = el('td'); if (data.validated && p.active && data.programme && data.programme.status === 'validated') { var a = el('a', p.code); a.href = '/procedure.html?mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(p.code); tdc.appendChild(a); } else tdc.textContent = p.code;
+          tr.appendChild(tdc); tr.appendChild(el('td', p.title));
           var tt = el('td'); tt.appendChild(el('span', (TYPE[p.type] || '?') + (p.condition ? ' ' + p.condition : ''), 'tag' + (p.type === 'RISK_DEPENDENT' ? ' risk' : ''))); tr.appendChild(tt);
           tr.appendChild(el('td', p.level || '')); tr.appendChild(el('td', MODE[p.sampling_mode] || ''));
           var ts = el('td');

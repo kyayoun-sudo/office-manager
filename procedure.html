@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ma procédure</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .row input[type=text],.row input[type=number],.row select,.it input,.it select,.it textarea,textarea.big{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
+  .row input[type=text]{flex:1 1 280px}
+  textarea.big{width:100%;min-height:90px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+  .ok{color:#1e7a3c;font-weight:600} .bad{color:#b3261e;font-weight:600}
+  .it{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+  .it h3{margin:0;font-size:15px}
+  .it .meta{margin:0}
+  .ai{border-left:3px solid var(--brand);padding:6px 10px;font-size:13.5px;line-height:1.5;background:var(--soft);border-radius:6px}
+  .ai p{margin:2px 0}
+  .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+  .tbl th,.tbl td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+  .wrap{overflow-x:auto}
+  .gaps{border-left:3px solid #b3261e;padding:6px 10px;font-size:14px}
+  details summary{cursor:pointer}
+  @media (prefers-color-scheme: dark){ .ok{color:#7ad69a} .bad{color:#ff9a8f} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/auditeur.html" aria-current="page">Enhanced Auditor</a>
+    <a href="/methodologie.html">Méthodologie</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <p class="meta"><a id="back" href="/mission.html">← Programme de travail</a></p>
+      <h1 id="title">Ma procédure</h1>
+      <p class="lead" id="sub"></p>
+      <p class="status" id="state" role="status" aria-live="polite"></p>
+    </header>
+
+    <section class="card" aria-labelledby="h-card">
+      <details id="card-box"><summary><h2 id="h-card" style="display:inline">Ce que dit le SOP</h2></summary><div id="card"></div></details>
+    </section>
+
+    <section class="card" aria-labelledby="h-pop" id="pop-card">
+      <h2 id="h-pop">1. La population</h2>
+      <p class="meta">Le fichier reçu du client (Excel, CSV ou Google Sheet, dans le Drive). Le programme compte les lignes et le total, puis le rapproche du grand livre : sans écart expliqué, pas d’échantillon (règle du SOP).</p>
+      <div class="row"><input id="pop-file" type="text" placeholder="Lien du fichier de la population" aria-label="Lien du fichier de la population"><button class="btn ghost" id="pop-read" type="button">Lire</button></div>
+      <div id="pop-map" hidden>
+        <div class="grid" id="pop-cols"></div>
+        <div class="grid">
+          <div class="field"><label for="pop-gl">Total au grand livre / à la balance</label><input id="pop-gl" type="text" inputmode="decimal"></div>
+          <div class="field"><label for="pop-gls">Source de ce total</label><input id="pop-gls" type="text" placeholder="ex. balance au 31/12, comptes 60-63"></div>
+          <div class="field"><label for="pop-exp">Explication d’un écart (si écart)</label><input id="pop-exp" type="text"></div>
+        </div>
+        <div class="row"><button class="btn" id="pop-set" type="button">Contrôler la population</button></div>
+        <div class="wrap" id="pop-preview"></div>
+      </div>
+      <p id="pop-result"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-sample" id="sample-card">
+      <h2 id="h-sample">2. L’échantillon</h2>
+      <p class="meta" id="sample-rule"></p>
+      <div class="row" id="sample-actions"></div>
+      <div class="wrap" id="sample-cand"></div>
+      <p id="sample-result"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-items" id="items-card">
+      <h2 id="h-items">3. Le test, élément par élément</h2>
+      <p class="meta">Déposez la pièce de chaque élément : elle est renommée avec le numéro de l’élément et rangée sous la mission. L’Enhanced Auditor peut la lire et vous proposer un résultat ; c’est vous qui décidez. PASS seulement avec une preuve ; une exception s’explique.</p>
+      <p class="status" id="systemic" role="status" aria-live="polite"></p>
+      <div class="stack" id="items"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-wt" id="wt-card" hidden>
+      <h2 id="h-wt">Questions de la procédure</h2>
+      <p class="meta">Une question par étape du SOP : répondez avec ce que vous avez constaté et la preuve vue.</p>
+      <div class="stack" id="wt"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-conc">
+      <h2 id="h-conc">4. Conclusion et Working Paper</h2>
+      <p class="meta" id="conc-model"></p>
+      <textarea class="big" id="conc" aria-label="Conclusion"></textarea>
+      <div class="row">
+        <button class="btn ghost" id="conc-save" type="button">Enregistrer la conclusion</button>
+        <button class="btn ghost" id="wp-write" type="button">Écrire dans le Working Paper</button>
+        <button class="btn" id="submit" type="button">Soumettre pour revue</button>
+        <span class="status" id="say" role="status" aria-live="polite"></span>
+      </div>
+      <div id="gaps"></div>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var qs = new URLSearchParams(location.search), missionId = qs.get('mission_id') || '', code = qs.get('code') || '';
+  var ERR = { NOT_YOUR_PROCEDURE: 'Cette procédure est préparée par une autre personne.', POPULATION_FIRST: 'Contrôlez d’abord la population.', EXPLAIN_POPULATION_DIFFERENCE_FIRST: 'Expliquez d’abord l’écart avec le grand livre.',
+    POPULATION_FILE_CHANGED: 'Le fichier de la population a changé depuis son contrôle : contrôlez-le à nouveau.', SAMPLE_SIZE_NOT_SET: 'Le Manager n’a pas fixé la taille de l’échantillon dans le programme.',
+    SAMPLE_ALREADY_USED: 'Des éléments ont déjà un résultat : seul un Manager peut refaire l’échantillon.', CHOOSE_ONE_ROW: 'Indiquez la ligne de la transaction suivie.', PASS_NEEDS_EVIDENCE: 'PASS seulement avec une preuve : déposez la pièce ou indiquez où elle est.',
+    EXCEPTION_NEEDS_EXPLANATION: 'Expliquez l’exception.', EVIDENCE_FIRST: 'Déposez d’abord la pièce.', FILE_TOO_LARGE: 'Fichier trop lourd (3 Mo au plus) : collez plutôt son lien Drive.', AMOUNT_COLUMN_REQUIRED: 'Choisissez la colonne du montant.',
+    POPULATION_EMPTY: 'Aucune ligne avec un montant dans ce fichier.', NO_WORKPAPER_FOR_CYCLE: 'Le Working Paper du cycle n’existe pas encore (Programme de travail → Créer les Working Papers).', ALREADY_SUBMITTED: 'Procédure déjà soumise.',
+    WORKPAPERS_FOLDER_NOT_FOUND: 'Dossier des Working Papers introuvable : le Manager colle son lien dans le programme.', MEMORY_CONFLICT: 'Le Working Paper a été modifié en même temps : réessayez.', SAME_FILE_ALREADY_FILED: 'Cette pièce est déjà rangée pour cet élément.', PROCEDURE_INCOMPLETE: 'La procédure n’est pas complète.' };
+  var GAP = { POPULATION_REQUIRED: 'contrôler la population', POPULATION_DIFFERENCE_UNEXPLAINED: 'expliquer l’écart de la population', SAMPLE_REQUIRED: 'tirer l’échantillon', ITEMS_WITHOUT_RESULT: 'donner un résultat à chaque élément', CONCLUSION_REQUIRED: 'écrire la conclusion' };
+  var STATUS = { to_do: 'à faire', in_progress: 'en cours', submitted: 'soumise pour revue', returned: 'renvoyée par la revue', reviewed: 'revue' };
+  var msg = function (e) { var c = e && (e.code || e.message); return ERR[c] || (e && e.message) || String(e); };
+  var data = null, fmt = function (n) { return n == null ? '' : Number(n).toLocaleString('fr-FR'); };
+  function post(b) { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ mission_id: missionId, code: code }, b)) }); }
+  function act(btn, body, sayEl, done) {
+    if (btn) btn.disabled = true; if (sayEl) { sayEl.className = 'status'; sayEl.textContent = 'Un instant…'; }
+    return post(body).then(function (r) { if (r && r.work) { data.work = r.work; } if (sayEl) sayEl.textContent = ''; if (done) done(r); else paint(); return r; })
+      .catch(function (e) { if (sayEl) { sayEl.className = 'status error'; sayEl.textContent = msg(e); } showGaps(e.data && e.data.gaps); })
+      .then(function (r) { if (btn) btn.disabled = false; return r; });
+  }
+  function showGaps(list) { var b = $('gaps'); b.textContent = ''; if (!list || !list.length) return; var d = el('div', 'Avant de soumettre : ' + list.map(function (g) { return GAP[g.gap] || g.gap; }).join(', ') + '.', 'gaps'); b.appendChild(d); }
+
+  function paintCard() {
+    var c = data.card || {}, box = $('card'); box.textContent = '';
+    [['Objectif', c.objective], ['Risque', c.risk], ['Assertion', c.assertion], ['Population', c.population], ['Sélection', data.sampling_label + (data.line.sample_size ? ' — ' + data.line.sample_size + ' élément(s)' : '')], ['Instruction', c.instruction]].forEach(function (x) { if (x[1]) { var p = el('p'); p.appendChild(el('strong', x[0] + ' : ')); p.appendChild(document.createTextNode(x[1])); box.appendChild(p); } });
+    [['À demander', c.ask], ['Préparer la population', c.population_steps], ['Étapes', (c.steps || []).map(function (s) { return s.text; })], ['Si ça ne correspond pas', c.exceptions]].forEach(function (x) {
+      if (!x[1] || !x[1].length) return; box.appendChild(el('p', null)).appendChild(el('strong', x[0])); var ol = el('ol'); x[1].forEach(function (t) { ol.appendChild(el('li', t)); }); box.appendChild(ol);
+    });
+  }
+
+  var preview = null;
+  $('pop-read').addEventListener('click', function () {
+    act(this, { action: 'population-preview', file: $('pop-file').value.trim() }, $('pop-result'), function (r) {
+      preview = r; $('pop-map').hidden = false;
+      var cols = $('pop-cols'); cols.textContent = '';
+      [['ref', 'Référence'], ['date', 'Date'], ['party', 'Tiers'], ['amount', 'Montant']].forEach(function (k) {
+        var f = el('div', null, 'field'), l = el('label', k[1]), s = el('select'); s.id = 'col-' + k[0]; l.htmlFor = s.id;
+        var o0 = el('option', '—'); o0.value = ''; s.appendChild(o0);
+        r.headers.forEach(function (h, i) { var o = el('option', h || ('colonne ' + (i + 1))); o.value = String(i); s.appendChild(o); });
+        if (r.guess[k[0]] != null) s.value = String(r.guess[k[0]]);
+        f.appendChild(l); f.appendChild(s); cols.appendChild(f);
+      });
+      var pv = $('pop-preview'); pv.textContent = ''; pv.appendChild(el('p', r.file.name + ' : ' + fmt(r.rows) + ' ligne(s). Premières lignes :', 'meta'));
+      pv.appendChild(UI.table(r.headers, r.first_rows));
+    });
+  });
+  $('pop-set').addEventListener('click', function () {
+    var columns = {}; ['ref', 'date', 'party', 'amount'].forEach(function (k) { columns[k] = $('col-' + k).value; });
+    act(this, { action: 'population', file: $('pop-file').value.trim(), header_row: preview ? preview.header_row : null, columns: columns, gl_total: $('pop-gl').value, gl_source: $('pop-gls').value, explanation: $('pop-exp').value }, $('pop-result'), function (r) { paint(); if (r.rule) $('pop-result').appendChild(el('span', ' ' + r.rule)); });
+  });
+
+  function paintPopulation() {
+    var p = data.work.population || {}, out = $('pop-result'); out.textContent = '';
+    if (!p.file_id) return;
+    $('pop-file').value = $('pop-file').value || 'https://drive.google.com/file/d/' + p.file_id;
+    var cls = p.status === 'RECONCILED' ? 'ok' : p.status === 'DIFFERENCE' && p.blocking ? 'bad' : '';
+    out.appendChild(el('span', (p.file_name || '') + ' : ' + fmt(p.rows) + ' lignes, total ' + fmt(p.total) + (p.gl_total != null ? ' ; grand livre ' + fmt(p.gl_total) + ' ; écart ' + fmt(p.difference) : ' ; total du grand livre non indiqué') +
+      (p.status === 'RECONCILED' ? ' — rapprochée.' : p.status === 'DIFFERENCE' ? (p.explanation ? ' — écart expliqué : ' + p.explanation : ' — écart à expliquer.') : '.'), cls));
+  }
+
+  function paintSample() {
+    var mode = data.line.sampling_mode, box = $('sample-actions'); box.textContent = ''; $('sample-cand').textContent = '';
+    $('sample-rule').textContent = 'Méthode du programme : ' + (data.sampling_label || '?') + (data.line.sample_size ? ' — ' + data.line.sample_size + ' élément(s)' : '') + '. Un élément tiré n’est jamais remplacé par un plus facile.';
+    var b = function (label, body, after) { var x = el('button', label, 'btn ghost'); x.type = 'button'; x.addEventListener('click', function () { act(x, body, $('sample-result'), after); }); box.appendChild(x); };
+    if (mode === 'none') { $('sample-card').hidden = true; return; }
+    if (mode === 'walkthrough') {
+      var n = el('input'); n.type = 'number'; n.min = '1'; n.placeholder = 'N° de ligne'; n.setAttribute('aria-label', 'Ligne de la transaction suivie'); box.appendChild(n);
+      var x = el('button', 'Suivre cette transaction', 'btn ghost'); x.type = 'button'; x.addEventListener('click', function () { act(x, { action: 'sample', row: n.value }, $('sample-result')); }); box.appendChild(x);
+    } else if (mode === 'risk_targeted' || mode === 'other') {
+      b('Proposer les éléments à risque', { action: 'sample' }, function (r) {
+        if (!r.candidates) { paint(); return; }
+        var t = $('sample-cand'); t.textContent = '';
+        var tbl = el('table', null, 'tbl'), hr = el('tr'); ['', 'Ligne', 'Réf.', 'Date', 'Tiers', 'Montant', 'Pourquoi'].forEach(function (h) { hr.appendChild(el('th', h)); }); var th = el('thead'); th.appendChild(hr); tbl.appendChild(th);
+        var tb = el('tbody'); r.candidates.forEach(function (c) { var tr = el('tr'), cb = el('input'); cb.type = 'checkbox'; cb.value = c.row; cb.setAttribute('aria-label', 'Retenir la ligne ' + c.row); var td = el('td'); td.appendChild(cb); tr.appendChild(td); [c.row, c.ref, c.date, c.party, fmt(c.amount), c.reasons.join(', ')].forEach(function (v) { tr.appendChild(el('td', v == null ? '' : String(v))); }); tb.appendChild(tr); });
+        tbl.appendChild(tb); t.appendChild(tbl);
+        var keep = el('button', 'Retenir la sélection', 'btn'); keep.type = 'button'; keep.addEventListener('click', function () { var rows = [].map.call(t.querySelectorAll('input:checked'), function (i) { return Number(i.value); }); act(keep, { action: 'sample', rows: rows }, $('sample-result')); }); t.appendChild(keep);
+        $('sample-result').textContent = r.candidates.length ? r.rule : 'Aucun élément ne répond aux critères de risque du programme.';
+      });
+    } else if (mode === 'exhaustive') b('Prendre toute la population', { action: 'sample' });
+    else b('Tirer l’échantillon' + (data.line.sample_size ? ' (' + data.line.sample_size + ')' : ''), { action: 'sample' });
+    var s = data.work.sample || {};
+    $('sample-result').textContent = s.size ? s.size + ' élément(s) sur ' + fmt(s.population_rows) + (s.seed ? ' — tirage reproductible (graine ' + s.seed + ')' : '') + ', le ' + UI.dateTime(s.drawn_at) + '.' : '';
+  }
+
+  function paintItems() {
+    var box = $('items'); box.textContent = '';
+    var items = data.work.items || [];
+    if (!items.length) { box.appendChild(el('p', data.line.sampling_mode === 'none' ? 'Pas d’échantillon pour cette procédure.' : 'Tirez d’abord l’échantillon.', 'empty')); return; }
+    var locked = ['submitted', 'reviewed'].indexOf(data.work.status) >= 0;
+    items.forEach(function (it) {
+      var c = el('div', null, 'it'), say = el('span', '', 'status');
+      c.appendChild(el('h3', it.sample_id + ' · ' + [it.ref, it.date, it.party].filter(Boolean).join(' · ') + ' · ' + fmt(it.amount)));
+      if (it.reasons) c.appendChild(el('p', 'Choisi parce que : ' + it.reasons.join(', '), 'meta'));
+      var ev = el('p', null, 'meta'); ev.appendChild(document.createTextNode('Pièces : '));
+      (it.evidence || []).forEach(function (e, i) { if (i) ev.appendChild(document.createTextNode(' ; ')); ev.appendChild(e.url ? UI.safeLink(e.url, e.name) : document.createTextNode(e.name || e.file_id)); });
+      if (!(it.evidence || []).length) ev.appendChild(document.createTextNode('aucune'));
+      c.appendChild(ev);
+      if (!locked) {
+        var up = el('div', null, 'row'), file = el('input'); file.type = 'file'; file.setAttribute('aria-label', 'Déposer la pièce de ' + it.sample_id);
+        var link = el('input'); link.type = 'text'; link.placeholder = 'ou lien Drive de la pièce'; link.setAttribute('aria-label', 'Lien Drive de la pièce de ' + it.sample_id);
+        var add = el('button', 'Ajouter la pièce', 'btn ghost'); add.type = 'button';
+        add.addEventListener('click', function () {
+          if (link.value.trim()) return act(add, { action: 'evidence', sample_id: it.sample_id, file: link.value.trim() }, say);
+          var f = file.files && file.files[0]; if (!f) { say.textContent = 'Choisissez un fichier ou collez un lien.'; return; }
+          var rd = new FileReader(); rd.onload = function () { act(add, { action: 'evidence', sample_id: it.sample_id, name: f.name, mime: f.type, base64: String(rd.result).split(',')[1] }, say); }; rd.readAsDataURL(f);
+        });
+        up.appendChild(file); up.appendChild(link); up.appendChild(add); c.appendChild(up);
+        var ask = el('button', 'Demander à l’Enhanced Auditor', 'btn ghost'); ask.type = 'button';
+        ask.addEventListener('click', function () { act(ask, { action: 'ai', sample_id: it.sample_id }, say, function (r) { if (r.ai) { say.textContent = r.message; return; } paint(); }); });
+        c.appendChild(ask);
+      }
+      if (it.ai) {
+        var a = el('div', null, 'ai'); a.appendChild(el('p', null)).appendChild(el('strong', 'Proposition de l’Enhanced Auditor : ' + it.ai.proposed_result));
+        if (it.ai.reason) a.appendChild(el('p', it.ai.reason));
+        (it.ai.attributes || []).forEach(function (x) { a.appendChild(el('p', x.name + ' : ligne « ' + (x.on_line || '') + ' », pièce « ' + (x.on_evidence || '') + ' » — ' + x.match)); });
+        if ((it.ai.missing || []).length) a.appendChild(el('p', 'Manque : ' + it.ai.missing.join(', ')));
+        c.appendChild(a);
+      }
+      var g = el('div', null, 'grid');
+      var res = el('select'); res.setAttribute('aria-label', 'Résultat ' + it.sample_id); [['', '— résultat —'], ['PASS', 'PASS'], ['EXCEPTION', 'EXCEPTION']].forEach(function (o) { var op = el('option', o[1]); op.value = o[0]; res.appendChild(op); }); res.value = it.result || '';
+      var attr = el('input'); attr.type = 'text'; attr.placeholder = 'Attributs vérifiés'; attr.value = it.attribute || ''; attr.setAttribute('aria-label', 'Attributs vérifiés ' + it.sample_id);
+      var diff = el('input'); diff.type = 'text'; diff.placeholder = 'Écart'; diff.value = it.difference == null ? '' : it.difference; diff.setAttribute('aria-label', 'Écart ' + it.sample_id);
+      var where = el('input'); where.type = 'text'; where.placeholder = 'Preuve vue ailleurs (classeur, page)'; where.value = it.evidence_ref || ''; where.setAttribute('aria-label', 'Où est la preuve ' + it.sample_id);
+      [res, attr, diff, where].forEach(function (x) { g.appendChild(x); });
+      c.appendChild(g);
+      var com = el('textarea'); com.placeholder = 'Commentaire (obligatoire pour une exception)'; com.value = it.comment || ''; com.setAttribute('aria-label', 'Commentaire ' + it.sample_id); c.appendChild(com);
+      var rowb = el('div', null, 'row'), save = el('button', 'Enregistrer', 'btn'); save.type = 'button';
+      save.addEventListener('click', function () { act(save, { action: 'item', sample_id: it.sample_id, result: res.value, attribute: attr.value, difference: diff.value, evidence_ref: where.value, comment: com.value }, say, function (r) { $('systemic').textContent = r.systemic ? r.systemic.message : ''; paint(); }); });
+      if (!locked) rowb.appendChild(save);
+      if (it.decided_by) rowb.appendChild(el('span', 'Décidé par ' + it.decided_by + ' le ' + UI.dateTime(it.decided_at) + (it.followed_ai === false ? ' (différent de la proposition de l’IA)' : ''), 'meta'));
+      rowb.appendChild(say); c.appendChild(rowb);
+      if (locked) c.querySelectorAll('input,select,textarea').forEach(function (x) { x.disabled = true; });
+      box.appendChild(c);
+    });
+  }
+
+  function paintWalkthrough() {
+    var mode = data.line.sampling_mode, steps = ((data.card || {}).steps || []).filter(function (s) { return !s.common; });
+    var show = (mode === 'walkthrough' || mode === 'none') && steps.length;
+    $('wt-card').hidden = !show; if (!show) return;
+    var box = $('wt'); box.textContent = ''; var saved = data.work.walkthrough || [];
+    steps.forEach(function (s, i) {
+      var f = el('div', null, 'field'), l = el('label', (i + 1) + '. ' + s.text), t = el('textarea'); t.id = 'wt-' + i; l.htmlFor = t.id; t.className = 'big'; t.style.minHeight = '60px';
+      var prev = saved.filter(function (w) { return w.q === s.text; })[0]; t.value = prev ? prev.a || '' : '';
+      f.appendChild(l); f.appendChild(t); box.appendChild(f);
+    });
+  }
+  function walkthroughAnswers() {
+    var steps = ((data.card || {}).steps || []).filter(function (s) { return !s.common; });
+    return $('wt-card').hidden ? undefined : steps.map(function (s, i) { return { q: s.text, a: ($('wt-' + i) || {}).value || '' }; });
+  }
+
+  $('conc-save').addEventListener('click', function () { act(this, { action: 'conclusion', conclusion: $('conc').value, walkthrough: walkthroughAnswers() }, $('say'), function () { $('say').textContent = 'Conclusion enregistrée.'; paint(); }); });
+  $('wp-write').addEventListener('click', function () {
+    act(this, { action: 'write-wp' }, $('say'), function (r) { var w = r.wp_sync; $('say').textContent = w.cells + ' case(s) écrite(s) dans le Working Paper' + (w.verified ? ', vérifié dans le Drive' : '') + (w.conflicts.length ? ' ; ' + w.conflicts.length + ' case(s) déjà remplie(s) par quelqu’un, gardée(s) : ' + w.conflicts.join(', ') : '') + '.'; });
+  });
+  $('submit').addEventListener('click', function () {
+    var b = this;
+    act(b, { action: 'conclusion', conclusion: $('conc').value, walkthrough: walkthroughAnswers() }, $('say'), function () {
+      act(b, { action: 'submit' }, $('say'), function () { $('say').textContent = 'Soumise pour revue.'; showGaps([]); paint(); });
+    });
+  });
+
+  function paint() {
+    var w = data.work;
+    $('title').textContent = data.line.code + ' — ' + data.line.title;
+    $('sub').textContent = data.cycle.code + ' · ' + data.cycle.title + ' · préparée par ' + (data.preparer || '?') + ' · programme v' + data.programme.version;
+    $('state').textContent = 'État : ' + (STATUS[w.status] || w.status) + (data.workpaper ? '' : ' · Working Paper du cycle pas encore créé');
+    $('back').href = '/programme.html?mission_id=' + encodeURIComponent(missionId);
+    var model = (data.card || {}).conclusion_template;
+    $('conc-model').textContent = model ? 'Modèle du SOP : « ' + model + ' »' : '';
+    if (!$('conc').value) $('conc').value = w.conclusion || data.proposed_conclusion || '';
+    $('pop-card').hidden = data.line.sampling_mode === 'none';
+    var locked = ['submitted', 'reviewed'].indexOf(w.status) >= 0;
+    ['conc-save', 'wp-write', 'submit', 'pop-read', 'pop-set'].forEach(function (id) { $(id).disabled = locked && id !== 'wp-write'; });
+    paintPopulation(); paintSample(); paintItems(); paintWalkthrough();
+  }
+  function load() {
+    if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
+    OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
+      data = d; paintCard(); paint();
+    }).catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
+  }
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });
+})();
+</script>
+</body>
+</html>

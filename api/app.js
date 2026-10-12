@@ -190,6 +190,28 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'WORK_PROGRAMME_UNAVAILABLE'
   },
+  // « Ma procédure » (2026-10-12): a procedure of the validated programme worked by its preparer with the Enhanced Auditor.
+  procedure: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const w = await import('../lib/procedure-work.js');
+      if (req.query?.mine) return w.myProcedures(orgId, req.account);
+      return w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'population-preview') return w.populationPreview(orgId, m, c, b, a);
+      if (b.action === 'population') return w.setPopulation(orgId, m, c, b, a);
+      if (b.action === 'sample') return w.drawSample(orgId, m, c, b, a);
+      if (b.action === 'evidence') return w.addEvidence(orgId, m, c, b, a);
+      if (b.action === 'ai') return w.aiProposal(orgId, m, c, b, a);
+      if (b.action === 'item') return w.recordItem(orgId, m, c, b, a);
+      if (b.action === 'conclusion') return w.saveConclusion(orgId, m, c, b, a);
+      if (b.action === 'write-wp') return w.writeWorkpaper(orgId, m, c, a);
+      if (b.action === 'submit') return w.submitProcedure(orgId, m, c, a);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'PROCEDURE_UNAVAILABLE'
+  },
   // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
   // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
   tenders: {
@@ -540,7 +562,15 @@ export const ROUTES = Object.freeze({
   // The global bell: notifications computed from what is recorded, one per event.
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
   // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
-  'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/opportunities.js')).myQuestions(orgId, req.account)), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => {
+    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account).catch(() => ({ questions: [] }));
+    // « Ta procédure t'attend » (2026-10-12): the procedures of the validated programmes this person prepares.
+    const mine = await (await import('../lib/procedure-work.js')).myProcedures(orgId, req.account).catch(() => ({ procedures: [] }));
+    for (const p of mine.procedures.filter(x => ['to_do', 'in_progress', 'returned'].includes(x.status)).slice(0, 5)) out.questions.push({ id: 'proc|' + p.programme_id + '|' + p.code, kind: 'procedure', title: p.mission_name,
+      question: (p.status === 'returned' ? 'Procédure renvoyée par la revue : ' : p.status === 'in_progress' ? 'Procédure en cours : ' : 'Votre procédure vous attend : ') + p.code + ' — ' + p.title, context: p.cycle_code + ' · ' + (p.cycle_title || ''),
+      href: '/procedure.html?mission_id=' + encodeURIComponent(p.mission_id) + '&code=' + encodeURIComponent(p.code) });
+    return out;
+  }), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {

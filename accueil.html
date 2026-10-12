@@ -49,6 +49,8 @@
     <section class="card" id="mywork" aria-labelledby="h-mywork" hidden>
       <div class="card-head"><h2 id="h-mywork">Mon travail</h2><span class="meta" id="mywork-meta"></span></div>
       <div id="mywork-kpis" class="kpis"></div>
+      <h3 class="kd-sub">Mes procédures</h3>
+      <div id="mywork-procs" class="stack"><p class="empty">Chargement…</p></div>
       <h3 class="kd-sub">Mes missions</h3>
       <div id="mywork-missions" class="stack"><p class="empty">Chargement…</p></div>
       <h3 class="kd-sub">Mes tâches ouvertes</h3>
@@ -401,6 +403,17 @@
         ab.appendChild(a);
       });
     }).catch(function (e) { UI.fail($('mywork-missions'), e); });
+    // The procedures of the validated work programmes I prepare (2026-10-12).
+    OM.api('/api/app?route=procedure&mine=1').then(function (r) {
+      var pb = $('mywork-procs'); pb.textContent = '';
+      var PST = { to_do: 'À faire', in_progress: 'En cours', submitted: 'Soumise', returned: 'Renvoyée', reviewed: 'Revue' };
+      if (!(r.procedures || []).length) { pb.appendChild(el('p', 'Aucune procédure ne vous est confiée dans un programme validé.', 'empty')); return; }
+      r.procedures.forEach(function (p) {
+        var a = el('a', null, 'item link-item'); a.href = '/procedure.html?mission_id=' + encodeURIComponent(p.mission_id) + '&code=' + encodeURIComponent(p.code);
+        var t = el('div', null, 't'); t.appendChild(el('span', p.code + ' — ' + p.title)); t.appendChild(el('span', [p.mission_name, p.cycle_code].filter(Boolean).join(' · '), 'meta')); a.appendChild(t);
+        a.appendChild(el('span', PST[p.status] || p.status, 'tag' + (p.status === 'returned' ? ' warn' : ''))); pb.appendChild(a);
+      });
+    }).catch(function () { $('mywork-procs').textContent = ''; });
   }
   function start() {
     var name = OM.getUserName(), role = OM.getRole();

@@ -286,7 +286,7 @@
     var post = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
     OM.api('/api/app?route=my-questions').then(function (r) {
       var here = new URLSearchParams(location.search).get('id');
-      var list = ((r && r.questions) || []).filter(function (q) { return !(later[q.id] > Date.now()) && !(/opportunites/.test(location.pathname) && here === q.opportunity_id); });
+      var list = ((r && r.questions) || []).filter(function (q) { return !(later[q.id] > Date.now()) && !(/opportunites/.test(location.pathname) && here === q.opportunity_id) && !(q.kind === 'procedure' && /\/procedure\.html/.test(location.pathname)); });
       if (!list.length) return;
       var d = node('dialog', null, 'om-dialog om-ask'); d.setAttribute('aria-labelledby', 'om-ask-title');
       document.body.appendChild(d);
@@ -303,7 +303,11 @@
         var fail = function (e) { say.className = 'status error'; say.textContent = { SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; }); };
         var busy = function () { [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = true; }); say.className = 'status'; say.textContent = 'Enregistrement…'; };
         var opts = node('div', null, 'om-actions om-ask-opts');
-        if (q.kind === 'independence') {
+        if (q.kind === 'procedure') {
+          var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
+          if (q.context) d.appendChild(node('p', q.context));
+          var go = node('a', 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+        } else if (q.kind === 'independence') {
           indep = indep || { k: 0, answers: {}, details: {} };
           var iq = q.questions[indep.k];
           if (iq) {
@@ -329,9 +333,9 @@
         d.appendChild(opts);
         var foot = node('div', null, 'om-actions');
         foot.appendChild(btn('Plus tard', 'ghost', snooze));
-        var open = node('a', 'Voir l’opportunité', 'om-ask-link'); open.href = '/opportunites.html?id=' + encodeURIComponent(q.opportunity_id); foot.appendChild(open);
+        if (q.opportunity_id) { var open = node('a', 'Voir l’opportunité', 'om-ask-link'); open.href = '/opportunites.html?id=' + encodeURIComponent(q.opportunity_id); foot.appendChild(open); }
         d.appendChild(foot); d.appendChild(say);
-        var first = d.querySelector('.om-ask-opts button'); if (first) first.focus();
+        var first = d.querySelector('.om-ask-opts button, .om-ask-opts a'); if (first) first.focus();
       }
       d.addEventListener('cancel', function (e) { e.preventDefault(); snooze(); });
       draw(); d.showModal();
