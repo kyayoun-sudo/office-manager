@@ -255,6 +255,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   le dossier de la mission ; niveaux de revue (Senior, Manager, Associé…) appliqués **seulement si la mission le requiert** (réglé
   par mission) ; Superviseur gardé en option ; **un Working Paper Excel par cycle** (modèle du cabinet) ; rôle « spécialiste »
   (juriste, fiscaliste, évaluateur) à ajouter pour la due diligence ; pilote validé : C02_ACH SYCEBNL + PRJ-05 éligibilité.
+- **Déroulé (Paul, 2026-10-12, 10:07)** : revue analytique → le Manager choisit les cycles → il fait le **programme de travail**
+  (cycles + contrôles) : il l'**importe** (upload) ou le **remplit dans le Mission Controller**, qui lui propose les tests des SOP avec
+  leurs codes → ce programme est ce que l'Enhanced Auditor voit et aide à exécuter. Les WP vont dans le dossier de la mission, sous-dossier
+  des working papers (chez TATY : `01_CLIENTS_ET_MISSIONS/01_AUDIT/<année>/<MISSION>/05_WORKING_PAPERS_CYCLES_SELECTIONNES` — exemple, à
+  trouver dans la carte du Drive / à régler, jamais écrit en dur). Le cabinet n'a pas encore de modèle de WP par cycle.
+- **Déjà dans le code, à étendre (pas à refaire)** : `lib/pbc-sop-plan.js` (programme + SOP → PBC, extraits vérifiés),
+  `lib/mission-plans.js` + `db/mission-plans.sql` (versions du plan), `lib/plan-integration.js`, `lib/workfiles.js` + panneau Excel
+  (`excel/taskpane.html` : revue de l'Enhanced Auditor écrite dans le fichier).
 
 ## Règles de travail
 
