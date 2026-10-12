@@ -46,6 +46,12 @@
       <div class="links" id="myspace-links"></div>
     </section>
 
+    <section class="card" id="myprocs" aria-labelledby="h-myprocs" hidden>
+      <h2 id="h-myprocs">Mes procédures</h2>
+      <p class="meta">Les procédures des programmes de travail validés que vous préparez.</p>
+      <div id="myprocs-list" class="stack"></div>
+    </section>
+
     <section class="card" id="myreviews" aria-labelledby="h-myreviews" hidden>
       <h2 id="h-myreviews">Mes revues</h2>
       <p class="meta">Les procédures soumises qui attendent votre niveau de revue.</p>
@@ -421,6 +427,20 @@
       });
     }).catch(function () { $('mywork-procs').textContent = ''; });
   }
+  // Managers and partners prepare procedures too: their home has no « Mon travail », so the list shows here (2026-10-12).
+  function loadMyProcsCard() {
+    if (!$('mywork').hidden) return;
+    OM.api('/api/app?route=procedure&mine=1').then(function (r) {
+      var list = (r && r.procedures) || []; if (!list.length) return;
+      var PST = { to_do: 'À faire', in_progress: 'En cours', submitted: 'Soumise', returned: 'Renvoyée', reviewed: 'Revue' }, box = $('myprocs-list'); box.textContent = '';
+      list.forEach(function (p) {
+        var a = el('a', null, 'item link-item'); a.href = '/procedure.html?mission_id=' + encodeURIComponent(p.mission_id) + '&code=' + encodeURIComponent(p.code);
+        var t = el('div', null, 't'); t.appendChild(el('span', p.code + ' — ' + p.title)); t.appendChild(el('span', [p.mission_name, p.cycle_code].filter(Boolean).join(' · '), 'meta')); a.appendChild(t);
+        a.appendChild(el('span', PST[p.status] || p.status, 'tag')); box.appendChild(a);
+      });
+      $('myprocs').hidden = false;
+    }).catch(function () {});
+  }
   // Procedures waiting for my review level (2026-10-12).
   function loadMyReviews() {
     OM.api('/api/app?route=procedure&reviews=1').then(function (r) {
@@ -440,7 +460,7 @@
     if (LEADS_TEXT[role]) $('page-lead').textContent = LEADS_TEXT[role];
     OM.loadBranding().catch(function () {});
     loadMySpace();
-    if (OM.hasPersonalSession && OM.hasPersonalSession()) loadMyReviews();
+    if (OM.hasPersonalSession && OM.hasPersonalSession()) { loadMyReviews(); setTimeout(loadMyProcsCard, 800); }
     // The IT administrator works on accounts and connections, not on the firm's engagements.
     if (role === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
     var lead = LEADS.indexOf(role) >= 0, manage = MANAGE.indexOf(role) >= 0;
