@@ -220,6 +220,26 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'PROCEDURE_UNAVAILABLE'
   },
+  // The secretariat (2026-10-12): the firm's document models, documents prepared for an opportunity or a mission,
+  // CVs (specialists, CVs adapted to the TDR, MI + CVs in one PDF), approval, sending recorded with its proof.
+  secretariat: {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/secretariat.js')).secretariatView(orgId, req.account)),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const b = req.body || {}, a = req.account;
+      const T = () => import('../lib/doc-templates.js'), C = () => import('../lib/cv-bank.js'), S = () => import('../lib/secretariat.js');
+      if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
+      if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
+      if (b.action === 'create-document') return (await T()).createDocument(orgId, b, a);
+      if (b.action === 'specialist-cv') return (await C()).uploadSpecialistCv(orgId, b, a);
+      if (b.action === 'adapted-cv') return (await C()).adaptedCv(orgId, b, a);
+      if (b.action === 'package') return (await C()).packagePdf(orgId, b, a);
+      if (b.action === 'approve') return (await S()).approveDocument(orgId, b, a);
+      if (b.action === 'send') return (await S()).recordSending(orgId, b, a);
+      if (b.action === 'settings') return (await S()).saveSecretariatSettings(orgId, b, a);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'SECRETARIAT_UNAVAILABLE'
+  },
   // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
   // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
   tenders: {

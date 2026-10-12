@@ -297,6 +297,24 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `lib/mission-plans.js` + `db/mission-plans.sql` (versions du plan), `lib/plan-integration.js`, `lib/workfiles.js` + panneau Excel
   (`excel/taskpane.html` : revue de l'Enhanced Auditor écrite dans le fichier).
 
+## Secrétariat, modèles, CV (Paul, 2026-10-12)
+- **Ce que Paul a dit** : les modèles (MI, lettre de mission, rapport…) sont mis dans l'application, en mémoire, et l'IA les remplit
+  selon la mission avec les CV des personnes choisies ; la secrétaire envoie MI, lettres de mission et rapports depuis le mail du
+  secrétariat ou sur la plateforme du bailleur (elle reçoit un mail) ; le Firm Manager / Mission Controller doivent connaître la date
+  d'envoi (avant / après la date limite) ; les factures partent de la comptabilité ; demandes de pièces et confirmations = manager et
+  auditeurs ; CV dans le Drive RH, mis à jour automatiquement, un CV adapté à la mission avant envoi, MI envoyées en PDF ; le CV d'un
+  spécialiste retenu est déposé dans la plateforme.
+- **Construit** : `lib/doc-templates.js` (modèles Word déposés, gardés dans `MODELES` de la maison des agents, chaque version gardée,
+  index `OFFICE_MANAGER_TEMPLATES.json` ; champs `{{CHAMP}}` / `[CHAMP]` ; le code remplit ce que l'application sait, l'IA propose le
+  reste avec sa source, sans IA = « [À COMPLÉTER] » ; Word + PDF dans le dossier de l'opportunité / de la mission, jamais écrasé) ;
+  `lib/cv-bank.js` (CV de spécialiste déposé → `CV_SPECIALISTES_EXTERNES` du Drive RH + compétences « consultant externe » ; CV adapté
+  au TDR = CV d'origine + missions faites au cabinet, rien d'inventé, modèle de CV du cabinet sinon PDF propre ; MI + CV en un PDF) ;
+  `lib/secretariat.js` (approbation par la bonne personne — associé pour lettre de mission et rapport, jamais celui qui l'a préparé ;
+  envoi enregistré avec preuve : message trouvé dans la boîte du secrétariat (`office_firm_settings.settings.secretariat_email`) ou
+  accusé de la plateforme rangé à côté ; sans preuve = « déclaré », jamais « envoyé » ; date comparée à la date limite ; opportunité,
+  veille et événement `DOCUMENT_SENT`) ; page `secretariat.html` (menu ⚙ « Secrétariat et modèles », raccourci de l'accueil secrétariat),
+  route `secretariat`. `exportAsPdf` (Google : Word → PDF, copie temporaire dans l'espace des agents mise à la corbeille).
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
