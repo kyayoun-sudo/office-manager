@@ -271,6 +271,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
      `WORK_PROGRAMME_VALIDATED`. Modifier = manager/superviseur de la mission ou associé ; valider = manager/associé.
   3. WP par cycle : `lib/cycle-workpapers.js` (Excel de base dans le dossier des working papers trouvé sous la mission ou collé ;
      jamais écrasé ; vérifié dans le Drive ; AUDIT_META masqué).
+  **Règle (Paul, 2026-10-12 : « si l'IA ne passe pas, l'application fonctionne-t-elle ? »)** : l'audit par cycle marche SANS IA —
+  tout ce qui est contrôle (population, tirage, doublons, cut-off, recalculs, conclusion à trous, écriture du WP, revues) est du code ;
+  l'IA (Enhanced Auditor) ne fait que pré-remplir et proposer ; sans réponse de l'IA l'écran le dit et la personne saisit elle-même.
   Suivant : écran « Ma procédure » (pop-up, population, échantillon, pièces rangées par l'Orpailleur, PASS/EXCEPTION écrits
   dans le WP), conclusion Senior, revues requises signées sur la version.
 - **Déjà dans le code, à étendre (pas à refaire)** : `lib/pbc-sop-plan.js` (programme + SOP → PBC, extraits vérifiés),
