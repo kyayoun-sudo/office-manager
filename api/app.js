@@ -1,3 +1,5 @@
+import { requireScreenAccess } from '../lib/permissions.js';
+import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
 import { requirePilotAccess } from '../lib/auth.js';
 import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
@@ -119,17 +121,17 @@ export const ROUTES = Object.freeze({
   },
   search: {
     // Smart search (2026-10-08): optional status and mission, keywords, what the agents read.
-    GET: (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null }),
+    GET: users(ALL_ROLES, async (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null, allowedMissionIds: req.resourceAccess?.mine ? await accessibleMissionIds(orgId, req.account) : null })),
     unavailable: 'SEARCH_UNAVAILABLE'
   },
   actions: {
-    GET: (orgId) => listPendingActions(orgId),
+    GET: users(ALL_ROLES, (orgId) => listPendingActions(orgId)),
     // Validators only, and the journal records who they really are (never a typed name).
     POST: users(MANAGERS, (orgId, req) => recordDecision(orgId, { ...(req.body || {}), decided_by: req.account?.display_name || req.account?.email || null })),
     unavailable: 'ACTIONS_UNAVAILABLE'
   },
   'mission-view': {
-    GET: (orgId, req) => getMissionView(orgId, req.query?.mission_id),
+    GET: users(ALL_ROLES, async (orgId, req) => { await requireMissionAccess(orgId, req.query?.mission_id, req.account); return getMissionView(orgId, req.query?.mission_id); }),
     unavailable: 'MISSION_VIEW_UNAVAILABLE'
   },
   // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
@@ -838,6 +840,11 @@ async function trainingAction(orgId, req) {
   throw fail('UNKNOWN_ACTION', 400);
 }
 
+export const ROUTE_SCREENS = Object.freeze({
+  search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
+  methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
+});
+const decisionLevel = req => ['sign'].includes(req.body?.action) ? 'review' : ['approve', 'decide', 'validate', 'review-decide', 'settings'].includes(req.body?.action) ? 'approve' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
@@ -855,6 +862,15 @@ export async function handleApp(req) {
   // Test mode (preview): never on the real firm's organisation (test run TATY TEST).
   if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
+  const screen = ROUTE_SCREENS[String(req.query?.route || '')];
+  if (screen) {
+    if (!req.account) req.account = await requireRole(req, [...EVERYONE]);
+    try {
+      req.resourceAccess = await requireScreenAccess(orgId, req.account, screen, req.method === 'GET' ? 'view' : decisionLevel(req));
+      const missionId = req.query?.mission_id || req.body?.mission_id;
+      if (req.resourceAccess.mine && missionId) await requireMissionAccess(orgId, missionId, req.account);
+    } catch (e) { await logAccess(orgId, req.account, 'ACCESS_REFUSED', String(req.query?.route || '') + ':' + e.message); throw e; }
+  }
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.

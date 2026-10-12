@@ -24,7 +24,7 @@ function world(extra = {}) {
     return [];
   };
   files.set('CVAWA', { name: 'CV Awa.pdf', parent: 'HR', buf: Buffer.from('x'), text: 'Awa Koné, expert-comptable, 10 ans d’audit de projets financés par la Banque mondiale.' });
-  return { files, put, d: { drive, fetchRows, folder: 'MEM', home: 'HOME', hrFolderId: async () => 'HR', findOrCreateFolder: async (p, nm) => ({ id: p + '/' + nm }), audit: async () => ({}), firmName: 'Cabinet Exemple',
+  return { files, put, d: { permissions: async () => ({ granted: true }), drive, fetchRows, folder: 'MEM', home: 'HOME', hrFolderId: async () => 'HR', findOrCreateFolder: async (p, nm) => ({ id: p + '/' + nm }), audit: async () => ({}), firmName: 'Cabinet Exemple',
     getOpportunity: async () => ({ id: 'o1', client: 'ONG X', reference: 'AMI-14', summary: 'Audit financier de projet bailleur', folder: { id: 'OPPF' } }), ...extra } };
 }
 const sec = { role: 'secretary', email: 's@c.ci' };
@@ -65,4 +65,14 @@ test('the MI and its CVs in one PDF', async () => {
   assert.equal(r.package.name, 'MI_X_COMPLET.pdf'); assert.equal(r.package.parts, 2);
   assert.equal((await PDFDocument.load(files.get(r.package.id).buf)).getPageCount(), 2);
   assert.equal(JSON.parse([...files.values()].find(f => f.name === TEMPLATES_FILE).buf).documents[0].package.id, r.package.id);
+});
+
+
+test('without the firm grant, specialist and adapted CVs never reach an AI provider', async () => {
+  let calls=0;
+  const {d}=world({permissions:async()=>({granted:false}),ai:async()=>{calls++;throw new Error('must not be called')}});
+  const upload=await uploadSpecialistCv('org',{person:'Jean',name:'cv.pdf',base64:Buffer.from('CV').toString('base64')},sec,d);
+  assert.equal(upload.read,'manual');
+  const adapted=await adaptedCv('org',{opportunity_id:'o1',person:'Awa Koné',email:'awa@c.ci'},sec,d);
+  assert.equal(adapted.by,null);assert.equal(calls,0);assert.ok(adapted.pdf.id);
 });

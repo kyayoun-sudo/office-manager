@@ -132,6 +132,9 @@
     POPULATION_EMPTY: 'Aucune ligne avec un montant dans ce fichier.', NO_WORKPAPER_FOR_CYCLE: 'Le Working Paper du cycle n’existe pas encore (Programme de travail → Créer les Working Papers).', ALREADY_SUBMITTED: 'Procédure déjà soumise.',
     WORKPAPERS_FOLDER_NOT_FOUND: 'Dossier des Working Papers introuvable : le Manager colle son lien dans le programme.', MEMORY_CONFLICT: 'Le Working Paper a été modifié en même temps : réessayez.', SAME_FILE_ALREADY_FILED: 'Cette pièce est déjà rangée pour cet élément.', PROCEDURE_INCOMPLETE: 'La procédure n’est pas complète.' };
   var GAP = { POPULATION_REQUIRED: 'contrôler la population', POPULATION_DIFFERENCE_UNEXPLAINED: 'expliquer l’écart de la population', SAMPLE_REQUIRED: 'tirer l’échantillon', ITEMS_WITHOUT_RESULT: 'donner un résultat à chaque élément', CONCLUSION_REQUIRED: 'écrire la conclusion', REVIEW_POINTS_TO_ANSWER: 'répondre aux points de revue' };
+  ERR.IN_REVIEW_OR_REVIEWED = 'Cette procédure est en revue ou déjà revue. Les corrections passent par un retour au préparateur.';
+  ERR.WORKPAPER_SYNC_REQUIRED = 'Écrivez le travail actuel dans le Working Paper et résolvez les conflits avant de signer.';
+  ERR.WORKPAPER_CONCLUSION_NOT_FOUND = 'La section Conclusion du Working Paper est introuvable : vérifiez sa structure.';
   var STATUS = { to_do: 'à faire', in_progress: 'en cours', submitted: 'soumise pour revue', returned: 'renvoyée par la revue : répondez aux points puis soumettez à nouveau', reviewed: 'revue terminée' };
   var msg = function (e) { var c = e && (e.code || e.message); return ERR[c] || (e && e.message) || String(e); };
   var data = null, fmt = function (n) { return n == null ? '' : Number(n).toLocaleString('fr-FR'); };

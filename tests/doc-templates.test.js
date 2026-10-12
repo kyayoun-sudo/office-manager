@@ -36,7 +36,7 @@ function world() {
     getMeta: async id => ({ id, modifiedTime: files.get(id)?.mt, webViewLink: 'https://drive/' + id }),
     exportPdf: async () => Buffer.from('%PDF-1.4')
   };
-  return { files, created, d: { drive, folder: 'MEM', home: 'HOME', findOrCreateFolder: async (p, nm) => ({ id: p + '/' + nm }), audit: async () => ({}), firmName: 'Cabinet Exemple',
+  return { files, created, d: { permissions: async () => ({ granted: true }), drive, folder: 'MEM', home: 'HOME', findOrCreateFolder: async (p, nm) => ({ id: p + '/' + nm }), audit: async () => ({}), firmName: 'Cabinet Exemple',
     getOpportunity: async id => id === 'o1' ? { id: 'o1', title: 'AMI-2026-14 — ONG Eau & Vie', client: 'ONG Eau & Vie', reference: 'AMI-2026-14', deadline: '2026-10-30', folder: { id: 'OPPF' }, summary: 'Audit des comptes du projet Eau potable 2025', team: { status: 'validated', members: [{ name: 'Awa K.', role: 'Associée' }, { name: 'Ali T.', role: 'Manager' }] } } : null } };
 }
 

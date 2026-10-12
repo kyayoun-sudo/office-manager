@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { buildCycleWorkpaper } from '../lib/cycle-workpapers.js';
 import * as R from '../lib/procedure-review.js';
+import { writeWorkpaper } from '../lib/procedure-work.js';
 
 const M = '11111111-1111-1111-1111-111111111111';
 const cycle = { cycle_code: 'ACH', cycle_title: 'Achats', status: 'IN_SCOPE', preparer: 'ali@c.ci', procedures: [{ code: 'ACH-03', title: 'Test de détail', type: 'CORE', active: true, sampling_mode: 'programme_sample', sample_size: 2 }] };
@@ -10,7 +11,7 @@ const programme = { id: 'prog1', version: 1, status: 'validated', cycles: [cycle
 const people = { ali: { role: 'auditor', email: 'ali@c.ci' }, sam: { role: 'senior', email: 'sam@c.ci', display_name: 'Sam' }, mia: { role: 'manager', email: 'mia@c.ci', display_name: 'Mia' }, out: { role: 'manager', email: 'out@c.ci' } };
 
 async function world() {
-  const t = { work: [{ id: 'w1', org_id: 'org', office_mission_id: M, programme_id: 'prog1', procedure_code: 'ACH-03', cycle_code: 'ACH', preparer: 'ali@c.ci', status: 'submitted', items: [{ sample_id: 'S01', result: 'PASS' }], population: {}, reviews: [], review_points: [], wp_sync: {}, conclusion: 'ok' }],
+  const t = { work: [{ id: 'w1', org_id: 'org', office_mission_id: M, programme_id: 'prog1', procedure_code: 'ACH-03', cycle_code: 'ACH', preparer: 'ali@c.ci', status: 'in_progress', items: [{ sample_id: 'S01', result: 'PASS' }], population: {}, reviews: [], review_points: [], wp_sync: {}, conclusion: 'ok' }],
     files: { WP1: { buf: await buildCycleWorkpaper({ firm: 'C', mission: { id: M, name: 'P' }, programme, cycle, procedures: cycle.procedures }), mt: 'm0' } } };
   const fetchRows = async (path, o = {}) => {
     if (path.startsWith('office_work_programmes')) return [programme];
@@ -28,7 +29,10 @@ async function world() {
     downloadBuffer: async id => t.files[id].buf,
     updateBinary: async (id, { buffer, expectedModifiedTime }) => { if (expectedModifiedTime !== t.files[id].mt) throw new Error('MEMORY_CONFLICT'); t.files[id] = { buf: buffer, mt: 'm' + Math.random() }; }
   };
-  return { t, d: { fetchRows, drive, audit: async () => ({}), permissions: async () => ({ granted: true }), methodology: async () => ({ sops: [] }) } };
+  const d = { fetchRows, drive, audit: async () => ({}), permissions: async () => ({ granted: true }), methodology: async () => ({ sops: [] }) };
+  await writeWorkpaper('org', M, 'ACH-03', people.ali, d);
+  t.work[0].status = 'submitted';
+  return { t, d };
 }
 async function editSheet(t, fn) { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(t.files.WP1.buf); fn(wb.getWorksheet('ACH-03')); t.files.WP1.buf = Buffer.from(await wb.xlsx.writeBuffer()); t.files.WP1.mt = 'edited'; }
 
