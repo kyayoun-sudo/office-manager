@@ -326,9 +326,11 @@
         } else {
           var h3 = node('h2', q.question); h3.id = 'om-ask-title'; d.appendChild(h3);
           if (q.context) q.context.split('\n').forEach(function (l) { d.appendChild(node('p', l)); });
+          var date = null;
+          if (q.date_cell) { date = node('input'); date.type = 'date'; date.required = true; date.className = 'om-ask-note'; date.setAttribute('aria-label', q.question || 'Date'); d.appendChild(date); }
           var note = null;
           if (q.note_cell && q.kind !== 'decision') { note = node('input'); note.type = 'text'; note.className = 'om-ask-note'; note.placeholder = q.options ? 'Précision (facultatif)' : 'Votre réponse, en quelques mots'; d.appendChild(note); }
-          var send = function (v) { var values = {}; if (v && q.choice_cell) values[q.choice_cell] = v; if (note && note.value.trim()) values[q.note_cell] = note.value.trim(); if (!Object.keys(values).length) { if (note) note.focus(); return; } busy(); post({ action: 'answer', opportunity_id: q.opportunity_id, sheet: q.sheet, row: q.row, values: values }).then(next).catch(fail); };
+          var send = function (v) { var values = {}; if (date) { if (!date.value || !date.checkValidity()) { date.reportValidity(); date.focus(); return; } values[q.date_cell] = date.value; } if (v && q.choice_cell) values[q.choice_cell] = v; if (note && note.value.trim()) values[q.note_cell] = note.value.trim(); if (!Object.keys(values).length) { if (note) note.focus(); return; } busy(); post({ action: 'answer', opportunity_id: q.opportunity_id, sheet: q.sheet, row: q.row, values: values }).then(next).catch(fail); };
           if (q.options) q.options.forEach(function (v) { opts.appendChild(btn(v.length > 34 ? v.slice(0, 32) + '…' : v, '', function () { send(v); })); });
           else opts.appendChild(btn('Enregistrer', '', function () { send(null); }));
         }

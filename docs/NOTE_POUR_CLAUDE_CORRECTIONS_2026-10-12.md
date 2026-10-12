@@ -7,6 +7,12 @@ Paul a demandé de corriger les dix défauts de la revue sans reconstruire Offic
 
 Les branches de construction, `main`, la base et les connexions du cabinet ne sont pas modifiées par cette préparation. Aucune fusion ni aucun déploiement de production ne fait partie de cette intervention.
 
+## Retour du test utilisateur après la revue
+
+La fenêtre demandant la date de réception du TDR ne proposait aucun champ : `myQuestions` excluait les cellules de date et la fenêtre ne savait afficher que choix ou texte. Ajout de `date_cell` et d'un champ date, écrit dans la cellule du classeur existant. Une saisie vide ou invalide ne part pas au serveur.
+
+Paul précise que le devis financier dispose DÉJÀ d'un classeur Excel contenant les tarifs et les formules. Ne pas créer un moteur de tarification parallèle : identifier ce classeur, faire une copie par opportunité et remplir uniquement ses entrées (équipe nominative, jours, etc.), en conservant ses formules. Le nom/lien du classeur a été demandé à Paul.
+
 ## Corrections communes
 
 1. Recherche, consultation d'une mission et lecture des actions exigent une session personnelle active. Le jeton pilote partagé reste utilisé par les appels internes existants ; il ne suffit plus à ouvrir ces données depuis un écran humain.
@@ -28,7 +34,7 @@ Les branches de construction, `main`, la base et les connexions du cabinet ne so
 
 Les tests existants des parcours autorisés sont conservés. Les fixtures qui simulaient une signature d'un classeur vide ou un appel IA sans autorisation ont été mises en conformité. Des tests reproduisent les refus et les parcours de correction, la sélection de 501 lignes, l'agrandissement du tableau Excel, la séparation des versions, l'absence d'appel IA et le passage de déclaration à envoi avec preuve.
 
-Résultats locaux : 538 tests passent sur white label et 473 sur amelioration.
+Résultats locaux : 541 tests passent sur white label et 473 sur amelioration.
 
 Avant fusion, vérifier la recette réelle avec les sessions du cabinet : recherche limitée aux missions affectées, écriture puis revue d'une procédure, ajout de preuve dans le secrétariat. Aucun appel Drive/Gmail/IA réel n'a été fait pendant les tests locaux.
 
