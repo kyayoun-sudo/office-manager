@@ -242,6 +242,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Ce qui s'affiche vient des données : nom du compte connecté, Drive partagés du compte Google connecté, nom de l'application réglé
   dans la marque du cabinet. Nouvel outil de l'IA : `read_master_sheet` (ex-`read_taty_master_sheet`).
 
+## Audit par cycle avec l'Enhanced Auditor (en conception, PAS DE CODE avant validation de Paul — 2026-10-12)
+- La méthodologie du cabinet pilote est dans les documents du projet claude.ai « Firm Manager » : manuel TATY (phases 0-20, RACI,
+  5 portes), `01_SOP_AUDIT_MASTER/01_AUDIT_FINANCIER_GENERAL` (20 SOP), `02_AUDIT_ENTITES_NON_LUCRATIVES_SYCEBNL` (C01-C06, T01, T02),
+  `15_DUE_DILIGENCE…` (SOP-01 à 15 sur un workfile Excel). Vision de Paul : `claude/VISION_AUDIT_PAR_CYCLE.md` ; carte proposée
+  (rôles × écrans × familles de tests code / IA / jugement / confirmation, trous, pilote C02_ACH + PRJ-05) :
+  `claude/CARTE_METHODOLOGIE_AUDIT_PAR_CYCLE.md`.
+- Constat clé : toutes les procédures ont la même fiche (objectif, risque, assertion, type CORE / RISK-DEPENDENT / OPTIONAL, niveau,
+  PBC, 5 modes d'échantillon, 10 colonnes de WP, PASS/EXCEPTION) → un seul écran « procédure », SOP chargés comme données du cabinet
+  (jamais codés pour TATY).
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
