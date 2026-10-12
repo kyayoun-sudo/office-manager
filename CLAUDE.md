@@ -274,7 +274,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   **Règle (Paul, 2026-10-12 : « si l'IA ne passe pas, l'application fonctionne-t-elle ? »)** : l'audit par cycle marche SANS IA —
   tout ce qui est contrôle (population, tirage, doublons, cut-off, recalculs, conclusion à trous, écriture du WP, revues) est du code ;
   l'IA (Enhanced Auditor) ne fait que pré-remplir et proposer ; sans réponse de l'IA l'écran le dit et la personne saisit elle-même.
-  Suivant : écran « Ma procédure » (pop-up, population, échantillon, pièces rangées par l'Orpailleur, PASS/EXCEPTION écrits
+  4. « Ma procédure » : `db/procedure-work.sql` (`office_procedure_work`), `lib/procedure-work.js`, `procedure.html`, route `procedure`
+     (+ « Mes procédures » dans Mon travail, pop-up via `my-questions`). Population lue et rapprochée par le code ; tirage
+     reproductible (graine) ; critères de risque par le code ; pièce rangée `PIECES_<CYCLE>/<CODE>/<CODE>_<S01>_…` sous le dossier
+     des WP ; l'Enhanced Auditor lit la pièce et PROPOSE (autorisation « Autoriser les agents » exigée) ; PASS = preuve,
+     EXCEPTION = explication ; résultats écrits dans le WP sans écraser une case remplie par quelqu'un ; soumission.
+  Suivant : revues requises par la mission (Senior → Manager → Superviseur → Associé) signées sur la version du WP, renvoi au
+  préparateur (statut `returned`), conclusion Senior du cycle (checklist 6 points), IA de revue par rôle.
   dans le WP), conclusion Senior, revues requises signées sur la version.
 - **Déjà dans le code, à étendre (pas à refaire)** : `lib/pbc-sop-plan.js` (programme + SOP → PBC, extraits vérifiés),
   `lib/mission-plans.js` + `db/mission-plans.sql` (versions du plan), `lib/plan-integration.js`, `lib/workfiles.js` + panneau Excel
