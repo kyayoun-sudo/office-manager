@@ -85,3 +85,13 @@ test('« Autoriser les agents »: only an owner or partner of THIS firm can writ
   assert.equal(direct, 0, 'a session never reads the firm tables directly (server only)');
   await db.close();
 });
+
+test('re-running INSTALL_TOUT on a base whose accounts have the new roles never fails (23514)', async () => {
+  const db = new PGlite();
+  await db.exec("create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;");
+  const sql = readFileSync(new URL('db/INSTALL_TOUT.sql', ROOT), 'utf8');
+  await db.exec(sql);
+  await db.exec("insert into office_app_users(org_id, auth_user_id, email, display_name, role) values ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'b@c.ci', 'B', 'bdm'), ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003', 'a@c.ci', 'A', 'auditor')");
+  await db.exec(sql);
+  await db.close();
+});

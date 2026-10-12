@@ -664,12 +664,15 @@ revoke all on public.office_access_log from public, anon, authenticated, service
 grant select, insert on public.office_access_log to service_role;
 
 -- "manager": sees team indicators and coordination, but not the firm settings.
+-- The full list of roles lives in db/roles.sql (single source). This block only adds the constraint when it is missing,
+-- with that full list: it never narrows it back to the first four roles (2026-10-11: re-running INSTALL_TOUT on a base
+-- with « bdm », « auditor »… accounts failed with 23514).
 do $$
 begin
-  if to_regclass('public.office_app_users') is not null then
-    alter table public.office_app_users drop constraint if exists office_app_users_role_check;
+  if to_regclass('public.office_app_users') is not null
+     and not exists (select 1 from pg_constraint where conname = 'office_app_users_role_check' and conrelid = 'public.office_app_users'::regclass) then
     alter table public.office_app_users add constraint office_app_users_role_check
-      check (role in ('owner', 'partner', 'manager', 'collaborator'));
+      check (role in ('owner', 'partner', 'quality_reviewer', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'secretary', 'it_admin', 'collaborator'));
   end if;
 end $$;
 commit;

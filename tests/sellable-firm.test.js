@@ -78,3 +78,21 @@ test('a team member’s home: only their missions and their open tasks', async (
   assert.deepEqual(k.missions.map(m => [m.id, m.my_role]), [['m1', 'auditeur']]);
   assert.deepEqual(k.open_actions.map(a => [a.id, a.overdue, a.mission]), [['a1', true, 'Nova 2026']]);
 });
+
+test('« Retenir » une personne : dates de la mission, sinon celles du manager, sinon une question claire (jamais 23502)', async () => {
+  const { retainPerson } = await import('../lib/people-cards.js');
+  const M = '11111111-1111-1111-1111-111111111111';
+  const make = mission => { const posts = []; return { posts, fetchRows: async (path, o = {}) => {
+    if (o.method === 'POST') { posts.push(JSON.parse(o.body)[0]); return null; }
+    if (path.startsWith('office_missions')) return [{ id: M, ...mission }];
+    if (path.startsWith('office_staff_profiles')) return [{ id: 's1', full_name: 'Aya' }];
+    return [];
+  } }; };
+  let m = make({ planned_start: null, planned_end: null });
+  await assert.rejects(retainPerson('org', M, { name: 'Aya' }, 'Paul', { fetchRows: m.fetchRows }), /MISSION_DATES_REQUIRED/);
+  assert.equal(m.posts.length, 0);
+  const r = await retainPerson('org', M, { name: 'Aya', planned_start: '2026-11-01', planned_end: '2026-12-15' }, 'Paul', { fetchRows: m.fetchRows });
+  assert.equal(r.planned_start, '2026-11-01'); assert.deepEqual(m.posts[0].cycle_codes, []);
+  m = make({ planned_start: '2026-10-01', planned_end: '2026-10-31' });
+  assert.equal((await retainPerson('org', M, { name: 'Aya' }, 'Paul', { fetchRows: m.fetchRows })).planned_end, '2026-10-31');
+});

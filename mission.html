@@ -432,9 +432,24 @@
       if (p.risks.length) t.appendChild(el('span', 'Risques : ' + p.risks.join(' ; '), 'meta warn-text'));
       item.appendChild(t); item.appendChild(el('span', p.agreement, p.agreement === 'les deux jugements' ? 'tag' : 'tag warn'));
       var keep = el('button', 'Retenir', 'btn ghost'); keep.type = 'button';
-      keep.addEventListener('click', function () { keep.disabled = true; OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ action: 'retain', mission_id: missionId, name: p.name, role: p.roles[0] || 'membre' }) })
-        .then(function (x) { keep.textContent = 'Retenu'; reload(); }).catch(function (e) { keep.disabled = false; $('reco-status').textContent = 'Impossible : ' + e.message; }); });
-      item.appendChild(keep); box.appendChild(item);
+      // The mission has no dates yet: the manager gives them here (never invented).
+      var dates = el('div', null, 'reco-dates'); dates.hidden = true;
+      var ds = document.createElement('input'); ds.type = 'date'; ds.setAttribute('aria-label', 'Début de l’affectation');
+      var de = document.createElement('input'); de.type = 'date'; de.setAttribute('aria-label', 'Fin de l’affectation');
+      dates.appendChild(el('span', 'La mission n’a pas encore de dates. Du ', 'meta')); dates.appendChild(ds); dates.appendChild(el('span', ' au ', 'meta')); dates.appendChild(de);
+      keep.addEventListener('click', function () {
+        keep.disabled = true;
+        OM.api('/api/app?route=team-recommendation', { method: 'POST', body: JSON.stringify({ action: 'retain', mission_id: missionId, name: p.name, role: p.roles[0] || 'membre', planned_start: ds.value || null, planned_end: de.value || null }) })
+          .then(function () { keep.textContent = 'Retenu'; dates.hidden = true; reload(); })
+          .catch(function (e) {
+            keep.disabled = false;
+            if (/MISSION_DATES_REQUIRED/.test(e.message)) { dates.hidden = false; keep.textContent = 'Retenir avec ces dates'; $('reco-status').textContent = 'Indiquez les dates de l’affectation de ' + p.name + ', puis « Retenir avec ces dates ».'; return; }
+            if (/MISSION_DATES_INVALID/.test(e.message)) { $('reco-status').textContent = 'La fin doit être après le début.'; return; }
+            if (/ASSIGNMENT_FIELD_REQUIRED/.test(e.message)) { var c = e.message.split(':')[1]; $('reco-status').textContent = 'La base demande une information manquante pour l’affectation' + (c ? ' (« ' + c + ' »)' : '') + '. Signalez-le au responsable informatique.'; return; }
+            $('reco-status').textContent = 'Impossible : ' + e.message;
+          });
+      });
+      item.appendChild(keep); item.appendChild(dates); box.appendChild(item);
     });
     if ((r.risks || []).length) { box.appendChild(el('h4', 'Risques signalés')); var ul = el('ul'); r.risks.forEach(function (x) { ul.appendChild(el('li', '[' + x.type + '] ' + x.message + ' (' + x.by + ')')); }); box.appendChild(ul); }
     if ((r.alternatives || []).length) { box.appendChild(el('h4', 'Alternatives')); var ul2 = el('ul'); r.alternatives.forEach(function (x) { ul2.appendChild(el('li', x.name + (x.instead_of ? ' à la place de ' + x.instead_of : '') + ' — ' + x.why + ' (' + x.by + ')')); }); box.appendChild(ul2); }
