@@ -260,6 +260,19 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   leurs codes → ce programme est ce que l'Enhanced Auditor voit et aide à exécuter. Les WP vont dans le dossier de la mission, sous-dossier
   des working papers (chez TATY : `01_CLIENTS_ET_MISSIONS/01_AUDIT/<année>/<MISSION>/05_WORKING_PAPERS_CYCLES_SELECTIONNES` — exemple, à
   trouver dans la carte du Drive / à régler, jamais écrit en dur). Le cabinet n'a pas encore de modèle de WP par cycle.
+- **Construit le 2026-10-12 (Paul : « super »)** :
+  1. Bibliothèque : `lib/methodology.js` (lecture des SOP Word par CODE, deux mises en page — SYCEBNL et audit général ;
+     copies suspectes signalées ; mémoire `OFFICE_MANAGER_METHODOLOGY.json` par Drive), page `methodologie.html` (menu ⚙),
+     route `methodology`. Le SOP n'est jamais copié dans la base.
+  2. Programme : `db/work-programme.sql` (`office_work_programmes`, versions brouillon → validé figé → superseded),
+     `lib/work-programme.js` (cycle proposé depuis le SOP, obligatoires cochées ; raison exigée pour une RISK-DEPENDENT activée
+     ou une obligatoire retirée ; taille d'échantillon ; matérialité ; revues requises par la mission ; import par codes),
+     page `programme.html` (lien « Programme de travail » dans la mission), route `work-programme`, événement
+     `WORK_PROGRAMME_VALIDATED`. Modifier = manager/superviseur de la mission ou associé ; valider = manager/associé.
+  3. WP par cycle : `lib/cycle-workpapers.js` (Excel de base dans le dossier des working papers trouvé sous la mission ou collé ;
+     jamais écrasé ; vérifié dans le Drive ; AUDIT_META masqué).
+  Suivant : écran « Ma procédure » (pop-up, population, échantillon, pièces rangées par l'Orpailleur, PASS/EXCEPTION écrits
+  dans le WP), conclusion Senior, revues requises signées sur la version.
 - **Déjà dans le code, à étendre (pas à refaire)** : `lib/pbc-sop-plan.js` (programme + SOP → PBC, extraits vérifiés),
   `lib/mission-plans.js` + `db/mission-plans.sql` (versions du plan), `lib/plan-integration.js`, `lib/workfiles.js` + panneau Excel
   (`excel/taskpane.html` : revue de l'Enhanced Auditor écrite dans le fichier).
