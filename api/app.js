@@ -195,6 +195,8 @@ export const ROUTES = Object.freeze({
     GET: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js');
       if (req.query?.mine) return w.myProcedures(orgId, req.account);
+      if (req.query?.reviews) return (await import('../lib/procedure-review.js')).myReviews(orgId, req.account);
+      if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
       return w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
@@ -208,6 +210,12 @@ export const ROUTES = Object.freeze({
       if (b.action === 'conclusion') return w.saveConclusion(orgId, m, c, b, a);
       if (b.action === 'write-wp') return w.writeWorkpaper(orgId, m, c, a);
       if (b.action === 'submit') return w.submitProcedure(orgId, m, c, a);
+      const r = await import('../lib/procedure-review.js');
+      if (b.action === 'review-ai') return r.aiReview(orgId, m, c, a);
+      if (b.action === 'return') return r.returnToPreparer(orgId, m, c, b, a);
+      if (b.action === 'answer-point') return r.answerPoint(orgId, m, c, b, a);
+      if (b.action === 'clear-point') return r.clearPoint(orgId, m, c, b, a);
+      if (b.action === 'sign') return r.signOff(orgId, m, c, a);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'PROCEDURE_UNAVAILABLE'
@@ -569,6 +577,10 @@ export const ROUTES = Object.freeze({
     for (const p of mine.procedures.filter(x => ['to_do', 'in_progress', 'returned'].includes(x.status)).slice(0, 5)) out.questions.push({ id: 'proc|' + p.programme_id + '|' + p.code, kind: 'procedure', title: p.mission_name,
       question: (p.status === 'returned' ? 'Procédure renvoyée par la revue : ' : p.status === 'in_progress' ? 'Procédure en cours : ' : 'Votre procédure vous attend : ') + p.code + ' — ' + p.title, context: p.cycle_code + ' · ' + (p.cycle_title || ''),
       href: '/procedure.html?mission_id=' + encodeURIComponent(p.mission_id) + '&code=' + encodeURIComponent(p.code) });
+    const rv = await (await import('../lib/procedure-review.js')).myReviews(orgId, req.account).catch(() => ({ reviews: [] }));
+    for (const x of rv.reviews.slice(0, 5)) out.questions.push({ id: 'rev|' + x.mission_id + '|' + x.code + '|' + x.level, kind: 'procedure', title: x.mission_name,
+      question: 'Revue ' + ({ senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }[x.level] || '') + ' à faire : ' + x.code, context: x.cycle_code + ' · préparée par ' + (x.preparer || '?'),
+      href: '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue' });
     return out;
   }), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.

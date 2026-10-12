@@ -29,3 +29,7 @@ create index if not exists office_procedure_work_preparer on public.office_proce
 alter table public.office_procedure_work enable row level security;
 revoke all on public.office_procedure_work from public, anon, authenticated;
 grant select, insert, update on public.office_procedure_work to service_role;
+-- Revues (2026-10-12) : signatures par niveau requis par la mission (liées au contenu exact de l'onglet de la procédure)
+-- et points de revue (ouvert → répondu → levé).
+alter table public.office_procedure_work add column if not exists reviews jsonb not null default '[]'::jsonb;
+alter table public.office_procedure_work add column if not exists review_points jsonb not null default '[]'::jsonb;

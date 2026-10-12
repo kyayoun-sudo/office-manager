@@ -306,7 +306,7 @@
         if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
-          var go = node('a', 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+          var go = node('a', String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
         } else if (q.kind === 'independence') {
           indep = indep || { k: 0, answers: {}, details: {} };
           var iq = q.questions[indep.k];

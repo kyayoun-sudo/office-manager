@@ -104,6 +104,19 @@
       </div>
       <div id="gaps"></div>
     </section>
+    <section class="card" aria-labelledby="h-rev" id="revue">
+      <h2 id="h-rev">5. Revues</h2>
+      <p class="meta" id="rev-levels"></p>
+      <p class="status" id="rev-changed" role="status" aria-live="polite"></p>
+      <div class="stack" id="rev-points"></div>
+      <div id="rev-tools" hidden>
+        <div class="row"><button class="btn ghost" id="rev-ai" type="button">Demander une revue à l’Enhanced Auditor</button><span class="status" id="rev-ai-say" role="status" aria-live="polite"></span></div>
+        <div id="rev-ai-out"></div>
+        <div class="field"><label for="rev-new">Points de revue (un par ligne)</label><textarea class="big" id="rev-new"></textarea></div>
+        <div class="row"><select id="rev-sev" aria-label="Gravité"><option value="mineur">Mineur</option><option value="majeur">Majeur</option></select>
+          <button class="btn ghost" id="rev-return" type="button">Renvoyer au préparateur</button><button class="btn" id="rev-sign" type="button">Signer la revue</button><span class="status" id="rev-say" role="status" aria-live="polite"></span></div>
+      </div>
+    </section>
   </main>
 </div>
 <script src="/assets/brand-theme.js"></script>
@@ -118,8 +131,8 @@
     EXCEPTION_NEEDS_EXPLANATION: 'Expliquez l’exception.', EVIDENCE_FIRST: 'Déposez d’abord la pièce.', FILE_TOO_LARGE: 'Fichier trop lourd (3 Mo au plus) : collez plutôt son lien Drive.', AMOUNT_COLUMN_REQUIRED: 'Choisissez la colonne du montant.',
     POPULATION_EMPTY: 'Aucune ligne avec un montant dans ce fichier.', NO_WORKPAPER_FOR_CYCLE: 'Le Working Paper du cycle n’existe pas encore (Programme de travail → Créer les Working Papers).', ALREADY_SUBMITTED: 'Procédure déjà soumise.',
     WORKPAPERS_FOLDER_NOT_FOUND: 'Dossier des Working Papers introuvable : le Manager colle son lien dans le programme.', MEMORY_CONFLICT: 'Le Working Paper a été modifié en même temps : réessayez.', SAME_FILE_ALREADY_FILED: 'Cette pièce est déjà rangée pour cet élément.', PROCEDURE_INCOMPLETE: 'La procédure n’est pas complète.' };
-  var GAP = { POPULATION_REQUIRED: 'contrôler la population', POPULATION_DIFFERENCE_UNEXPLAINED: 'expliquer l’écart de la population', SAMPLE_REQUIRED: 'tirer l’échantillon', ITEMS_WITHOUT_RESULT: 'donner un résultat à chaque élément', CONCLUSION_REQUIRED: 'écrire la conclusion' };
-  var STATUS = { to_do: 'à faire', in_progress: 'en cours', submitted: 'soumise pour revue', returned: 'renvoyée par la revue', reviewed: 'revue' };
+  var GAP = { POPULATION_REQUIRED: 'contrôler la population', POPULATION_DIFFERENCE_UNEXPLAINED: 'expliquer l’écart de la population', SAMPLE_REQUIRED: 'tirer l’échantillon', ITEMS_WITHOUT_RESULT: 'donner un résultat à chaque élément', CONCLUSION_REQUIRED: 'écrire la conclusion', REVIEW_POINTS_TO_ANSWER: 'répondre aux points de revue' };
+  var STATUS = { to_do: 'à faire', in_progress: 'en cours', submitted: 'soumise pour revue', returned: 'renvoyée par la revue : répondez aux points puis soumettez à nouveau', reviewed: 'revue terminée' };
   var msg = function (e) { var c = e && (e.code || e.message); return ERR[c] || (e && e.message) || String(e); };
   var data = null, fmt = function (n) { return n == null ? '' : Number(n).toLocaleString('fr-FR'); };
   function post(b) { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ mission_id: missionId, code: code }, b)) }); }
@@ -197,7 +210,7 @@
     var box = $('items'); box.textContent = '';
     var items = data.work.items || [];
     if (!items.length) { box.appendChild(el('p', data.line.sampling_mode === 'none' ? 'Pas d’échantillon pour cette procédure.' : 'Tirez d’abord l’échantillon.', 'empty')); return; }
-    var locked = ['submitted', 'reviewed'].indexOf(data.work.status) >= 0;
+    var locked = ['submitted', 'reviewed'].indexOf(data.work.status) >= 0 || data.editable === false;
     items.forEach(function (it) {
       var c = el('div', null, 'it'), say = el('span', '', 'status');
       c.appendChild(el('h3', it.sample_id + ' · ' + [it.ref, it.date, it.party].filter(Boolean).join(' · ') + ' · ' + fmt(it.amount)));
@@ -268,7 +281,8 @@
   $('submit').addEventListener('click', function () {
     var b = this;
     act(b, { action: 'conclusion', conclusion: $('conc').value, walkthrough: walkthroughAnswers() }, $('say'), function () {
-      act(b, { action: 'submit' }, $('say'), function () { $('say').textContent = 'Soumise pour revue.'; showGaps([]); paint(); });
+      var go = function () { act(b, { action: 'submit' }, $('say'), function () { $('say').textContent = 'Soumise pour revue.'; showGaps([]); paint(); loadReview(); }); };
+      if (data.workpaper) act(b, { action: 'write-wp' }, $('say'), go); else go();
     });
   });
 
@@ -282,14 +296,56 @@
     $('conc-model').textContent = model ? 'Modèle du SOP : « ' + model + ' »' : '';
     if (!$('conc').value) $('conc').value = w.conclusion || data.proposed_conclusion || '';
     $('pop-card').hidden = data.line.sampling_mode === 'none';
-    var locked = ['submitted', 'reviewed'].indexOf(w.status) >= 0;
-    ['conc-save', 'wp-write', 'submit', 'pop-read', 'pop-set'].forEach(function (id) { $(id).disabled = locked && id !== 'wp-write'; });
+    var locked = ['submitted', 'reviewed'].indexOf(w.status) >= 0 || data.editable === false;
+    ['conc-save', 'wp-write', 'submit', 'pop-read', 'pop-set'].forEach(function (id) { $(id).disabled = locked; });
     paintPopulation(); paintSample(); paintItems(); paintWalkthrough();
   }
+  var LV = { senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' };
+  var RERR = { NOT_THIS_REVIEW_LEVEL: 'Ce n’est pas à votre niveau de revoir maintenant.', NO_SELF_REVIEW: 'Vous avez préparé cette procédure : une autre personne la revoit.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.',
+    OPEN_REVIEW_POINTS: 'Des points de revue sont encore ouverts.', POINT_NOT_ANSWERED: 'Le préparateur n’a pas encore répondu à ce point.', REVIEW_POINT_REQUIRED: 'Écrivez au moins un point.', NOTHING_TO_REVIEW: 'Rien à revoir pour l’instant.', ALREADY_REVIEWED: 'Toutes les revues requises sont faites.' };
+  var rmsg = function (e) { var c = e && (e.code || e.message); return RERR[c] || msg(e); };
+  function postR(b, sayEl, done) { return post(b).then(function (r) { if (r && r.work) data.work = r.work; if (done) done(r); else { paint(); loadReview(); } }).catch(function (e) { sayEl.className = 'status error'; sayEl.textContent = rmsg(e); }); }
+  function loadReview() {
+    OM.api('/api/app?route=procedure&review=1&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (v) {
+      var lv = v.levels.map(function (l) { var s = v.signed.filter(function (x) { return x.level === l; })[0]; return LV[l] + (s ? ' : signé par ' + (s.name || s.by) + ' le ' + UI.dateTime(s.at) : v.next === l ? ' : à faire maintenant' : ' : en attente'); });
+      $('rev-levels').textContent = v.levels.length ? 'Revues requises par la mission — ' + lv.join(' · ') : 'Aucune revue requise par le programme.';
+      $('rev-changed').className = v.changed_after_signoff ? 'status error' : 'status';
+      $('rev-changed').textContent = v.changed_after_signoff ? 'Le contenu de l’onglet a changé depuis la dernière signature : la revue est à refaire.' : '';
+      var box = $('rev-points'); box.textContent = '';
+      (v.points || []).forEach(function (p) {
+        var c = el('div', null, 'it');
+        c.appendChild(el('h3', p.id + ' · ' + LV[p.level] + ' · ' + p.severity + ' · ' + ({ open: 'ouvert', answered: 'répondu', cleared: 'levé' }[p.status] || p.status)));
+        c.appendChild(el('p', p.text)); c.appendChild(el('p', 'Par ' + p.by + ' le ' + UI.dateTime(p.at) + (p.from_ai ? ' (proposé par l’Enhanced Auditor, retenu par le réviseur)' : ''), 'meta'));
+        if (p.response) c.appendChild(el('p', 'Réponse : ' + p.response + ' — ' + (p.answered_by || ''), 'meta'));
+        var say = el('span', '', 'status');
+        if (v.me.is_preparer && p.status === 'open') { var a = el('textarea'); a.placeholder = 'Votre réponse (ce que vous avez corrigé, la preuve)'; a.setAttribute('aria-label', 'Réponse au point ' + p.id); c.appendChild(a); var b = el('button', 'Répondre', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { postR({ action: 'answer-point', id: p.id, response: a.value }, say); }); c.appendChild(b); }
+        if (!v.me.is_preparer && p.status === 'answered') { var cl = el('button', 'Lever le point', 'btn ghost'); cl.type = 'button'; cl.addEventListener('click', function () { postR({ action: 'clear-point', id: p.id }, say); }); c.appendChild(cl); }
+        c.appendChild(say); box.appendChild(c);
+      });
+      $('rev-tools').hidden = !v.me.may_review;
+      if (v.next && !v.me.may_review && !v.me.is_preparer) $('rev-levels').appendChild(el('span', ' — ' + (RERR[v.me.why_not] || ''), 'meta'));
+    }).catch(function () {});
+  }
+  $('rev-ai').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('rev-ai-say').textContent = 'L’Enhanced Auditor relit la procédure…';
+    post({ action: 'review-ai' }).then(function (r) {
+      var out = $('rev-ai-out'); out.textContent = ''; $('rev-ai-say').textContent = '';
+      if (r.ai) { $('rev-ai-say').textContent = r.message; return; }
+      var a = el('div', null, 'ai'); a.appendChild(el('p', null)).appendChild(el('strong', 'Revue proposée (' + (LV[r.level] || '') + ') : ' + (r.ready_to_sign ? 'rien de bloquant' : r.points.length + ' point(s)')));
+      if (r.summary) a.appendChild(el('p', r.summary));
+      r.points.forEach(function (p) { var l = el('label'); l.style.display = 'flex'; l.style.gap = '6px'; var cb = el('input'); cb.type = 'checkbox'; cb.dataset.text = p.text + (p.ref ? ' [' + p.ref + ']' : ''); l.appendChild(cb); l.appendChild(document.createTextNode(p.severity + ' — ' + p.text + (p.ref ? ' [' + p.ref + ']' : ''))); a.appendChild(l); });
+      if (r.points.length) { var keep = el('button', 'Reprendre les points cochés', 'btn ghost'); keep.type = 'button'; keep.addEventListener('click', function () { var t = [].map.call(a.querySelectorAll('input:checked'), function (c) { return c.dataset.text; }); $('rev-new').value = ($('rev-new').value ? $('rev-new').value + '\n' : '') + t.join('\n'); fromAi = true; }); a.appendChild(keep); }
+      out.appendChild(a);
+    }).catch(function (e) { $('rev-ai-say').textContent = rmsg(e); }).then(function () { b.disabled = false; });
+  });
+  var fromAi = false;
+  $('rev-return').addEventListener('click', function () { postR({ action: 'return', points: $('rev-new').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean), severity: $('rev-sev').value, from_ai: fromAi }, $('rev-say'), function () { $('rev-new').value = ''; fromAi = false; $('rev-say').textContent = 'Renvoyée au préparateur.'; paint(); loadReview(); }); });
+  $('rev-sign').addEventListener('click', function () { postR({ action: 'sign' }, $('rev-say'), function (r) { $('rev-say').textContent = r.all_signed ? 'Signé : toutes les revues requises sont faites.' : 'Signé. Revue suivante : ' + (LV[r.next] || '') + '.'; paint(); loadReview(); }); });
+
   function load() {
     if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
     OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
-      data = d; paintCard(); paint();
+      data = d; paintCard(); paint(); loadReview();
     }).catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
   }
   UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });

@@ -46,6 +46,12 @@
       <div class="links" id="myspace-links"></div>
     </section>
 
+    <section class="card" id="myreviews" aria-labelledby="h-myreviews" hidden>
+      <h2 id="h-myreviews">Mes revues</h2>
+      <p class="meta">Les procédures soumises qui attendent votre niveau de revue.</p>
+      <div id="myreviews-list" class="stack"></div>
+    </section>
+
     <section class="card" id="mywork" aria-labelledby="h-mywork" hidden>
       <div class="card-head"><h2 id="h-mywork">Mon travail</h2><span class="meta" id="mywork-meta"></span></div>
       <div id="mywork-kpis" class="kpis"></div>
@@ -415,12 +421,26 @@
       });
     }).catch(function () { $('mywork-procs').textContent = ''; });
   }
+  // Procedures waiting for my review level (2026-10-12).
+  function loadMyReviews() {
+    OM.api('/api/app?route=procedure&reviews=1').then(function (r) {
+      var list = (r && r.reviews) || []; if (!list.length) return;
+      var LV = { senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }, box = $('myreviews-list'); box.textContent = '';
+      list.forEach(function (x) {
+        var a = el('a', null, 'item link-item'); a.href = '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue';
+        var t = el('div', null, 't'); t.appendChild(el('span', x.code + ' — revue ' + (LV[x.level] || ''))); t.appendChild(el('span', [x.mission_name, x.cycle_code, 'préparée par ' + (x.preparer || '?')].join(' · '), 'meta')); a.appendChild(t);
+        box.appendChild(a);
+      });
+      $('myreviews').hidden = false;
+    }).catch(function () {});
+  }
   function start() {
     var name = OM.getUserName(), role = OM.getRole();
     $('hello').textContent = name ? 'Bonjour ' + name.split(' ')[0] : 'Bonjour';
     if (LEADS_TEXT[role]) $('page-lead').textContent = LEADS_TEXT[role];
     OM.loadBranding().catch(function () {});
     loadMySpace();
+    if (OM.hasPersonalSession && OM.hasPersonalSession()) loadMyReviews();
     // The IT administrator works on accounts and connections, not on the firm's engagements.
     if (role === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
     var lead = LEADS.indexOf(role) >= 0, manage = MANAGE.indexOf(role) >= 0;

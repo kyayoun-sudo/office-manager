@@ -285,8 +285,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   populations non rapprochées, cases du WP remplies à la main) ; ses enquêtes peuvent proposer une meilleure méthode ou un meilleur modèle
   de fiche Excel (correction `method`, inspirée des bonnes pratiques web) = leçon en attente d'un associé / manager, jamais appliquée seule,
   jamais un changement des SOP.
-  Suivant : revues requises par la mission (Senior → Manager → Superviseur → Associé) signées sur la version du WP, renvoi au
-  préparateur (statut `returned`), conclusion Senior du cycle (checklist 6 points), IA de revue par rôle.
+  5. Revues : `lib/procedure-review.js` (colonnes `reviews`, `review_points` de `office_procedure_work`), section « Revues » de
+     `procedure.html`, « Mes revues » à l'accueil, pop-up. Seulement les niveaux requis par le programme, dans l'ordre Senior → Manager →
+     Superviseur → Associé ; jamais sa propre procédure ; points de revue (renvoi → réponse du préparateur → levé) ; signature liée au
+     contenu exact de l'onglet (hash, la ligne « Revu par » exclue), écrite dans le WP ; modifié après signature = signalé, et la
+     signature tombe à la suivante ; l'Enhanced Auditor propose une revue écrite pour le rôle du réviseur (propositions seulement).
+  Suivant : conclusion du cycle par le Senior (checklist 6 points du SOP, calculée), signature du cycle par les niveaux requis,
+  puis la synthèse pour l'Associé.
   dans le WP), conclusion Senior, revues requises signées sur la version.
 - **Déjà dans le code, à étendre (pas à refaire)** : `lib/pbc-sop-plan.js` (programme + SOP → PBC, extraits vérifiés),
   `lib/mission-plans.js` + `db/mission-plans.sql` (versions du plan), `lib/plan-integration.js`, `lib/workfiles.js` + panneau Excel
