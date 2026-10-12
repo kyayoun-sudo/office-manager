@@ -12,7 +12,7 @@ test('app router: one endpoint serves the four screens, methods are restricted',
   await assert.rejects(handleApp(req('search', 'GET', 'bad')), /UNAUTHORIZED/);
   await assert.rejects(handleApp(req('nope')), /UNKNOWN_ROUTE/);
   await assert.rejects(handleApp(req('search', 'POST')), /METHOD_NOT_ALLOWED/);
-  await assert.rejects(handleApp({ ...req('search'), query: { route: 'search', q: 'a' } }), /QUERY_TOO_SHORT/);
+  await assert.rejects(handleApp({ ...req('search'), query: { route: 'search', q: 'a' } }), /USER_SESSION_REQUIRED/);
 });
 
 test('app router: stays within the Vercel Hobby limit of 12 functions', () => {

@@ -1,5 +1,7 @@
 # Office Manager AI — à lire avant toute modification
 
+**Corrections Codex du 12 octobre 2026** : lire [le message pour Claude](docs/NOTE_POUR_CLAUDE_CORRECTIONS_2026-10-12.md) avant de poursuivre. Les corrections sont sur des branches dédiées ; les parcours métier sont conservés.
+
 Projet de Paul KOMENAN (cabinet TATY & Associés, premier cabinet utilisateur). **Le produit est pour tous les cabinets
 (Paul, 2026-10-11)** : rien de propre à TATY dans le code ; ce qui varie se règle dans Paramètres. Ce fichier est la mémoire de projet de Claude :
 il est lu au début de chaque session. La pensée générale du produit est dans `docs/architecture/` et
