@@ -185,6 +185,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
       if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account);
       if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
+      if (b.action === 'workpapers') { if (!w.VALIDATORS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return (await import('../lib/cycle-workpapers.js')).prepareCycleWorkpapers(orgId, id, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'WORK_PROGRAMME_UNAVAILABLE'

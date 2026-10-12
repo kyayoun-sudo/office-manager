@@ -66,6 +66,7 @@
       <div class="grid">
         <div class="field"><label for="m-basis">Base retenue</label><input id="m-basis" type="text" placeholder="ex. 2 % du total des dépenses"></div>
         <div class="field"><label for="m-file">Lien du fichier Excel de matérialité</label><input id="m-file" type="text" placeholder="https://docs.google.com/…"></div>
+        <div class="field"><label for="m-wp">Dossier des Working Papers (seulement si l’application ne le trouve pas sous la mission)</label><input id="m-wp" type="text" placeholder="https://drive.google.com/drive/folders/…"></div>
       </div>
     </section>
 
@@ -93,6 +94,13 @@
       <div class="row"><button class="btn ghost" id="save" type="button">Enregistrer le brouillon</button><button class="btn" id="validate" type="button">Valider le programme</button><span class="status" id="say" role="status" aria-live="polite"></span></div>
       <div id="gaps"></div>
       <div id="history"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-wps" id="wps-card" hidden>
+      <h2 id="h-wps">Working Papers des cycles</h2>
+      <p class="meta">Un fichier Excel par cycle, dans le dossier des Working Papers de la mission : page de garde, un onglet par procédure du programme (fiche du SOP, étapes, colonnes, lignes d’échantillon, conclusion). Un fichier qui existe déjà n’est jamais écrasé.</p>
+      <div class="row"><button class="btn ghost" id="make-wps" type="button">Créer les Working Papers manquants</button><span class="status" id="wp-say" role="status" aria-live="polite"></span></div>
+      <div id="wps"></div>
     </section>
   </main>
 </div>
@@ -193,7 +201,7 @@
   function body() {
     var reviews = {}; REVIEWS.forEach(function (r) { reviews[r[0]] = $('r-' + r[0]).checked; });
     return { mission_id: missionId, cycles: cycles, reviews: reviews,
-      materiality: { overall: $('m-overall').value, performance: $('m-perf').value, trivial: $('m-trivial').value, currency: $('m-cur').value, basis: $('m-basis').value, file: $('m-file').value } };
+      materiality: { overall: $('m-overall').value, performance: $('m-perf').value, trivial: $('m-trivial').value, currency: $('m-cur').value, basis: $('m-basis').value, file: $('m-file').value, workpapers_folder: $('m-wp').value } };
   }
   function post(b) { return OM.api('/api/app?route=work-programme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); }
   function gapText(g) { return (g.cycle ? g.cycle + (g.code ? ' · ' + g.code : '') + ' : ' : '') + (GAP[g.gap] || g.gap); }
@@ -211,9 +219,25 @@
   $('validate').addEventListener('click', function () {
     var b = this; b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
     post(Object.assign(body(), { action: 'save' })).then(function () { return post({ action: 'validate', mission_id: missionId }); }).then(function (r) {
-      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). Le Mission Controller prépare les Working Papers des cycles.'; showGaps([]); load(true);
+      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). Le Mission Controller prépare les Working Papers des cycles…'; showGaps([]);
+      return makeWps();
     }).catch(function (e) { $('say').textContent = msg(e); showGaps(e.data && e.data.gaps); }).then(function () { b.disabled = false; });
   });
+  var WP_ERR = { WORKPAPERS_FOLDER_NOT_FOUND: 'Je ne trouve pas le dossier des Working Papers sous la mission : collez son lien dans « Matérialité », enregistrez, puis « Créer les Working Papers ».',
+    MISSION_FOLDER_NOT_KNOWN: 'Le dossier Drive de la mission n’est pas connu : collez le lien du dossier des Working Papers dans « Matérialité ».', NO_VALIDATED_PROGRAMME: 'Validez d’abord le programme.' };
+  var WP_STATUS = { CREATED: 'créé et vérifié dans le Drive', CREATED_NOT_VERIFIED: 'créé, pas encore vérifié', ALREADY_EXISTS: 'existait déjà : gardé tel quel', FAILED: 'échec' };
+  function makeWps() {
+    $('wp-say').textContent = 'Création des Working Papers…';
+    return post({ action: 'workpapers', mission_id: missionId }).then(function (r) {
+      $('wp-say').textContent = 'Dossier : ' + (r.folder.name || 'collé dans le programme') + '.'; paintWps(r.workpapers); load(true);
+    }).catch(function (e) { $('wp-say').textContent = WP_ERR[e.code] || ('Impossible : ' + msg(e)); });
+  }
+  function paintWps(list) {
+    var box = $('wps'); box.textContent = '';
+    if (!list || !list.length) return;
+    box.appendChild(UI.table(['Cycle', 'Fichier', 'État'], list.map(function (w) { return [w.cycle_code || '', w.url ? UI.safeLink(w.url, w.name) : w.name, (WP_STATUS[w.status] || w.status) + (w.error ? ' : ' + w.error : '')]; })));
+  }
+  $('make-wps').addEventListener('click', function () { var b = this; b.disabled = true; makeWps().then(function () { b.disabled = false; }); });
   var importedFrom = null;
   $('imp').addEventListener('click', function () {
     var b = this; b.disabled = true; $('imp-say').textContent = 'Lecture du fichier…';
@@ -235,12 +259,14 @@
     var m = (p && p.materiality) || {};
     $('m-overall').value = m.overall || ''; $('m-perf').value = m.performance || ''; $('m-trivial').value = m.trivial || ''; $('m-cur').value = m.currency || 'FCFA'; $('m-basis').value = m.basis || '';
     $('m-file').value = m.file ? 'https://drive.google.com/file/d/' + m.file : '';
+    $('m-wp').value = m.workpapers_folder ? 'https://drive.google.com/drive/folders/' + m.workpapers_folder : '';
     var rv = $('reviews'); rv.textContent = '';
     REVIEWS.forEach(function (r) { var l = el('label'), c = el('input'); c.type = 'checkbox'; c.id = 'r-' + r[0]; c.checked = !!(p && p.reviews && p.reviews[r[0]]); l.appendChild(c); l.appendChild(document.createTextNode(r[1])); rv.appendChild(l); });
     cycles = JSON.parse(JSON.stringify((p && p.cycles) || []));
     paintCycles(); paintAdd();
     $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
     document.querySelectorAll('#h-mat ~ .grid input, #reviews input').forEach(function (x) { x.disabled = !editable; });
+    var val = data.validated; $('wps-card').hidden = !val; if (val) { paintWps(val.workpapers); $('make-wps').hidden = !data.may_validate; }
     var h = $('history'); h.textContent = '';
     if (data.history.length > 1) h.appendChild(UI.table(['Version', 'État', 'Validé par', 'Le'], data.history.map(function (x) { return [x.version, { draft: 'brouillon', validated: 'validé', superseded: 'remplacé' }[x.status], x.validated_by || '', x.validated_at ? UI.dateTime(x.validated_at) : '']; })));
   }
