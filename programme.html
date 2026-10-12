@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Programme de travail</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .row input,.row select,.grid input,.grid select,.cyc input,.cyc select{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
+  .row input[type=text]{flex:1 1 300px}
+  .checks{display:flex;flex-wrap:wrap;gap:16px}
+  .checks label{display:flex;gap:6px;align-items:center;font-size:14.5px}
+  .cyc{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+  .cyc h3{margin:0;font-size:16px}
+  .cyc-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  .procs{width:100%;border-collapse:collapse;font-size:14px}
+  .procs th,.procs td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
+  .procs td input[type=number]{width:80px}
+  .procs td input[type=text]{width:100%;min-width:160px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--soft);white-space:nowrap}
+  .tag.risk{background:#fff3d6;color:#7a5200}
+  .gaps{border-left:3px solid #c0392b;padding:8px 12px;font-size:14px;line-height:1.5}
+  .gaps ul{margin:4px 0 0;padding-left:18px}
+  .wrap{overflow-x:auto}
+  @media (prefers-color-scheme: dark){ .tag.risk{background:#4a3a10;color:#ffd98a} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/mission.html" aria-current="page">Missions</a>
+    <a href="/auditeur.html">Enhanced Auditor</a>
+    <a href="/methodologie.html">Méthodologie</a>
+    <a href="/validations.html">À valider</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <p class="meta"><a id="back" href="/mission.html">← Retour à la mission</a></p>
+      <h1 id="title">Programme de travail</h1>
+      <p class="lead">Après la revue analytique, le Manager choisit les cycles et les contrôles. Les procédures viennent des SOP du cabinet, avec leurs codes : les obligatoires sont cochées, celles qui dépendent du risque s’activent avec une raison. Une fois validé, le programme est figé ; c’est lui que l’Enhanced Auditor suit.</p>
+      <p class="status" id="state" role="status" aria-live="polite"></p>
+    </header>
+
+    <section class="card" aria-labelledby="h-mat">
+      <h2 id="h-mat">Matérialité</h2>
+      <p class="meta">Les montants que vous avez fixés dans votre fichier Excel de matérialité.</p>
+      <div class="grid">
+        <div class="field"><label for="m-overall">Seuil de signification</label><input id="m-overall" type="number" min="0" step="1"></div>
+        <div class="field"><label for="m-perf">Seuil de planification (performance)</label><input id="m-perf" type="number" min="0" step="1"></div>
+        <div class="field"><label for="m-trivial">Seuil des anomalies insignifiantes</label><input id="m-trivial" type="number" min="0" step="1"></div>
+        <div class="field"><label for="m-cur">Devise</label><input id="m-cur" type="text" value="FCFA"></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label for="m-basis">Base retenue</label><input id="m-basis" type="text" placeholder="ex. 2 % du total des dépenses"></div>
+        <div class="field"><label for="m-file">Lien du fichier Excel de matérialité</label><input id="m-file" type="text" placeholder="https://docs.google.com/…"></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-rev">
+      <h2 id="h-rev">Revues requises par cette mission</h2>
+      <div class="checks" id="reviews"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-cyc">
+      <h2 id="h-cyc">Cycles et contrôles</h2>
+      <div class="row" id="add-row"><label for="add-sop" class="meta">Ajouter un cycle</label><select id="add-sop"></select><button class="btn ghost" id="add" type="button">Ajouter</button></div>
+      <p class="meta" id="no-lib" hidden>Aucun SOP lu pour l’instant : un manager les fait lire dans <a href="/methodologie.html">Méthodologie du cabinet</a>.</p>
+      <div class="stack" id="cycles"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-imp" id="import-card">
+      <h2 id="h-imp">Importer votre programme</h2>
+      <p class="meta">Vous avez déjà un programme (Excel ou Word) dans le Drive ? Collez son lien : les codes de procédures qu’il contient (ACH-03, CASH-12…) sont reconnus et cochés. Ce qui n’est pas un code connu est listé, rien n’est deviné. Vérifiez puis enregistrez.</p>
+      <div class="row"><input id="imp-file" type="text" placeholder="https://drive.google.com/file/d/…" aria-label="Lien du programme"><button class="btn ghost" id="imp" type="button">Importer</button></div>
+      <p class="status" id="imp-say" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-act">
+      <h2 id="h-act">Enregistrer et valider</h2>
+      <div class="row"><button class="btn ghost" id="save" type="button">Enregistrer le brouillon</button><button class="btn" id="validate" type="button">Valider le programme</button><span class="status" id="say" role="status" aria-live="polite"></span></div>
+      <div id="gaps"></div>
+      <div id="history"></div>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var missionId = new URLSearchParams(location.search).get('mission_id') || '';
+  var TYPE = { CORE: 'Obligatoire', RISK_DEPENDENT: 'Selon le risque', OPTIONAL: 'Facultatif' };
+  var MODE = { none: 'Pas d’échantillon', walkthrough: '1 transaction', exhaustive: 'Toute la population', risk_targeted: 'Ciblage par risque', programme_sample: 'Échantillon (taille à fixer)', random: 'Aléatoire', other: 'Voir le SOP' };
+  var REVIEWS = [['senior', 'Revue Senior'], ['manager', 'Revue Manager'], ['supervisor', 'Revue Superviseur'], ['partner', 'Revue Associé']];
+  var STATUS = [['IN_SCOPE', 'Dans le périmètre'], ['LIMITED_SCOPE', 'Périmètre limité'], ['N/A_JUSTIFIED', 'Non applicable (justifié)']];
+  var GAP = { MATERIALITY_REQUIRED: 'Indiquez le seuil de signification.', NO_CYCLE: 'Ajoutez au moins un cycle.', REVIEW_LEVEL_REQUIRED: 'Cochez au moins une revue requise.',
+    CYCLE_NA_NEEDS_REASON: 'Cycle non applicable : donnez la raison.', CYCLE_PREPARER_REQUIRED: 'Choisissez qui prépare le cycle.', CYCLE_WITHOUT_PROCEDURE: 'Aucune procédure cochée dans ce cycle.',
+    MANDATORY_OFF_NEEDS_REASON: 'Procédure obligatoire décochée : donnez la raison.', RISK_DEPENDENT_NEEDS_REASON: 'Procédure selon le risque activée : donnez la raison.', SAMPLE_SIZE_REQUIRED: 'Fixez la taille de l’échantillon.' };
+  var ERR = { ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas de modifier le programme.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_DRAFT_TO_VALIDATE: 'Rien à valider : enregistrez d’abord le brouillon.',
+    PROGRAMME_INCOMPLETE: 'Le programme n’est pas complet :', NO_PROCEDURE_CODE_IN_FILE: 'Aucun code de procédure connu dans ce fichier.', PROGRAMME_FILE_REQUIRED: 'Collez le lien du fichier.', SOP_NOT_IN_LIBRARY: 'Un cycle ne vient plus de la bibliothèque : relisez les SOP.' };
+  var msg = function (e) { var m = e && (e.code || e.message) || String(e); return ERR[m] || (e && e.message) || m; };
+  var data = null, cycles = [], editable = false;
+
+  function sopById(id) { return (data.library || []).filter(function (s) { return s.file_id === id; })[0]; }
+  function teamSelect(value, allowEmpty, label) {
+    var s = el('select'); s.setAttribute('aria-label', label);
+    var o0 = el('option', allowEmpty ? '— comme le cycle —' : '— choisir —'); o0.value = ''; s.appendChild(o0);
+    (data.team || []).forEach(function (p) { var o = el('option', p.name + (p.mission_role ? ' (' + p.mission_role + ')' : '')); o.value = p.email || p.name; s.appendChild(o); });
+    s.value = value || ''; if (value && s.value !== value) { var o = el('option', value); o.value = value; s.appendChild(o); s.value = value; }
+    return s;
+  }
+
+  function paintCycles() {
+    var box = $('cycles'); box.textContent = '';
+    if (!cycles.length) box.appendChild(el('p', 'Aucun cycle choisi.', 'empty'));
+    cycles.forEach(function (c, ci) {
+      var card = el('div', null, 'cyc'), head = el('div', null, 'cyc-head');
+      head.appendChild(el('h3', (c.cycle_code ? c.cycle_code + ' — ' : '') + c.cycle_title));
+      var tools = el('div', null, 'row');
+      var st = el('select'); st.setAttribute('aria-label', 'Statut du cycle'); STATUS.forEach(function (x) { var o = el('option', x[1]); o.value = x[0]; st.appendChild(o); }); st.value = c.status || 'IN_SCOPE';
+      st.addEventListener('change', function () { c.status = st.value; paintCycles(); });
+      tools.appendChild(st);
+      var prep = teamSelect(c.preparer, false, 'Qui prépare le cycle'); prep.addEventListener('change', function () { c.preparer = prep.value; });
+      tools.appendChild(el('span', 'Préparé par', 'meta')); tools.appendChild(prep);
+      if (editable) { var rm = el('button', 'Retirer', 'btn ghost'); rm.type = 'button'; rm.addEventListener('click', function () { cycles.splice(ci, 1); paintCycles(); paintAdd(); }); tools.appendChild(rm); }
+      head.appendChild(tools); card.appendChild(head);
+      if (c.status !== 'IN_SCOPE') {
+        var j = el('input'); j.type = 'text'; j.placeholder = c.status === 'N/A_JUSTIFIED' ? 'Pourquoi ce cycle n’est pas applicable' : 'Limite du périmètre'; j.value = c.justification || ''; j.setAttribute('aria-label', 'Justification du cycle');
+        j.addEventListener('input', function () { c.justification = j.value; }); card.appendChild(j);
+      }
+      if (c.status !== 'N/A_JUSTIFIED') {
+        var wrap = el('div', null, 'wrap'), t = el('table', null, 'procs'), th = el('tr');
+        ['', 'Code', 'Procédure', 'Type', 'Niveau', 'Sélection', 'Taille', 'Raison', 'Préparé par'].forEach(function (h) { th.appendChild(el('th', h)); });
+        var thead = el('thead'); thead.appendChild(th); t.appendChild(thead); var tb = el('tbody');
+        c.procedures.forEach(function (p) {
+          var tr = el('tr'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!p.active; cb.setAttribute('aria-label', 'Faire ' + p.code);
+          cb.addEventListener('change', function () { p.active = cb.checked; paintCycles(); });
+          var td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
+          tr.appendChild(el('td', p.code)); tr.appendChild(el('td', p.title));
+          var tt = el('td'); tt.appendChild(el('span', (TYPE[p.type] || '?') + (p.condition ? ' ' + p.condition : ''), 'tag' + (p.type === 'RISK_DEPENDENT' ? ' risk' : ''))); tr.appendChild(tt);
+          tr.appendChild(el('td', p.level || '')); tr.appendChild(el('td', MODE[p.sampling_mode] || ''));
+          var ts = el('td');
+          if (p.active && (p.sampling_mode === 'programme_sample' || p.sampling_mode === 'random' || p.sampling_mode === 'risk_targeted')) {
+            var n = el('input'); n.type = 'number'; n.min = '1'; n.value = p.sample_size || ''; n.setAttribute('aria-label', 'Taille de l’échantillon ' + p.code);
+            n.addEventListener('input', function () { p.sample_size = n.value; }); ts.appendChild(n);
+          }
+          tr.appendChild(ts);
+          var tj = el('td'), needs = (p.type === 'CORE' && !p.active) || (p.type === 'RISK_DEPENDENT' && p.active) || p.justification;
+          if (needs) { var r = el('input'); r.type = 'text'; r.value = p.justification || ''; r.placeholder = p.active ? 'Pourquoi l’activer' : 'Pourquoi ne pas la faire'; r.setAttribute('aria-label', 'Raison ' + p.code); r.addEventListener('input', function () { p.justification = r.value; }); tj.appendChild(r); }
+          tr.appendChild(tj);
+          var tp = el('td'); if (p.active) { var ps = teamSelect(p.preparer, true, 'Qui prépare ' + p.code); ps.addEventListener('change', function () { p.preparer = ps.value; }); tp.appendChild(ps); } tr.appendChild(tp);
+          tb.appendChild(tr);
+        });
+        t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap);
+      }
+      box.appendChild(card);
+    });
+    if (!editable) box.querySelectorAll('input,select,button').forEach(function (x) { x.disabled = true; });
+  }
+
+  function paintAdd() {
+    var s = $('add-sop'); s.textContent = '';
+    var lib = (data.library || []).filter(function (x) { return !cycles.some(function (c) { return c.sop_file_id === x.file_id; }); });
+    $('no-lib').hidden = (data.library || []).length > 0;
+    $('add-row').hidden = !editable || !(data.library || []).length;
+    lib.forEach(function (x) { var o = el('option', (x.family ? x.family + ' · ' : '') + (x.cycle && x.cycle.code ? x.cycle.code + ' — ' + x.cycle.title : x.file_name) + ' (' + x.procedures + ')'); o.value = x.file_id; s.appendChild(o); });
+  }
+
+  function proposal(fileId) {
+    return OM.api('/api/app?route=methodology&sop=' + encodeURIComponent(fileId)).then(function (s) {
+      return { sop_file_id: s.file_id, sop_file_name: s.file_name, cycle_code: s.cycle && s.cycle.code, cycle_title: (s.cycle && s.cycle.title) || s.file_name, status: 'IN_SCOPE', preparer: null,
+        procedures: s.procedures.map(function (p) { return { code: p.code, title: p.title, type: p.type, condition: p.condition, level: p.level, sampling_mode: p.sampling_mode, active: p.type === 'CORE', sample_size: p.sample_size || null }; }) };
+    });
+  }
+  $('add').addEventListener('click', function () {
+    var id = $('add-sop').value; if (!id) return;
+    proposal(id).then(function (c) { cycles.push(c); paintCycles(); paintAdd(); }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); });
+  });
+
+  function body() {
+    var reviews = {}; REVIEWS.forEach(function (r) { reviews[r[0]] = $('r-' + r[0]).checked; });
+    return { mission_id: missionId, cycles: cycles, reviews: reviews,
+      materiality: { overall: $('m-overall').value, performance: $('m-perf').value, trivial: $('m-trivial').value, currency: $('m-cur').value, basis: $('m-basis').value, file: $('m-file').value } };
+  }
+  function post(b) { return OM.api('/api/app?route=work-programme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); }
+  function gapText(g) { return (g.cycle ? g.cycle + (g.code ? ' · ' + g.code : '') + ' : ' : '') + (GAP[g.gap] || g.gap); }
+  function showGaps(list) {
+    var box = $('gaps'); box.textContent = '';
+    if (!list || !list.length) return;
+    var d = el('div', null, 'gaps'); d.appendChild(el('strong', 'Avant de valider :')); var ul = el('ul'); list.forEach(function (g) { ul.appendChild(el('li', gapText(g))); }); d.appendChild(ul); box.appendChild(d);
+  }
+  $('save').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').textContent = 'Enregistrement…';
+    post(Object.assign(body(), { action: 'save', source: importedFrom ? 'import' : undefined, imported_file_id: importedFrom || undefined })).then(function (r) {
+      $('say').textContent = 'Brouillon enregistré (version ' + r.programme.version + ').'; showGaps(r.gaps); load(true);
+    }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('validate').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
+    post(Object.assign(body(), { action: 'save' })).then(function () { return post({ action: 'validate', mission_id: missionId }); }).then(function (r) {
+      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). Le Mission Controller prépare les Working Papers des cycles.'; showGaps([]); load(true);
+    }).catch(function (e) { $('say').textContent = msg(e); showGaps(e.data && e.data.gaps); }).then(function () { b.disabled = false; });
+  });
+  var importedFrom = null;
+  $('imp').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('imp-say').textContent = 'Lecture du fichier…';
+    post({ action: 'import', mission_id: missionId, file: $('imp-file').value.trim() }).then(function (r) {
+      r.cycles.forEach(function (c) { var i = cycles.findIndex(function (x) { return x.sop_file_id === c.sop_file_id; }); if (i >= 0) cycles[i] = c; else cycles.push(c); });
+      importedFrom = r.file_id; paintCycles(); paintAdd();
+      $('imp-say').textContent = r.matched.length + ' procédure(s) reconnue(s)' + (r.unknown.length ? ' ; codes inconnus de la bibliothèque : ' + r.unknown.join(', ') : '') + (r.truncated ? ' ; fichier lu en partie.' : '.') + ' Vérifiez puis enregistrez.';
+    }).catch(function (e) { $('imp-say').textContent = msg(e) + (e.data && e.data.unknown && e.data.unknown.length ? ' Codes trouvés : ' + e.data.unknown.join(', ') : ''); }).then(function () { b.disabled = false; });
+  });
+
+  function paint() {
+    var p = data.programme, v = data.validated;
+    $('title').textContent = 'Programme de travail — ' + data.mission.name;
+    $('back').href = '/mission.html?id=' + encodeURIComponent(missionId);
+    var state = !p ? 'Pas encore de programme.' : p.status === 'draft' ? 'Brouillon, version ' + p.version + (v ? ' (la version ' + v.version + ' validée reste en vigueur jusqu’à la validation de celle-ci)' : '') + '.'
+      : 'Validé, version ' + p.version + ', par ' + (p.validated_by || '?') + ' le ' + UI.dateTime(p.validated_at) + '. Une modification enregistrée crée la version ' + (p.version + 1) + '.';
+    $('state').textContent = state;
+    editable = !!data.may_edit;
+    var m = (p && p.materiality) || {};
+    $('m-overall').value = m.overall || ''; $('m-perf').value = m.performance || ''; $('m-trivial').value = m.trivial || ''; $('m-cur').value = m.currency || 'FCFA'; $('m-basis').value = m.basis || '';
+    $('m-file').value = m.file ? 'https://drive.google.com/file/d/' + m.file : '';
+    var rv = $('reviews'); rv.textContent = '';
+    REVIEWS.forEach(function (r) { var l = el('label'), c = el('input'); c.type = 'checkbox'; c.id = 'r-' + r[0]; c.checked = !!(p && p.reviews && p.reviews[r[0]]); l.appendChild(c); l.appendChild(document.createTextNode(r[1])); rv.appendChild(l); });
+    cycles = JSON.parse(JSON.stringify((p && p.cycles) || []));
+    paintCycles(); paintAdd();
+    $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
+    document.querySelectorAll('#h-mat ~ .grid input, #reviews input').forEach(function (x) { x.disabled = !editable; });
+    var h = $('history'); h.textContent = '';
+    if (data.history.length > 1) h.appendChild(UI.table(['Version', 'État', 'Validé par', 'Le'], data.history.map(function (x) { return [x.version, { draft: 'brouillon', validated: 'validé', superseded: 'remplacé' }[x.status], x.validated_by || '', x.validated_at ? UI.dateTime(x.validated_at) : '']; })));
+  }
+  function load(keepSay) {
+    if (!missionId) { $('state').textContent = 'Ouvrez le programme depuis une mission.'; return; }
+    OM.api('/api/app?route=work-programme&mission_id=' + encodeURIComponent(missionId)).then(function (d) { data = d; paint(); })
+      .catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
+  }
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });
+})();
+</script>
+</body>
+</html>

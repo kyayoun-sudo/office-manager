@@ -177,6 +177,18 @@ export const ROUTES = Object.freeze({
     POST: users(MANAGERS, async (orgId, req) => (await import('../lib/methodology.js')).loadMethodology(orgId, req.body || {}, req.account)),
     unavailable: 'METHODOLOGY_UNAVAILABLE'
   },
+  // The mission's work programme (2026-10-12): cycles and procedures chosen by the Manager from the firm's SOP.
+  'work-programme': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/work-programme.js')).programmeView(orgId, String(req.query?.mission_id || ''), req.account)),
+    POST: users(MANAGERS, async (orgId, req) => {
+      const w = await import('../lib/work-programme.js'); const b = req.body || {}; const id = String(b.mission_id || '');
+      if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
+      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account);
+      if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'WORK_PROGRAMME_UNAVAILABLE'
+  },
   // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
   // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
   tenders: {
@@ -812,6 +824,9 @@ export default async function handler(req, res) {
       console.error('[app] ' + String(req.query?.route || '') + ' failed:', detail);
     }
     if (Array.isArray(error.outside)) body.outside = error.outside;
+    // What blocks a validation, listed (work programme, 2026-10-12) — codes only, no data.
+    if (status < 500 && Array.isArray(error.gaps)) body.gaps = error.gaps.slice(0, 200);
+    if (status < 500 && Array.isArray(error.unknown)) body.unknown = error.unknown.slice(0, 100);
     return res.status(status).json(body);
   }
 }

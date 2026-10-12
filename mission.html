@@ -94,6 +94,11 @@
           <details id="risk-brief-box" hidden><summary>Briefing des risques du secteur (Mission Controller)</summary><div id="risk-brief" class="rich"></div></details>
         </section>
 
+        <section class="card" id="sec-programme" aria-labelledby="h-programme">
+          <div class="card-head"><h2 id="h-programme">Programme de travail</h2><a id="prog-link" href="/programme.html">Ouvrir</a></div>
+          <p class="meta">Après la revue analytique : les cycles et les contrôles choisis par le Manager dans les SOP du cabinet, la matérialité et les revues requises. C’est ce que l’Enhanced Auditor suit.</p>
+        </section>
+
         <section class="card" id="sec-team" aria-labelledby="h-team">
           <h2 id="h-team">Équipe</h2>
           <h3 class="sub">Équipe retenue (affectations)</h3>
@@ -310,6 +315,7 @@
     $('dossier-view').hidden = false;
     var m = d.mission || {};
     $('m-name').textContent = m.name || m.mission_code || 'Mission';
+    $('prog-link').href = '/programme.html?mission_id=' + encodeURIComponent(m.id || missionId);
     document.title = (m.name || 'Mission') + ' · Missions';
     $('m-meta').textContent = [d.client ? 'Client : ' + d.client : null, m.mission_code, UI.dateRange(m.planned_start, m.planned_end)].filter(Boolean).join(' · ');
     var st = d.status || {};
