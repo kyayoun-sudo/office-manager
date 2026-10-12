@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Méthodologie du cabinet</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .row input{flex:1 1 320px;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+  .proc{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--surface)}
+  .proc summary{cursor:pointer;font-size:14.5px;line-height:1.5}
+  .proc summary strong{margin-right:6px}
+  .proc p,.proc ul,.proc ol{font-size:14px;line-height:1.5;margin:6px 0}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--soft);margin-left:4px}
+  .tag.risk{background:#fff3d6;color:#7a5200}
+  .issue{font-size:13.5px;color:#8a3b00;margin:4px 0}
+  @media (prefers-color-scheme: dark){ .tag.risk{background:#4a3a10;color:#ffd98a} .issue{color:#ffb98a} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/recherche.html">Recherche</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/auditeur.html">Enhanced Auditor</a>
+    <a href="/rangement.html">Rangement</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/methodologie.html" aria-current="page">Méthodologie</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" aria-labelledby="h-login" hidden>
+      <h2 id="h-login">Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <div><button class="btn" id="connect" type="button">Se connecter</button></div>
+    </section>
+
+    <header class="page-head">
+      <h1>Méthodologie du cabinet</h1>
+      <p class="lead">Les SOP du cabinet, lus procédure par procédure : code, objectif, risque, type (obligatoire, selon le risque, facultatif), niveau, pièces à demander, façon de prendre l’échantillon, étapes et conclusion. Le Mission Controller s’en sert pour proposer les contrôles du programme de travail. Les fichiers Word restent dans votre Drive.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-load" id="load-card" hidden>
+      <h2 id="h-load">Lire les SOP</h2>
+      <p class="meta">Collez le lien du dossier Drive qui contient vos SOP (les sous-dossiers sont lus aussi). Relancez après chaque mise à jour d’un SOP.</p>
+      <div class="row"><input id="folder" type="text" placeholder="https://drive.google.com/drive/folders/…" aria-label="Lien du dossier des SOP"><button class="btn" id="go" type="button">Lire les SOP</button></div>
+      <p class="status" id="say" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="kpis" id="kpis" aria-label="Résumé"></section>
+
+    <section class="card" aria-labelledby="h-sops">
+      <h2 id="h-sops">SOP lus</h2>
+      <div id="sops"><p class="empty">Chargement…</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-procs" id="procs-card" hidden>
+      <h2 id="h-procs">Procédures</h2>
+      <div class="stack" id="procs"></div>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var ERR = { METHODOLOGY_FOLDER_REQUIRED: 'Collez le lien du dossier des SOP.', NO_SOP_FOUND_IN_FOLDER: 'Aucun fichier Word dans ce dossier.', ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas cette action.' };
+  var msg = function (e) { var m = e && e.message || String(e); return ERR[m] || m; };
+  var TYPE = { CORE: 'Obligatoire', RISK_DEPENDENT: 'Selon le risque', OPTIONAL: 'Facultatif' };
+  var MODE = { none: 'Pas d’échantillon', walkthrough: '1 transaction dirigée', exhaustive: 'Toute la population', risk_targeted: 'Ciblage par risque', programme_sample: 'Échantillon du programme', random: 'Échantillon aléatoire', other: 'Voir le SOP' };
+  var STATUS = { READ: 'lu', PARTIAL: 'lu en partie (trop long)', NOT_READ: 'non lu', NO_PROCEDURE_FOUND: 'aucune procédure reconnue' };
+  var ISSUE = { PROCEDURE_INCOMPLETE: 'fiche incomplète', SAME_OBJECTIVE_DIFFERENT_TITLES: 'même objectif sous des titres différents (copie à corriger ?)', SAME_INSTRUCTION_DIFFERENT_TITLES: 'même instruction sous des titres différents (copie à corriger ?)' };
+  var MISSING = { objective: 'objectif', type: 'type', level: 'niveau', steps: 'étapes' };
+
+  function kpi(label, value) { var k = el('div', null, 'kpi'); k.appendChild(el('span', label)); k.appendChild(el('strong', String(value))); return k; }
+
+  function paint(d) {
+    var box = $('kpis'); box.textContent = '';
+    box.appendChild(kpi('SOP', d.sops.length));
+    box.appendChild(kpi('Procédures', d.procedures));
+    box.appendChild(kpi('Non lus', d.sops.filter(function (s) { return s.status !== 'READ'; }).length));
+    var sops = $('sops'); sops.textContent = '';
+    if (!d.sops.length) { sops.appendChild(el('p', d.status === 'loading' ? 'Lecture en cours…' : 'Aucun SOP lu pour ce Drive.', 'empty')); return; }
+    if (d.loaded_at) sops.appendChild(el('p', 'Lus le ' + UI.dateTime(d.loaded_at) + (d.loaded_by ? ' par ' + d.loaded_by : '') + '.', 'meta'));
+    sops.appendChild(UI.table(['Famille', 'Cycle', 'Fichier', 'Procédures', 'État', 'À vérifier'], d.sops.map(function (s) {
+      var open = el('button', s.cycle ? (s.cycle.code || '') + ' — ' + (s.cycle.title || '') : s.file_name, 'btn ghost');
+      open.type = 'button'; open.addEventListener('click', function () { show(s.file_id); });
+      var issues = (s.issues || []).map(function (i) { return i.code + ' : ' + (ISSUE[i.issue] || i.issue) + (i.missing ? ' (' + i.missing.map(function (m) { return MISSING[m] || m; }).join(', ') + ')' : ''); }).join(' ; ');
+      return [s.family || '', s.procedures ? open : (s.cycle && s.cycle.code) || '', s.file_name, s.procedures, (STATUS[s.status] || s.status) + (s.error ? ' : ' + s.error : ''), issues];
+    })));
+  }
+
+  function list(title, items, ordered) {
+    if (!items || !items.length) return null;
+    var wrap = el('div'); wrap.appendChild(el('p', null)).appendChild(el('strong', title));
+    var l = el(ordered ? 'ol' : 'ul'); items.forEach(function (t) { l.appendChild(el('li', t)); }); wrap.appendChild(l); return wrap;
+  }
+  function show(fileId) {
+    OM.api('/api/app?route=methodology&sop=' + encodeURIComponent(fileId)).then(function (s) {
+      $('procs-card').hidden = false;
+      $('h-procs').textContent = 'Procédures — ' + (s.cycle ? (s.cycle.code || '') + ' ' + (s.cycle.title || '') : s.file_name);
+      var box = $('procs'); box.textContent = '';
+      if (s.cycle && s.cycle.objective) box.appendChild(el('p', 'Objectif du cycle : ' + s.cycle.objective, 'meta'));
+      s.procedures.forEach(function (p) {
+        var d = el('details', null, 'proc'), sum = el('summary');
+        sum.appendChild(el('strong', p.code)); sum.appendChild(document.createTextNode(p.title));
+        sum.appendChild(el('span', (TYPE[p.type] || '?') + (p.condition ? ' ' + p.condition : ''), 'tag' + (p.type === 'RISK_DEPENDENT' ? ' risk' : '')));
+        sum.appendChild(el('span', p.level || 'niveau ?', 'tag'));
+        sum.appendChild(el('span', (MODE[p.sampling_mode] || 'Sélection ?') + (p.sample_size ? ' (' + p.sample_size + ')' : ''), 'tag'));
+        d.appendChild(sum);
+        [['Objectif', p.objective], ['Risque', p.risk], ['Assertion', p.assertion], ['Population', p.population], ['Sélection', p.selection], ['Instruction', p.instruction]].forEach(function (x) {
+          if (x[1]) { var para = el('p'); para.appendChild(el('strong', x[0] + ' : ')); para.appendChild(document.createTextNode(x[1])); d.appendChild(para); }
+        });
+        [list('À demander au client', p.ask), list('Préparer la population', p.population_steps, true), list('Prendre l’échantillon', p.sampling, true),
+          list('Étapes', (p.steps || []).map(function (x) { return x.text; }), true), list('Si ça ne correspond pas', p.exceptions),
+          list('Colonnes du Working Paper', p.wp_columns)].forEach(function (n) { if (n) d.appendChild(n); });
+        if (p.conclusion_template) { var c = el('p'); c.appendChild(el('strong', 'Conclusion modèle : ')); c.appendChild(document.createTextNode('« ' + p.conclusion_template + ' »')); d.appendChild(c); }
+        box.appendChild(d);
+      });
+      if ($('procs-card').scrollIntoView) $('procs-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }).catch(function (e) { UI.fail($('procs'), { message: msg(e) }); });
+  }
+
+  function post(body) { return OM.api('/api/app?route=methodology', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  function step(total) {
+    return post({ action: 'step', batch: 4 }).then(function (r) {
+      paint(r);
+      if (r.left) { $('say').textContent = 'Lecture : ' + (total - r.left) + ' / ' + total + ' fichiers…'; return step(total); }
+      $('say').textContent = 'Terminé : ' + r.sops.length + ' SOP, ' + r.procedures + ' procédures.';
+    });
+  }
+  $('go').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').textContent = 'Recherche des fichiers…';
+    post({ action: 'list', folder_id: $('folder').value.trim() }).then(function (r) { return step(r.files); })
+      .catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); }).then(function () { b.disabled = false; });
+  });
+
+  function load() {
+    if (OM.isManager()) $('load-card').hidden = false;
+    OM.api('/api/app?route=methodology').then(function (d) {
+      paint(d);
+      if (d.source_folder_id) $('folder').value = 'https://drive.google.com/drive/folders/' + d.source_folder_id;
+      if (d.status === 'loading' && OM.isManager()) { $('say').textContent = 'Une lecture était en cours : elle reprend.'; step(d.sops.length + d.left).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); }); }
+    }).catch(function (e) { UI.fail($('sops'), { message: msg(e) }); });
+  }
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });
+})();
+</script>
+</body>
+</html>

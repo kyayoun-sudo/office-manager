@@ -166,6 +166,17 @@ export const ROUTES = Object.freeze({
     POST: users([...FIRM_LEAD], async (orgId, req) => (await import('../lib/permissions.js')).savePermissions(orgId, req.body || {}, req.account)),
     unavailable: 'PERMISSIONS_UNAVAILABLE'
   },
+  // The firm's methodology library (2026-10-12): its SOP read procedure by procedure (code, no AI).
+  methodology: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/methodology.js'); const state = await m.methodologyState();
+      const file = String(req.query?.sop || '');
+      if (file) { const s = (state.sops || []).find(x => x.file_id === file); if (!s) throw fail('SOP_NOT_FOUND', 404); return s; }
+      return m.librarySummary(state);
+    }),
+    POST: users(MANAGERS, async (orgId, req) => (await import('../lib/methodology.js')).loadMethodology(orgId, req.body || {}, req.account)),
+    unavailable: 'METHODOLOGY_UNAVAILABLE'
+  },
   // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
   // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
   tenders: {
