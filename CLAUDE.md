@@ -251,6 +251,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Constat clé : toutes les procédures ont la même fiche (objectif, risque, assertion, type CORE / RISK-DEPENDENT / OPTIONAL, niveau,
   PBC, 5 modes d'échantillon, 10 colonnes de WP, PASS/EXCEPTION) → un seul écran « procédure », SOP chargés comme données du cabinet
   (jamais codés pour TATY).
+- **Décisions de Paul (2026-10-12)** : le Manager fixe la matérialité dans un Excel ; les working files vivent dans le Drive, sous
+  le dossier de la mission ; niveaux de revue (Senior, Manager, Associé…) appliqués **seulement si la mission le requiert** (réglé
+  par mission) ; Superviseur gardé en option ; **un Working Paper Excel par cycle** (modèle du cabinet) ; rôle « spécialiste »
+  (juriste, fiscaliste, évaluateur) à ajouter pour la due diligence ; pilote validé : C02_ACH SYCEBNL + PRJ-05 éligibilité.
 
 ## Règles de travail
 
