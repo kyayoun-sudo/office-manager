@@ -349,56 +349,137 @@
       draw(); d.showModal();
     }).catch(function () {});
   }
-  // The global bell (2026-10-08): one notification per event, « lu » remembered on this device.
+  // Shared notification centre: read state belongs to this person and this firm.
   function addBell(me) {
     if (document.getElementById('bell-btn') || /\/excel\//.test(location.pathname)) return;
-    var KEY = 'om_seen_notifications';
-    var seen = {}; try { seen = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { seen = {}; }
-    var save = function () { try { var keys = Object.keys(seen); if (keys.length > 800) keys.slice(0, keys.length - 800).forEach(function (k) { delete seen[k]; }); localStorage.setItem(KEY, JSON.stringify(seen)); } catch (e) {} };
-    var bell = node('button', null, 'gear bell'); bell.type = 'button'; bell.id = 'bell-btn';
-    bell.setAttribute('aria-label', 'Notifications'); bell.setAttribute('aria-haspopup', 'true'); bell.setAttribute('aria-expanded', 'false');
+    var seen = {}, storageKey = null, list = [], filter = 'all', expanded = false;
+    var loaded = false, loading = false, error = '', lastAt = null;
+    var toolbar = node('div', null, 'notification-tools');
+    var bell = node('button', null, 'bell'); bell.type = 'button'; bell.id = 'bell-btn';
+    bell.setAttribute('aria-label', 'Notifications'); bell.setAttribute('aria-haspopup', 'dialog');
+    bell.setAttribute('aria-expanded', 'false'); bell.setAttribute('aria-controls', 'bell-panel');
     bell.appendChild(svgIcon('M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'));
+    bell.appendChild(node('span', 'Notifications', 'bell-label'));
     var badge = node('span', '', 'bell-badge'); badge.hidden = true; bell.appendChild(badge);
-    me.insertBefore(bell, me.lastChild);
-    var panel = node('div', null, 'bell-panel'); panel.hidden = true; panel.id = 'bell-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Notifications');
-    document.body.appendChild(panel);   // outside the navigation: its link styles do not apply
-    var list = [];
-    function count() { var n = list.filter(function (x) { return !seen[x.key]; }).length; badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n); bell.setAttribute('aria-label', 'Notifications' + (n ? ' (' + n + ' non lues)' : '')); }
+    toolbar.appendChild(bell);
+    var host = document.querySelector('.main') || document.querySelector('main') || document.body;
+    host.insertBefore(toolbar, host.firstChild);
+    var panel = node('section', null, 'bell-panel'); panel.hidden = true; panel.id = 'bell-panel';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-labelledby', 'bell-title');
+    document.body.appendChild(panel);
+    // A redraw replaces the clicked filter. Keep that event inside the panel.
+    panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    function readSeen() {
+      try { var value = JSON.parse(localStorage.getItem(storageKey) || '{}'); seen = value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+      catch (e) { seen = {}; }
+    }
+    function reader(viewer) {
+      if (!viewer || !viewer.org_id || !viewer.user_id) return;
+      var next = 'om_seen_notifications:' + encodeURIComponent(viewer.org_id) + ':' + encodeURIComponent(viewer.user_id);
+      if (next !== storageKey) { storageKey = next; readSeen(); }
+    }
+    function save() {
+      if (!storageKey) return;
+      try {
+        var keys = Object.keys(seen).sort(function (a, b) { return seen[a] - seen[b]; });
+        keys.slice(0, Math.max(0, keys.length - 800)).forEach(function (k) { delete seen[k]; });
+        localStorage.setItem(storageKey, JSON.stringify(seen));
+      } catch (e) { /* Reading notifications still works without device storage. */ }
+    }
+    function count() {
+      var n = list.filter(function (x) { return !seen[x.key]; }).length;
+      badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n);
+      bell.setAttribute('aria-label', 'Notifications' + (n ? ', ' + n + ' non lues' : ''));
+    }
+    function position() {
+      var rect = bell.getBoundingClientRect();
+      var top = Math.min(Math.max(12, rect.bottom + 8), Math.max(12, window.innerHeight - 180));
+      panel.style.top = top + 'px'; panel.style.maxHeight = Math.max(140, window.innerHeight - top - 16) + 'px';
+    }
+    function button(text, cls, fn) {
+      var b = node('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b;
+    }
+    function href(value) {
+      if (typeof value !== 'string' || value.charAt(0) !== '/' || value.slice(0, 2) === '//') return null;
+      try { var url = new URL(value, location.origin); return url.origin === location.origin ? url.pathname + url.search + url.hash : null; }
+      catch (e) { return null; }
+    }
+    function markRead(x) { seen[x.key] = Date.now(); save(); count(); }
     function draw() {
+      var focused = document.activeElement && document.activeElement.getAttribute('data-bell-control');
       panel.textContent = '';
-      var head = node('div', null, 'bell-head'); head.appendChild(node('strong', 'Notifications'));
-      var all = node('button', 'Tout marquer comme lu', 'linkish'); all.type = 'button'; all.addEventListener('click', function () { list.forEach(function (x) { seen[x.key] = 1; }); save(); count(); draw(); });
-      head.appendChild(all); panel.appendChild(head);
-      if (!list.length) { panel.appendChild(node('p', 'Rien de nouveau.', 'bell-empty')); return; }
-      list.slice(0, 40).forEach(function (x) {
-        var a = node(x.href ? 'a' : 'div', null, 'bell-item' + (seen[x.key] ? ' read' : '')); if (x.href) a.href = x.href;
-        a.appendChild(node('span', x.label, 'bell-type')); a.appendChild(node('span', x.title, 'bell-title')); if (x.meta) a.appendChild(node('span', x.meta, 'bell-meta'));
-        a.addEventListener('click', function () { seen[x.key] = 1; save(); count(); });
-        panel.appendChild(a);
+      var head = node('div', null, 'bell-head'); var title = node('h2', 'Notifications'); title.id = 'bell-title'; head.appendChild(title);
+      var close = button('×', 'bell-close', function () { toggle(false); bell.focus(); });
+      close.setAttribute('aria-label', 'Fermer les notifications'); close.setAttribute('data-bell-control', 'close'); head.appendChild(close); panel.appendChild(head);
+      var filters = node('div', null, 'bell-filters'); filters.setAttribute('role', 'group'); filters.setAttribute('aria-label', 'Filtrer les notifications');
+      [['all', 'Toutes', list.length], ['unread', 'Non lues', list.filter(function (x) { return !seen[x.key]; }).length], ['action', 'À traiter', list.filter(function (x) { return x.action_required; }).length]].forEach(function (f) {
+        var b = button(f[1] + ' (' + f[2] + ')', 'bell-filter', function () { filter = f[0]; expanded = false; draw(); });
+        b.setAttribute('aria-pressed', String(filter === f[0])); b.setAttribute('data-bell-control', f[0]); filters.appendChild(b);
       });
+      panel.appendChild(filters);
+      var status = node('p', '', 'bell-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+      if (error) { status.textContent = loaded ? 'Actualisation impossible. Les dernières notifications restent affichées.' : 'Les notifications sont indisponibles pour le moment.'; }
+      else if (!loaded) status.textContent = 'Chargement des notifications…';
+      else if (lastAt) status.textContent = 'Actualisé à ' + new Date(lastAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      panel.appendChild(status);
+      if (error) panel.appendChild(button('Réessayer', 'bell-retry', load));
+      var shown = list.filter(function (x) { return filter === 'unread' ? !seen[x.key] : filter === 'action' ? x.action_required : true; });
+      var rows = node('div', null, 'bell-list');
+      if (loaded && !shown.length) rows.appendChild(node('p', filter === 'unread' ? 'Toutes vos notifications sont lues.' : filter === 'action' ? 'Aucune notification ne demande une action.' : 'Aucune notification pour le moment.', 'bell-empty'));
+      shown.slice(0, expanded ? shown.length : 12).forEach(function (x) {
+        var row = node('article', null, 'bell-item' + (seen[x.key] ? ' read' : ''));
+        var label = node('div', null, 'bell-item-label'); label.appendChild(node('span', x.label || 'Information', 'bell-type'));
+        if (!seen[x.key]) { var dot = node('span', '', 'bell-unread'); dot.setAttribute('aria-label', 'Non lue'); label.appendChild(dot); }
+        row.appendChild(label); row.appendChild(node('strong', x.title, 'bell-title'));
+        if (x.meta) row.appendChild(node('span', x.meta, 'bell-meta'));
+        if (x.at && Number.isFinite(Date.parse(x.at))) { var time = node('time', new Date(x.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), 'bell-time'); time.dateTime = x.at; row.appendChild(time); }
+        var actions = node('div', null, 'bell-item-actions'), link = href(x.href);
+        if (link) {
+          var a = node('a', x.action_label || 'Ouvrir', 'bell-open'); a.href = link;
+          a.addEventListener('click', function () { markRead(x); }); actions.appendChild(a);
+        }
+        if (!seen[x.key]) {
+          var read = button('Marquer comme lue', 'linkish', function () { markRead(x); draw(); });
+          read.setAttribute('aria-label', 'Marquer comme lue : ' + x.title); actions.appendChild(read);
+        }
+        row.appendChild(actions); rows.appendChild(row);
+      });
+      panel.appendChild(rows);
+      var foot = node('div', null, 'bell-footer');
+      var all = button('Tout marquer comme lu', 'linkish', function () { list.forEach(markRead); draw(); });
+      all.disabled = !list.some(function (x) { return !seen[x.key]; }); all.setAttribute('data-bell-control', 'mark-all'); foot.appendChild(all);
+      if (shown.length > 12 && !expanded) foot.appendChild(button('Voir toutes les notifications', 'linkish', function () { expanded = true; draw(); }));
+      panel.appendChild(foot); position();
+      if (focused) { var replacement = panel.querySelector('[data-bell-control="' + focused + '"]'); if (replacement) replacement.focus(); }
     }
-    var badgeLoading = false;
     function load() {
-      if (!OM.getToken || !OM.getToken() || badgeLoading) return;
-      badgeLoading = true;
-      var notices = OM.api('/api/app?route=notifications').then(function (d) { list = (d && d.notifications) || []; count(); if (!panel.hidden) draw(); }).catch(function () {});
-      var actions = OM.api('/api/app?route=actions').then(function (d) {
-        var pending = ((d && d.actions) || []).filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
+      if (!OM.getToken || !OM.getToken() || loading) return;
+      loading = true;
+      return OM.api('/api/app?route=notifications').then(function (d) {
+        reader(d.viewer); list = Array.isArray(d.notifications) ? d.notifications : [];
+        loaded = true; error = ''; lastAt = d.at || new Date().toISOString(); count();
         var link = document.querySelector('a[href="/validations.html"]');
-        if (!link) return;
-        var tag = document.getElementById('nav-count');
-        if (!tag) { tag = node('span', '', 'badge'); tag.id = 'nav-count'; link.appendChild(tag); }
-        tag.hidden = !pending; tag.textContent = String(pending);
-      }).catch(function () {});
-      Promise.all([notices, actions]).then(function () { badgeLoading = false; });
+        if (link && d.counts) {
+          var tag = document.getElementById('nav-count');
+          if (!tag) { tag = node('span', '', 'badge'); tag.id = 'nav-count'; link.appendChild(tag); }
+          var pending = Number(d.counts.pending_actions) || 0; tag.hidden = !pending; tag.textContent = pending > 99 ? '99+' : String(pending);
+        }
+      }).catch(function (e) { error = String(e && e.message || 'NOTIFICATIONS_UNAVAILABLE'); })
+        .then(function () { loading = false; if (!panel.hidden) draw(); });
     }
-    function toggle(open) { if (open) draw(); panel.hidden = !open; bell.setAttribute('aria-expanded', String(open)); }
+    function toggle(open) {
+      panel.hidden = !open; bell.setAttribute('aria-expanded', String(open));
+      if (open) { draw(); panel.querySelector('.bell-close').focus(); load(); }
+    }
     bell.addEventListener('click', function (e) { e.stopPropagation(); toggle(panel.hidden); });
-    document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && e.target !== bell) toggle(false); });
+    document.addEventListener('click', function (e) { if (!panel.hidden && !panel.contains(e.target) && !bell.contains(e.target)) toggle(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { toggle(false); bell.focus(); } });
-    setTimeout(load, 1500); setInterval(function () { if (!document.hidden) load(); }, 15000);
+    window.addEventListener('resize', function () { if (!panel.hidden) position(); });
+    window.addEventListener('storage', function (e) { if (storageKey && e.key === storageKey) { readSeen(); count(); if (!panel.hidden) draw(); } });
+    setTimeout(load, 500); setInterval(function () { if (!document.hidden) load(); }, 30000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
   }
+
   function openClose() {
     var s = readSession() || {}, email = (s.user && s.user.email) || '';
     var d = node('dialog', null, 'om-dialog');
