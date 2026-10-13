@@ -128,6 +128,7 @@
         <button id="override-save" class="btn" type="button">Enregistrer ma décision</button><p id="override-say" class="status" role="status"></p>
       </section>
       <section class="card" id="continuity-card" hidden aria-labelledby="h-continuity">
+        <p id="handoff-status" role="status"></p><a id="handoff-config" hidden>Configurer le dossier des missions</a> <a id="handoff-folder" hidden>Ouvrir le dossier de mission</a> <button id="handoff-retry" type="button" class="btn ghost" hidden>Transmettre les documents à la mission</button>
         <h2 id="h-continuity">Offre et préparation de la mission</h2>
         <p class="meta">Le classeur existant est conservé. Le KYC et les déclarations personnelles peuvent être complétés en parallèle ; leur état reste visible.</p>
         <label for="kyc-person">Personne chargée de compléter le KYC</label><select id="kyc-person"><option value="">Choisir un membre de l’équipe</option></select><button id="kyc-assign" class="btn ghost" type="button">Désigner cette personne</button><p id="kyc-assigned" class="status" role="status"></p>
@@ -262,7 +263,7 @@
     var tick = function () {
       OM.api('/api/app?route=opportunities&id=' + encodeURIComponent(id)).then(function (o) {
         if (stop) return; render(o);
-        if (o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing')) timer = setTimeout(tick, 6000);
+        if ((o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing')) timer = setTimeout(tick, 6000);
       }).catch(function (e) { if (stop) return; $('read-error').hidden = false; $('read-error').textContent = msg(e); });
     };
     tick();
@@ -294,6 +295,11 @@
     $('override-target').querySelector('[value="kyc_prepare"]').disabled = role !== 'owner';
     if (role !== 'owner' && $('override-target').value === 'kyc_prepare') $('override-target').value = 'mission_start';
     $('continuity-card').hidden = !manages;
+    var handoff = o.handoff || {}, handoffLabels = { queued: 'Transmission en attente.', transferring: 'Mission Controller transmet les documents.', partial: 'Transmission en cours, reprise automatique.', complete: 'Documents transmis au dossier de mission : ' + (handoff.copied || 0) + ' fichier(s).' };
+    $('handoff-status').textContent = handoff.reason || handoffLabels[handoff.status] || '';
+    $('handoff-config').hidden = !handoff.configuration_href; if (handoff.configuration_href) $('handoff-config').href = handoff.configuration_href;
+    $('handoff-folder').hidden = !handoff.url; if (handoff.url) $('handoff-folder').href = handoff.url;
+    $('handoff-retry').hidden = !o.mission_id || ['queued', 'transferring', 'partial'].indexOf(handoff.status) >= 0;
     var persons = $('kyc-person'); persons.textContent = ''; persons.appendChild(new Option('Choisir un membre de l’équipe', ''));
     ((o.team && o.team.members) || []).filter(function (m) { return !m.external && m.email; }).forEach(function (m) { persons.appendChild(new Option(m.name, m.email)); });
     persons.value = o.kyc_responsible ? o.kyc_responsible.email : '';
@@ -749,6 +755,7 @@
       .then(function (r) { $('override-say').textContent = r.override.status === 'pending' ? 'Décision conservée ; le démarrage reste en attente : ' + (r.override.error || '') : 'Décision enregistrée. Les éléments manquants restent ouverts.'; window.reloadOpportunity(); })
       .catch(function (e) { $('override-say').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
+  $('handoff-retry').addEventListener('click', function () { var b = this; b.disabled = true; api({ action: 'transmit-documents', opportunity_id: current.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { $('handoff-status').textContent = msg(e); }).then(function () { b.disabled = false; }); });
   $('kyc-assign').addEventListener('click', function () {
     var b = this; b.disabled = true;
     api({ action: 'assign-kyc', opportunity_id: current.id, email: $('kyc-person').value }).then(function () { window.reloadOpportunity(); }).catch(function (e) { $('kyc-assigned').textContent = msg(e); }).then(function () { b.disabled = false; });

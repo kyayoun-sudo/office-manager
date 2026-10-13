@@ -25,3 +25,12 @@ Le module existant permet déjà de préparer les Word/PDF et CV adaptés, de co
 - Vérification finale ciblée : 40 tests réussis, couvrant notamment la réutilisation du classeur, la dérogation du propriétaire, le responsable KYC, la création unique d'une mission sans lettre et la reformulation sans appel IA non autorisé.
 - Syntaxe des modules et pages modifiés contrôlée.
 - Modifications locales sur `feature/white-label-desktop`. Publication non effectuée : l'approbation automatique nécessaire pour vérifier GitHub a échoué pour limite d'utilisation. Aucun autre chemin n'a été utilisé pour contourner ce contrôle.
+
+## Mémoire commune et transmission opportunité → mission
+
+- Paramètres mène à la configuration des documents partagés : fichier déposé ou lien Drive confirmé, mission/cycle/période et rôle conservés dans la mémoire existante.
+- Les recherches incertaines retournent le lien de configuration prérempli. Le dossier parent des missions doit être confirmé explicitement ; aucun emplacement ambigu n’est choisi automatiquement.
+- Au démarrage autorisé de la mission, Mission Controller crée ou réutilise son dossier distinct, y copie les documents et sous-dossiers de l’opportunité et les inscrit dans la mémoire documentaire de la mission. Les originaux restent en place.
+- Le transfert est repris par lots et sans doublons. Une collision ou une source modifiée demande une vérification, sans écrasement.
+- Si le dossier parent manque, le responsable suit « Configurer le dossier des missions », confirme son lien puis revient cliquer « Transmettre les documents à la mission ».
+- Vérification : tests de création, conservation des sources, mémoire documentaire, reprise de 205 documents, changement de source, parent invalide et configuration du dossier. Aucun document réel déplacé ou envoyé pendant ces vérifications.

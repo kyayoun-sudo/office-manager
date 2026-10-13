@@ -229,10 +229,11 @@ export const ROUTES = Object.freeze({
     POST: users(ALL_ROLES, async (orgId, req) => {
       const b = req.body || {}, a = req.account;
       const T = () => import('../lib/doc-templates.js'), C = () => import('../lib/cv-bank.js'), S = () => import('../lib/secretariat.js');
-      if (['locate-document', 'confirm-document', 'unavailable-document'].includes(b.action)) {
+      if (['locate-document', 'confirm-document', 'unavailable-document', 'upload-reference'].includes(b.action)) {
         if (!['owner', 'partner', 'manager', 'supervisor', 'bdm', 'secretary'].includes(a.role)) throw fail('ROLE_NOT_ALLOWED', 403);
         if (b.mission_id) await requireMissionAccess(orgId, b.mission_id, a);
         const index = await import('../lib/file-index.js');
+        if (b.action === 'upload-reference') return index.uploadDocumentReference(orgId, b, a);
         if (b.action === 'unavailable-document') return index.confirmDocumentUnavailable(orgId, b, a);
         return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
       }
@@ -520,7 +521,8 @@ export const ROUTES = Object.freeze({
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
-      if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account);
+      if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account, { req });
+      if (a === 'transmit-documents') return o.requestOpportunityHandoff(orgId, req, b, req.account);
       if (a === 'assign-kyc') return o.assignKyc(orgId, b, req.account, { req });
       if (a === 'accept-existing-kyc') return o.acceptExistingKyc(orgId, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
@@ -549,6 +551,7 @@ export const ROUTES = Object.freeze({
   'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-team-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).teamStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-handoff-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityHandoffStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
     GET: users(MANAGERS, async () => light(await submissionState())),

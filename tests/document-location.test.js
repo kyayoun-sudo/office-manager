@@ -151,3 +151,14 @@ test('the named manager can start the opportunity mission without a letter; crea
   await assert.rejects(ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'audit_start' }, manager, d), /MISSION_ALREADY_STARTED_OR_ENDED/);
   assert.equal(creations, 1);
 });
+
+test('configuration accepts a mission folder and reuses it without treating folder activity as a new model version', async () => {
+  const { d, files } = setup();
+  files.root = { id: 'root', name: 'MISSIONS', mimeType: 'application/vnd.google-apps.folder', modifiedTime: 'v1' };
+  const request = { document_type: 'mission_root', document_role: 'firm_reference', file_id: 'root' };
+  await confirmDocumentReference('org', request, { role: 'owner', email: 'owner@example.org' }, d);
+  files.root.modifiedTime = 'v2';
+  const result = await locateRequiredDocument('org', request, d);
+  assert.equal(result.status, 'FOUND');
+  await assert.rejects(confirmDocumentReference('org', { ...request, file_id: 'f1' }, { role: 'owner', email: 'owner@example.org' }, d), /MISSION_ROOT_FOLDER_REQUIRED/);
+});
