@@ -1,0 +1,38 @@
+.workspace-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:6px 0 24px;padding:24px;background:var(--surface);border:1px solid var(--line);border-radius:18px}
+.workspace-eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-ink);font-weight:700;margin:0 0 10px}
+.workspace-hero h1{font-size:clamp(26px,3vw,38px);line-height:1.15;margin:0 0 12px;letter-spacing:-.03em}
+.workspace-hero p{max-width:700px;line-height:1.6;color:var(--muted);margin:0}
+.workspace-avatar{width:54px;height:54px;border-radius:16px;background:var(--soft);color:var(--brand-ink);display:flex;align-items:center;justify-content:center;flex:none;font-size:22px;font-weight:700}
+.workspace-launchers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
+.workspace-launcher{display:flex;flex-direction:column;gap:9px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-decoration:none;min-height:140px}
+.workspace-launcher:hover{border-color:var(--brand);background:var(--surface-2)}
+.workspace-launcher:first-child{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.workspace-launcher span{font-size:13px;line-height:1.5;opacity:.86}
+.workspace-launcher strong{font-size:16px;line-height:1.35}
+.workspace-launcher i{font-style:normal;margin-top:auto;font-size:18px}
+.workspace-agents{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 24px}
+.workspace-agent{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 16px;text-decoration:none;color:var(--ink)}
+.workspace-agent b{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--brand-ink);font-size:12px}
+.workspace-agent span{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.workspace-agent small{font-size:12px;font-weight:400;color:var(--muted)}
+.workspace-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:20px;align-items:start}
+.workspace-column{min-width:0;display:flex;flex-direction:column;gap:18px}
+.workspace-column>.card,.workspace-column>.callout{margin:0}
+.workspace-heading{font-size:18px;margin:0 0 12px}
+.workspace-alerts .item{padding:14px 0;border-bottom:1px solid var(--line)}
+.workspace-alerts .item:last-child{border-bottom:0}
+.workspace-preview-link{display:inline-block;font-size:13px;margin:14px 0 22px;color:var(--brand-ink)}
+.workspace-secondary-nav{margin-top:12px;border-top:1px solid var(--nav-line);padding-top:10px;color:var(--nav-text)}
+.workspace-secondary-nav summary{cursor:pointer;padding:10px;font-size:13px;list-style-position:inside}
+.workspace-secondary-nav a{font-size:13px}
+.workspace-note{padding:12px 16px;border-radius:10px;background:var(--warn-bg);color:var(--warn-ink);font-size:13px;line-height:1.5;margin-bottom:20px}
+.workspace-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.workspace-tabs button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.workspace-tabs button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.workspace-flow{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;padding:0;list-style:none}
+.workspace-flow li{font-size:12px;border-radius:8px;padding:9px 12px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.workspace-flow li.active{background:var(--soft);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.workspace-detail{line-height:1.6;color:var(--muted);font-size:14px}
+.workspace-demo .main{max-width:none}
+@media(max-width:1100px){.workspace-launchers{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.workspace-grid{grid-template-columns:1fr}.workspace-hero{padding:20px;gap:12px}.workspace-launchers{grid-template-columns:1fr 1fr}.workspace-launcher{padding:14px;min-height:130px}.workspace-launcher strong{font-size:14px}.workspace-avatar{width:40px;height:40px;font-size:16px}}

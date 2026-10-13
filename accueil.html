@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
-</head>
+<link rel="stylesheet" href="/assets/workspace.css"></head>
 <body>
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
@@ -466,7 +466,7 @@
     var lead = LEADS.indexOf(role) >= 0, manage = MANAGE.indexOf(role) >= 0;
     if (!lead) document.querySelectorAll('#shortcuts [data-lead-only]').forEach(function (a) { a.hidden = true; });
     if (lead) { loadCockpit(); loadMails(); loadMissions(); loadRuns(); loadPending(); loadPasses(); loadSetup(); return; }
-    if (manage) { loadCockpit(); loadMails(); loadMissions(); loadPending(); hide('runs-card'); hide('passes-card'); return; }
+    if (manage) { loadMyWork(); loadPending(); hide('missions-card'); hide('cockpit-section'); hide('runs-card'); hide('passes-card'); return; }
     // Team members: their own work only.
     ['cockpit-section', 'missions-card', 'runs-card', 'passes-card'].forEach(hide);
     loadMyWork(); loadPending();
@@ -487,5 +487,5 @@
   UI.requireLogin(start);
 })();
 </script>
-</body>
+<script src="/assets/role-workspace.js"></script></body>
 </html>

@@ -21,7 +21,7 @@ details.card summary{cursor:pointer;font-weight:600;font-size:16px;list-style-po
 details.card[open] summary{margin-bottom:6px}
 .hint{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 </style>
-</head>
+<link rel="stylesheet" href="/assets/workspace.css"></head>
 <body>
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
@@ -60,6 +60,7 @@ details.card[open] summary{margin-bottom:6px}
         <button type="button" class="agent-card" data-agent="auto" aria-pressed="true"><strong>Grand Contrôleur</strong><span>Choisit lui-même les spécialistes à consulter.</span></button>
         <button type="button" class="agent-card" data-agent="mission-controller" aria-pressed="false"><strong>Mission Controller</strong><span>Programme, cycles, Working Papers, PBC, revue, échéances.</span></button>
         <button type="button" class="agent-card" data-agent="orpailleur" aria-pressed="false"><strong>Orpailleur</strong><span>Drive, documents, versions, inventaire, classement contrôlé.</span></button>
+        <button type="button" class="agent-card" data-agent="enhanced-auditor" aria-pressed="false"><strong>Enhanced Auditor</strong><span>Risques, procédures, preuves et fichiers de travail.</span></button>
         <button type="button" class="agent-card" data-agent="sika" aria-pressed="false"><strong>Sika</strong><span>Facturation, recouvrement, suivi administratif.</span></button>
       </div>
       <div class="field"><label for="message">Demande</label>
@@ -413,11 +414,11 @@ details.card[open] summary{margin-bottom:6px}
     OM.loadBranding().catch(function () {});
     var params = new URLSearchParams(location.search);
     var a = params.get('agent');
-    if (a && ['auto', 'mission-controller', 'orpailleur', 'sika'].indexOf(a) >= 0) selectAgent(a);
+    if (a && ['auto', 'mission-controller', 'orpailleur', 'sika', 'enhanced-auditor'].indexOf(a) >= 0) selectAgent(a);
     loadMissions(params.get('mission'));
   }
   UI.requireLogin(start);
 })();
 </script>
-</body>
+<script src="/assets/role-workspace.js"></script></body>
 </html>
