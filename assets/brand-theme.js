@@ -300,9 +300,13 @@
       function draw() {
         d.textContent = '';
         if (i >= list.length) { d.appendChild(node('h2', 'Merci, c’est enregistré.')); var row0 = node('div', null, 'om-actions'); row0.appendChild(btn('Fermer', '', close)); d.appendChild(row0); return; }
-        var q = list[i], say = node('p', '', 'status');
+        var q = list[i], say = node('p', '', 'status'), lastAnswer = null, overrideShown = false;
         d.appendChild(node('p', (list.length > 1 ? (i + 1) + ' sur ' + list.length + ' · ' : '') + q.title, 'om-ask-ctx'));
-        var fail = function (e) { say.className = 'status error'; say.textContent = { SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; }); };
+        var fail = function (e) { say.className = 'status error'; say.textContent = { SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider, ou le propriétaire peut enregistrer une dérogation.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; });
+          if (!overrideShown && lastAnswer && window.OfficeManager.getRole() === 'owner' && ['SEPARATION_OF_FUNCTIONS', 'NOT_THE_DECIDING_PARTNER', 'NOT_THE_MISSION_MANAGER'].indexOf(e.message) >= 0) {
+            overrideShown = true; opts.appendChild(btn('Valider par dérogation du propriétaire', '', function () { busy(); post(Object.assign({}, lastAnswer, { owner_override: true })).then(next).catch(fail); }));
+          }
+        };
         var busy = function () { [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = true; }); say.className = 'status'; say.textContent = 'Enregistrement…'; };
         var opts = node('div', null, 'om-actions om-ask-opts');
         if (q.kind === 'procedure') {
@@ -330,7 +334,7 @@
           if (q.date_cell) { date = node('input'); date.type = 'date'; date.required = true; date.className = 'om-ask-note'; date.setAttribute('aria-label', q.question || 'Date'); d.appendChild(date); }
           var note = null;
           if (q.note_cell && q.kind !== 'decision') { note = node('input'); note.type = 'text'; note.className = 'om-ask-note'; note.placeholder = q.options ? 'Précision (facultatif)' : 'Votre réponse, en quelques mots'; d.appendChild(note); }
-          var send = function (v) { var values = {}; if (date) { if (!date.value || !date.checkValidity()) { date.reportValidity(); date.focus(); return; } values[q.date_cell] = date.value; } if (v && q.choice_cell) values[q.choice_cell] = v; if (note && note.value.trim()) values[q.note_cell] = note.value.trim(); if (!Object.keys(values).length) { if (note) note.focus(); return; } busy(); post({ action: 'answer', opportunity_id: q.opportunity_id, sheet: q.sheet, row: q.row, values: values }).then(next).catch(fail); };
+          var send = function (v) { var values = {}; if (date) { if (!date.value || !date.checkValidity()) { date.reportValidity(); date.focus(); return; } values[q.date_cell] = date.value; } if (v && q.choice_cell) values[q.choice_cell] = v; if (note && note.value.trim()) values[q.note_cell] = note.value.trim(); if (!Object.keys(values).length) { if (note) note.focus(); return; } lastAnswer = { action: 'answer', opportunity_id: q.opportunity_id, sheet: q.sheet, row: q.row, values: values }; busy(); post(lastAnswer).then(next).catch(fail); };
           if (q.options) q.options.forEach(function (v) { opts.appendChild(btn(v.length > 34 ? v.slice(0, 32) + '…' : v, '', function () { send(v); })); });
           else opts.appendChild(btn('Enregistrer', '', function () { send(null); }));
         }

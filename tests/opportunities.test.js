@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
-import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence } from '../lib/opportunities.js';
+import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence, assignKyc, getOpportunity, acceptExistingKyc } from '../lib/opportunities.js';
 
 // A small workbook built like a firm's acceptance template (legend, mode d'emploi, sections, header
 // rows, input cells, lists, dates, formulas) — no firm's real template in the repository.
@@ -123,6 +123,60 @@ async function setup() {
   return { drive, d, fired, events, audits };
 }
 const run = async (id, d) => { let o; for (let i = 0; i < 5; i++) { o = await opportunityStep('org', {}, { opportunity_id: id }, d); if (o.status !== 'running') break; } return o; };
+
+test('already-filled workbook decisions are not asked again; assigning KYC preserves the original file and answers', async () => {
+  const { d, drive } = await setup();
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('TDR').toString('base64') }, { display_name: 'Owner' }, d);
+  const o = await run(created.opportunity.id, d);
+  const file = drive.files.get(o.workbook.id);
+  file.buffer = await writeCells(file.buffer, [{ sheet: '02_PHASE_0', cell: 'D44', value: 'POURSUIVRE VERS PHASE 1' }]);
+  const questions = await myQuestions('org', { role: 'owner', email: 'owner@example.org', display_name: 'Owner' }, d);
+  assert.equal(questions.questions.some(q => q.id === 'dec|' + o.id), false, 'decision imported from the real workbook is reused');
+  await validateTeam('org', { opportunity_id: o.id, members: [{ name: 'Manager', email: 'manager@example.org', role: 'Manager' }, { name: 'Auditor', email: 'auditor@example.org', role: 'Auditeur' }] }, { role: 'owner', email: 'owner@example.org' }, d);
+  await assignKyc('org', { opportunity_id: o.id, email: 'auditor@example.org' }, { role: 'manager', email: 'manager@example.org', display_name: 'Manager' }, d);
+  const after = await getOpportunity(o.id, d);
+  assert.equal(after.workbook.id, o.workbook.id);
+  assert.equal(after.kyc_responsible.email, 'auditor@example.org');
+  assert.equal((await readCells(file.buffer, [{ sheet: '02_PHASE_0', cell: 'D44' }]))['02_PHASE_0!D44'], 'POURSUIVRE VERS PHASE 1');
+  await assert.rejects(assignKyc('org', { opportunity_id: o.id, email: 'auditor@example.org' }, { role: 'manager', email: 'outside@example.org' }, d), /NOT_THE_MISSION_MANAGER/);
+});
+
+test('accepting existing KYC is a signed human decision and never rewrites the workbook or certifies team members', async () => {
+  const { d, drive } = await setup();
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('TDR').toString('base64') }, { display_name: 'Owner' }, d);
+  const o = await run(created.opportunity.id, d);
+  const before = Buffer.from(drive.files.get(o.workbook.id).buffer);
+  const account = { role: 'owner', email: 'owner@example.org' };
+  await assert.rejects(acceptExistingKyc('org', { opportunity_id: o.id }, account, d), /CERTIFICATION_REQUIRED/);
+  const result = await acceptExistingKyc('org', { opportunity_id: o.id, confirm: true }, account, d);
+  assert.equal(result.review.file_id, o.workbook.id);
+  assert.equal(result.review.basis, 'human_confirmation');
+  assert.equal(result.review.by, account.email);
+  assert.deepEqual(drive.files.get(o.workbook.id).buffer, before);
+  assert.equal((await getOpportunity(o.id, d)).declarations, undefined);
+  await assert.rejects(acceptExistingKyc('org', { opportunity_id: o.id, confirm: true }, { role: 'auditor', email: 'auditor@example.org' }, d), /NOT_THE_MISSION_MANAGER/);
+});
+
+test('the owner can explicitly override separation in the same workbook; a manager cannot acquire that exception', async () => {
+  const { d, drive } = await setup();
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('TDR').toString('base64') }, { display_name: 'Owner' }, d);
+  const o = await run(created.opportunity.id, d);
+  const structure = await describeWorkbook(await buildTemplate());
+  structure.sheets.find(s => s.name === '02_PHASE_0').rows.push({ row: 7, label: 'Préparé par', fields: [{ cell: 'C7', type: 'text', header: 'Nom' }] });
+  d.templateStructure = async () => ({ structure });
+  const file = drive.files.get(o.workbook.id);
+  file.buffer = await writeCells(file.buffer, [{ sheet: '02_PHASE_0', cell: 'C7', value: 'Owner' }]);
+  const body = { opportunity_id: o.id, sheet: '02_PHASE_0', row: 44, values: { D44: 'POURSUIVRE VERS PHASE 1' } };
+  const owner = { role: 'owner', email: 'owner@example.org', display_name: 'Owner' };
+  await assert.rejects(answerRow('org', body, owner, d), /SEPARATION_OF_FUNCTIONS/);
+  const result = await answerRow('org', { ...body, owner_override: true }, owner, d);
+  assert.equal(result.verified, true);
+  const after = await getOpportunity(o.id, d);
+  assert.equal(after.overrides.at(-1).target, 'workbook_decision');
+  assert.equal(after.overrides.at(-1).by, owner.email);
+  assert.equal(after.workbook.id, o.workbook.id);
+  await assert.rejects(answerRow('org', { ...body, owner_override: true }, { role: 'manager', email: 'manager@example.org' }, d), /PARTNER_DECISION_ONLY|OWNER_ONLY/);
+});
 
 test('the template structure is read from the template itself (legend, sections, headers, lists, name rule)', async () => {
   const s = await describeWorkbook(await buildTemplate());

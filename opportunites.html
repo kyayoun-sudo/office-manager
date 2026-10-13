@@ -119,13 +119,20 @@
         <div class="quick" id="mine" aria-live="polite"></div>
       </section>
       <section class="card" aria-labelledby="h-override" id="override-card" hidden>
-        <h2 id="h-override">Décision exceptionnelle du propriétaire</h2>
+        <h2 id="h-override">Décision de progression de la mission</h2>
         <p class="meta">Cette autorisation est conservée dans le journal. Les pièces manquantes et les validations du classeur restent ouvertes.</p>
         <label for="override-target">Action autorisée</label><select id="override-target"><option value="kyc_prepare">Préparer le KYC maintenant</option><option value="mission_start">Commencer la planification de la mission</option><option value="audit_start">Commencer les travaux d’audit</option></select>
-        <label for="override-mission">Mission concernée (pour un démarrage)</label><select id="override-mission"><option value="">Choisir une mission</option></select>
+        <label for="override-mission">Mission concernée (pour un démarrage)</label><select id="override-mission"><option value="">Créer ou reprendre la mission de cette opportunité</option></select>
         <label for="override-reason">Motif (facultatif)</label><textarea id="override-reason" rows="2"></textarea>
         <label for="override-open">Éléments restant ouverts (un par ligne)</label><textarea id="override-open" rows="3"></textarea>
         <button id="override-save" class="btn" type="button">Enregistrer ma décision</button><p id="override-say" class="status" role="status"></p>
+      </section>
+      <section class="card" id="continuity-card" hidden aria-labelledby="h-continuity">
+        <h2 id="h-continuity">Offre et préparation de la mission</h2>
+        <p class="meta">Le classeur existant est conservé. Le KYC et les déclarations personnelles peuvent être complétés en parallèle ; leur état reste visible.</p>
+        <label for="kyc-person">Personne chargée de compléter le KYC</label><select id="kyc-person"><option value="">Choisir un membre de l’équipe</option></select><button id="kyc-assign" class="btn ghost" type="button">Désigner cette personne</button><p id="kyc-assigned" class="status" role="status"></p>
+        <label for="existing-kyc">Lien du KYC déjà effectué (facultatif ; sinon le classeur actuel)</label><input id="existing-kyc" type="text"><button id="kyc-accept-existing" class="btn ghost" type="button">Je confirme et valide le KYC déjà effectué</button><p id="kyc-existing-status" class="status" role="status"></p>
+        <div class="links"><a id="technical-offer" class="btn" href="/secretariat.html">Préparer l’offre technique et les CV</a><a id="engagement-letter" class="btn ghost" href="/secretariat.html">Préparer la lettre de mission</a></div>
       </section>
 
       <section class="card" aria-labelledby="h-team" id="team-card" hidden>
@@ -282,8 +289,19 @@
     if (o.status === 'running') log.appendChild(el('li', 'Le Firm Manager travaille…', 'meta'));
     var role = (o.viewer && o.viewer.role) || '';
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
-    $('override-card').hidden = role !== 'owner' || ['removed', 'duplicate', 'running'].indexOf(o.status) >= 0;
-    if (role === 'owner' && $('override-mission').options.length === 1) OM.api('/api/missions').then(function (r) { (r.missions || []).forEach(function (m) { var option = document.createElement('option'); option.value = m.id; option.textContent = m.name || m.id; $('override-mission').appendChild(option); }); }).catch(function () {});
+    var manages = Boolean(o.viewer && o.viewer.may_manage);
+    $('override-card').hidden = !manages || ['removed', 'duplicate', 'running'].indexOf(o.status) >= 0;
+    $('override-target').querySelector('[value="kyc_prepare"]').disabled = role !== 'owner';
+    if (role !== 'owner' && $('override-target').value === 'kyc_prepare') $('override-target').value = 'mission_start';
+    $('continuity-card').hidden = !manages;
+    var persons = $('kyc-person'); persons.textContent = ''; persons.appendChild(new Option('Choisir un membre de l’équipe', ''));
+    ((o.team && o.team.members) || []).filter(function (m) { return !m.external && m.email; }).forEach(function (m) { persons.appendChild(new Option(m.name, m.email)); });
+    persons.value = o.kyc_responsible ? o.kyc_responsible.email : '';
+    $('kyc-assigned').textContent = o.kyc_responsible ? 'Responsable : ' + o.kyc_responsible.name : '';
+    $('kyc-existing-status').textContent = o.kyc_review ? 'KYC existant accepté par ' + o.kyc_review.by + ' le ' + UI.dateTime(o.kyc_review.at) + '. Les réponses du classeur sont conservées.' : '';
+    $('technical-offer').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=proposition';
+    $('engagement-letter').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=lettre_mission';
+    if (manages && $('override-mission').options.length === 1) OM.api('/api/missions').then(function (r) { (r.missions || []).forEach(function (m) { var option = document.createElement('option'); option.value = m.id; option.textContent = m.name || m.id; $('override-mission').appendChild(option); }); }).catch(function () {});
     $('reception-edit').hidden = ['owner', 'partner', 'manager', 'bdm', 'secretary'].indexOf(role) < 0;
     $('reception-date').value = o.tdr_received_at || '';
     $('won-card').hidden = o.status !== 'go' || !(lead || role === 'manager');
@@ -328,15 +346,21 @@
   function shortLabel(r) { return String(r.label || '').split(' — ')[0]; }
   function choiceField(r) { return r.fields.find(function (f) { return f.options && f.options.length; }) || null; }
   function noteField(r) { return r.fields.find(function (f) { return !(f.options && f.options.length) && f.type !== 'date' && !/Pr[ée]par[ée] par|Revu|^Date|Lien|Preuve/i.test(f.header || ''); }) || null; }
-  function isEmpty(r) { return r.fields.every(function (f) { return !f.value; }); }
+  function isEmpty(r) {
+    // A preparer, a source or a comment does not answer the actual question.
+    var main = choiceField(r) || noteField(r);
+    if (main) return main.value == null || String(main.value).trim() === '';
+    return r.fields.filter(function (f) { return !/Pr[ée]par[ée] par|Revu|^Date|Lien|Preuve/i.test(f.header || ''); }).every(function (f) { return f.value == null || String(f.value).trim() === ''; });
+  }
   function queueFor(o, role) {
-    var later = ['won', 'phase1'].indexOf(o.status) >= 0, q = [];
+    var later = ['won', 'phase1'].indexOf(o.status) >= 0 || Boolean(o.phase1), q = [];
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
     (o.sheets || []).forEach(function (s) {
       if (!s.open || (later ? s.owner === 'firm-manager' : s.owner !== 'firm-manager')) return;
       s.rows.forEach(function (r) {
         if (!r.may_fill || r.identity || !isEmpty(r) || /^(Nom|Date)\b/i.test(shortLabel(r))) return;
         var key = s.name + '!' + r.row, p = r.proposal, done = (o.ai_filled || {})[key];
+        if (o.kyc_review && o.kyc_review.status === 'accepted' && p && p.for_team && /KYC|AML|DOCUMENTS.*IDENTIFICATION/i.test(r.section || '')) return;
         if (r.authority === 'partner') { if (lead && /D[ÉE]CISION/i.test(shortLabel(r)) && choiceField(r)) q.push({ kind: 'decide', s: s, r: r, order: 5 }); return; }
         if (r.authority === 'manager') { if (mayReview(role) && choiceField(r)) q.push({ kind: 'rate', s: s, r: r, order: 4 }); return; }
         if (p && p.for_team) q.push({ kind: 'ask', s: s, r: r, p: p, order: 1 });
@@ -724,6 +748,14 @@
     api({ action: 'owner-override', opportunity_id: current.id, target: $('override-target').value, mission_id: $('override-mission').value || null, reason: $('override-reason').value, outstanding: $('override-open').value.split('\n').filter(function (s) { return s.trim(); }) })
       .then(function (r) { $('override-say').textContent = r.override.status === 'pending' ? 'Décision conservée ; le démarrage reste en attente : ' + (r.override.error || '') : 'Décision enregistrée. Les éléments manquants restent ouverts.'; window.reloadOpportunity(); })
       .catch(function (e) { $('override-say').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('kyc-assign').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'assign-kyc', opportunity_id: current.id, email: $('kyc-person').value }).then(function () { window.reloadOpportunity(); }).catch(function (e) { $('kyc-assigned').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('kyc-accept-existing').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'accept-existing-kyc', opportunity_id: current.id, link: $('existing-kyc').value.trim(), confirm: true }).then(function () { window.reloadOpportunity(); }).catch(function (e) { $('kyc-existing-status').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
   $('reception-save').addEventListener('click', function () {
     var b = this; b.disabled = true;

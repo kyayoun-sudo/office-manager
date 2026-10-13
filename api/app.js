@@ -238,6 +238,7 @@ export const ROUTES = Object.freeze({
       }
       if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
       if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
+      if (b.action === 'methodology-draft') return (await T()).rewriteMethodology(orgId, b, a);
       if (b.action === 'create-document') return (await T()).createDocument(orgId, b, a);
       if (b.action === 'specialist-cv') return (await C()).uploadSpecialistCv(orgId, b, a);
       if (b.action === 'adapted-cv') return (await C()).adaptedCv(orgId, b, a);
@@ -520,6 +521,8 @@ export const ROUTES = Object.freeze({
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
       if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account);
+      if (a === 'assign-kyc') return o.assignKyc(orgId, b, req.account, { req });
+      if (a === 'accept-existing-kyc') return o.acceptExistingKyc(orgId, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
       if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
@@ -853,7 +856,7 @@ export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
-const decisionLevel = req => ['sign'].includes(req.body?.action) ? 'review' : ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override'].includes(req.body?.action) ? 'approve' : 'prepare';
+const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
