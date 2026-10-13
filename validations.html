@@ -76,6 +76,8 @@
   var AGENTS = { 'grand-controleur': 'Grand Contrôleur', 'mission-controller': 'Mission Controller', orpailleur: 'Orpailleur', sika: 'Sika' };
   var LABELS = { approve: 'Validé', reject: 'Refusé', defer: 'Reporté' };
   var all = [], filter = 'all', editing = false;
+  var targetAction = new URLSearchParams(location.search).get('action'), targetMessage = new URLSearchParams(location.search).get('message'), targetFocused = false;
+  function focusTarget(element, match) { if (match && !targetFocused) { targetFocused = true; element.tabIndex = -1; requestAnimationFrame(function () { element.scrollIntoView({ block: 'center' }); element.focus({ preventScroll: true }); }); } }
   document.addEventListener('input', function (e) { if (e.target.matches('input:not([type=checkbox]), textarea')) editing = true; });
   var isOpen = function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; };
   var openOnly = function () { return $('open-only').checked; };
@@ -106,6 +108,7 @@
 
   function card(action) {
     var c = el('article', null, 'card');
+    focusTarget(c, action.id === targetAction);
     var head = el('div', null, 'btn-row');
     head.style.alignItems = 'center';
     head.appendChild(el('span', agentName(action.agent_key), 'tag'));
@@ -274,7 +277,7 @@
 
   function render() {
     var list = $('list'); list.textContent = '';
-    var rows = all.filter(function (a) { return (filter === 'all' || (a.agent_key || 'autre') === filter) && (!openOnly() || isOpen(a)); });
+    var rows = all.filter(function (a) { return (a.id === targetAction || filter === 'all' || (a.agent_key || 'autre') === filter) && (a.id === targetAction || !openOnly() || isOpen(a)); });
     var open = all.filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
     $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
     if (!rows.length) { list.appendChild(el('p', openOnly() ? 'Rien n’attend de réponse. Décochez le filtre pour revoir ce qui a déjà été décidé.' : 'Rien à valider pour le moment.', 'empty')); return; }
@@ -296,6 +299,7 @@
 
   function mailCard(m) {
     var c = el('article', null, 'item'); c.style.flexDirection = 'column'; c.style.alignItems = 'stretch';
+    focusTarget(c, m.id === targetMessage);
     var head = el('div', null, 't'); head.style.flex = '0 0 auto';
     var client = m.audience === 'client';
     head.appendChild(el('span', (client ? 'AU CLIENT — ' : 'À : ') + m.recipients.join(', ')));
@@ -350,7 +354,7 @@
       if (!d.mail_configured) msay('Envoi pas encore branché : vous pouvez valider, l’envoi se fera une fois l’accès Google configuré (voir Mise en service).');
       var box = $('mail-list'); box.textContent = '';
       if (!d.messages.length) box.appendChild(el('p', 'Aucun message pour le moment.', 'empty'));
-      var shown = d.messages.filter(function (m) { return !openOnly() || m.status === 'pending_approval' || m.status === 'failed'; });
+      var shown = d.messages.filter(function (m) { return m.id === targetMessage || !openOnly() || m.status === 'pending_approval' || m.status === 'failed'; });
       if (d.messages.length && !shown.length) box.appendChild(el('p', 'Aucun message n’attend de réponse.', 'empty'));
       shown.slice(0, 30).forEach(function (m) { box.appendChild(mailCard(m)); });
     }).catch(function (e) { msay(mmsg(e)); });

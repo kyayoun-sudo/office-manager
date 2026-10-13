@@ -108,6 +108,7 @@
         <p class="lead" id="opp-waiting"></p>
         <div class="links" id="opp-links"></div>
         <dl class="facts" id="opp-facts"></dl>
+        <div id="reception-edit" hidden><label for="reception-date">Date de réception du TDR</label><input id="reception-date" type="date"><button class="btn ghost" id="reception-save" type="button">Enregistrer la date</button><p id="reception-say" class="status" role="status"></p></div>
         <details class="opp-journal"><summary class="meta">Journal des agents</summary><ul class="joblog" id="opp-log"></ul></details>
         <div class="btn-row" id="dup-row" hidden><button class="btn" id="not-dup" type="button">Ce n’est pas un doublon, continuer</button><a id="dup-link" href="#">Voir l’autre opportunité</a><span class="meta" id="dup-say"></span></div>
         <div class="btn-row" id="remove-row" hidden><button class="btn ghost" id="remove" type="button">Retirer cette opportunité</button><span class="meta" id="remove-say"></span></div>
@@ -116,6 +117,15 @@
       <section class="card" aria-labelledby="h-mine" id="mine-card" hidden>
         <h2 id="h-mine">À faire maintenant</h2>
         <div class="quick" id="mine" aria-live="polite"></div>
+      </section>
+      <section class="card" aria-labelledby="h-override" id="override-card" hidden>
+        <h2 id="h-override">Décision exceptionnelle du propriétaire</h2>
+        <p class="meta">Cette autorisation est conservée dans le journal. Les pièces manquantes et les validations du classeur restent ouvertes.</p>
+        <label for="override-target">Action autorisée</label><select id="override-target"><option value="kyc_prepare">Préparer le KYC maintenant</option><option value="mission_start">Commencer la planification de la mission</option><option value="audit_start">Commencer les travaux d’audit</option></select>
+        <label for="override-mission">Mission concernée (pour un démarrage)</label><select id="override-mission"><option value="">Choisir une mission</option></select>
+        <label for="override-reason">Motif (facultatif)</label><textarea id="override-reason" rows="2"></textarea>
+        <label for="override-open">Éléments restant ouverts (un par ligne)</label><textarea id="override-open" rows="3"></textarea>
+        <button id="override-save" class="btn" type="button">Enregistrer ma décision</button><p id="override-say" class="status" role="status"></p>
       </section>
 
       <section class="card" aria-labelledby="h-team" id="team-card" hidden>
@@ -272,6 +282,10 @@
     if (o.status === 'running') log.appendChild(el('li', 'Le Firm Manager travaille…', 'meta'));
     var role = (o.viewer && o.viewer.role) || '';
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
+    $('override-card').hidden = role !== 'owner' || ['removed', 'duplicate', 'running'].indexOf(o.status) >= 0;
+    if (role === 'owner' && $('override-mission').options.length === 1) OM.api('/api/missions').then(function (r) { (r.missions || []).forEach(function (m) { var option = document.createElement('option'); option.value = m.id; option.textContent = m.name || m.id; $('override-mission').appendChild(option); }); }).catch(function () {});
+    $('reception-edit').hidden = ['owner', 'partner', 'manager', 'bdm', 'secretary'].indexOf(role) < 0;
+    $('reception-date').value = o.tdr_received_at || '';
     $('won-card').hidden = o.status !== 'go' || !(lead || role === 'manager');
     drawMine(o, role);
     drawTeam(o, role);
@@ -705,6 +719,19 @@
   }
 
   $('won-file').addEventListener('change', function () { wonFile = this.files[0] || null; });
+  $('override-save').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'owner-override', opportunity_id: current.id, target: $('override-target').value, mission_id: $('override-mission').value || null, reason: $('override-reason').value, outstanding: $('override-open').value.split('\n').filter(function (s) { return s.trim(); }) })
+      .then(function (r) { $('override-say').textContent = r.override.status === 'pending' ? 'Décision conservée ; le démarrage reste en attente : ' + (r.override.error || '') : 'Décision enregistrée. Les éléments manquants restent ouverts.'; window.reloadOpportunity(); })
+      .catch(function (e) { $('override-say').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('reception-save').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    api({ action: 'reception-date', opportunity_id: current.id, tdr_received_at: $('reception-date').value })
+      .then(function (r) { $('reception-say').textContent = r.workbook_sync === 'pending' || r.workbook_sync === 'unverified' ? 'Date enregistrée ; synchronisation du classeur à vérifier.' : 'Date enregistrée.'; window.reloadOpportunity(); })
+      .catch(function (e) { $('reception-say').textContent = msg(e); })
+      .then(function () { b.disabled = false; });
+  });
   $('won-send').addEventListener('click', function () {
     var link = $('won-link').value.trim();
     if (!wonFile && !link) { $('won-say').textContent = 'Déposez la lettre ou collez son lien.'; return; }

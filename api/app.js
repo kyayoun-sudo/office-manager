@@ -229,6 +229,13 @@ export const ROUTES = Object.freeze({
     POST: users(ALL_ROLES, async (orgId, req) => {
       const b = req.body || {}, a = req.account;
       const T = () => import('../lib/doc-templates.js'), C = () => import('../lib/cv-bank.js'), S = () => import('../lib/secretariat.js');
+      if (['locate-document', 'confirm-document', 'unavailable-document'].includes(b.action)) {
+        if (!['owner', 'partner', 'manager', 'supervisor', 'bdm', 'secretary'].includes(a.role)) throw fail('ROLE_NOT_ALLOWED', 403);
+        if (b.mission_id) await requireMissionAccess(orgId, b.mission_id, a);
+        const index = await import('../lib/file-index.js');
+        if (b.action === 'unavailable-document') return index.confirmDocumentUnavailable(orgId, b, a);
+        return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
+      }
       if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
       if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
       if (b.action === 'create-document') return (await T()).createDocument(orgId, b, a);
@@ -511,6 +518,8 @@ export const ROUTES = Object.freeze({
       if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
+      if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
+      if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
       if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
@@ -844,7 +853,7 @@ export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
-const decisionLevel = req => ['sign'].includes(req.body?.action) ? 'review' : ['approve', 'decide', 'validate', 'review-decide', 'settings'].includes(req.body?.action) ? 'approve' : 'prepare';
+const decisionLevel = req => ['sign'].includes(req.body?.action) ? 'review' : ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override'].includes(req.body?.action) ? 'approve' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
