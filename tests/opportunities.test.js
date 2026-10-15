@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { independenceQuestions, keepProposals, riskProposals } from '../lib/opportunities.js';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
 import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence, assignKyc, getOpportunity, acceptExistingKyc } from '../lib/opportunities.js';
@@ -90,8 +91,8 @@ function fakeTidy(drive) {
   };
 }
 
-async function setup() {
-  const template = await buildTemplate();
+async function setup(templateOverride = null) {
+  const template = templateOverride || await buildTemplate();
   const drive = fakeDrive(template);
   // The Drive map the agents keep (scan state) and the opportunities folder.
   drive.add({ id: 'F03xxxxxxxxxxxxxxxxxxxxxxxxxxxx', name: '03_APPELS', parents: ['ROOT'], mimeType: 'application/vnd.google-apps.folder' });
@@ -123,6 +124,70 @@ async function setup() {
   return { drive, d, fired, events, audits };
 }
 const run = async (id, d) => { let o; for (let i = 0; i < 5; i++) { o = await opportunityStep('org', {}, { opportunity_id: id }, d); if (o.status !== 'running') break; } return o; };
+
+test('shared independence facts are prepared once; personal declarations and manager conclusions stay human', async () => {
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buildTemplate());
+  const ws = wb.getWorksheet('03_PHASE_1');
+  ws.getCell('B77').value = 'C.11'; ws.getCell('C77').value = 'Honoraires antérieurs impayés';
+  for (const cell of ['D77', 'I77']) ws.getCell(cell).fill = fill(INPUT);
+  const structure = await describeWorkbook(Buffer.from(await wb.xlsx.writeBuffer()));
+  assert.deepEqual(independenceQuestions(structure).map(q => q.ref), ['C.01']);
+  const props = keepProposals(structure, [
+    { sheet: '03_PHASE_1', row: 77, values: { D77: 'Facture en attente', I77: 'AUCUNE MENACE' }, sources: ['Comptabilité du cabinet'] },
+    { sheet: '03_PHASE_1', row: 76, values: { D76: 'aucun intérêt financier' }, sources: ['web'] }
+  ], ['mission-controller']);
+  assert.deepEqual(props['03_PHASE_1!77'].values, { D77: 'Facture en attente' });
+  assert.equal(props['03_PHASE_1!76'], undefined);
+  const writes = agentWrites(structure, props, {}, 'mission-controller').writes;
+  assert.equal(writes.find(w => w.cell === 'D77').value, 'Facture en attente');
+  assert.equal(writes.some(w => w.cell === 'I77' || w.cell === 'D76'), false);
+  assert.equal(agentWrites(structure, props, { '03_PHASE_1!D77': 'Réponse humaine' }, 'mission-controller').writes.length, 0);
+
+  const { d, drive } = await setup(Buffer.from(await wb.xlsx.writeBuffer()));
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(created.opportunity.id, d);
+  const partner = { role: 'partner', display_name: 'Associée', email: 'partner@cab.ci' };
+  const members = [{ name: 'Manager', email: 'm@cab.ci', role: 'Manager' }, { name: 'Auditor', email: 'a@cab.ci', role: 'Auditeur' }];
+  await validateTeam('org', { opportunity_id: o.id, members }, partner, d);
+  await onOpportunityWon('org', { object_id: o.id }, d);
+  await answerRow('org', { opportunity_id: o.id, sheet: '03_PHASE_1', row: 77, values: { D77: 'Facture à recouvrer' } }, partner, d);
+  for (const m of members) await declareIndependence('org', { opportunity_id: o.id, answers: { 'C.01': 'Non' }, certify: true }, { display_name: m.name, email: m.email }, d);
+  const back = await readCells(drive.files.get(o.workbook.id).buffer, [{ sheet: '03_PHASE_1', cell: 'D77' }]);
+  assert.equal(back['03_PHASE_1!D77'], 'Facture à recouvrer', 'personal declarations never clear or certify shared firm facts');
+});
+
+test('AI risk proposals require evidence, respect template lists and cannot write manager ratings or signatures', () => {
+  const structure = { sheets: [{ name: '03_PHASE_1', rows: [
+    { row: 10, label: 'Risque KYC', section: 'SECTION H — COTATION DU RISQUE', fields: [{ cell: 'D10', header: 'Cotation proposée', type: 'list', options: ['FAIBLE', 'MODERE', 'ELEVE'] }, { cell: 'F10', header: 'Justification', type: 'text' }] },
+    { row: 11, label: 'Cotation proposée par (Manager) / date', section: 'SECTION H — COTATION DU RISQUE', fields: [{ cell: 'D11', header: 'Nom du Manager', type: 'text' }] }
+  ] }] };
+  const rows = [
+    { sheet: '03_PHASE_1', row: 10, values: { D10: 'MODERE', F10: 'Pièces à compléter' }, why: 'Vérification incomplète', sources: ['Dossier client'] },
+    { sheet: '03_PHASE_1', row: 11, values: { D11: 'Manager inventé' }, sources: ['web'] }
+  ];
+  const proposals = riskProposals(structure, rows);
+  assert.deepEqual(Object.keys(proposals), ['03_PHASE_1!10']);
+  assert.equal(proposals['03_PHASE_1!10'].requires_manager_validation, true);
+  assert.equal(agentWrites(structure, proposals, {}, 'mission-controller').writes.length, 0);
+  assert.deepEqual(riskProposals(structure, [{ ...rows[0], sources: [] }]), {});
+  assert.deepEqual(riskProposals(structure, [{ ...rows[0], values: { D10: 'INVENTE' } }]), {});
+});
+
+test('KYC preparation receives existing answers and the internal mission register for named conflict research', async () => {
+  const { d } = await setup();
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(created.opportunity.id, d);
+  await onOpportunityWon('org', { object_id: o.id }, d);
+  await answerRow('org', { opportunity_id: o.id, sheet: '03_PHASE_1', row: 61, values: { D61: 'Dirigeante déjà confirmée' } }, { role: 'partner', email: 'partner@cab.ci', display_name: 'Associée' }, d);
+  await prepareKyc('org', {}, { opportunity_id: o.id }, null, d);
+  let prompt;
+  const after = await kycStep('org', {}, { opportunity_id: o.id }, { ...d, ai: async (order, input) => { prompt = input; return d.ai(order, input); } });
+  assert.equal(after.phase1.status, 'ready', after.phase1.error);
+  assert.match(prompt.input, /Dirigeante déjà confirmée/);
+  assert.match(prompt.input, /Audit SOCIETE IVOIRIENNE TEST 2024/);
+  assert.match(prompt.instructions, /noms complets/);
+  assert.match(prompt.instructions, /COTATION/);
+});
 
 test('already-filled workbook decisions are not asked again; assigning KYC preserves the original file and answers', async () => {
   const { d, drive } = await setup();

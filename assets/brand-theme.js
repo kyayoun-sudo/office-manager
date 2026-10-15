@@ -320,11 +320,15 @@
             var h = node('h2', iq.label); h.id = 'om-ask-title'; d.appendChild(h);
             d.appendChild(node('p', 'Votre déclaration d’indépendance, pour vous-même · ' + (indep.k + 1) + ' sur ' + q.questions.length));
             var dt = node('input'); dt.type = 'text'; dt.placeholder = 'Si « Oui » : précisez en quelques mots'; dt.className = 'om-ask-note'; d.appendChild(dt);
-            ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { indep.answers[iq.ref] = v; if (dt.value.trim()) indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });
+            dt.value = indep.details[iq.ref] || '';
+            if (indep.answers[iq.ref]) d.appendChild(node('p', 'Réponse enregistrée : ' + indep.answers[iq.ref]));
+            if (indep.k > 0) opts.appendChild(btn('Précédent', 'ghost', function () { indep.details[iq.ref] = dt.value.trim(); indep.k--; draw(); }));
+            ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { indep.answers[iq.ref] = v; indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });
           } else {
             var h2 = node('h2', 'Je certifie ces réponses'); h2.id = 'om-ask-title'; d.appendChild(h2);
             var n = Object.keys(indep.answers).filter(function (k) { return indep.answers[k] === 'Oui'; }).length;
             d.appendChild(node('p', n ? n + ' situation(s) déclarée(s) : le Manager et l’Associé les examineront.' : 'Aucune menace déclarée.'));
+            (q.questions || []).forEach(function (item, index) { opts.appendChild(btn('Corriger : ' + item.label, 'ghost', function () { indep.k = index; draw(); })); });
             opts.appendChild(btn('Je certifie et j’enregistre', '', function () { busy(); post({ action: 'declare', opportunity_id: q.opportunity_id, answers: indep.answers, details: indep.details, certify: true }).then(next).catch(fail); }));
           }
         } else {
