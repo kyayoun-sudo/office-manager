@@ -264,7 +264,7 @@
     var tick = function () {
       OM.api('/api/app?route=opportunities&id=' + encodeURIComponent(id)).then(function (o) {
         if (stop) return; render(o);
-        if ((o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing') || (o.quotation && ['queued', 'preparing'].indexOf(o.quotation.status) >= 0) || (o.commercial && o.commercial.analysis && o.commercial.analysis.status === 'queued')) timer = setTimeout(tick, 6000);
+        if ((o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing') || (o.quotation && ['queued', 'preparing'].indexOf(o.quotation.status) >= 0) || (o.workspace && ['queued', 'preparing'].indexOf(o.workspace.status) >= 0) || (o.commercial && o.commercial.analysis && o.commercial.analysis.status === 'queued')) timer = setTimeout(tick, 6000);
       }).catch(function (e) { if (stop) return; $('read-error').hidden = false; $('read-error').textContent = msg(e); });
     };
     tick();

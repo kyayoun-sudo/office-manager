@@ -101,6 +101,7 @@ STAFFING (MISSION LEVEL):
 
 MISSION INITIALISATION:
 When reliable evidence shows the mission has started (signed engagement letter/contract or another approved source) and the mission folder is not already initialised, you may create its folder skeleton from the approved structure template (folders only). The operation is idempotent: never overwrite or delete existing files. Work products come later, from the validated programme.
+For the cabinet's mission structure, use locate_required_document with document_type="mission_structure", document_role="template" and cycle=the mission type established from the scoping documents. Shared models have no mission_id. Inspect the selected model and reuse the mission's existing destination folder; do not create a competing mission dossier. If unresolved, the application presents a popup with a Drive-link input; never ask the user to retype an already confirmed reference. The workspace preparation action chains structure setup, applicable working files and sourced header prefill using the tools above. Report actual tool results and missing items; do not certify work from narrative alone.
 
 WORK STATES:
 Always distinguish REQUESTED / EXECUTED / VERIFIED. An issue closes only after the actual work/evidence has been re-checked. A reminder is not proof of completion.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { independenceQuestions, keepProposals, riskProposals, commercialAction, recordOpportunitySending, prepareParallelKyc, saveDeclarationDraft, confirmEngagementAgreement } from '../lib/opportunities.js';
+import { independenceQuestions, keepProposals, riskProposals, commercialAction, recordOpportunitySending, prepareParallelKyc, saveDeclarationDraft, confirmEngagementAgreement, requestMissionWorkspace, missionWorkspaceStep } from '../lib/opportunities.js';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
 import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence, assignKyc, getOpportunity, acceptExistingKyc } from '../lib/opportunities.js';
@@ -640,4 +640,30 @@ test('validating the team queues the budget before KYC and independence, without
   assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
   await validateTeam('org', input, account, { ...d, req: {} });
   assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
+});
+
+test('mission workspace queues once, preserves dossier state, and rechecks authority in the worker', async () => {
+  const { d, drive, fired } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const memory = [...drive.files.values()].find(f => f.name === 'OFFICE_MANAGER_OPPORTUNITIES.json');
+  const state = JSON.parse(memory.buffer.toString());
+  state.opportunities[o.id].mission_id = 'mission-id';
+  state.opportunities[o.id].handoff = { status: 'complete', folder_id: 'dest' };
+  memory.buffer = Buffer.from(JSON.stringify(state));
+  const account = { role: 'owner', email: 'owner@example.org' }, body = { opportunity_id: o.id };
+  await assert.rejects(requestMissionWorkspace('org', {}, body, { role: 'collaborator', email: 'other@example.org' }, d), /NOT_THE_MISSION_MANAGER/);
+  await requestMissionWorkspace('org', {}, body, account, d);
+  assert.equal((await requestMissionWorkspace('org', {}, body, account, d)).status, 'already_running');
+  assert.equal(fired.filter(f => f.body.workspace === true).length, 1);
+  let calls = 0;
+  const result = await missionWorkspaceStep('org', body, { ...d, fetchRows: async path => path.startsWith('office_app_users?') ? [account] : [{ id: 'mission-id', status: 'planning', drive_folder_id: 'dest' }], prepareWorkspace: async () => { calls++; return { status: 'reported', summary: 'Modèle à confirmer', review_required: true }; } });
+  assert.equal(result.status, 'reported'); assert.equal(calls, 1);
+  assert.equal((await missionWorkspaceStep('org', body, d)).status, 'not_queued');
+  const after = await getOpportunity(o.id, d);
+  assert.deepEqual(after.workbook, o.workbook); assert.deepEqual(after.answers, o.answers);
+  assert.equal(after.workspace.summary, 'Modèle à confirmer');
+  await requestMissionWorkspace('org', {}, body, account, d);
+  const revoked = await missionWorkspaceStep('org', body, { ...d, fetchRows: async () => [], prepareWorkspace: async () => { calls++; } });
+  assert.equal(revoked.status, 'failed'); assert.equal(calls, 1);
 });
