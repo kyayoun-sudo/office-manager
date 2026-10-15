@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { locateRequiredDocument, confirmDocumentReference, confirmDocumentUnavailable } from '../lib/file-index.js';
+import { locateRequiredDocument, confirmDocumentReference, confirmDocumentUnavailable, documentRequests } from '../lib/file-index.js';
+
+test('agents share one unresolved file-location request; human confirmation resolves it for every agent', async () => {
+  const { d } = setup(); d.ai = async () => ({ text: JSON.stringify({ file_id: null, ambiguous: true, confidence: 0 }) });
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'mission-controller' }, d);
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'sika' }, d);
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'mission-controller' }, d);
+  const requests = await documentRequests('org', d);
+  assert.equal(requests.length, 1); assert.deepEqual(requests[0].agents, ['mission-controller', 'sika']);
+  assert.deepEqual(await documentRequests('other-org', d), []);
+  await confirmDocumentReference('org', { ...request, file_id: 'f1' }, { role: 'owner', email: 'owner@example.org' }, d);
+  assert.deepEqual(await documentRequests('org', d), []);
+  const result = await locateRequiredDocument('org', { ...request, requested_by_agent: 'sika' }, d);
+  assert.equal(result.status, 'FOUND'); assert.equal(result.confidence, 100);
+});
 import { receptionDate, ficheWrites, findTemplate, ownerWorkflowOverride, setReceptionDate } from '../lib/opportunities.js';
 import { SENDERS, mayRecordSending } from '../lib/secretariat.js';
 
@@ -17,6 +31,15 @@ function setup() {
   return { d, calls, files, state: () => state };
 }
 const request = { document_type: 'quotation', document_role: 'template', requested_by_agent: 'mission-controller' };
+
+test('budget template search reads the workbook inside Budget rather than selecting its folder', async () => {
+  const { d, calls, files } = setup();
+  d.drive.searchFiles = async input => { assert.equal(input.query, 'budget'); return [{ id: 'budget-folder', name: 'budget', mimeType: 'application/vnd.google-apps.folder' }]; };
+  d.drive.listChildren = async id => { assert.equal(id, 'budget-folder'); return [{ ...files.f1, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }]; };
+  const result = await locateRequiredDocument('org', { ...request, document_type: 'quotation_workbook' }, d);
+  assert.equal(result.status, 'FOUND'); assert.equal(result.file.id, 'f1');
+  assert.ok(calls.includes('read:f1'));
+});
 
 test('required document: memory → mission → Drive → Orpailleur reads/analyzes; nothing moved or created', async () => {
   const { d, calls } = setup();

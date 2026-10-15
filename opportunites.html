@@ -179,6 +179,7 @@
 </div>
 <script src="/assets/brand-theme.js"></script>
 <script src="/assets/screens.js"></script>
+<script src="/assets/opportunity-workflow.js"></script>
 <script>
 (function () {
   var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
@@ -263,7 +264,7 @@
     var tick = function () {
       OM.api('/api/app?route=opportunities&id=' + encodeURIComponent(id)).then(function (o) {
         if (stop) return; render(o);
-        if ((o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing')) timer = setTimeout(tick, 6000);
+        if ((o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || o.status === 'running' || (o.phase1 && o.phase1.status === 'preparing') || (o.team && o.team.status === 'proposing') || (o.quotation && ['queued', 'preparing'].indexOf(o.quotation.status) >= 0) || (o.commercial && o.commercial.analysis && o.commercial.analysis.status === 'queued')) timer = setTimeout(tick, 6000);
       }).catch(function (e) { if (stop) return; $('read-error').hidden = false; $('read-error').textContent = msg(e); });
     };
     tick();
@@ -273,6 +274,7 @@
   function render(o) {
     var first = !current || current.updated_at !== o.updated_at;
     current = o;
+    if (window.OMWorkflow) window.OMWorkflow.render(o);
     $('h-opp').textContent = o.title || 'Opportunité';
     $('opp-status').textContent = STATUS[o.status] || o.status;
     $('opp-waiting').textContent = o.status === 'failed' ? 'Arrêt : ' + (o.error || '') : o.status === 'duplicate' ? 'POSSIBLE DUPLICATE — REVIEW REQUIRED : même référence qu’une opportunité existante. Rien n’a été créé.' : (o.summary || '');
@@ -305,12 +307,13 @@
     persons.value = o.kyc_responsible ? o.kyc_responsible.email : '';
     $('kyc-assigned').textContent = o.kyc_responsible ? 'Responsable : ' + o.kyc_responsible.name : '';
     $('kyc-existing-status').textContent = o.kyc_review ? 'KYC existant accepté par ' + o.kyc_review.by + ' le ' + UI.dateTime(o.kyc_review.at) + '. Les réponses du classeur sont conservées.' : '';
-    $('technical-offer').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=proposition';
+    $('technical-offer').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=' + encodeURIComponent(o.commercial && o.commercial.document_kind || 'proposition');
+    $('technical-offer').textContent = o.commercial && o.commercial.document_kind === 'mi' ? 'Préparer la manifestation d’intérêt et les CV' : 'Préparer l’offre technique et les CV';
     $('engagement-letter').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=lettre_mission';
     if (manages && $('override-mission').options.length === 1) OM.api('/api/missions').then(function (r) { (r.missions || []).forEach(function (m) { var option = document.createElement('option'); option.value = m.id; option.textContent = m.name || m.id; $('override-mission').appendChild(option); }); }).catch(function () {});
     $('reception-edit').hidden = ['owner', 'partner', 'manager', 'bdm', 'secretary'].indexOf(role) < 0;
     $('reception-date').value = o.tdr_received_at || '';
-    $('won-card').hidden = o.status !== 'go' || !(lead || role === 'manager');
+    $('won-card').hidden = !(['go', 'phase0', 'phase1'].indexOf(o.status) >= 0 && (lead || role === 'manager') && (!o.commercial || ['proposal_prepare', 'proposal_waiting'].indexOf(o.commercial.stage) >= 0));
     drawMine(o, role);
     drawTeam(o, role);
     $('again-row').hidden = !(o.status === 'phase0' && mayReview(role));
@@ -607,6 +610,7 @@
         var g = el('div', null, 'opp-fields');
         var a = document.createElement('select'); a.dataset.ref = q.ref; a.appendChild(new Option('—', '')); a.appendChild(new Option('Non', 'Non')); a.appendChild(new Option('Oui', 'Oui')); a.setAttribute('aria-label', q.label);
         var dtl = document.createElement('textarea'); dtl.dataset.detail = q.ref; dtl.placeholder = 'Si « Oui » : précisez'; dtl.rows = 1;
+        a.value = o.my_declaration_draft && o.my_declaration_draft.answers[q.ref] || ''; dtl.value = o.my_declaration_draft && o.my_declaration_draft.details[q.ref] || '';
         var l1 = el('label', 'Votre réponse'); l1.appendChild(a); var l2 = el('label', 'Précision'); l2.appendChild(dtl); g.appendChild(l1); g.appendChild(l2); row.appendChild(g);
         $('indep-qs').appendChild(row);
       });
@@ -620,6 +624,13 @@
     api({ action: 'declare', opportunity_id: current.id, answers: answers, details: details, certify: $('indep-certify').checked })
       .then(function (r) { $('indep-say').textContent = r.threats.length ? 'Déclaration enregistrée : ' + r.threats.length + ' situation(s) seront examinées par le Manager et l’Associé.' : 'Déclaration enregistrée : aucune menace.'; window.reloadOpportunity(); })
       .catch(function (e) { b.disabled = false; $('indep-say').textContent = msg(e); });
+  });
+  var saveDraft = el('button', 'Enregistrer le brouillon et reprendre plus tard', 'btn ghost'); saveDraft.type = 'button'; $('indep-send').parentNode.appendChild(saveDraft);
+  saveDraft.addEventListener('click', function () {
+    var answers = {}, details = {}, b = this; b.disabled = true;
+    document.querySelectorAll('#indep-qs select').forEach(function (s) { answers[s.dataset.ref] = s.value; });
+    document.querySelectorAll('#indep-qs textarea').forEach(function (s) { details[s.dataset.detail] = s.value; });
+    api({ action: 'declaration-draft', opportunity_id: current.id, answers: answers, details: details }).then(function () { $('indep-say').textContent = 'Brouillon enregistré. Il ne constitue pas une déclaration signée.'; }).catch(function (e) { $('indep-say').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
 
   function drawSheets(o) {

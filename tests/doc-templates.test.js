@@ -2,7 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
 import { makeDocx } from './helpers/make-docx.js';
-import { modelFields, fillModel, uploadTemplate, prepareValues, createDocument, opportunityValues, TEMPLATES_FILE } from '../lib/doc-templates.js';
+import { modelFields, fillModel, uploadTemplate, prepareValues, createDocument, opportunityValues, TEMPLATES_FILE, registerTemplateReference, templatesState } from '../lib/doc-templates.js';
+
+test('a confirmed existing model is registered once by reference, stays unchanged and requires recheck when changed', async () => {
+  const { d, files, created } = world(), bytes = await splitRunsDocx();
+  files.set('existing', { name: 'MI.docx', parent: 'ORIGINAL', buf: bytes, mt: 'v1' });
+  const dep = { ...d, documentReferences: async () => [{ document_role: 'template', file_id: 'existing', version: 'v1' }], drive: { ...d.drive,
+    getMeta: async id => id === 'existing' ? { id, name: 'MI.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', modifiedTime: files.get(id).mt } : d.drive.getMeta(id) } };
+  const body = { kind: 'mi', file_id: 'existing' }, account = { role: 'secretary', email: 's@example.org' };
+  const a = await registerTemplateReference('org', body, account, dep);
+  const b = await registerTemplateReference('org', body, account, dep);
+  assert.equal(a.template.id, 'existing'); assert.equal(b.template.version, 1);
+  assert.equal((await templatesState(dep)).templates.length, 1);
+  assert.deepEqual(files.get('existing').buf, bytes); assert.equal(created.some(f => f.parent === 'HOME/MODELES'), false);
+  files.get('existing').mt = 'v2';
+  await assert.rejects(prepareValues('org', { template_id: 'existing', opportunity_id: 'o1' }, account, dep), /CONFIRMED_DOCUMENT_CHANGED/);
+});
 
 async function splitRunsDocx() {
   // Word often cuts a field in several runs: {{CLI + ENT}}.

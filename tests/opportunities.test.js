@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { independenceQuestions, keepProposals, riskProposals } from '../lib/opportunities.js';
+import { independenceQuestions, keepProposals, riskProposals, commercialAction, recordOpportunitySending, prepareParallelKyc, saveDeclarationDraft, confirmEngagementAgreement } from '../lib/opportunities.js';
 import ExcelJS from 'exceljs';
 import { describeWorkbook, writeCells, readCells, validateWrites, namingRule, copyName, patchSheetXml } from '../lib/acceptance-workbook.js';
 import { createOpportunity, opportunityStep, answerRow, answerRows, opportunityTasks, myQuestions, removeOpportunity, listOpportunities, notDuplicate, findSpecialists, deciderOf, reviewSection, agentWrites, prepareAgain, markWon, onOpportunityWon, prepareKyc, kycStep, opportunityView, sheetOwner, rowAuthority, opportunityRound, teamStep, validateTeam, declareIndependence, assignKyc, getOpportunity, acceptExistingKyc } from '../lib/opportunities.js';
@@ -124,6 +124,73 @@ async function setup(templateOverride = null) {
   return { drive, d, fired, events, audits };
 }
 const run = async (id, d) => { let o; for (let i = 0; i < 5; i++) { o = await opportunityStep('org', {}, { opportunity_id: id }, d); if (o.status !== 'running') break; } return o; };
+
+test('AMI → MI → shortlist → proposal uses the same dossier and preserves KYC, team, answers and workbook', async () => {
+  const { d, drive } = await setup(), actor = { email: 'owner@cab.ci', role: 'owner', display_name: 'Owner' };
+  const created = await createOpportunity('org', {}, { name: 'AMI.pdf', base64: Buffer.from('x').toString('base64') }, actor, d);
+  const initial = await run(created.opportunity.id, d), workbook = initial.workbook.id;
+  await commercialAction('org', { opportunity_id: initial.id, milestone: 'classify', entry_kind: 'ami' }, actor, d);
+  await prepareParallelKyc('org', {}, { opportunity_id: initial.id }, actor, d);
+  const before = await getOpportunity(initial.id, d);
+  assert.equal(before.status, 'phase0', 'preparing KYC does not invent a commercial decision');
+  await assert.rejects(markWon('org', {}, { opportunity_id: initial.id, link: 'unused' }, actor, d), /AWARD_IS_NOT_SHORTLISTING/);
+  await recordOpportunitySending(initial.id, { kind: 'mi', status: 'declared', proof: { kind: 'link' } }, d);
+  await assert.rejects(commercialAction('org', { opportunity_id: initial.id, milestone: 'shortlisted', file_id: 'x'.repeat(30) }, actor, d), /COMMERCIAL_TRANSITION_INVALID/);
+  await recordOpportunitySending(initial.id, { kind: 'mi', status: 'sent', proof: { kind: 'receipt' } }, d);
+  const result = drive.add({ name: 'Presélection.pdf', mimeType: 'application/pdf', buffer: Buffer.from('x') });
+  await commercialAction('org', { opportunity_id: initial.id, milestone: 'shortlisted', file_id: result.id }, actor, d);
+  const ddp = drive.add({ name: 'DDP.pdf', mimeType: 'application/pdf', buffer: Buffer.from('x') });
+  await commercialAction('org', { opportunity_id: initial.id, milestone: 'proposal_received', file_id: ddp.id }, actor, d);
+  const after = await getOpportunity(initial.id, d);
+  assert.equal(after.commercial.stage, 'proposal_prepare'); assert.equal(after.workbook.id, workbook);
+  assert.deepEqual(after.answers, before.answers); assert.deepEqual(after.team, before.team); assert.deepEqual(after.phase1, before.phase1);
+  assert.ok(after.tdr_files.some(f => f.id === ddp.id));
+  await assert.rejects(commercialAction('org', { opportunity_id: initial.id, milestone: 'lost', file_id: result.id }, { role: 'auditor', email: 'a@cab.ci' }, d), /ROLE_NOT_ALLOWED/);
+});
+
+test('independence draft is private, resumes, and never certifies a person or completes the workbook', async () => {
+  const { d, drive } = await setup();
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, null, d);
+  const o = await run(created.opportunity.id, d), member = { name: 'Auditor', email: 'a@cab.ci', role: 'Auditeur' };
+  await validateTeam('org', { opportunity_id: o.id, members: [member] }, { role: 'owner', email: 'owner@cab.ci' }, d);
+  const bytes = Buffer.from(drive.files.get(o.workbook.id).buffer);
+  await saveDeclarationDraft('org', { opportunity_id: o.id, answers: { 'C.01': 'Oui', 'C.11': 'Non' }, details: { 'C.01': 'À préciser' } }, { email: member.email, display_name: member.name }, d);
+  const mine = await opportunityView('org', o.id, { email: member.email, display_name: member.name }, d);
+  assert.equal(mine.my_declaration_draft.answers['C.01'], 'Oui'); assert.equal(mine.my_declaration, null);
+  const other = await opportunityView('org', o.id, { role: 'owner', email: 'owner@cab.ci' }, d);
+  assert.equal(other.declaration_drafts, undefined); assert.equal(other.my_declaration_draft, null);
+  assert.deepEqual(drive.files.get(o.workbook.id).buffer, bytes);
+});
+
+test('written agreement is a separate partner review, never an automatic start', async () => {
+  const { d, drive } = await setup(), actor = { role: 'owner', email: 'owner@cab.ci' };
+  const created = await createOpportunity('org', {}, { name: 'DDP.pdf', base64: Buffer.from('x').toString('base64') }, actor, d);
+  const o = await run(created.opportunity.id, d);
+  await commercialAction('org', { opportunity_id: o.id, milestone: 'classify', entry_kind: 'proposal' }, actor, d);
+  await markWon('org', {}, { opportunity_id: o.id, name: 'Attribution.pdf', base64: Buffer.from('yes').toString('base64') }, actor, d);
+  const agreement = drive.add({ name: 'Contrat signé.pdf', mimeType: 'application/pdf', buffer: Buffer.from('signed') });
+  const body = { opportunity_id: o.id, file_id: agreement.id, confirm: true, signatory: 'Client', version: 'v1' };
+  await assert.rejects(confirmEngagementAgreement('org', body, { role: 'manager', email: 'manager@cab.ci' }, d), /PARTNER_DECISION_ONLY/);
+  await assert.rejects(confirmEngagementAgreement('org', { ...body, confirm: false }, actor, d), /AGREEMENT_CONFIRMATION_REQUIRED/);
+  const result = await confirmEngagementAgreement('org', body, actor, d);
+  assert.equal(result.agreement.status, 'verified'); assert.equal(result.mission_started, false);
+  assert.equal((await getOpportunity(o.id, d)).mission_id, undefined);
+});
+
+test('KYC finishing in the background preserves commercial progress and human answers entered during research', async () => {
+  const { d } = await setup(), actor = { role: 'owner', email: 'owner@cab.ci' };
+  const created = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, actor, d);
+  const o = await run(created.opportunity.id, d);
+  await prepareParallelKyc('org', {}, { opportunity_id: o.id }, actor, d);
+  const after = await kycStep('org', {}, { opportunity_id: o.id }, { ...d, ai: async (order, input) => {
+    await commercialAction('org', { opportunity_id: o.id, milestone: 'classify', entry_kind: 'ami' }, actor, d);
+    await answerRow('org', { opportunity_id: o.id, sheet: '03_PHASE_1', row: 61, values: { D61: 'Information confirmée pendant la recherche' } }, actor, d);
+    return d.ai(order, input);
+  } });
+  assert.equal(after.commercial.stage, 'mi_prepare');
+  assert.ok(after.answers.some(a => a.row === 61));
+  assert.equal(after.phase1.status, 'ready');
+});
 
 test('shared independence facts are prepared once; personal declarations and manager conclusions stay human', async () => {
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buildTemplate());
@@ -557,4 +624,20 @@ test('who decides: the business-development Associé named in Paramètres; the m
   assert.equal(deciderOf({ team }, sheet, rating, {}).who[0].name, 'K. Manager');
   assert.equal(deciderOf({ team }, { name: '04_CONCLUSION', title: 'Synthèse et décision' }, accept, {}).who[0].name, 'P. Partner');
   assert.equal(deciderOf({}, sheet, rating, {}), null, 'no team yet: any Manager may');
+});
+
+test('validating the team queues the budget before KYC and independence, without duplicate work', async () => {
+  const { d, fired } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const input = { opportunity_id: o.id, members: [{ name: 'Moussa', email: 'manager@example.org', role: 'Manager' }] };
+  const account = { display_name: 'Moussa', email: 'manager@example.org', role: 'manager' };
+  await validateTeam('org', input, account, { ...d, req: {} });
+  const current = await getOpportunity(o.id, d);
+  assert.equal(current.quotation.status, 'queued');
+  assert.equal(current.team.status, 'validated');
+  assert.ok(!current.phase1);
+  assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
+  await validateTeam('org', input, account, { ...d, req: {} });
+  assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
 });
