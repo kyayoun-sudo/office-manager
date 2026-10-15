@@ -63,13 +63,14 @@
     box.appendChild(status);
     var quote = document.getElementById('quotation-card');
     if (!quote) { quote = node('section', null, 'card'); quote.id = 'quotation-card'; box.parentNode.insertBefore(quote, box.nextSibling); }
-    quote.textContent = ''; quote.appendChild(node('h2', 'Cotation financière — Mission Controller'));
+    quote.textContent = ''; quote.appendChild(node('h2', 'Budget — Mission Controller'));
+    quote.appendChild(node('p', 'Préparation automatique dès la validation de l’équipe, avant le KYC et les déclarations d’indépendance. Le modèle est recherché dans le dossier Budget du cabinet.', 'meta'));
     quote.appendChild(node('p', 'Le classeur du cabinet est copié une seule fois pour ce dossier. Ses tarifs et formules restent en place ; les données connues sont préparées, les jours et montants non établis restent à compléter.', 'meta'));
-    var q = o.quotation || {}, qs = node('p', q.error || (q.status === 'prepared' ? 'Préparé — relecture et validation du management requises.' : q.question || ''), 'status'); qs.setAttribute('role', 'status');
-    if (q.file && q.file.url) quote.appendChild(link('Ouvrir le classeur de cotation', q.file.url));
-    if (q.configuration_href) quote.appendChild(link('Indiquer le modèle de cotation', q.configuration_href));
+    var q = o.quotation || {}, qs = node('p', q.error || (q.status === 'prepared' ? 'Préparé — relecture et validation du management requises.' : q.status === 'queued' || q.status === 'preparing' ? 'Mission Controller prépare le budget…' : q.question || ''), 'status'); qs.setAttribute('role', 'status');
+    if (q.file && q.file.url) quote.appendChild(link('Ouvrir le budget', q.file.url));
+    if (q.configuration_href) quote.appendChild(link('Indiquer le modèle budget', q.configuration_href));
     (q.questions || []).forEach(function (s) { quote.appendChild(node('p', s)); });
-    if (o.viewer && o.viewer.may_manage) { var b = button(q.file ? 'Compléter les entrées encore vides' : 'Préparer la cotation', function (b) { post(o, 'prepare-quotation', {}, b, qs); }); b.disabled = q.status === 'preparing'; quote.appendChild(b); }
+    if (o.viewer && o.viewer.may_manage) { var b = button(q.file ? 'Compléter les entrées encore vides' : 'Préparer le budget', function (b) { post(o, 'prepare-quotation', {}, b, qs); }); b.disabled = q.status === 'preparing' || q.status === 'queued'; quote.appendChild(b); }
     quote.appendChild(qs);
   }
   window.OMWorkflow = { render: render };

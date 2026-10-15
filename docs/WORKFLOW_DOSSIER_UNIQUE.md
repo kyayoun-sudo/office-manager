@@ -61,3 +61,8 @@ Aucune migration SQL, aucun remplacement de classeur, aucune suppression de fich
 Les tests couvrent les deux entrées, les transitions prouvées, les droits, la conservation pendant les recherches parallèles, les brouillons, les demandes de fichiers partagées, l'enregistrement de modèles par référence et la protection des tarifs/formules du classeur de cotation.
 
 Les écrans Opportunité → Secrétariat ont été contrôlés dans le navigateur avec des données fictives et sans erreur JavaScript. Les appels de production Drive, IA, courrier et signatures ne sont pas exécutés par cette recette locale ; la qualité du remplissage réel doit être examinée sur un dossier pilote autorisé après intégration.
+
+### Budget après validation de l’équipe
+La validation de l’équipe déclenche Mission Controller immédiatement, avant le KYC et les déclarations. Le modèle est recherché dans les dossiers Drive exactement nommés Budget (sans distinction de casse), puis les classeurs sont lus pour identifier le modèle. Plusieurs modèles plausibles nécessitent une confirmation. Les références déjà confirmées restent réutilisées. En l’absence de dossier Budget exploitable, la recherche cotation/devis existante reste disponible.
+Le budget réutilise le fichier de cotation du même dossier, sans nouveau stockage parallèle. Un modèle manquant ou un traitement échoué peut être repris à la validation de l’équipe. Aucune formule, saisie humaine ou tarif existant n’est écrasé.
+Validation ciblée : 40 tests, 37 réussis ; seuls les trois échecs préexistants de document-location persistent. Les tests ajoutés couvrent la recherche dans Budget et le déclenchement dès validation de l’équipe, avant phase 1, sans double traitement.

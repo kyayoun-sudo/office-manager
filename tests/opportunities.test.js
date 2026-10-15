@@ -625,3 +625,19 @@ test('who decides: the business-development Associé named in Paramètres; the m
   assert.equal(deciderOf({ team }, { name: '04_CONCLUSION', title: 'Synthèse et décision' }, accept, {}).who[0].name, 'P. Partner');
   assert.equal(deciderOf({}, sheet, rating, {}), null, 'no team yet: any Manager may');
 });
+
+test('validating the team queues the budget before KYC and independence, without duplicate work', async () => {
+  const { d, fired } = await setup();
+  const { opportunity } = await createOpportunity('org', {}, { name: 'TDR.pdf', base64: Buffer.from('x').toString('base64') }, { display_name: 'Awa' }, d);
+  const o = await run(opportunity.id, d);
+  const input = { opportunity_id: o.id, members: [{ name: 'Moussa', email: 'manager@example.org', role: 'Manager' }] };
+  const account = { display_name: 'Moussa', email: 'manager@example.org', role: 'manager' };
+  await validateTeam('org', input, account, { ...d, req: {} });
+  const current = await getOpportunity(o.id, d);
+  assert.equal(current.quotation.status, 'queued');
+  assert.equal(current.team.status, 'validated');
+  assert.ok(!current.phase1);
+  assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
+  await validateTeam('org', input, account, { ...d, req: {} });
+  assert.equal(fired.filter(f => f.path.includes('quotation-step')).length, 1);
+});
