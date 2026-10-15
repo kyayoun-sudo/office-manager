@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { locateRequiredDocument, confirmDocumentReference, confirmDocumentUnavailable } from '../lib/file-index.js';
+import { locateRequiredDocument, confirmDocumentReference, confirmDocumentUnavailable, documentRequests } from '../lib/file-index.js';
+
+test('agents share one unresolved file-location request; human confirmation resolves it for every agent', async () => {
+  const { d } = setup(); d.ai = async () => ({ text: JSON.stringify({ file_id: null, ambiguous: true, confidence: 0 }) });
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'mission-controller' }, d);
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'sika' }, d);
+  await locateRequiredDocument('org', { ...request, requested_by_agent: 'mission-controller' }, d);
+  const requests = await documentRequests('org', d);
+  assert.equal(requests.length, 1); assert.deepEqual(requests[0].agents, ['mission-controller', 'sika']);
+  assert.deepEqual(await documentRequests('other-org', d), []);
+  await confirmDocumentReference('org', { ...request, file_id: 'f1' }, { role: 'owner', email: 'owner@example.org' }, d);
+  assert.deepEqual(await documentRequests('org', d), []);
+  const result = await locateRequiredDocument('org', { ...request, requested_by_agent: 'sika' }, d);
+  assert.equal(result.status, 'FOUND'); assert.equal(result.confidence, 100);
+});
 import { receptionDate, ficheWrites, findTemplate, ownerWorkflowOverride, setReceptionDate } from '../lib/opportunities.js';
 import { SENDERS, mayRecordSending } from '../lib/secretariat.js';
 

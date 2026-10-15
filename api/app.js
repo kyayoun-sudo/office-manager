@@ -238,6 +238,7 @@ export const ROUTES = Object.freeze({
         return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
       }
       if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
+      if (b.action === 'register-reference-template') return (await T()).registerTemplateReference(orgId, b, a);
       if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
       if (b.action === 'methodology-draft') return (await T()).rewriteMethodology(orgId, b, a);
       if (b.action === 'create-document') return (await T()).createDocument(orgId, b, a);
@@ -501,6 +502,7 @@ export const ROUTES = Object.freeze({
     GET: users(ALL_ROLES, async (orgId, req) => {
       const o = await import('../lib/opportunities.js');
       if (req.query?.settings) return o.opportunitySettingsView(orgId);
+      if (req.query?.mission_id) { await requireMissionAccess(orgId, String(req.query.mission_id), req.account); return o.opportunityForMission(orgId, String(req.query.mission_id)); }
       return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
@@ -515,15 +517,20 @@ export const ROUTES = Object.freeze({
       if (a === 'remove') return o.removeOpportunity(orgId, b, req.account, { req });
       if (a === 'not-duplicate') return o.notDuplicate(orgId, req, b, req.account);
       if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
-      if (a === 'validate-team') return o.validateTeam(orgId, b, req.account);
+      if (a === 'validate-team') return o.validateTeam(orgId, b, req.account, { req });
       if (a === 'find-specialists') return o.findSpecialists(orgId, b, req.account);
       if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
+      if (a === 'declaration-draft') return o.saveDeclarationDraft(orgId, b, req.account);
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
       if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
       if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
       if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account, { req });
       if (a === 'transmit-documents') return o.requestOpportunityHandoff(orgId, req, b, req.account);
       if (a === 'assign-kyc') return o.assignKyc(orgId, b, req.account, { req });
+      if (a === 'commercial') return o.commercialAction(orgId, b, req.account, { req });
+      if (a === 'parallel-kyc') return o.prepareParallelKyc(orgId, req, b, req.account);
+      if (a === 'prepare-quotation') return o.prepareOpportunityQuotation(orgId, b, req.account);
+      if (a === 'confirm-agreement') return o.confirmEngagementAgreement(orgId, b, req.account);
       if (a === 'accept-existing-kyc') return o.acceptExistingKyc(orgId, b, req.account);
       if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
       if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
@@ -551,6 +558,8 @@ export const ROUTES = Object.freeze({
   'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-team-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).teamStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-quotation-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).quotationStep(orgId, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
+  'opportunity-commercial-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).commercialDocumentStep(orgId, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   'opportunity-handoff-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityHandoffStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
@@ -859,7 +868,7 @@ export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
-const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
+const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }

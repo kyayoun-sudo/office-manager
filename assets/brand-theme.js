@@ -172,6 +172,8 @@
       // Each role sees its own menu (2026-10-10: « tout le monde ne peut pas avoir la même interface »).
       // The server refuses what a role may not do; the menu only shows what it may.
       var role = OM.getRole();
+      var taskLabels = { '/accueil.html': 'Mon travail', '/rangement.html': 'Documents', '/pilotage.html': 'Pilotage' };
+      document.querySelectorAll('.nav a[href]').forEach(function (a) { var label = taskLabels[a.getAttribute('href')]; if (label) { a.textContent = label; a.setAttribute('aria-label', label); } });
       if (role) document.querySelectorAll('.nav a[href]').forEach(function (a) {
         var allowed = NAV_ROLES[a.getAttribute('href')];
         if (allowed && allowed.indexOf(role) < 0) a.hidden = true;
@@ -294,7 +296,11 @@
       document.body.appendChild(d);
       var i = 0, indep = null;
       var close = function () { d.close(); d.remove(); };
-      var snooze = function () { list.slice(i).forEach(function (q) { later[q.id] = Date.now() + 3600000; }); try { sessionStorage.setItem(LATER, JSON.stringify(later)); } catch (e) {} close(); };
+      var snooze = function () {
+        var finish = function () { list.slice(i).forEach(function (q) { later[q.id] = Date.now() + 3600000; }); try { sessionStorage.setItem(LATER, JSON.stringify(later)); } catch (e) {} close(); };
+        if (indep && list[i] && list[i].kind === 'independence') post({ action: 'declaration-draft', opportunity_id: list[i].opportunity_id, answers: indep.answers, details: indep.details }).then(finish).catch(function () { var error = node('p', 'Brouillon non enregistré : réessayez avant de fermer.', 'status error'); d.appendChild(error); });
+        else finish();
+      };
       var btn = function (label, cls, fn) { var b = node('button', label, 'btn' + (cls ? ' ' + cls : '')); b.type = 'button'; b.addEventListener('click', fn); return b; };
       function next() { i++; indep = null; draw(); }
       function draw() {
@@ -312,15 +318,16 @@
         if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
-          var go = node('a', String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+          var go = node('a', String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
         } else if (q.kind === 'independence') {
-          indep = indep || { k: 0, answers: {}, details: {} };
+          indep = indep || { k: 0, answers: Object.assign({}, q.draft && q.draft.answers), details: Object.assign({}, q.draft && q.draft.details) };
           var iq = q.questions[indep.k];
           if (iq) {
             var h = node('h2', iq.label); h.id = 'om-ask-title'; d.appendChild(h);
             d.appendChild(node('p', 'Votre déclaration d’indépendance, pour vous-même · ' + (indep.k + 1) + ' sur ' + q.questions.length));
             var dt = node('input'); dt.type = 'text'; dt.placeholder = 'Si « Oui » : précisez en quelques mots'; dt.className = 'om-ask-note'; d.appendChild(dt);
             dt.value = indep.details[iq.ref] || '';
+            dt.addEventListener('input', function () { indep.details[iq.ref] = dt.value.trim(); });
             if (indep.answers[iq.ref]) d.appendChild(node('p', 'Réponse enregistrée : ' + indep.answers[iq.ref]));
             if (indep.k > 0) opts.appendChild(btn('Précédent', 'ghost', function () { indep.details[iq.ref] = dt.value.trim(); indep.k--; draw(); }));
             ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { indep.answers[iq.ref] = v; indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });

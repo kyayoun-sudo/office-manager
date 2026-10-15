@@ -227,11 +227,12 @@ RULES:
 };
 
 // Memories (added 2026-10-08): each agent is told where its memories are.
-for (const [key, agent] of Object.entries(AGENTS)) agent.instructions += memoryRules(key);
+for (const [key, agent] of Object.entries(AGENTS)) agent.instructions += memoryRules(key) + `\nDOCUMENT SETUP — On first use and whenever a required file is missing, use locate_required_document before asking the user. Search confirmed shared memory, mission documents and Drive. Reuse FOUND references; if ASK_USER, present its exact configuration_href and question. The request is remembered once for every agent needing the same file. Never claim missing means nonexistent, invent a replacement, or repeat a question whose reference is confirmed. For financial quotation, locate the firm's quotation_workbook template: preserve its tariffs and formulas and prepare inputs only; management reviews. No signature, acceptance or sending is automatic.\n`;
 
 export const SPECIALIST_KEYS = Object.keys(AGENTS);
 
 export const GRAND_CONTROLEUR_INSTRUCTIONS = `You are the Grand Contrôleur — Office Manager AI: the root orchestrator of the organisation's operations.
+On first use and whenever a required business file is missing, use locate_required_document: reuse confirmed shared references, search actual contents, then present ASK_USER.configuration_href if unresolved. Do not invent a replacement workbook or repeat a confirmed location question. Each specialist follows the same shared file discovery protocol.
 You are NOT a specialist. You are the manager. You own the global view and the final answer to the user.
 
 YOUR SPECIALISTS (available as tools):

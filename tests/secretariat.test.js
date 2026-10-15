@@ -59,3 +59,18 @@ test('the secretariat sees the MI to prepare, nearest deadline first', async () 
   const v = await secretariatView('org', sec, d);
   assert.deepEqual(v.mi_to_prepare.map(x => x.opportunity_id), ['o3', 'o2']); assert.equal(v.me.may_send, true);
 });
+
+test('secretariat next action follows the dossier, and a sent CV never hides an offer', async () => {
+  const { d } = world({ ...mi(), kind: 'cv', status: 'sent', target: { kind: 'opportunity', id: 'offer' } }, {
+    listOpportunities: async () => ({ opportunities: [
+      { id: 'ami', status: 'go', kind: 'AMI' }, { id: 'offer', status: 'phase0', kind: 'DDP' },
+      { id: 'waiting', status: 'go', commercial: { stage: 'mi_waiting', document_kind: null } },
+      { id: 'awarded', status: 'won', commercial: { stage: 'awarded', document_kind: 'lettre_mission', label: 'Finaliser la lettre', href: '/secretariat.html?kind=lettre_mission' } }
+    ] })
+  });
+  const v = await secretariatView('org', sec, d);
+  assert.equal(v.document_queue.find(x => x.opportunity_id === 'ami').document_kind, 'mi');
+  assert.equal(v.document_queue.find(x => x.opportunity_id === 'offer').document_kind, 'proposition');
+  assert.equal(v.document_queue.some(x => x.opportunity_id === 'waiting'), false);
+  assert.equal(v.document_queue.find(x => x.opportunity_id === 'awarded').document_kind, 'lettre_mission');
+});

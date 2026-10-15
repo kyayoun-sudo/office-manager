@@ -599,6 +599,18 @@
   }
   function start() {
     OM.loadBranding().catch(function () {});
+    if (missionId) {
+      OM.api('/api/app?route=opportunities&mission_id=' + encodeURIComponent(missionId)).then(function (r) {
+        if (!r.opportunity) return;
+        var o = r.opportunity, c = o.commercial, box = el('section', null, 'card'); box.id = 'mission-next-action';
+        box.appendChild(el('h2', 'Prochaine étape du dossier'));
+        box.appendChild(el('p', c.label));
+        var action = el('a', c.label, 'btn'); action.href = c.href; box.appendChild(action);
+        var dossier = el('a', 'Retrouver l’équipe, le KYC et les documents', 'btn ghost'); dossier.href = '/opportunites.html?id=' + encodeURIComponent(o.id); box.appendChild(dossier);
+        var letter = el('a', 'Préparer la lettre de mission', 'btn ghost'); letter.href = '/secretariat.html?mission_id=' + encodeURIComponent(missionId) + '&kind=lettre_mission'; box.appendChild(letter);
+        var host = $('dossier-view'); host.insertBefore(box, host.firstChild);
+      }).catch(function () { /* the existing mission remains usable if no opportunity is linked */ });
+    }
     if (!missionId) { showList(); return; }
     // Remarks written in the work files by the Excel panel (branch « amelioration »).
     OM.api('/api/app?route=workfile&mission_id=' + encodeURIComponent(missionId)).then(function (d) {
