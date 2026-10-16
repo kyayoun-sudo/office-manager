@@ -32,6 +32,35 @@ function setup() {
 }
 const request = { document_type: 'quotation', document_role: 'template', requested_by_agent: 'mission-controller' };
 
+test('popup accepts a real Drive link and remembers a mission structure per mission type', async () => {
+  const { d, files } = setup();
+  files.model = { id: 'model', name: 'Modèle Due diligence', mimeType: 'application/vnd.google-apps.folder', modifiedTime: 'v1' };
+  const req = { document_type: 'mission_structure', document_role: 'template', cycle: 'DUE_DILIGENCE', requested_by_agent: 'mission-controller' };
+  const account = { role: 'owner', email: 'owner@example.org' };
+  await locateRequiredDocument('org', req, d);
+  await confirmDocumentReference('org', { ...req, file_link: 'https://drive.google.com/drive/folders/model?usp=sharing' }, account, d);
+  const found = await locateRequiredDocument('org', req, d);
+  assert.equal(found.status, 'FOUND'); assert.equal(found.reference.file_id, 'model');
+  assert.equal((await documentRequests('org', d)).length, 0);
+  assert.equal((await locateRequiredDocument('org', { ...req, cycle: 'AUDIT' }, d)).status, 'ASK_USER');
+  await assert.rejects(confirmDocumentReference('org', { ...req, file_link: 'https://example.org/drive/folders/model' }, account, d), /INVALID_DRIVE_LINK/);
+  await assert.rejects(confirmDocumentReference('org', { ...request, file_link: 'https://drive.google.com/drive/folders/model' }, account, d), /DOCUMENT_FILE_REQUIRED/);
+});
+
+test('mission structure is selected by inspected content for the mission type, ambiguity asks for a link', async () => {
+  const { d } = setup();
+  d.drive.searchFiles = async () => [{ id: 'structure', name: 'Modèle mission', mimeType: 'application/vnd.google-apps.folder' }];
+  d.drive.listChildren = async () => [{ id: 'instructions', name: 'Mode emploi', mimeType: 'text/plain' }];
+  d.drive.readText = async () => ({ text: 'Modèle vierge de mission Due diligence financière, programme et fichiers de travail.' });
+  let ambiguous = false;
+  d.ai = async (providers, input) => { assert.match(input.input, /DUE_DILIGENCE/); assert.match(input.input, /Modèle vierge/); return { text: JSON.stringify({ file_id: 'structure', confidence: 95, ambiguous }) }; };
+  const req = { document_type: 'mission_structure', document_role: 'template', cycle: 'DUE_DILIGENCE', requested_by_agent: 'mission-controller' };
+  assert.equal((await locateRequiredDocument('org', req, d)).file.id, 'structure');
+  ambiguous = true;
+  assert.equal((await locateRequiredDocument('org', req, d)).status, 'ASK_USER');
+  assert.equal((await documentRequests('org', d)).length, 1);
+});
+
 test('budget template search reads the workbook inside Budget rather than selecting its folder', async () => {
   const { d, calls, files } = setup();
   d.drive.searchFiles = async input => { assert.equal(input.query, 'budget'); return [{ id: 'budget-folder', name: 'budget', mimeType: 'application/vnd.google-apps.folder' }]; };

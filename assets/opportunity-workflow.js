@@ -72,6 +72,18 @@
     (q.questions || []).forEach(function (s) { quote.appendChild(node('p', s)); });
     if (o.viewer && o.viewer.may_manage) { var b = button(q.file ? 'Compléter les entrées encore vides' : 'Préparer le budget', function (b) { post(o, 'prepare-quotation', {}, b, qs); }); b.disabled = q.status === 'preparing' || q.status === 'queued'; quote.appendChild(b); }
     quote.appendChild(qs);
+    var workspace = document.getElementById('mission-workspace-card');
+    if (!workspace) { workspace = node('section', null, 'card'); workspace.id = 'mission-workspace-card'; quote.parentNode.insertBefore(workspace, quote.nextSibling); }
+    workspace.textContent = ''; workspace.appendChild(node('h2', 'Dossier et fichiers de travail — Mission Controller'));
+    workspace.appendChild(node('p', 'Après l’autorisation de démarrage et le transfert des documents : modèle adapté à la mission → structure du dossier → fichiers de travail applicables → préremplissage des informations connues.', 'meta'));
+    var w = o.workspace || {}, labels = { queued: 'Préparation en attente.', preparing: 'Mission Controller inspecte le modèle et prépare les fichiers.', reported: 'Compte rendu disponible — vérifiez les fichiers préparés et les points restant à traiter.' };
+    workspace.appendChild(node('p', w.error || labels[w.status] || 'La préparation commencera après la création autorisée du dossier de mission.', 'status'));
+    if (w.summary) { var report = node('details'); report.appendChild(node('summary', 'Voir le travail réalisé et les prochaines actions')); var content = node('p', w.summary); content.style.whiteSpace = 'pre-wrap'; report.appendChild(content); workspace.appendChild(report); }
+    if (o.handoff && o.handoff.url) workspace.appendChild(link('Ouvrir le dossier de mission', o.handoff.url));
+    if (o.viewer && o.viewer.may_manage && o.mission_id && o.handoff && o.handoff.status === 'complete') {
+      var status = node('p', '', 'status'); var prepare = button(w.status ? 'Reprendre la préparation des fichiers' : 'Préparer les fichiers de travail', function (b) { post(o, 'prepare-mission-files', {}, b, status); });
+      prepare.disabled = ['queued', 'preparing'].indexOf(w.status) >= 0 && Date.now() - Date.parse(w.started_at || w.requested_at) < 600000; workspace.appendChild(prepare); workspace.appendChild(status);
+    }
   }
   window.OMWorkflow = { render: render };
 })();

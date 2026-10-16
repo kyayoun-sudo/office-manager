@@ -526,6 +526,7 @@ export const ROUTES = Object.freeze({
       if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
       if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account, { req });
       if (a === 'transmit-documents') return o.requestOpportunityHandoff(orgId, req, b, req.account);
+      if (a === 'prepare-mission-files') return o.requestMissionWorkspace(orgId, req, b, req.account);
       if (a === 'assign-kyc') return o.assignKyc(orgId, b, req.account, { req });
       if (a === 'commercial') return o.commercialAction(orgId, b, req.account, { req });
       if (a === 'parallel-kyc') return o.prepareParallelKyc(orgId, req, b, req.account);

@@ -308,14 +308,24 @@
         if (i >= list.length) { d.appendChild(node('h2', 'Merci, c’est enregistré.')); var row0 = node('div', null, 'om-actions'); row0.appendChild(btn('Fermer', '', close)); d.appendChild(row0); return; }
         var q = list[i], say = node('p', '', 'status'), lastAnswer = null, overrideShown = false;
         d.appendChild(node('p', (list.length > 1 ? (i + 1) + ' sur ' + list.length + ' · ' : '') + q.title, 'om-ask-ctx'));
-        var fail = function (e) { say.className = 'status error'; say.textContent = { SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider, ou le propriétaire peut enregistrer une dérogation.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; });
+        var fail = function (e) { say.className = 'status error'; say.textContent = { INVALID_DRIVE_LINK: 'Collez un lien Google Drive ou Google Docs valide.', DOCUMENT_FILE_REQUIRED: 'Ce besoin attend un fichier, et non un dossier.', MISSION_ROOT_FOLDER_REQUIRED: 'Collez le lien du dossier Drive demandé.', SEPARATION_OF_FUNCTIONS: 'Vous avez préparé ou relu ce dossier : un autre Associé doit décider, ou le propriétaire peut enregistrer une dérogation.', PARTNER_DECISION_ONLY: 'Seul un Associé peut décider.' }[e.message] || e.message; [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = false; });
           if (!overrideShown && lastAnswer && window.OfficeManager.getRole() === 'owner' && ['SEPARATION_OF_FUNCTIONS', 'NOT_THE_DECIDING_PARTNER', 'NOT_THE_MISSION_MANAGER'].indexOf(e.message) >= 0) {
             overrideShown = true; opts.appendChild(btn('Valider par dérogation du propriétaire', '', function () { busy(); post(Object.assign({}, lastAnswer, { owner_override: true })).then(next).catch(fail); }));
           }
         };
         var busy = function () { [].forEach.call(d.querySelectorAll('button'), function (b) { b.disabled = true; }); say.className = 'status'; say.textContent = 'Enregistrement…'; };
         var opts = node('div', null, 'om-actions om-ask-opts');
-        if (q.kind === 'procedure') {
+        if (q.kind === 'document_location') {
+          var title = node('h2', q.question); title.id = 'om-ask-title'; d.appendChild(title);
+          if (q.context) d.appendChild(node('p', q.context));
+          var label = node('label', 'Lien Drive du modèle ou du dossier demandé'); label.htmlFor = 'om-document-link'; d.appendChild(label);
+          var locationInput = node('input'); locationInput.id = 'om-document-link'; locationInput.type = 'url'; locationInput.required = true; locationInput.placeholder = 'https://drive.google.com/…'; locationInput.className = 'om-ask-note'; d.appendChild(locationInput);
+          opts.appendChild(btn('Mémoriser ce lien', '', function () {
+            if (!locationInput.value.trim() || !locationInput.checkValidity()) { locationInput.reportValidity(); locationInput.focus(); return; }
+            busy(); OM.api('/api/app?route=secretariat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, q.document_request, { action: 'confirm-document', file_link: locationInput.value.trim() })) }).then(next).catch(fail);
+          }));
+          var advanced = node('a', 'Rechercher ou choisir parmi les fichiers', 'om-ask-link'); advanced.href = q.href; opts.appendChild(advanced);
+        } else if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
           var go = node('a', String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
@@ -354,7 +364,7 @@
         foot.appendChild(btn('Plus tard', 'ghost', snooze));
         if (q.opportunity_id) { var open = node('a', 'Voir l’opportunité', 'om-ask-link'); open.href = '/opportunites.html?id=' + encodeURIComponent(q.opportunity_id); foot.appendChild(open); }
         d.appendChild(foot); d.appendChild(say);
-        var first = d.querySelector('.om-ask-opts button, .om-ask-opts a'); if (first) first.focus();
+        var first = d.querySelector('#om-document-link, .om-ask-opts button, .om-ask-opts a'); if (first) first.focus();
       }
       d.addEventListener('cancel', function (e) { e.preventDefault(); snooze(); });
       draw(); d.showModal();
