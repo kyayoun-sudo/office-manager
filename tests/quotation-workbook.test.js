@@ -48,3 +48,7 @@ test('missing quotation model asks for location and denied AI permission sends n
   await assert.rejects(prepareQuotation('org', o, { ...w.d, permissions: async () => ({ granted: false }), ai: async () => { called = true; } }), /AGENTS_NOT_AUTHORIZED/);
   assert.equal(called, false);
 });
+test('zero valid writes never reports a prepared budget; existing copy remains accessible', async () => {
+ const w=await world();const result=await prepareQuotation('org',{id:'opp',folder:{id:'opp'}},{...w.d,ai:async()=>({text:JSON.stringify({writes:[],questions:['Où renseigner les noms ?']})})});
+ assert.equal(result.status,'needs_review');assert.equal(result.written,0);assert.match(result.question,/Aucune cellule/);assert.ok(result.file.url.includes('copy'));assert.deepEqual(w.files.get('master').buffer,w.original);
+});

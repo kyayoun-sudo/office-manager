@@ -5,9 +5,28 @@
   function post(o, action, extra, button, status) {
     button.disabled = true; status.textContent = 'En cours…';
     return window.OfficeManager.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: action, opportunity_id: o.id }, extra || {})) })
-      .then(function () { status.textContent = 'Enregistré.'; if (window.reloadOpportunity) window.reloadOpportunity(); })
+      .then(function (result) {
+        if (action === 'prepare-quotation') {
+          status.textContent = quotationMessage(result || {});
+          if (result && result.file && result.file.id) status.appendChild(link('Ouvrir le budget', result.file.url || 'https://drive.google.com/file/d/' + encodeURIComponent(result.file.id) + '/view'));
+        } else status.textContent = 'Enregistré.';
+        if (window.reloadOpportunity) window.reloadOpportunity();
+      })
       .catch(function (e) { var messages = { RESULT_DOCUMENT_REQUIRED: 'Indiquez le lien Drive du document reçu.', COMMERCIAL_TRANSITION_INVALID: 'Cette étape a changé. Actualisez le dossier.', QUOTATION_XLSX_REQUIRED: 'Confirmez le modèle Excel (.xlsx) de cotation.', QUOTATION_PREPARING: 'La cotation est déjà en préparation.', AGENTS_NOT_AUTHORIZED: 'Le cabinet doit autoriser les agents dans les paramètres.', DOCUMENT_ALREADY_LINKED: 'Ce document appartient déjà à une autre opportunité.' }; status.textContent = messages[e.code || e.message] || e.message; })
       .then(function () { button.disabled = false; });
+  }
+  function quotationMessage(q) {
+    var started = Date.parse((q.status === 'queued' ? q.requested_at : q.started_at) || '');
+    if (['preparing', 'queued'].indexOf(q.status) >= 0 && Number.isFinite(started) && Date.now() - started >= 300000) return 'La préparation n’a pas abouti dans le délai attendu. Aucun remplissage réussi n’est confirmé. Vous pouvez relancer ; le fichier existant sera réutilisé.';
+    if (q.error) return 'Préparation interrompue : ' + ({ NO_AI_PROVIDER_CONFIGURED: 'aucun fournisseur IA disponible ; vérifiez les paramètres du cabinet', TARGET_FOLDER_NOT_KNOWN: 'le dossier Drive de l’opportunité n’est pas identifié', QUOTATION_COPY_NOT_VERIFIED: 'l’emplacement de la copie du modèle n’a pas pu être vérifié', AGENTS_NOT_AUTHORIZED: 'les agents ne sont pas autorisés par le cabinet' }[q.error] || q.error) + '. Le fichier éventuellement créé reste accessible ci-dessous.';
+    if (q.status === 'prepared' && typeof q.written !== 'number') return 'Le budget est signalé préparé. Ouvrez-le pour vérifier les noms, jours et tarifs.';
+    if (q.status === 'prepared') return 'Budget préparé : ' + q.written + ' cellule(s) écrite(s), ' + q.verified + ' vérifiée(s) par relecture. Vérifiez les noms, jours et tarifs avant validation.';
+    if (q.status === 'unverified') return 'Des écritures ont été tentées, mais leur vérification est incomplète. Ouvrez le budget avant de continuer.';
+    if (q.question) return q.question;
+    if (q.status === 'queued' && !Number.isFinite(started)) return 'Une demande de préparation existe, sans heure de démarrage confirmée. Vous pouvez relancer la préparation.';
+    if (q.status === 'queued') return 'Demande enregistrée. Mission Controller doit encore démarrer le remplissage du budget.';
+    if (q.status === 'preparing') return 'Mission Controller prépare le budget. Le résultat apparaîtra ici après vérification.';
+    return 'Aucun budget préparé n’est confirmé pour ce dossier. Le bouton ci-dessous prépare une copie du modèle dans le dossier de l’opportunité.';
   }
   function button(text, fn) { var b = node('button', text, 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { fn(b); }); return b; }
   function documentId(value) { var v = String(value || '').trim(), m = v.match(/\/(?:d|folders)\/([-\w]+)|[?&]id=([-\w]+)/); return m ? m[1] || m[2] : /^[-\w]{25,}$/.test(v) ? v : ''; }
@@ -66,11 +85,12 @@
     quote.textContent = ''; quote.appendChild(node('h2', 'Budget — Mission Controller'));
     quote.appendChild(node('p', 'Préparation automatique dès la validation de l’équipe, avant le KYC et les déclarations d’indépendance. Le modèle est recherché dans le dossier Budget du cabinet.', 'meta'));
     quote.appendChild(node('p', 'Le classeur du cabinet est copié une seule fois pour ce dossier. Ses tarifs et formules restent en place ; les données connues sont préparées, les jours et montants non établis restent à compléter.', 'meta'));
-    var q = o.quotation || {}, qs = node('p', q.error || (q.status === 'prepared' ? 'Préparé — relecture et validation du management requises.' : q.status === 'queued' || q.status === 'preparing' ? 'Mission Controller prépare le budget…' : q.question || ''), 'status'); qs.setAttribute('role', 'status');
-    if (q.file && q.file.url) quote.appendChild(link('Ouvrir le budget', q.file.url));
+    var q = o.quotation || {}, qs = node('p', quotationMessage(q), 'status'); qs.setAttribute('role', 'status');
+    if (q.file && q.file.id) quote.appendChild(link('Ouvrir le budget', q.file.url || 'https://drive.google.com/file/d/' + encodeURIComponent(q.file.id) + '/view'));
+    if (o.folder && o.folder.id) quote.appendChild(link('Ouvrir le dossier de l’opportunité', o.folder.url || 'https://drive.google.com/drive/folders/' + encodeURIComponent(o.folder.id)));
     if (q.configuration_href) quote.appendChild(link('Indiquer le modèle budget', q.configuration_href));
     (q.questions || []).forEach(function (s) { quote.appendChild(node('p', s)); });
-    if (o.viewer && o.viewer.may_manage) { var b = button(q.file ? 'Compléter les entrées encore vides' : 'Préparer le budget', function (b) { post(o, 'prepare-quotation', {}, b, qs); }); b.disabled = q.status === 'preparing' || q.status === 'queued'; quote.appendChild(b); }
+    if (o.viewer && o.viewer.may_manage) { var b = button(q.file ? 'Compléter les entrées encore vides' : 'Préparer le budget', function (b) { post(o, 'prepare-quotation', {}, b, qs); }); b.disabled = ['preparing', 'queued'].indexOf(q.status) >= 0 && (Number.isFinite(Date.parse((q.status === 'queued' ? q.requested_at : q.started_at) || '')) && Date.now() - Date.parse(q.status === 'queued' ? q.requested_at : q.started_at) < 300000); quote.appendChild(b); }
     quote.appendChild(qs);
     var workspace = document.getElementById('mission-workspace-card');
     if (!workspace) { workspace = node('section', null, 'card'); workspace.id = 'mission-workspace-card'; quote.parentNode.insertBefore(workspace, quote.nextSibling); }
