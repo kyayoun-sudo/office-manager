@@ -4,7 +4,7 @@ Ajout progressif sur `feature/white-label-desktop`. Aucune fonctionnalité suppr
 
 ## Parcours livré
 
-Le bloc « SIKA · Débours de mission » apparaît dans la mission, l’accueil Finance/Manager et le secrétariat. Le raccordement est dans les Paramètres existants : aucune nouvelle page.
+Le bloc « SIKA · Débours de mission » apparaît dans un onglet supplémentaire de la mission (les onglets existants gardent leur ordre), l’accueil Finance/Manager et le secrétariat. Le raccordement est dans les Paramètres existants : aucune nouvelle page.
 
 1. Un membre affecté saisit description, date, montant/devise, personne ayant payé et justificatif PDF/JPEG/PNG (2 Mo maximum).
 2. Le connecteur existant sauvegarde le justificatif original sous un nom déterministe dans le dossier documentaire déjà enregistré de la mission. Parent et empreinte SHA-256 sont relus. Sans dossier connu, sans pièce ou si le dépôt échoue, aucune réussite n’est annoncée.
@@ -34,7 +34,7 @@ La plage doit correspondre aux véritables entrées du tableau, à l’intérieu
 ## Vérification
 
 - 12 tests métier nouveaux : circuit complet, scopes cabinet/mission, session humaine, revue indépendante, motif/accord client, version périmée, doublons/reprises, protection des formules, correction historisée, pièce modifiée, transfert automatique, mémoire stricte et sauvegarde réelle via l’adaptateur en mémoire.
-- Test Chromium : vrai composant → service réel → adaptateur documentaire simulé, dépôt → Partner/configuration → validation et écriture XLSX vérifiée → comptabilité/remboursement/facture ; écran mobile sans débordement, aucune erreur JS. Capture `/workspace/output/sika/debours-processus.png` (données fictives).
+- Test Chromium : vrai composant → service réel → adaptateur documentaire simulé, dépôt → Partner/configuration → validation et écriture XLSX vérifiée → comptabilité/remboursement/facture ; écran mobile sans débordement, aucune erreur JS ; ouverture et mise à jour du vrai mécanisme autoTabs vérifiées en isolation. Capture `/workspace/output/sika/debours-processus.png` (données fictives).
 - Routeur : refus GET/POST sans session personnelle, nombre de fonctions Vercel inchangé.
 - Deux anciennes fixtures `document-location.test.js` attendaient un démarrage alors que les prérequis étaient manquants. Elles vérifient désormais le blocage, puis simulent les prérequis complétés avant de tester la transition ou sa reprise en attente. Aucune modification des règles de production de ce workflow.
 - `npm test` : **686 tests, 686 réussites, aucun échec**. Contrôles syntaxiques et `git diff --check` réussis. Statut Vercel à consulter dans le compte rendu de livraison.

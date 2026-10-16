@@ -18,7 +18,7 @@
     return;
   if (path === "/mission.html" && !missionId) return;
   var main = document.querySelector(".main"),
-    host;
+    host = document.getElementById("sika-expenses");
   if (!main) return;
   var state,
     selected = missionId || "",
@@ -312,7 +312,7 @@
   }
   function render() {
     host.textContent = "";
-    host.append(node("h2", "SIKA · Débours de mission"));
+    var title = node("h2", "SIKA · Débours de mission"); title.id = "h-sika-expenses"; host.append(title);
     host.append(
       node(
         "p",
