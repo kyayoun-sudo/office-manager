@@ -28,9 +28,9 @@
   var body = document.createElement("div");
   body.className = "stack";
   section.appendChild(body);
-  var anchor = document.getElementById("area");
+  var anchor = document.getElementById("audit-sandbox-host");
   if (!anchor) return;
-  anchor.insertAdjacentElement("beforebegin", section);
+  anchor.appendChild(section);
   var busy = false;
   var errors = {
     NO_AI_PROVIDER_CONFIGURED:
