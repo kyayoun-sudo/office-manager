@@ -15,10 +15,17 @@
   button.onclick = function () { enabled = !enabled; localStorage.setItem(key, enabled ? 'on' : 'off'); unlock(); label(); };
   var host = document.querySelector('.nav') || document.querySelector('main');
   if (host) host.appendChild(button);
-  var panel;
-  if (OM.isManager() && host) {
-    panel = document.createElement('details'); var summary = document.createElement('summary'); summary.textContent = 'En ligne'; panel.appendChild(summary);
-    var list = document.createElement('div'); list.setAttribute('role', 'status'); panel.appendChild(list); host.appendChild(panel);
+  var panel, heading, list;
+  var dashboard = location.pathname === '/accueil.html' || location.pathname === '/accueil';
+  var space = document.getElementById('myspace');
+  if (OM.isManager() && dashboard && space) {
+    panel = document.createElement('section'); panel.className = 'card'; panel.id = 'online-team';
+    panel.setAttribute('aria-labelledby', 'online-team-heading');
+    var head = document.createElement('div'); head.className = 'card-head';
+    heading = document.createElement('h2'); heading.id = 'online-team-heading'; heading.textContent = 'Équipe en ligne'; head.appendChild(heading); panel.appendChild(head);
+    var note = document.createElement('p'); note.className = 'meta'; note.textContent = 'Les personnes de votre périmètre connectées récemment. Cliquez sur un nom pour discuter.'; panel.appendChild(note);
+    list = document.createElement('div'); list.className = 'links'; list.setAttribute('role', 'status'); list.textContent = 'Chargement des présences…'; panel.appendChild(list);
+    space.insertAdjacentElement('afterend', panel);
   }
   function ring(ids) {
     if (!enabled || !audio || audio.state !== 'running') return;
@@ -40,7 +47,7 @@
       badge.textContent = String(d.unread); badge.hidden = !d.unread;
       a.setAttribute('aria-label', 'Messages, ' + d.unread + ' non lus');
     });
-    if (panel) { panel.firstChild.textContent = '● En ligne (' + d.people.length + ')'; list.textContent = ''; d.people.forEach(function (p) { var a = document.createElement('a'); a.href = '/messagerie.html?to=' + encodeURIComponent(p.email); a.textContent = '● ' + p.name; a.style.cssText = 'display:block;padding:6px;color:inherit'; list.appendChild(a); }); if (!d.people.length) list.textContent = 'Aucune présence récente dans votre périmètre.'; panel.title = 'Onglets visibles récemment · actualisation 5 s · expiration 45 s'; }
+    if (panel) { heading.textContent = 'Équipe en ligne (' + d.people.length + ')'; list.textContent = ''; d.people.forEach(function (p) { var a = document.createElement('a'); a.href = '/messagerie.html?to=' + encodeURIComponent(p.email); a.textContent = '● ' + p.name; a.className = 'btn ghost'; a.style.cssText = 'display:inline-flex;align-items:center;gap:6px'; list.appendChild(a); }); if (!d.people.length) list.textContent = 'Aucune présence récente dans votre périmètre.'; panel.title = 'Onglets visibles récemment · actualisation 5 s · expiration 45 s'; }
     var fresh = d.unread_ids.filter(function (id) { return previous && previous.indexOf(id) < 0; });
     if (fresh.length) ring(fresh);
     previous = d.unread_ids;
@@ -52,7 +59,7 @@
     var beat = !document.hidden && Date.now() - lastBeat > 14000;
     if (beat) lastBeat = Date.now();
     OM.api('/api/app?route=chat' + (beat ? '' : '&live=1'), beat ? { method: 'POST', body: JSON.stringify({ action: 'heartbeat' }) } : undefined)
-      .then(render).catch(function () { if (panel) { panel.firstChild.textContent = 'Présence indisponible'; list.textContent = 'Connexion ou configuration à vérifier.'; } }).finally(function () { busy = false; });
+      .then(render).catch(function () { if (panel) { heading.textContent = 'Présence indisponible'; list.textContent = 'Connexion ou configuration à vérifier.'; } }).finally(function () { busy = false; });
   }
   window.addEventListener('om-chat-read', poll);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });

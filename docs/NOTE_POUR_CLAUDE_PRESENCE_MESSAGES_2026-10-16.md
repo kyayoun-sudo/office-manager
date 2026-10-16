@@ -13,3 +13,6 @@ Installation requise : exécuter db/live-collaboration.sql sur la base de l’en
 Limites : polling, présence approximative après fermeture, compteur limité à la fenêtre courante du chat (2000 messages/24 h), pas de notification système/mobile en arrière-plan. Le son réel et deux sessions du cabinet nécessitent une recette sur la prévisualisation après installation SQL. Les tests locaux ne prouvent pas une installation distante.
 
 Vérifications : 4 tests métier supplémentaires (identité serveur, compteurs, périmètre, refus de mission), test SQL répété avec RLS et refus anon/authenticated ; routeur, notifications et mémoire passent. Suite générale : les trois échecs préexistants de document-location restent hors périmètre. Installation complète exécutée deux fois dans PGlite ; aucune base distante touchée.
+
+## Emplacement corrigé à la demande de Paul
+La présence quitte la navigation : elle apparaît maintenant dans une carte « Équipe en ligne » du tableau de bord accueil, juste après Mon espace, pour les managers/superviseurs/associés/owner. Aucun registre de présence ajouté aux autres pages. Compteurs et alertes restent disponibles globalement.
