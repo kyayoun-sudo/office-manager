@@ -4,7 +4,7 @@
 
 L’utilisateur a validé le développement : « ok code, tu ne detruit pas ce qu’on a deja ». Conserver les fonctions et travailler sur la présentation et la continuité des dossiers. Le cahier consolidé décrit une cible plus large que ce lot ; ne pas annoncer ses 49 sections comme réalisées.
 
-Dépôt : `kyayoun-sudo/office-manager`. Base distante observée : branche production Vercel `feature/white-label-desktop`, commit `9a4f0ffcd4ac0b5c5169502bbf89dc89dc0e6a49`. Travail local isolé : branche `feature/mission-workspace-extension`.
+Dépôt : `kyayoun-sudo/office-manager`. Base de travail distante observée : branche `feature/white-label-desktop`, commit `9a4f0ffcd4ac0b5c5169502bbf89dc89dc0e6a49`. Travail local isolé : branche `feature/mission-workspace-extension`.
 
 ## Réparation nécessaire du lot précédent
 
@@ -54,4 +54,13 @@ La note du paquet précédent `NOTE_POUR_CLAUDE_DOSSIERS_2026-10-16.md` précise
 
 Appliquer le lot en conservant ses chemins, jamais tous les fichiers à la racine. Le code est poussé sur `feature/mission-workspace-extension`, commit initial `704a9d2e8a524c3dd172728fcf0cacf0a8f9e650`. Utiliser la pull request vers `feature/white-label-desktop` pour conserver automatiquement les chemins. Aucun upload manuel à plat n’est nécessaire. Un ZIP de sources et un patch peuvent être générés depuis cette branche pour la transmission technique.
 
-Pull request : https://github.com/kyayoun-sudo/office-manager/pull/8 vers `feature/white-label-desktop`. La prévisualisation du commit initial a atteint READY sur Vercel ; les pages et scripts nouveaux répondent 200, l’API sans authentification répond 401. La simple création d’une branche ou d’une PR ne prouve pas un déploiement en production. Vérifier séparément l’état GitHub/Vercel mentionné dans le fichier de livraison ; ne pas annoncer une publication si elle n’a pas réussi. Le retour arrière du code se fait par revert du commit ; la désactivation du connecteur se fait en retirant ses variables backend, sans effacer ses fichiers ni ses versions.
+Pull request fusionnée : https://github.com/kyayoun-sudo/office-manager/pull/8 vers `feature/white-label-desktop`, merge `9a4625214b5385c0c58545615a210aa51476366c`. La prévisualisation du commit initial a atteint READY sur Vercel ; les pages et scripts nouveaux répondent 200, l’API sans authentification répond 401. La simple création d’une branche ou d’une PR ne prouve pas un déploiement en production. Vérifier séparément l’état GitHub/Vercel mentionné dans le fichier de livraison ; ne pas annoncer une publication si elle n’a pas réussi. Le retour arrière du code se fait par revert du commit ; la désactivation du connecteur se fait en retirant ses variables backend, sans effacer ses fichiers ni ses versions.
+
+
+## État de publication vérifié après intégration
+
+La branche `feature/white-label-desktop` contient les ajouts et la réparation. Vercel construit cette branche en **Preview**, et non en production. L’URL de production `https://office-manager-personal-pilot.vercel.app` pointe actuellement vers `main`, commit `310b08d142f1d97bceb65586d2e6a71839eb75cb`, qui correspond à une version nettement plus ancienne. Les centaines de différences comprennent beaucoup de développements antérieurs à ce lot et certains anciens fichiers supprimés dans l’historique de la branche de travail.
+
+**Main et le déploiement de production n’ont pas été modifiés par ce lot.** Ne pas promouvoir aveuglément la Preview : elle utilise le mode test de l’application et la publication de toute cette branche vers main représente un périmètre plus large que ce lot. Une question a été adressée à l’utilisateur pour choisir entre la vérification en Preview et la préparation d’une mise à jour complète de main. Conserver les changements propres à main et faire une recette d’intégration avant ce second passage.
+
+Prévisualisation du merge : `https://office-manager-personal-pilot-iicjwh1sa-paul-bc10.vercel.app`. Vérifier son état Vercel et l’alias de branche pour une version documentaire plus récente. L’API de la Preview nécessite les comptes et la configuration de test ; les contrôles HTTP ne constituent pas une connexion avec un compte réel.
