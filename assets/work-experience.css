@@ -1,0 +1,122 @@
+.work-welcome {
+  background: var(--surface, #fff);
+  border-top: 3px solid #172b4d;
+  padding: 24px;
+  box-shadow: none;
+}
+.work-welcome h2 {
+  font-size: 25px;
+  margin: 4px 0 10px;
+  color: var(--ink, #172b4d);
+}
+.work-eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.work-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+.work-priorities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.work-priority {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  text-decoration: none;
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.work-priority:hover {
+  border-color: var(--brand);
+  background: var(--soft);
+}
+.work-continue {
+  font-size: 13px;
+  color: var(--brand);
+  margin-top: auto;
+}
+.work-secondary {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 12px 0;
+  background: var(--surface);
+}
+.work-secondary > summary {
+  padding: 16px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+.work-secondary > section {
+  margin: 0;
+  padding: 18px;
+  box-shadow: none;
+  border: 0;
+}
+.work-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+.dossier-find {
+  width: min(100%, 560px);
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  margin: 12px 0;
+}
+@media (max-width: 600px) {
+  .work-welcome {
+    padding: 18px;
+  }
+  .work-priorities {
+    grid-template-columns: 1fr;
+  }
+  .work-quick-actions > .btn {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+  .work-context .meta {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .work-priority {
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+  }
+}
+.dossier-help > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.dossier-help .links {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dossier-find ~ .dossier-index-grid [hidden] {
+  display: none !important;
+}

@@ -31,7 +31,10 @@
   var anchor = document.getElementById("audit-sandbox-host");
   if (!anchor) return;
   anchor.appendChild(section);
-  var busy = false;
+  var busy = false,
+    running = false,
+    latest = null,
+    drafts = {};
   var errors = {
     NO_AI_PROVIDER_CONFIGURED:
       "Configurez un fournisseur IA dans les paramètres avant de lancer cet exercice.",
@@ -47,7 +50,10 @@
       "Une étape est déjà en cours pour cette organisation.",
   };
   function api(action, data) {
-    if (busy) return Promise.reject(new Error("Une étape est déjà en cours."));
+    if (busy) {
+      status.textContent = "Une étape est déjà en cours.";
+      return Promise.resolve(null);
+    }
     busy = true;
     status.textContent = "Exécution…";
     return OM.api("/api/app?route=shadow", {
@@ -59,6 +65,7 @@
       })
       .catch(function (e) {
         status.textContent = errors[e.message] || e.message;
+        return null;
       })
       .finally(function () {
         busy = false;
@@ -76,13 +83,60 @@
   button(controls, "Nouvelle campagne", function () {
     api("sandbox-create", { seed: Number(seed.value) });
   });
+  var run = button(controls, "Continuer l’entraînement", async function () {
+    if (running || busy) return;
+    running = true;
+    run.disabled = true;
+    pause.hidden = false;
+    try {
+      var data = latest;
+      if (!data || !data.campaign)
+        data = await api("sandbox-create", { seed: Number(seed.value) });
+      for (var i = 0; running && !section.closest("[hidden]") && data && i < 50; i++) {
+        var next = data.campaign.organisations.find(function (o) {
+          return o.status !== "completed" && o.steps < 10;
+        });
+        if (!next) break;
+        data = await api("sandbox-step", { organisation: next.id });
+        if (data && running)
+          status.textContent =
+            "Progression enregistrée · " +
+            next.name +
+            " · " +
+            data.campaign.organisations.filter(function (o) {
+              return o.status === "completed";
+            }).length +
+            " / 5 exercices terminés";
+      }
+    } finally {
+      running = false;
+      run.disabled = false;
+      pause.hidden = true;
+    }
+  });
+  var pause = button(controls, "Mettre en pause", function () {
+    running = false;
+    status.textContent = "Pause demandée. L’étape en cours sera enregistrée.";
+  });
+  pause.hidden = true;
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) running = false;
+  });
+  var help = document.createElement("p");
+  help.className = "small";
+  help.textContent =
+    "Un clic pour enchaîner les exercices tant que cette page reste visible. Vous pouvez mettre en pause ; les validations de leçons restent humaines et les limites de budget restent appliquées.";
+  section.insertBefore(help, status);
   var download = button(controls, "Télécharger les résultats", function () {});
   download.hidden = true;
   function load() {
     return OM.api("/api/app?route=shadow&sandbox=1").then(function (d) {
+      latest = d;
       body.textContent = "";
       status.textContent = d.campaign
-        ? "Campagne " + d.campaign.id + " · " + d.campaign.status
+        ? d.campaign.organisations.filter(function (o) {
+            return o.status === "completed";
+          }).length + " / 5 exercices terminés · progression enregistrée"
         : "Prêt. Créez une campagne pour commencer.";
       download.hidden = !d.campaign;
       download.onclick = function () {
@@ -138,6 +192,10 @@
               api("sandbox-step", { organisation: o.id });
             }).disabled = o.status === "completed";
             var correction = document.createElement("textarea");
+            correction.value = drafts[o.id] || "";
+            correction.addEventListener("input", function () {
+              drafts[o.id] = correction.value;
+            });
             correction.placeholder =
               "Correction humaine expliquée : constat, cause, bonne méthode…";
             correction.setAttribute("aria-label", "Correction pour " + o.name);
@@ -179,6 +237,7 @@
           body.appendChild(card);
         },
       );
+      return d;
     });
   }
   load().catch(function (e) {
