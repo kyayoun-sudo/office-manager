@@ -12,7 +12,7 @@
         } else status.textContent = 'Enregistré.';
         if (window.reloadOpportunity) window.reloadOpportunity();
       })
-      .catch(function (e) { var messages = { RESULT_DOCUMENT_REQUIRED: 'Indiquez le lien Drive du document reçu.', COMMERCIAL_TRANSITION_INVALID: 'Cette étape a changé. Actualisez le dossier.', QUOTATION_XLSX_REQUIRED: 'Confirmez le modèle Excel (.xlsx) de cotation.', QUOTATION_PREPARING: 'La cotation est déjà en préparation.', AGENTS_NOT_AUTHORIZED: 'Le cabinet doit autoriser les agents dans les paramètres.', DOCUMENT_ALREADY_LINKED: 'Ce document appartient déjà à une autre opportunité.' }; status.textContent = messages[e.code || e.message] || e.message; })
+      .catch(function (e) { var messages = { RESULT_DOCUMENT_REQUIRED: 'Indiquez le lien Drive du document reçu.', COMMERCIAL_TRANSITION_INVALID: 'Cette étape a changé. Actualisez le dossier.', WORKBOOK_LEGEND_NOT_FOUND: 'Le format du modèle n’a pas été reconnu. Aucun remplissage réussi n’est confirmé.', QUOTATION_XLSX_REQUIRED: 'Confirmez le modèle Excel (.xlsx) de cotation.', QUOTATION_PREPARING: 'La cotation est déjà en préparation.', AGENTS_NOT_AUTHORIZED: 'Le cabinet doit autoriser les agents dans les paramètres.', DOCUMENT_ALREADY_LINKED: 'Ce document appartient déjà à une autre opportunité.' }; status.textContent = messages[e.code || e.message] || e.message; })
       .then(function () { button.disabled = false; });
   }
   function quotationMessage(q) {

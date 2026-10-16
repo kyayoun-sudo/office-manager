@@ -20,3 +20,12 @@ test('app router: stays within the Vercel Hobby limit of 12 functions', () => {
   const fns = readdirSync(new URL('../api/', import.meta.url)).filter(f => /\.(js|ts|mjs)$/.test(f));
   assert.ok(fns.length <= 12, 'api/ has ' + fns.length + ' functions');
 });
+test('validation errors from workbook inspection keep their actionable 422 code', async () => {
+ const {default: app}=await import('../api/app.js');
+ const route='chat'; const original = ROUTES[route].GET;
+ process.env.OFFICE_MANAGER_ACCESS_TOKEN='t';process.env.DEFAULT_ORG_ID='org-1';
+ ROUTES[route].GET=()=>{throw Object.assign(new Error('WORKBOOK_LEGEND_NOT_FOUND'),{statusCode:422});};
+ let status,body;const res={setHeader(){},status(n){status=n;return this;},json(b){body=b;return this;}};
+ try {await app({method:'GET',query:{route},headers:{'x-office-manager-token':'t'}},res);assert.equal(status,422);assert.equal(body.error,'WORKBOOK_LEGEND_NOT_FOUND');}
+ finally {ROUTES[route].GET=original;}
+});

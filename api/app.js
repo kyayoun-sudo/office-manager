@@ -953,7 +953,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = error.statusCode || 500;
     const route = ROUTES[String(req.query?.route || '')];
-    const shown = [400, 401, 403, 404, 405, 409, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
+    const shown = [400, 401, 403, 404, 405, 409, 422, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
     if (status >= 500) {
       // The real cause, short and without secrets, so the screen (and the logs) say what broke.
