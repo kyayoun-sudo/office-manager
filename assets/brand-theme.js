@@ -812,5 +812,23 @@
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
+  // Additive dossier navigation: existing screens and their controls remain available.
+  function addDossierNavigation() {
+    if (onLoginPage() || inExcel() || !readSession()) return;
+    var nav = document.querySelector('.nav');
+    if (nav && !nav.querySelector('a[href="/dossiers.html"]') && OM.getRole() !== 'it_admin') {
+      var a = node('a', 'Mes dossiers'); a.href = '/dossiers.html';
+      var brand = nav.querySelector('.brand');
+      nav.insertBefore(a, brand ? brand.nextSibling : nav.firstChild);
+    }
+    var main = document.querySelector('.main'), p = new URLSearchParams(location.search);
+    var mission = location.pathname === '/mission.html' ? p.get('id') : p.get('mission_id');
+    var opportunity = location.pathname === '/opportunites.html' ? p.get('id') : p.get('opportunity_id');
+    if (main && location.pathname !== '/dossiers.html' && (mission || opportunity)) {
+      var q = new URLSearchParams(); if (mission) q.set('mission_id', mission); if (opportunity) q.set('opportunity_id', opportunity);
+      var link = node('a', 'Voir le dossier, les travaux et les relais →', 'btn ghost'); link.href = '/dossiers.html?' + q;
+      main.insertBefore(link, main.firstChild);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addDossierNavigation); else addDossierNavigation();
 })();
-

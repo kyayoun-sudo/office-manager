@@ -1,5 +1,3 @@
-import { requireScreenAccess } from '../lib/permissions.js';
-import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
 import { requirePilotAccess } from '../lib/auth.js';
 import { requireFirmOwner } from '../lib/owner-auth.js';
 import { getBranding, saveBranding } from '../lib/branding.js';
@@ -8,7 +6,7 @@ import { smartSearch } from '../lib/smart-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount, restartFirm, resetFirm } from '../lib/accounts.js';
+import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount } from '../lib/accounts.js';
 import { translateTexts } from '../lib/translate-ui.js';
 import { providersStatus } from '../lib/ai-plus.js';
 import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityReport, capabilityContext } from '../lib/capabilities.js';
@@ -16,7 +14,6 @@ import { engagementMissions, tdrCandidates, engagementState, startEngagementPrep
 import { submissionState, startSubmissionReview, submissionStep } from '../lib/submissions.js';
 import { auditorState, auditorReviews, startAuditorReview, auditorStep } from '../lib/enhanced-auditor.js';
 import { startDepositAnalysis, depositStep, depositState, listDeposits, attachDeposit } from '../lib/deposit-analysis.js';
-import { startSession, beat, endSession, reviewWorkbook, listRemarks, updateRemark, myWorkfileActions, decideWorkfileAction, workfileKpis } from '../lib/workfiles.js';
 import { diagnose } from '../lib/diagnostic.js';
 import { createRequest, listRequests, getRequest, step, decide, undo, stop } from '../lib/tidy.js';
 import { getSchedule, saveSchedule } from '../lib/schedule.js';
@@ -34,7 +31,7 @@ import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
 import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
 import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
-import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion, stopTidy } from '../lib/tidy-plan.js';
+import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion } from '../lib/tidy-plan.js';
 import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
 import { dropFile } from '../lib/drop-box.js';
 import { peopleBrief } from '../lib/people-brief.js';
@@ -89,10 +86,6 @@ import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from
 //   POST /api/app?route=training-step              next unit of training work (background chain)
 //   GET  /api/app?route=messages                   agent's messages to colleagues — MANAGERS (personal session)
 //   POST /api/app?route=messages {action}          propose (any account) | decide approve/reject (owner, partner, manager)
-//   GET  /api/app?route=permissions                screens × roles, actions and rules (everyone: their own; partners: all)
-//   POST /api/app?route=permissions {changes}      partners adjust the defaults (never their own role upwards)
-//   GET  /api/app?route=tenders                    tender watch: tenders, indicators, workload (BDM, partners)
-//   POST /api/app?route=tenders {action}           run | decide | tdr | submitted | result | review-decide | review-run | settings
 //   GET  /api/app?route=readiness                  "Mise en service": every link of the chain checked — OWNER ONLY
 //   POST /api/app?route=readiness {action}         mapping-pass (full Drive mapping by the Orpailleur) — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
@@ -102,33 +95,16 @@ const fail = (code, statusCode) => Object.assign(new Error(code), { statusCode }
 const owner = run => Object.assign(run, { ownerOnly: true });
 const open = run => Object.assign(run, { public: true });
 // Needs a personal session (Supabase access token) with one of these roles.
-// The role families come from lib/roles.js (2026-10-10: the firm's roles and positions).
-import { MANAGERS as ROLE_MANAGERS, WORKERS, EVERYONE, FIRM_LEAD, ACCOUNT_ADMINS, BUSINESS_DEV, SHADOW_VIEWERS, ROLE_LABELS, visiblePeople, firmSettings, saveFirmSettings } from '../lib/roles.js';
-const MANAGERS = [...ROLE_MANAGERS];
+const MANAGERS = ['owner', 'partner', 'manager'];
 const users = (roles, run) => Object.assign(run, { userRoles: roles });
 const lastAiDedupe = new Map();
-const ALL_ROLES = [...WORKERS];
-const PARTNERS = [...FIRM_LEAD];
+const ALL_ROLES = ['owner', 'partner', 'manager', 'collaborator'];
+const PARTNERS = ['owner', 'partner'];
 const who = req => req.account?.display_name || req.account?.email || null;
 // Results kept in Drive JSON without the heavy working data (raw mail, read files).
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
-  dossier: {
-    GET: users(ALL_ROLES, async (orgId, req) => { const m = await import('../lib/dossier-service.js'); return req.query?.mission_id || req.query?.opportunity_id ? m.dossierView(orgId, req.query || {}, req.account) : m.dossierList(orgId, req.account); }),
-    unavailable: 'DOSSIER_UNAVAILABLE'
-  },
-  'dossier-followup': {
-    POST: users(MANAGERS, async (orgId, req) => {
-      const b = req.body || {}, action = b.action;
-      const screen = action === 'specialist' ? 'team' : action === 'quotation' ? 'billing' : null;
-      if (!screen) throw fail('UNKNOWN_ACTION', 400);
-      await requireScreenAccess(orgId, req.account, 'opportunities', 'prepare');
-      await requireScreenAccess(orgId, req.account, screen, 'prepare');
-      const m = await import('../lib/dossier-actions.js');
-      return action === 'specialist' ? m.updateSpecialist(orgId, b, req.account) : m.recordQuotationChange(orgId, b, req.account);
-    }), unavailable: 'DOSSIER_UNAVAILABLE'
-  },
   branding: {
     GET: (orgId) => getBranding(orgId),
     POST: owner((orgId, req) => saveBranding(orgId, req.body || {}, req.body?.updated_by)),
@@ -136,37 +112,28 @@ export const ROUTES = Object.freeze({
   },
   search: {
     // Smart search (2026-10-08): optional status and mission, keywords, what the agents read.
-    GET: users(ALL_ROLES, async (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null, allowedMissionIds: req.resourceAccess?.mine ? await accessibleMissionIds(orgId, req.account) : null })),
+    GET: (orgId, req) => smartSearch(orgId, { q: req.query?.q, scope: req.query?.scope, status: req.query?.status, mission_id: req.query?.mission_id || null }),
     unavailable: 'SEARCH_UNAVAILABLE'
   },
   actions: {
-    GET: users(ALL_ROLES, (orgId) => listPendingActions(orgId)),
+    GET: (orgId) => listPendingActions(orgId),
     // Validators only, and the journal records who they really are (never a typed name).
     POST: users(MANAGERS, (orgId, req) => recordDecision(orgId, { ...(req.body || {}), decided_by: req.account?.display_name || req.account?.email || null })),
     unavailable: 'ACTIONS_UNAVAILABLE'
   },
   'mission-view': {
-    GET: users(ALL_ROLES, async (orgId, req) => { await requireMissionAccess(orgId, req.query?.mission_id, req.account); return getMissionView(orgId, req.query?.mission_id); }),
+    GET: (orgId, req) => getMissionView(orgId, req.query?.mission_id),
     unavailable: 'MISSION_VIEW_UNAVAILABLE'
   },
   // Agents' names chosen by the firm (everyone reads them; the owner changes them) and the
   // « rangement automatique » switch.
   // One question about a real situation, for the Management Cards (managers answer).
   // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
-  // Shadow is seen by the partners and the IT administrator (Paul, 2026-10-11); the partners decide on
-  // lessons and experiments; code proposals may also be asked by the IT administrator.
   shadow: {
-    GET: users([...SHADOW_VIEWERS], async () => (await import('../lib/shadow.js')).labView()),
-    POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
+    GET: owner(async () => (await import('../lib/shadow.js')).labView()),
+    POST: owner(async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
-      if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
-      if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
-      // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
-      if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
-      if (b.action === 'code-close') return (await import('../lib/shadow-code.js')).closeCodeProposal(orgId, { id: b.id, reason: b.reason }, who(req) || 'propriétaire');
-      // An investigation (with a question: « pourquoi l'Orpailleur ne fait pas X ? ») or the filing exam now.
-      if (b.action === 'investigate') { const { AGENT_GOALS } = await import('../lib/agent-goals.js'); if (!AGENT_GOALS[b.agent]) throw fail('UNKNOWN_AGENT', 400); await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { agent: b.agent, question: String(b.question || '').slice(0, 600) }); return { started: true }; }
-      if (b.action === 'exam') { await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { exam: true }); return { started: true }; }
+      if (b.action === 'run') return s.shadowPass(orgId, { force: true });
       if (b.action === 'decide') return s.decide(orgId, b, who(req));
       if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
       if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
@@ -177,118 +144,6 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'SHADOW_UNAVAILABLE'
   },
-  // Permissions (2026-10-11): screens × roles and sensitive actions; the firm's lead adjusts the defaults.
-  permissions: {
-    GET: users([...EVERYONE], async (orgId, req) => (await import('../lib/permissions.js')).permissionsView(orgId, req.account)),
-    POST: users([...FIRM_LEAD], async (orgId, req) => (await import('../lib/permissions.js')).savePermissions(orgId, req.body || {}, req.account)),
-    unavailable: 'PERMISSIONS_UNAVAILABLE'
-  },
-  // The firm's methodology library (2026-10-12): its SOP read procedure by procedure (code, no AI).
-  methodology: {
-    GET: users(ALL_ROLES, async (orgId, req) => {
-      const m = await import('../lib/methodology.js'); const state = await m.methodologyState();
-      const file = String(req.query?.sop || '');
-      if (file) { const s = (state.sops || []).find(x => x.file_id === file); if (!s) throw fail('SOP_NOT_FOUND', 404); return s; }
-      return m.librarySummary(state);
-    }),
-    POST: users(MANAGERS, async (orgId, req) => (await import('../lib/methodology.js')).loadMethodology(orgId, req.body || {}, req.account)),
-    unavailable: 'METHODOLOGY_UNAVAILABLE'
-  },
-  // The mission's work programme (2026-10-12): cycles and procedures chosen by the Manager from the firm's SOP.
-  'work-programme': {
-    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/work-programme.js')).programmeView(orgId, String(req.query?.mission_id || ''), req.account)),
-    POST: users(MANAGERS, async (orgId, req) => {
-      const w = await import('../lib/work-programme.js'); const b = req.body || {}; const id = String(b.mission_id || '');
-      if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
-      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account);
-      if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
-      if (b.action === 'workpapers') { if (!w.VALIDATORS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return (await import('../lib/cycle-workpapers.js')).prepareCycleWorkpapers(orgId, id, req.account); }
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'WORK_PROGRAMME_UNAVAILABLE'
-  },
-  // « Ma procédure » (2026-10-12): a procedure of the validated programme worked by its preparer with the Enhanced Auditor.
-  procedure: {
-    GET: users(ALL_ROLES, async (orgId, req) => {
-      const w = await import('../lib/procedure-work.js');
-      if (req.query?.mine) return w.myProcedures(orgId, req.account);
-      if (req.query?.reviews) return (await import('../lib/procedure-review.js')).myReviews(orgId, req.account);
-      if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
-      return w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
-    }),
-    POST: users(ALL_ROLES, async (orgId, req) => {
-      const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
-      if (b.action === 'population-preview') return w.populationPreview(orgId, m, c, b, a);
-      if (b.action === 'population') return w.setPopulation(orgId, m, c, b, a);
-      if (b.action === 'sample') return w.drawSample(orgId, m, c, b, a);
-      if (b.action === 'evidence') return w.addEvidence(orgId, m, c, b, a);
-      if (b.action === 'ai') return w.aiProposal(orgId, m, c, b, a);
-      if (b.action === 'item') return w.recordItem(orgId, m, c, b, a);
-      if (b.action === 'conclusion') return w.saveConclusion(orgId, m, c, b, a);
-      if (b.action === 'write-wp') return w.writeWorkpaper(orgId, m, c, a);
-      if (b.action === 'submit') return w.submitProcedure(orgId, m, c, a);
-      const r = await import('../lib/procedure-review.js');
-      if (b.action === 'review-ai') return r.aiReview(orgId, m, c, a);
-      if (b.action === 'return') return r.returnToPreparer(orgId, m, c, b, a);
-      if (b.action === 'answer-point') return r.answerPoint(orgId, m, c, b, a);
-      if (b.action === 'clear-point') return r.clearPoint(orgId, m, c, b, a);
-      if (b.action === 'sign') return r.signOff(orgId, m, c, a);
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'PROCEDURE_UNAVAILABLE'
-  },
-  // The secretariat (2026-10-12): the firm's document models, documents prepared for an opportunity or a mission,
-  // CVs (specialists, CVs adapted to the TDR, MI + CVs in one PDF), approval, sending recorded with its proof.
-  secretariat: {
-    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/secretariat.js')).secretariatView(orgId, req.account)),
-    POST: users(ALL_ROLES, async (orgId, req) => {
-      const b = req.body || {}, a = req.account;
-      const T = () => import('../lib/doc-templates.js'), C = () => import('../lib/cv-bank.js'), S = () => import('../lib/secretariat.js');
-      if (['locate-document', 'confirm-document', 'unavailable-document', 'upload-reference'].includes(b.action)) {
-        if (!['owner', 'partner', 'manager', 'supervisor', 'bdm', 'secretary'].includes(a.role)) throw fail('ROLE_NOT_ALLOWED', 403);
-        if (b.mission_id) await requireMissionAccess(orgId, b.mission_id, a);
-        const index = await import('../lib/file-index.js');
-        if (b.action === 'upload-reference') return index.uploadDocumentReference(orgId, b, a);
-        if (b.action === 'unavailable-document') return index.confirmDocumentUnavailable(orgId, b, a);
-        return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
-      }
-      if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
-      if (b.action === 'register-reference-template') return (await T()).registerTemplateReference(orgId, b, a);
-      if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
-      if (b.action === 'methodology-draft') return (await T()).rewriteMethodology(orgId, b, a);
-      if (b.action === 'create-document') return (await T()).createDocument(orgId, b, a);
-      if (b.action === 'specialist-cv') return (await C()).uploadSpecialistCv(orgId, b, a);
-      if (b.action === 'adapted-cv') return (await C()).adaptedCv(orgId, b, a);
-      if (b.action === 'package') return (await C()).packagePdf(orgId, b, a);
-      if (b.action === 'approve') return (await S()).approveDocument(orgId, b, a);
-      if (b.action === 'send') return (await S()).recordSending(orgId, b, a);
-      if (b.action === 'settings') return (await S()).saveSecretariatSettings(orgId, b, a);
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'SECRETARIAT_UNAVAILABLE'
-  },
-  // Tender watch (2026-10-11): the daily desk sends the tenders to the BDM and the partners; a partner
-  // decides; the BDM obtains the TDR, creates the opportunity, records the submission and the result.
-  tenders: {
-    GET: users([...BUSINESS_DEV], async (orgId, req) => (await import('../lib/tender-watch.js')).tendersView(orgId, req.account)),
-    POST: users([...BUSINESS_DEV], async (orgId, req) => {
-      const t = await import('../lib/tender-watch.js'); const b = req.body || {}; const a = b.action;
-      if (a === 'run') return t.startTenderWatch(orgId, req, { force: true, by: who(req) });
-      if (a === 'decide') return t.decideTender(orgId, b, req.account);
-      if (a === 'tdr') return t.markTdr(orgId, b, req.account);
-      if (a === 'submitted') return t.recordSubmission(orgId, b, req.account);
-      if (a === 'result') return t.recordResult(orgId, req, b, req.account);
-      if (a === 'review-decide') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.decideLossReview(orgId, b, req.account); }
-      if (a === 'review-run') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.reviewLoss(orgId, String(b.id || '')); }
-      if (a === 'settings') return t.saveWatchSettings(orgId, b, req.account);
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'TENDERS_UNAVAILABLE'
-  },
-  'tender-step': { POST: async (orgId, req) => (await import('../lib/tender-watch.js')).tenderStep(orgId, req, req.body || {}), unavailable: 'TENDERS_UNAVAILABLE' },
-  'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
-  // Shadow's background investigations and exams (2026-10-11).
-  'shadow-investigate-step': { POST: async (orgId, req) => (await import('../lib/shadow-investigate.js')).investigateStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   'shadow-survey': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).currentSurvey(req.account)),
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/shadow.js')).answerSurvey(req.body || {}, req.account)),
@@ -359,19 +214,11 @@ export const ROUTES = Object.freeze({
     unavailable: 'COORDINATION_UNAVAILABLE'
   },
   'team-kpi': {
-    // Whose indicators: everybody for owners and partners; for a manager or a supervisor, the people who
-    // report to them directly (when the firm allows it) and themselves.
-    GET: users(MANAGERS, async (orgId, req) => {
-      await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null);
-      const k = await teamKpis(orgId); const seen = await visiblePeople(orgId, req.account);
-      if (!seen) return k;
-      const people = k.people.filter(p => seen.has(String(p.email || '').toLowerCase()));
-      return { ...k, people, scope: 'direct_reports', team: { ...k.team, people: people.length, overloaded: people.filter(p => p.load_pct > 100).length } };
-    }),
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_team_kpi'); await (await import('../lib/people-sync.js')).syncStaffFromUsers(orgId).catch(() => null); return teamKpis(orgId); }),
     unavailable: 'KPI_UNAVAILABLE'
   },
   'my-kpi': {
-    GET: users([...EVERYONE], (orgId, req) => myKpis(orgId, req.account)),
+    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => myKpis(orgId, req.account)),
     unavailable: 'KPI_UNAVAILABLE'
   },
   training: {
@@ -400,22 +247,9 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'READINESS_UNAVAILABLE'
   },
-  // Accounts: owner, partners and the IT administrator (personal session); each one acts as itself
-  // (only an owner makes an owner; the IT administrator never touches the partners' accounts).
   users: {
-    GET: users([...ACCOUNT_ADMINS], async (orgId) => ({ ...(await listAccounts(orgId)), role_labels: ROLE_LABELS })),
-    POST: users([...ACCOUNT_ADMINS], async (orgId, req) => { await logAccess(orgId, req.account, 'manage_account', String(req.body?.auth_user_id || req.body?.email || '')).catch(() => null); return manageAccount(orgId, req.body || {}, { actor: req.account }); }),
-    unavailable: 'USERS_UNAVAILABLE'
-  },
-  // The firm's settings for people (e.g. managers see the performance of their direct reports).
-  'firm-settings': {
-    GET: users([...EVERYONE], (orgId) => firmSettings(orgId)),
-    POST: users(PARTNERS, (orgId, req) => saveFirmSettings(orgId, req.body || {}, who(req))),
-    unavailable: 'SETTINGS_UNAVAILABLE'
-  },
-  // Firm Manager: roles and positions proposed from the firm's team sheet (a person confirms them).
-  'team-roles': {
-    GET: users([...ACCOUNT_ADMINS], async (orgId) => (await import('../lib/team-roles.js')).proposeTeamRoles(orgId)),
+    GET: owner((orgId) => listAccounts(orgId)),
+    POST: owner((orgId, req) => manageAccount(orgId, req.body || {})),
     unavailable: 'USERS_UNAVAILABLE'
   },
   // Test of the whole app on a copy of the firm — works only in a preview on a test firm.
@@ -465,9 +299,7 @@ export const ROUTES = Object.freeze({
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
       if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
-      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req, req.body.browser_batches === true ? { resume: true, fire: async () => true } : {});
-      if (req.body?.action === 'tidy-batch') return tidyPlanStep(orgId, req, { noLoop: true });
-      if (req.body?.action === 'tidy-stop') return stopTidy(orgId, req.account?.display_name || req.account?.email || req.body?.by || 'propriétaire');
+      if (req.body?.action === 'tidy') return startTidyPlan(orgId, req);
       if (req.body?.action === 'dedupe') return dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge });
       throw fail('UNKNOWN_ACTION', 400);
     }),
@@ -476,12 +308,8 @@ export const ROUTES = Object.freeze({
   // Understanding the firm, then (same first scan) where every file goes.
   'firm-learn': { POST: async (orgId, req) => { const k = await learnFirm(orgId); if (req.body?.skip_tidy !== true) await startTidyPlan(orgId, req).catch(() => null); return k; }, unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // The settings wheel: close one's own account (typed e-mail), the interface in English.
-  // A space closed earlier: its former owner restarts it from zero (identity re-checked, « EFFACER » typed).
-  // The connected owner starts again from zero (everything erased but their login), typed « EFFACER ».
-  'firm-reset': { POST: users(['owner'], (orgId, req) => resetFirm(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
-  'firm-restart': { POST: open((orgId, req) => restartFirm(orgId, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
-  'close-account': { POST: users([...EVERYONE], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
-  translate: { POST: users([...EVERYONE], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
+  'close-account': { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => closeOwnAccount(orgId, req.account, req.body || {})), unavailable: 'ACCOUNTS_UNAVAILABLE' },
+  translate: { POST: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
   // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----
   // Which AI providers are configured (keys in Vercel; nothing secret returned).
   'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), unavailable: 'AI_UNAVAILABLE' },
@@ -510,73 +338,6 @@ export const ROUTES = Object.freeze({
     unavailable: 'ENGAGEMENT_UNAVAILABLE'
   },
   'engagement-step': { POST: (orgId, req) => engagementStep(orgId, req, req.body || {}), unavailable: 'ENGAGEMENT_UNAVAILABLE' },
-  // Opportunities (2026-10-10): a TDR / AMI deposited → Firm Manager reads, files, fills the firm's
-  // acceptance workbook and prepares Phase 0; the client's confirmation → Mission Controller (KYC,
-  // independence) in the same workbook. People answer; only the Associé decides.
-  opportunities: {
-    GET: users(ALL_ROLES, async (orgId, req) => {
-      const o = await import('../lib/opportunities.js');
-      if (req.query?.settings) return o.opportunitySettingsView(orgId);
-      if (req.query?.mission_id) { await requireMissionAccess(orgId, String(req.query.mission_id), req.account); return o.opportunityForMission(orgId, String(req.query.mission_id)); }
-      return req.query?.id ? o.opportunityView(orgId, String(req.query.id), req.account) : o.listOpportunities(orgId);
-    }),
-    POST: users(ALL_ROLES, async (orgId, req) => {
-      const o = await import('../lib/opportunities.js'); const b = req.body || {}; const a = b.action;
-      if (a === 'create') return o.createOpportunity(orgId, req, b, req.account);
-      if (a === 'upload-start') return o.startTdrUpload(orgId, b, req);
-      if (a === 'answer') return o.answerRow(orgId, b, req.account, { req });
-      if (a === 'answer-rows') return o.answerRows(orgId, b, req.account, { req });
-      if (a === 'review-section') return o.reviewSection(orgId, b, req.account);
-      if (a === 'prepare-again') return o.prepareAgain(orgId, req, b, req.account);
-      if (a === 'settings') return o.saveOpportunitySettings(orgId, b, req.account);
-      if (a === 'remove') return o.removeOpportunity(orgId, b, req.account, { req });
-      if (a === 'not-duplicate') return o.notDuplicate(orgId, req, b, req.account);
-      if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
-      if (a === 'validate-team') return o.validateTeam(orgId, b, req.account, { req });
-      if (a === 'find-specialists') return o.findSpecialists(orgId, b, req.account);
-      if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
-      if (a === 'declaration-draft') return o.saveDeclarationDraft(orgId, b, req.account);
-      if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
-      if (a === 'kyc-prepare') return o.prepareKyc(orgId, req, b, req.account);
-      if (a === 'reception-date') return o.setReceptionDate(orgId, b, req.account);
-      if (a === 'owner-override') return o.ownerWorkflowOverride(orgId, b, req.account, { req });
-      if (a === 'transmit-documents') return o.requestOpportunityHandoff(orgId, req, b, req.account);
-      if (a === 'prepare-mission-files') return o.requestMissionWorkspace(orgId, req, b, req.account);
-      if (a === 'assign-kyc') return o.assignKyc(orgId, b, req.account, { req });
-      if (a === 'commercial') return o.commercialAction(orgId, b, req.account, { req });
-      if (a === 'parallel-kyc') return o.prepareParallelKyc(orgId, req, b, req.account);
-      if (a === 'prepare-quotation') return o.prepareOpportunityQuotation(orgId, b, req.account);
-      if (a === 'confirm-agreement') return o.confirmEngagementAgreement(orgId, b, req.account);
-      if (a === 'accept-existing-kyc') return o.acceptExistingKyc(orgId, b, req.account);
-      if (a === 'dismiss-signal') return o.dismissSignal(orgId, b);
-      if (a === 'template') { if (!PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403); return o.setTemplate(orgId, b, req.account); }
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'OPPORTUNITIES_UNAVAILABLE'
-  },
-  // « Mon IA »: each person may connect their own AI after accepting the warning; partners see who
-  // did and may switch it off for the whole firm.
-  'my-ai': {
-    GET: users([...ALL_ROLES], async (orgId, req) => (await import('../lib/personal-ai.js')).myAIView(orgId, req.account)),
-    POST: users([...ALL_ROLES], async (orgId, req) => {
-      const p = await import('../lib/personal-ai.js'); const b = req.body || {};
-      if (b.action === 'connect') return p.connectMyAI(orgId, req.account, b);
-      if (b.action === 'disconnect') return p.disconnectMyAI(orgId, req.account, b);
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'MY_AI_UNAVAILABLE'
-  },
-  'personal-ai': {
-    GET: users(PARTNERS, async (orgId) => (await import('../lib/personal-ai.js')).personalAIOverview(orgId)),
-    POST: users(PARTNERS, async (orgId, req) => (await import('../lib/personal-ai.js')).setPersonalAIAllowed(orgId, Boolean(req.body?.allowed), who(req))),
-    unavailable: 'MY_AI_UNAVAILABLE'
-  },
-  'opportunity-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
-  'opportunity-team-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).teamStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
-  'opportunity-kyc-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).kycStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
-  'opportunity-quotation-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).quotationStep(orgId, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
-  'opportunity-commercial-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).commercialDocumentStep(orgId, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
-  'opportunity-handoff-step': { POST: async (orgId, req) => (await import('../lib/opportunities.js')).opportunityHandoffStep(orgId, req, req.body || {}), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Submission performance (Grand Contrôleur): tenders and proposals read in Gmail.
   submissions: {
     GET: users(MANAGERS, async () => light(await submissionState())),
@@ -604,22 +365,6 @@ export const ROUTES = Object.freeze({
     unavailable: 'DEPOSIT_UNAVAILABLE'
   },
   'deposit-step': { POST: (orgId, req) => depositStep(orgId, req, req.body || {}), unavailable: 'DEPOSIT_UNAVAILABLE' },
-  // Work files in Excel (Office Manager panel): sessions, review remarks, files left open.
-  workfile: {
-    GET: users(ALL_ROLES, (orgId, req) => req.query?.mine ? myWorkfileActions(orgId, req.account) : listRemarks(orgId, req.query || {})),
-    POST: users(ALL_ROLES, (orgId, req) => {
-      const b = req.body || {}, a = b.action;
-      if (a === 'start') return startSession(orgId, req.account, b);
-      if (a === 'beat') return beat(orgId, req.account, b);
-      if (a === 'end') return endSession(orgId, b);
-      if (a === 'review') return reviewWorkbook(orgId, req.account, b);
-      if (a === 'remark') return updateRemark(orgId, req.account, b);
-      if (a === 'decide') return decideWorkfileAction(orgId, req.account, b);
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-    unavailable: 'WORKFILE_UNAVAILABLE'
-  },
-  'workfile-kpi': { GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_workfile_kpi'); return workfileKpis(orgId); }), unavailable: 'WORKFILE_UNAVAILABLE' },
   // Partner Dashboard: firm improvement in one place (owner / partners).
   'partner-dashboard': {
     GET: users(PARTNERS, async (orgId, req) => {
@@ -631,20 +376,6 @@ export const ROUTES = Object.freeze({
   },
   // The global bell: notifications computed from what is recorded, one per event.
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
-  // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
-  'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => {
-    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account).catch(() => ({ questions: [] }));
-    // « Ta procédure t'attend » (2026-10-12): the procedures of the validated programmes this person prepares.
-    const mine = await (await import('../lib/procedure-work.js')).myProcedures(orgId, req.account).catch(() => ({ procedures: [] }));
-    for (const p of mine.procedures.filter(x => ['to_do', 'in_progress', 'returned'].includes(x.status)).slice(0, 5)) out.questions.push({ id: 'proc|' + p.programme_id + '|' + p.code, kind: 'procedure', title: p.mission_name,
-      question: (p.status === 'returned' ? 'Procédure renvoyée par la revue : ' : p.status === 'in_progress' ? 'Procédure en cours : ' : 'Votre procédure vous attend : ') + p.code + ' — ' + p.title, context: p.cycle_code + ' · ' + (p.cycle_title || ''),
-      href: '/procedure.html?mission_id=' + encodeURIComponent(p.mission_id) + '&code=' + encodeURIComponent(p.code) });
-    const rv = await (await import('../lib/procedure-review.js')).myReviews(orgId, req.account).catch(() => ({ reviews: [] }));
-    for (const x of rv.reviews.slice(0, 5)) out.questions.push({ id: 'rev|' + x.mission_id + '|' + x.code + '|' + x.level, kind: 'procedure', title: x.mission_name,
-      question: 'Revue ' + ({ senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }[x.level] || '') + ' à faire : ' + x.code, context: x.cycle_code + ' · préparée par ' + (x.preparer || '?'),
-      href: '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue' });
-    return out;
-  }), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {
@@ -657,15 +388,7 @@ export const ROUTES = Object.freeze({
   },
   // Management Card (owner, partners, managers): opened from a person; each opening is journaled.
   'management-card': {
-    GET: users(MANAGERS, async (orgId, req) => {
-      await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null);
-      const seen = await visiblePeople(orgId, req.account);
-      if (seen) {
-        const [p] = await rest('office_staff_profiles?org_id=eq.' + encodeURIComponent(orgId) + '&id=eq.' + encodeURIComponent(String(req.query?.staff_id || '')) + '&select=email&limit=1').catch(() => []) || [];
-        if (!p || !seen.has(String(p.email || '').toLowerCase())) throw fail('NOT_YOUR_DIRECT_REPORT', 403);
-      }
-      return managementCard(orgId, String(req.query?.staff_id || ''));
-    }),
+    GET: users(MANAGERS, async (orgId, req) => { await logAccess(orgId, req.account, 'view_management_card', String(req.query?.staff_id || '')).catch(() => null); return managementCard(orgId, String(req.query?.staff_id || '')); }),
     POST: users(MANAGERS, (orgId, req) => {
       const b = req.body || {};
       if (b.action === 'refresh') return refreshCard(orgId, String(b.staff_id || ''), who(req));
@@ -803,11 +526,11 @@ export const ROUTES = Object.freeze({
   'mission-dedupe': { POST: orgId => dedupeMissions(orgId, { ai: true, loadKnowledge: firmKnowledge }), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   'tidy-plan-step': { POST: (orgId, req) => tidyPlanStep(orgId, req), unavailable: 'KNOWLEDGE_UNAVAILABLE' },
   // People a message about a mission goes to: the mission team first, then the whole firm.
-  'mission-contacts': { GET: users(ALL_ROLES, (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
+  'mission-contacts': { GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId, req) => getMissionContacts(orgId, req.query?.mission_id || null)), unavailable: 'CONTACTS_UNAVAILABLE' },
   // The firm's people-management policy, kept in the agents' Drive memory (owner).
   // Documents dropped on the Rangement page (40 max, one per request): named, placed, sent — after validation.
   // Small files through the app; large ones straight from the browser to Google (start / finish).
-  drop: { POST: users(ALL_ROLES, async (orgId, req) => {
+  drop: { POST: users(['owner', 'partner', 'manager', 'collaborator'], async (orgId, req) => {
     const a = req.body?.action;
     if (a === 'start_upload') return (await import('../lib/drop-box.js')).startLargeUpload(orgId, req.body || {}, req.account, req);
     if (a === 'finish_upload') return (await import('../lib/drop-box.js')).finishLargeUpload(orgId, req.body || {}, req.account);
@@ -820,7 +543,7 @@ export const ROUTES = Object.freeze({
   // Saved → read at once by the agents (team, preferences, questionnaire answers → Équipe and Management Cards).
   'people-policy': { GET: owner(() => loadPeoplePolicy()), POST: owner(async (orgId, req) => { const r = await savePeoplePolicy(req.body || {}); const read = await (await import('../lib/capabilities.js')).startCapabilityRefresh(orgId, req).catch(e => ({ error: String(e.message || e) })); return { ...r, reading: read }; }), unavailable: 'POLICY_UNAVAILABLE' },
   'agent-permissions': {
-    GET: users(ALL_ROLES, (orgId) => agentPermissions(orgId)),
+    GET: users(['owner', 'partner', 'manager', 'collaborator'], (orgId) => agentPermissions(orgId)),
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
     unavailable: 'PERMISSIONS_UNAVAILABLE'
   },
@@ -880,41 +603,20 @@ async function trainingAction(orgId, req) {
   throw fail('UNKNOWN_ACTION', 400);
 }
 
-export const ROUTE_SCREENS = Object.freeze({
-  search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
-  methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
-});
-const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
   const run = route[req.method];
   if (typeof run !== 'function') { requirePilotAccess(req); throw fail('METHOD_NOT_ALLOWED', 405); }
   if (!run.public) requirePilotAccess(req);
-  // Owner-only routes (2026-10-11): the owner's or a partner's personal session is enough — no code to type,
-  // the product is sold to other firms. The owner code still works (older pages, scripts).
-  if (run.ownerOnly) {
-    try { requireFirmOwner(req); }
-    catch (e) { const acc = await requireRole(req, [...FIRM_LEAD]).catch(() => null); if (!acc) throw e; req.account = acc; }
-  }
+  if (run.ownerOnly) requireFirmOwner(req);
   const orgId = process.env.DEFAULT_ORG_ID;
   if (!orgId && route !== ROUTES.diagnostic) throw new Error('DEFAULT_ORG_ID_MISSING');
   // Test mode (preview): never on the real firm's organisation (test run TATY TEST).
   if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
-  const screen = ROUTE_SCREENS[String(req.query?.route || '')];
-  if (screen) {
-    if (!req.account) req.account = await requireRole(req, [...EVERYONE]);
-    try {
-      req.resourceAccess = await requireScreenAccess(orgId, req.account, screen, req.method === 'GET' ? 'view' : decisionLevel(req));
-      const missionId = req.query?.mission_id || req.body?.mission_id;
-      if (req.resourceAccess.mine && missionId) await requireMissionAccess(orgId, missionId, req.account);
-    } catch (e) { await logAccess(orgId, req.account, 'ACCESS_REFUSED', String(req.query?.route || '') + ':' + e.message); throw e; }
-  }
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
-  // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
-  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, () => run(orgId, req));
   return run(orgId, req);
 }
 
@@ -943,10 +645,6 @@ export default async function handler(req, res) {
       console.error('[app] ' + String(req.query?.route || '') + ' failed:', detail);
     }
     if (Array.isArray(error.outside)) body.outside = error.outside;
-    // What blocks a validation, listed (work programme, 2026-10-12) — codes only, no data.
-    if (status < 500 && Array.isArray(error.gaps)) body.gaps = error.gaps.slice(0, 200);
-    if (status < 500 && Array.isArray(error.unknown)) body.unknown = error.unknown.slice(0, 100);
     return res.status(status).json(body);
   }
 }
-

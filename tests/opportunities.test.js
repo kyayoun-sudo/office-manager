@@ -667,3 +667,17 @@ test('mission workspace queues once, preserves dossier state, and rechecks autho
   const revoked = await missionWorkspaceStep('org', body, { ...d, fetchRows: async () => [], prepareWorkspace: async () => { calls++; } });
   assert.equal(revoked.status, 'failed'); assert.equal(calls, 1);
 });
+
+
+test('team and KYC responsibility are saved together, preserving personal independence and clearing removed assignees', async () => {
+  const {d}=await setup(), actor={role:'owner',email:'owner@cab.ci'};
+  const created=await createOpportunity('org',{}, {name:'TDR.pdf',base64:Buffer.from('x').toString('base64')},actor,d);
+  const o=await run(created.opportunity.id,d), members=[{name:'Auditor',email:'a@cab.ci',role:'Auditeur'}];
+  await assert.rejects(validateTeam('org',{opportunity_id:o.id,members,kyc_email:'outside@cab.ci'},actor,d),/KYC_RESPONSIBLE_MUST_BE_IN_TEAM/);
+  await validateTeam('org',{opportunity_id:o.id,members,kyc_email:'a@cab.ci'},actor,d);
+  const saved=await getOpportunity(o.id,d);
+  assert.equal(saved.kyc_responsible.email,'a@cab.ci');assert.equal(saved.workbook.id,o.workbook.id);
+  assert.equal(Object.keys(saved.declarations||{}).length,0);
+  await validateTeam('org',{opportunity_id:o.id,members:[{name:'Other',email:'b@cab.ci',role:'Auditeur'}]},actor,d);
+  assert.equal((await getOpportunity(o.id,d)).kyc_responsible,null);
+});

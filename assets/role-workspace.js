@@ -30,10 +30,10 @@
     hero.appendChild(el('div', (name || profile.label).split(/\s+/).map(function(w){return w[0];}).slice(0,2).join('').toUpperCase(), 'workspace-avatar')); host.appendChild(hero);
     var launchers = el('div', null, 'workspace-launchers');
     profile.actions.forEach(function(a){var link=el('a',null,'workspace-launcher');link.href=a[0];link.appendChild(el('strong',a[1]));link.appendChild(el('span',a[2]));link.appendChild(el('i','→'));launchers.appendChild(link);});host.appendChild(launchers);
-    host.appendChild(el('h2','Mes agents','workspace-heading')); var strip=el('div',null,'workspace-agents');
+    var agentDetails=el('details',null,'workspace-agent-details');agentDetails.appendChild(el('summary','Mes agents')); var strip=el('div',null,'workspace-agents');
     profile.agents.forEach(function(key){var a=agents[key],link=el('a',null,'workspace-agent');link.href='/assistant.html?agent='+encodeURIComponent(key);link.appendChild(el('b',a[0]));var info=el('span',a[1]);info.appendChild(el('small',a[2]));link.appendChild(info);strip.appendChild(link);});
     if (!profile.agents.length) strip.appendChild(el('p','Assistant de contribution — accès limité à la mission','workspace-detail'));
-    host.appendChild(strip);
+    agentDetails.appendChild(strip);host.appendChild(agentDetails);
   }
   function home() {
     var OM=window.OfficeManager; if(!OM || !document.getElementById('myspace'))return;
@@ -63,6 +63,14 @@
     if(role==='secretary')document.getElementById('h-mywork').textContent='Mes dossiers et mes tâches';
     if(role==='senior')document.getElementById('h-myreviews').textContent='Les travaux soumis à ma revue';
     if(role==='auditor'||role==='collaborator')document.getElementById('h-mywork').textContent='Mes travaux à réaliser';
+    var learning = el('section', null, 'card'); learning.id = 'personal-learning';
+    learning.appendChild(el('h2', 'Mon apprentissage et mes agents'));
+    learning.appendChild(el('p', 'Vos retours passent par le questionnaire existant de Shadow. Les simulations restent dans le laboratoire autorisé du cabinet ; elles ne changent jamais une mission réelle.', 'workspace-detail'));
+    var choices = el('div', null, 'workspace-tabs');
+    [['M’améliorer', '/questionnaire.html'], ['Entraîner mon IA : préférences et corrections', '/questionnaire.html'], ['Améliorer ma collaboration avec les agents', '/questionnaire.html']].forEach(function (x) { var a = el('a', x[0], 'btn ghost'); a.href = x[1]; choices.appendChild(a); });
+    if (['owner', 'partner', 'it_admin'].indexOf(role) >= 0) { var lab = el('a', 'Simulations et entraînement du cabinet', 'btn ghost'); lab.href = '/entrainement.html'; choices.appendChild(lab); }
+    learning.appendChild(choices); main.appendChild(learning);
+    var dossierLink=el('a','Mes dossiers : travaux, pièces et prochaines actions →','workspace-preview-link');dossierLink.href='/dossiers.html';intro.appendChild(dossierLink);
     var link=el('a','Voir la présentation des huit métiers →','workspace-preview-link');link.href='/presentation.html';intro.appendChild(link);
   }
   function assistant(){
@@ -76,7 +84,7 @@
   }
   function simplifyNav(){
     var OM=window.OfficeManager;if(!OM||OM.getRole()==='owner')return;var nav=document.querySelector('.nav');if(!nav)return;
-    var keep=['/accueil.html','/assistant.html','/messagerie.html','/validations.html','/rangement.html','/equipe.html','/entrainement.html','/mission.html'];
+    var keep=['/accueil.html','/dossiers.html','/assistant.html','/messagerie.html','/validations.html','/rangement.html','/equipe.html','/entrainement.html','/mission.html'];
     var details=el('details',null,'workspace-secondary-nav');details.appendChild(el('summary','Autres espaces'));var who=nav.querySelector('.who');nav.insertBefore(details,who||null);
     Array.from(nav.children).forEach(function(a){if(a.tagName==='A'&&keep.indexOf(a.getAttribute('href'))<0&&a.getAttribute('aria-current')!=='page')details.appendChild(a);});
   }
