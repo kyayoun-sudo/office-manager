@@ -140,14 +140,16 @@
   var chat = { key: 'cabinet', archive: false, timer: null, seen: '' };
   var ERRC = { MIGRATION_MISSING_DB_MEMORY_SQL: 'La discussion sera disponible dès que db/memory.sql aura été exécuté dans Supabase.', USER_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel pour discuter.' };
   function chatLoad(scroll) {
+    var requested = chat.key;
     return OM.api('/api/app?route=chat&conversation=' + encodeURIComponent(chat.key) + (chat.archive ? '&archive=1' : '')).then(function (d) {
+      if (requested !== chat.key) return;
       if (!d.available) { $('chat-bubbles').textContent = ''; $('chat-bubbles').appendChild(el('p', ERRC.MIGRATION_MISSING_DB_MEMORY_SQL, 'empty-pane')); return; }
       $('chat-title').textContent = d.label;
       var list = $('chat-convs'); list.textContent = '';
       d.conversations.forEach(function (c) {
-        var b = el('button', null, 'conv'); b.type = 'button'; b.setAttribute('aria-current', String(c.key === chat.key));
+        var b = el('button', null, 'conv'); b.type = 'button'; b.dataset.key = c.key; b.setAttribute('aria-current', String(c.key === chat.key));
         b.appendChild(el('span', c.label, 'who')); if (c.last) b.appendChild(el('span', c.last.from + ' : ' + c.last.body, 'sub'));
-        b.addEventListener('click', function () { chat.key = c.key; chat.archive = false; chatLoad(true); });
+        b.addEventListener('click', function () { chat.key = c.key; chat.pendingTo = null; chat.archive = false; chatLoad(true); });
         list.appendChild(b);
       });
       var sel = $('chat-new');
@@ -156,6 +158,12 @@
         var g0 = document.createElement('optgroup'); g0.label = 'Groupes'; var on = el('option', '＋ Nouveau groupe…'); on.value = 'new-group'; g0.appendChild(on); sel.appendChild(g0);
         chat.users = d.users;
         var g2 = document.createElement('optgroup'); g2.label = 'Missions'; d.missions.forEach(function (m) { var o = el('option', m.name); o.value = m.key; g2.appendChild(o); }); sel.appendChild(g2);
+      }
+      if (chat.loadedKey === chat.key) { var arrived = d.messages.filter(function (m) { return m.sender_email !== d.me && chat.loadedIds.indexOf(m.id) < 0; }).map(function (m) { return m.id; }); if (arrived.length) window.dispatchEvent(new CustomEvent('om-chat-arrived', { detail: arrived })); }
+      chat.loadedKey = chat.key; chat.loadedIds = d.messages.map(function (m) { return m.id; });
+      if (!document.hidden && !$('chat').hidden && !chat.archive && !chat.pendingTo && d.messages.length) {
+        var last = d.messages[d.messages.length - 1];
+        if (chat.readId !== last.id) { chat.readId = last.id; OM.api('/api/app?route=chat', { method: 'POST', body: JSON.stringify({ action: 'read', conversation: chat.key, message_id: last.id }) }).then(function () { window.dispatchEvent(new Event('om-chat-read')); }).catch(function () { chat.readId = null; }); }
       }
       var sig = d.messages.map(function (m) { return m.id; }).join(',') + chat.key + chat.archive;
       if (sig === chat.seen && !scroll) return;
@@ -195,6 +203,7 @@
       .then(function (g) { $('group-form').hidden = true; $('group-name').value = ''; chat.key = g.key; chat.pendingTo = null; chat.archive = false; chatLoad(true); })
       .catch(function (err) { $('group-status').textContent = err.message; });
   });
+  window.addEventListener('om-chat-counts', function (e) { document.querySelectorAll('#chat-convs .conv').forEach(function (b) { var count = e.detail[b.dataset.key] || 0; var old = b.querySelector('.chat-unread'); if (old) old.remove(); if (count) b.appendChild(el('span', String(count), 'chat-unread')); }); });
   var EMO = ['😊','😂','🙂','😉','😍','🤔','😅','😮','😢','😡','👍','👎','👏','🙏','💪','🎉','✅','❌','⚠️','📎','📄','📊','⏰','🔥','❤️','👀','🚀','☕'];
   EMO.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.textContent = x; b.setAttribute('aria-label', 'Insérer ' + x);
     b.addEventListener('click', function () { var t = $('chat-text'), i = t.selectionStart || t.value.length; t.value = t.value.slice(0, i) + x + t.value.slice(t.selectionEnd || i); t.focus(); t.selectionStart = t.selectionEnd = i + x.length; });
@@ -245,7 +254,7 @@
     var list = conversations().filter(function (c) { return !q || (who(c.recipients) + ' ' + c.recipients.join(' ') + ' ' + c.items.map(function (m) { return m.subject; }).join(' ')).toLowerCase().indexOf(q) >= 0; });
     if (!list.length) { box.appendChild(el('p', 'Aucune conversation.', 'empty-pane')); return; }
     list.forEach(function (c) {
-      var b = el('button', null, 'conv'); b.type = 'button'; b.setAttribute('aria-current', String(current && current.key === c.key));
+      var b = el('button', null, 'conv'); b.type = 'button'; b.dataset.key = c.key; b.setAttribute('aria-current', String(current && current.key === c.key));
       var top = el('span', null, 'who'); top.appendChild(el('span', who(c.recipients)));
       if (c.pending) top.appendChild(el('span', String(c.pending), 'pill'));
       b.appendChild(top); b.appendChild(el('span', c.last.subject, 'sub')); b.appendChild(el('span', UI.dateTime(c.last.created_at) + ' · ' + (STATUS[c.last.status] || c.last.status), 'meta'));

@@ -1,3 +1,4 @@
+import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
 import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
 import { requirePilotAccess } from '../lib/auth.js';
@@ -737,8 +738,8 @@ export const ROUTES = Object.freeze({
   'partner-view': { GET: users(PARTNERS, () => partnerView()), unavailable: 'AUDITOR_UNAVAILABLE' },
   // Instant internal messaging: no validation, 24 h then archived (formal e-mails stay in « messages »).
   chat: {
-    GET: users(ALL_ROLES, (orgId, req) => chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),
-    POST: users(ALL_ROLES, (orgId, req) => req.body?.action === 'group' ? createGroup(orgId, req.account, req.body) : sendChat(orgId, req.account, req.body || {})),
+    GET: users(ALL_ROLES, (orgId, req) => req.query?.live === '1' ? collaboration(orgId, req.account) : chatState(orgId, req.account, { conversation: req.query?.conversation || 'cabinet', archive: req.query?.archive === '1' })),
+    POST: users(ALL_ROLES, (orgId, req) => ['heartbeat', 'read'].includes(req.body?.action) ? collaboration(orgId, req.account, req.body) : req.body?.action === 'group' ? createGroup(orgId, req.account, req.body) : sendChat(orgId, req.account, req.body || {})),
     unavailable: 'CHAT_UNAVAILABLE'
   },
   // Give an action to a person (« Sans responsable », or right after validating it).

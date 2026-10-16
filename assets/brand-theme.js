@@ -812,6 +812,8 @@
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
+  function startCollaboration() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/live-collaboration.js'; document.head.appendChild(script); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startCollaboration); else startCollaboration();
   // Additive dossier navigation: existing screens and their controls remain available.
   function addDossierNavigation() {
     if (onLoginPage() || inExcel() || !readSession()) return;
