@@ -822,6 +822,9 @@
   }
   function startIndependenceReview() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/independence-review.js'; document.head.appendChild(script); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startIndependenceReview); else startIndependenceReview();
+  // SIKA extends the existing mission, accounting workspace and settings; no separate page.
+  function startSikaExpenses() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/assets/sika-expenses.css'; document.head.appendChild(css); var script = document.createElement('script'); script.src = '/assets/sika-expenses.js'; document.head.appendChild(script); }
+  startSikaExpenses();
   function startWorkExperience() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/assets/work-experience.css'; document.head.appendChild(css); var script = document.createElement('script'); script.src = '/assets/work-experience.js'; document.head.appendChild(script); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startWorkExperience); else startWorkExperience();
   function startCollaboration() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/live-collaboration.js'; document.head.appendChild(script); }

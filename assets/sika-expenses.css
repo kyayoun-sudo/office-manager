@@ -1,0 +1,69 @@
+.sika-panel {
+  margin-top: 20px;
+}
+.sika-panel form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.sika-panel .field input,
+.sika-panel .field select,
+.sika-panel .field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.sika-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 0;
+}
+.sika-ledger {
+  background: #20252b;
+  color: #f1f3f5;
+  padding: 16px;
+  margin-top: 18px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.sika-expense {
+  border-bottom: 1px solid #515961;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+.sika-expense:last-child {
+  border: 0;
+}
+.sika-expense h3,
+.sika-expense a,
+.sika-expense summary {
+  color: #ffd166;
+}
+.sika-expense .btn {
+  background: #303842;
+  color: #ffd166;
+  border: 1px solid #79838e;
+  box-shadow: none;
+}
+.sika-expense input,
+.sika-expense textarea,
+.sika-expense select {
+  background: #171b20;
+  color: #fff;
+  border: 1px solid #79838e;
+}
+.sika-expense p {
+  color: #f1f3f5;
+}
+.sika-panel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+@media (max-width: 600px) {
+  .sika-panel form {
+    grid-template-columns: 1fr;
+  }
+  .sika-ledger {
+    padding: 10px;
+  }
+}

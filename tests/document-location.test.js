@@ -155,6 +155,12 @@ test('owner exception is journaled before starting, keeps missing pieces open an
   assert.deepEqual(state().opportunities.opp.answers, []);
   assert.deepEqual(state().opportunities.opp.declarations, {});
   assert.ok(result.override.outstanding.includes('Beneficial ownership document'));
+  // Current workflow keeps an override blocked while these prerequisites remain missing.
+  const blocked = await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Demande de démarrage avant réception des pièces', target: 'audit_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d);
+  assert.equal(blocked.override.status, 'blocked');
+  assert.equal(calls.some(c => c.options.method === 'PATCH'), false);
+  // Simulate their later completion before testing the actual transition (no production gate changed).
+  Object.assign(state().opportunities.opp, { workbook: { id: 'acceptance' }, won: { letter: 'client-confirmation' }, phase1: { status: 'ready' }, team: { status: 'validated', members: [] } });
   d.fetchRows = async (query, options = {}) => {
     calls.push({ query, options });
     if (options.method === 'PATCH') assert.ok(state().opportunities.opp.overrides.some(o => o.target === 'audit_start'), 'decision persisted first');
@@ -167,6 +173,7 @@ test('owner exception is journaled before starting, keeps missing pieces open an
 
 test('failed mission transition stays pending; real TDR reception corrections keep a signed history', async () => {
   const { d, state } = opportunityWorld();
+  Object.assign(state().opportunities.opp, { workbook: { id: 'acceptance' }, won: { letter: 'client-confirmation' }, phase1: { status: 'ready' }, team: { status: 'validated', members: [] } });
   const fetchRows = d.fetchRows;
   d.fetchRows = async (query, options = {}) => options.method === 'PATCH' ? [] : fetchRows(query, options);
   const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Justification métier documentée pour cet essai', target: 'mission_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d);
