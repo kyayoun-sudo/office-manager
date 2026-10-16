@@ -6,6 +6,7 @@ const now = Date.parse('2026-10-13T10:00:00Z');
 const manager = { role: 'manager', email: 'manager@firm.example', auth_user_id: 'manager-id' };
 function deps(overrides = {}) {
   return {
+    learningNotice: async () => ({ due: false }),
     now, accessibleMissionIds: async () => new Set(['my-mission']),
     fetchRows: async path => path.startsWith('office_action_queue?') ? [
       { id: 'pbc-own', summary: 'Own PBC', office_mission_id: 'my-mission' },

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mon entraînement</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/screens.css" />
+    <link rel="stylesheet" href="/assets/dossiers.css" />
+    <style>
+      .learning-tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 20px 0;
+      }
+      .learning-tabs [aria-current="page"] {
+        background: #142c4d;
+        color: white;
+      }
+      .learning-question {
+        border-top: 1px solid var(--line);
+        padding: 20px 0;
+      }
+      .learning-question textarea,
+      #agent-form textarea {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 8px 0 16px;
+        min-height: 110px;
+        font: inherit;
+      }
+      .learning-feedback {
+        padding: 14px;
+        background: var(--surface);
+        border-left: 3px solid #b27b15;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .learning-history button {
+        margin: 4px;
+      }
+      .learning-modes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+        gap: 16px;
+      }
+      .learning-modes a {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        text-decoration: none;
+      }
+      .learning-modes strong,
+      .learning-modes span {
+        display: block;
+      }
+      .learning-modes span {
+        margin-top: 8px;
+      }
+      .learning-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      #learning-case {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav" aria-label="Navigation principale">
+        <div class="brand">
+          <div class="logo" data-firm-logo>C</div>
+          <div><span data-firm-name>Office Manager</span></div>
+        </div>
+        <a href="/accueil.html">Mon travail</a
+        ><a href="/dossiers.html">Mes dossiers</a
+        ><a href="/apprentissage.html" aria-current="page">Mon entraînement</a
+        ><a href="/assistant.html">Assistant</a
+        ><a href="/questionnaire.html">Retours sur les agents</a>
+      </nav>
+      <main class="main dossier-main" data-no-tabs>
+        <header class="page-head">
+          <h1>Mon entraînement</h1>
+          <p id="learning-role" class="lead"></p>
+        </header>
+        <nav class="learning-tabs" aria-label="Parcours d’apprentissage">
+          <a class="btn ghost" data-mode="monthly" href="?mode=monthly"
+            >M’améliorer</a
+          ><a class="btn ghost" data-mode="agent" href="?mode=agent"
+            >Entraîner mon IA</a
+          ><a
+            class="btn ghost"
+            data-mode="collaboration"
+            href="?mode=collaboration"
+            >Mieux travailler ensemble</a
+          >
+        </nav>
+        <p id="learning-status" class="status" role="status" aria-live="polite">
+          Chargement…
+        </p>
+        <section id="learning-intro" class="card">
+          <h2 id="learning-title"></h2>
+          <p id="learning-description"></p>
+          <div class="learning-actions" id="learning-start"></div>
+        </section>
+        <section class="card" id="learning-session" hidden>
+          <h2 id="learning-session-title"></h2>
+          <p id="learning-source" class="meta"></p>
+          <p id="learning-case"></p>
+          <form id="learning-answer-form">
+            <div id="learning-questions"></div>
+            <div class="learning-actions">
+              <button class="btn ghost" id="learning-draft" type="button">
+                Enregistrer et reprendre plus tard</button
+              ><button class="btn" id="learning-submit" type="submit">
+                Terminer et voir le retour
+              </button>
+            </div>
+          </form>
+        </section>
+        <section class="card" id="learning-agent" hidden>
+          <h2>Ce que j’apprends à mon agent</h2>
+          <p>
+            Décrivez votre façon de travailler et donnez un exemple. Ces
+            consignes personnelles accompagnent vos prochaines conversations
+            dans l’Assistant. Elles ne changent ni les droits ni les règles du
+            cabinet.
+          </p>
+          <form id="agent-form">
+            <label for="learning-agent-choice">Mon agent</label
+            ><select id="learning-agent-choice"></select
+            ><label for="agent-desired"
+              >Ce que je veux que mon agent fasse</label
+            ><textarea
+              id="agent-desired"
+              maxlength="2500"
+              placeholder="Exemple : présente d’abord les pièces manquantes, puis les vérifications à faire."
+            ></textarea
+            ><label for="agent-avoid">Ce qu’il doit éviter</label
+            ><textarea
+              id="agent-avoid"
+              maxlength="1500"
+              placeholder="Exemple : ne conclus pas sans citer les pièces examinées."
+            ></textarea
+            ><label for="agent-example"
+              >Exemple de réponse ou de correction attendue</label
+            ><textarea
+              id="agent-example"
+              maxlength="2500"
+              placeholder="Quand je te demande…, je veux une réponse comme…"
+            ></textarea>
+            <div class="learning-actions">
+              <button class="btn" type="submit">Retenir mes consignes</button
+              ><button class="btn ghost" type="button" id="agent-clear">
+                Retirer mes consignes pour cet agent
+              </button>
+            </div>
+          </form>
+        </section>
+        <section class="card learning-history">
+          <h2>Mes sessions</h2>
+          <div id="learning-history"></div>
+        </section>
+      </main>
+    </div>
+    <script src="/assets/brand-theme.js"></script>
+    <script src="/assets/personal-learning.js"></script>
+  </body>
+</html>
