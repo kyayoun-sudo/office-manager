@@ -172,10 +172,11 @@ export const ROUTES = Object.freeze({
   // Shadow is seen by the partners and the IT administrator (Paul, 2026-10-11); the partners decide on
   // lessons and experiments; code proposals may also be asked by the IT administrator.
   shadow: {
-    GET: users([...SHADOW_VIEWERS], async () => (await import('../lib/shadow.js')).labView()),
+    GET: users([...SHADOW_VIEWERS], async (orgId, req) => req.query?.sandbox === '1' ? (await import('../lib/audit-sandbox.js')).sandboxView(orgId) : (await import('../lib/shadow.js')).labView()),
     POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
       if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
+      if (String(b.action).startsWith('sandbox-')) return (await import('../lib/audit-sandbox.js')).sandboxAction(orgId, req.account, b);
       if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
       // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
       if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
