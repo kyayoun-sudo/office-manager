@@ -575,11 +575,13 @@
     document.documentElement.lang = 'en';
     var cache = {}; try { cache = JSON.parse(safeGet(window.localStorage, I18N_KEY) || '{}') || {}; } catch (e) { cache = {}; }
     Object.keys(LOGIN_EN).forEach(function (k) { if (!cache[k]) cache[k] = LOGIN_EN[k]; });
-    var english = new Set(Object.keys(cache).map(function (k) { return cache[k]; }));
-    var queue = new Set(), timer = null, sending = false;
+    // Match the agent-name formatter before touching the DOM. Otherwise its
+    // observer and the translator can alternate between two labels forever.
+    var english = new Set(Object.keys(cache).map(function (k) { return renameText(cache[k]); }));
+    var queue = new Set(), attempted = new Set(), timer = null, sending = false;
     var SKIP = 'script,style,textarea,code,pre,[data-keep],[data-user-name],[data-firm-name],.mtile .client,.mtile .name,.avatar';
     var worth = function (t) { return t.length > 1 && /[A-Za-zÀ-ÿ]{2}/.test(t) && !english.has(t) && !/^[\w.+-]+@[\w.-]+$/.test(t) && !/^[A-Z0-9_\-]{2,}$/.test(t) && !/^https?:/.test(t); };
-    function tr(t) { var k = t.trim(); if (!worth(k)) return null; if (cache[k]) return t.replace(k, cache[k]); queue.add(k); return null; }
+    function tr(t) { var k = t.trim(); if (!worth(k)) return null; if (cache[k]) return t.replace(k, renameText(cache[k])); if (!attempted.has(k)) queue.add(k); return null; }
     function pass(root) {
       if (!root || root.nodeType !== 1 && root.nodeType !== 9) return;
       var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) { return n.parentElement && n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; } });
@@ -598,11 +600,15 @@
         var batch = [], size = 0;
         queue.forEach(function (t) { if (batch.length < 120 && size + t.length < 20000) { batch.push(t); size += t.length; } });
         if (!batch.length) return;
+        batch.forEach(function (t) { attempted.add(t); });
         sending = true;
         OM.api('/api/app?route=translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: 'en', texts: batch }) })
           .then(function (d) {
             var got = (d && d.translations) || {};
-            Object.keys(got).forEach(function (k) { cache[k] = got[k]; english.add(got[k]); });
+            Object.keys(got).forEach(function (k) {
+              if (typeof got[k] !== 'string' || !got[k].trim()) return;
+              cache[k] = got[k]; english.add(renameText(got[k]));
+            });
             var keys = Object.keys(cache); if (keys.length > 6000) keys.slice(0, keys.length - 6000).forEach(function (k) { delete cache[k]; });
             safeSet(window.localStorage, I18N_KEY, JSON.stringify(cache));
           })
@@ -807,3 +813,4 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
 })();
+
