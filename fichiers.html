@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Serveur du cabinet</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/screens.css" />
+    <link rel="stylesheet" href="/assets/dossiers.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav" aria-label="Navigation principale">
+        <div class="brand">
+          <div class="logo" data-firm-logo>C</div>
+          <div><span data-firm-name>Office Manager</span></div>
+        </div>
+        <a href="/accueil.html">Mon travail</a
+        ><a href="/dossiers.html">Mes dossiers</a
+        ><a href="/rangement.html">Documents Drive</a
+        ><a href="/fichiers.html" aria-current="page">Serveur du cabinet</a
+        ><a href="/parametres.html">Paramètres</a>
+      </nav>
+      <main class="main dossier-main" data-no-tabs>
+        <header class="page-head">
+          <h1>Serveur du cabinet</h1>
+          <p class="lead">
+            Retrouvez les dossiers que le cabinet vous autorise à consulter. Les
+            documents Drive restent disponibles.
+          </p>
+        </header>
+        <p id="files-status" role="status" aria-live="polite">Chargement…</p>
+        <section class="card">
+          <h2>Dossiers et fichiers</h2>
+          <div id="files-navigation" class="btn-row"></div>
+          <div id="files-list" class="stack"></div>
+        </section>
+        <section class="card" id="files-detail" hidden></section>
+        <section class="card" id="files-upload" hidden>
+          <h2>Ajouter un fichier</h2>
+          <form id="upload-form">
+            <label for="upload-file">Fichier (3 Mo maximum)</label
+            ><input id="upload-file" type="file" required /><button
+              class="btn"
+              type="submit"
+            >
+              Ajouter sans remplacer un fichier existant
+            </button>
+          </form>
+        </section>
+      </main>
+    </div>
+    <script src="/assets/brand-theme.js"></script>
+    <script src="/assets/server-files.js"></script>
+  </body>
+</html>

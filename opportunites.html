@@ -529,11 +529,17 @@
     go.addEventListener('click', function () { if (!need.value.trim()) { need.focus(); return; } searchSpecialists(o, need.value.trim(), go); });
     free.appendChild(need); free.appendChild(go); spec.appendChild(free);
     box.appendChild(spec);
+    var kycLabel = el('label', 'Responsable KYC (facultatif)');
+    var kycChoice = document.createElement('select'); kycChoice.id = 'team-kyc-person'; kycLabel.htmlFor = kycChoice.id;
+    kycChoice.appendChild(new Option('Choisir maintenant ou plus tard', ''));
+    draft.filter(function(m){return !m.external && m.email;}).forEach(function(m){kycChoice.appendChild(new Option(m.name,m.email));});
+    kycChoice.value = (o.kyc_responsible && o.kyc_responsible.email) || '';
+    act.appendChild(kycLabel); act.appendChild(kycChoice);
     var ok = el('button', 'Valider l’équipe', 'btn'); ok.type = 'button';
     ok.addEventListener('click', function () {
       if (!draft.length) { $('team-say').textContent = 'Ajoutez au moins une personne.'; return; }
       ok.disabled = true;
-      api({ action: 'validate-team', opportunity_id: o.id, members: draft.map(function (m) { return { name: m.name, email: m.email || null, role: m.role, external: Boolean(m.external), speciality: m.speciality || null, contact: m.contact || null, source: m.source || null }; }) })
+      api({ action: 'validate-team', opportunity_id: o.id, kyc_email: kycChoice.value, members: draft.map(function (m) { return { name: m.name, email: m.email || null, role: m.role, external: Boolean(m.external), speciality: m.speciality || null, contact: m.contact || null, source: m.source || null }; }) })
         .then(function () { delete teamDraft[o.id]; delete teamEdit[o.id]; $('team-say').textContent = 'Équipe validée : les noms sont écrits dans la fiche du classeur ; chaque membre du cabinet reçoit sa déclaration d’indépendance.'; window.reloadOpportunity(); })
         .catch(function (e) { ok.disabled = false; $('team-say').textContent = msg(e); });
     });

@@ -1,0 +1,14 @@
+{
+  "org_id": "REPLACE_WITH_ORGANISATION_ID",
+  "port": 8788,
+  "state_file": "/var/lib/office-manager/registry.json",
+  "roots": [
+    {
+      "id": "audit",
+      "name": "Dossiers audit",
+      "path": "/srv/cabinet/audit",
+      "readers": ["reviewer@example.com"],
+      "writers": ["auditor@example.com", "manager@example.com"]
+    }
+  ]
+}

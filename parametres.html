@@ -205,6 +205,18 @@
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="pp-save" type="button">Enregistrer dans la mémoire des agents</button><span class="status" id="pp-status" role="status" aria-live="polite"></span></div>
         </section>
 
+        <section class="card" id="workflow-reference" hidden aria-labelledby="h-workflow-reference">
+          <h2 id="h-workflow-reference">Workflow et documents de gestion</h2>
+          <p class="hint">Référencez le workflow du cabinet et le modèle de management card. Le document est vérifié avant d’être enregistré dans les références partagées. Les droits et validations restent ceux configurés dans l’application.</p>
+          <form id="workflow-reference-form">
+            <label for="workflow-reference-kind">Document</label><select id="workflow-reference-kind"><option value="firm_workflow">Workflow du cabinet</option><option value="management_card_template">Modèle de management card</option></select>
+            <label for="workflow-reference-link">Lien Drive ou référence du serveur du cabinet</label><input id="workflow-reference-link" type="text" required maxlength="1000">
+            <button class="btn ghost" type="submit">Vérifier et retenir ce document</button>
+          </form>
+          <p id="workflow-reference-status" class="status" role="status" aria-live="polite"></p>
+          <div class="links"><a href="/secretariat.html">Consulter les références et modèles</a><a href="/fichiers.html">Serveur du cabinet</a></div>
+        </section>
+
         <section class="card" aria-labelledby="h-sched">
           <h2 id="h-sched">Horaires des agents</h2>
           <p class="hint" style="margin:0">Les agents passent seuls, à heures fixes, et se complètent : l'Orpailleur range et renomme, le Grand Contrôleur part de son travail et lui laisse ses besoins pour le passage suivant, Sika fait le point de la semaine.</p>
@@ -932,5 +944,6 @@
   });
 })();
 </script>
+<script src="/assets/workflow-reference.js"></script>
 </body>
 </html>

@@ -114,6 +114,26 @@ const who = req => req.account?.display_name || req.account?.email || null;
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
+  'server-files': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/server-files.js')).serverFiles(orgId, req, req.account)),
+    POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/server-files.js')).serverFiles(orgId, req, req.account)),
+    unavailable: 'LOCAL_DOCUMENTS_UNAVAILABLE'
+  },
+  dossier: {
+    GET: users(ALL_ROLES, async (orgId, req) => { const m = await import('../lib/dossier-service.js'); return req.query?.mission_id || req.query?.opportunity_id ? m.dossierView(orgId, req.query || {}, req.account) : m.dossierList(orgId, req.account); }),
+    unavailable: 'DOSSIER_UNAVAILABLE'
+  },
+  'dossier-followup': {
+    POST: users(MANAGERS, async (orgId, req) => {
+      const b = req.body || {}, action = b.action;
+      const screen = action === 'specialist' ? 'team' : action === 'quotation' ? 'billing' : null;
+      if (!screen) throw fail('UNKNOWN_ACTION', 400);
+      await requireScreenAccess(orgId, req.account, 'opportunities', 'prepare');
+      await requireScreenAccess(orgId, req.account, screen, 'prepare');
+      const m = await import('../lib/dossier-actions.js');
+      return action === 'specialist' ? m.updateSpecialist(orgId, b, req.account) : m.recordQuotationChange(orgId, b, req.account);
+    }), unavailable: 'DOSSIER_UNAVAILABLE'
+  },
   branding: {
     GET: (orgId) => getBranding(orgId),
     POST: owner((orgId, req) => saveBranding(orgId, req.body || {}, req.body?.updated_by)),
@@ -899,8 +919,9 @@ export async function handleApp(req) {
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
-  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, () => run(orgId, req));
-  return run(orgId, req);
+  const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => run(orgId, req)));
+  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, invoke);
+  return invoke();
 }
 
 export default async function handler(req, res) {
