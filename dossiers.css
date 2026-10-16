@@ -1,0 +1,111 @@
+.dossier-main {
+  max-width: 1440px;
+}
+.dossier-main .card {
+  margin-bottom: 16px;
+}
+.dossier-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+.dossier-step {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 2fr);
+  gap: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dossier-step:last-child {
+  border-bottom: 0;
+}
+.dossier-step h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.dossier-step p {
+  margin: 4px 0;
+  line-height: 1.5;
+  font-size: 14px;
+}
+.dossier-handoff {
+  color: var(--muted);
+}
+.dossier-work {
+  --surface: #20242b;
+  --surface-2: #272c34;
+  --ink: #e8ecf2;
+  --muted: #b5bfcd;
+  --line: #414a58;
+  --brand: #ffc35c;
+  --brand-ink: #ffd080;
+  --on-brand: #1c2026;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: none;
+  color-scheme: dark;
+}
+.dossier-work .btn.ghost {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.dossier-work h2,
+.dossier-work h3 {
+  color: var(--ink);
+}
+.dossier-work a {
+  color: var(--brand-ink);
+}
+.dossier-muted {
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 14px;
+}
+#dossier-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--ground);
+  padding: 8px 0;
+}
+#dossier-body:focus {
+  outline: none;
+}
+.dossier-stat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+.dossier-stat strong {
+  font-variant-numeric: tabular-nums;
+}
+.dossier-form {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.dossier-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dossier-form textarea {
+  min-height: 80px;
+}
+@media (max-width: 700px) {
+  .dossier-step {
+    grid-template-columns: 1fr;
+  }
+  .dossier-index-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+#dossier-status:empty {
+  display: none;
+}

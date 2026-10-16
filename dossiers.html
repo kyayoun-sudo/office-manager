@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mes dossiers</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/screens.css" />
+    <link rel="stylesheet" href="/assets/dossiers.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav" aria-label="Navigation principale">
+        <div class="brand">
+          <div class="logo" data-firm-logo>C</div>
+          <div>
+            <span data-firm-name>Office Manager</span
+            ><small>Office Manager</small>
+          </div>
+        </div>
+        <a href="/accueil.html">Mon travail</a
+        ><a href="/dossiers.html" aria-current="page">Mes dossiers</a
+        ><a href="/opportunites.html">Opportunités</a
+        ><a href="/mission.html">Missions</a
+        ><a href="/rangement.html">Documents</a
+        ><a href="/validations.html">À valider</a
+        ><a href="/messagerie.html">Messagerie</a
+        ><a href="/assistant.html">Assistant</a
+        ><a href="/entrainement.html">Entraînement</a>
+        <div class="who"><span data-user-name>Utilisateur</span></div>
+      </nav>
+      <main class="main dossier-main" data-no-tabs>
+        <header class="page-head">
+          <a href="/dossiers.html" id="all-dossiers" hidden>← Mes dossiers</a>
+          <h1 id="dossier-title">Mes dossiers</h1>
+          <p class="lead" id="dossier-lead">
+            Une vue commune du dossier, adaptée à votre rôle : prochaine action,
+            pièces, travaux et personnes responsables.
+          </p>
+        </header>
+        <p class="status" id="dossier-status" role="status" aria-live="polite">
+          Chargement…
+        </p>
+        <div class="btn-row">
+          <button class="btn ghost" type="button" id="dossier-reload">
+            Actualiser</button
+          ><button
+            class="btn ghost"
+            type="button"
+            id="organisation-toggle"
+            aria-expanded="false"
+            aria-controls="organisation"
+          >
+            Qui fait quoi ?
+          </button>
+        </div>
+        <section class="card" id="organisation" hidden>
+          <h2>Le cabinet et ses agents</h2>
+          <p>
+            L’humain décide, valide et signe. Les agents préparent et proposent
+            sur le même dossier ; les pièces et les modèles restent dans le
+            Drive du cabinet.
+          </p>
+          <div id="organisation-content" class="stack"></div>
+          <div class="links">
+            <a href="/parametres.html#h-users">Rôles et remplacements</a
+            ><a href="/parametres.html">Modèles, droits et configuration</a
+            ><a href="/mise-en-service.html">Questions de mise en service</a>
+          </div>
+        </section>
+        <div id="dossier-index" class="stack"></div>
+        <section id="dossier-next" class="card" hidden></section>
+        <nav
+          id="dossier-tabs"
+          class="chips"
+          aria-label="Rubriques du dossier"
+          hidden
+        ></nav>
+        <div id="dossier-body"></div>
+      </main>
+    </div>
+    <script src="/assets/brand-theme.js"></script>
+    <script src="/assets/dossiers.js"></script>
+  </body>
+</html>

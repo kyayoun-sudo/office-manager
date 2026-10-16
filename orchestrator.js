@@ -21,8 +21,22 @@ function safeJson(value) {
   }
 }
 
+// How an answer reads (Paul, 2026-10-07: « écris comme un professionnel… gras, souligné, mais pas
+// ces étoiles partout »). The app shows the Markdown as a formatted document.
+export const ANSWER_STYLE = `WRITING THE ANSWER (shown to the firm as a formatted document):
+- Write like a senior audit manager writing to a partner: clear, factual, concise, no filler, no emoji, no exclamation marks.
+- Start with one or two sentences that answer the question directly. Then, only if useful, short sections with a "### " title (2 to 4 sections at most).
+- Bold (**text**) only for the few facts that matter (a figure, a deadline, a name, a decision to take): at most one per paragraph. Underline (++text++) only for the one point the reader must act on. Never put asterisks anywhere else; never bold whole sentences or list labels.
+- Lists with "- " for items; numbered "1. " for steps. A small table (| col | col |) when comparing people, missions or figures.
+- End with a "### Prochaines étapes" (or "### Next steps" when answering in English) section of 1 to 3 items when an action is expected.
+- Plain characters: no decorative symbols, no "---" separators, no headings in capitals.`;
+
 function withSnapshot(instructions, evidence) {
   return `${instructions}
+
+${ANSWER_STYLE}
+
+REQUIRED DOCUMENT RULE: for every necessary document, use locate_required_document (or consult Orpailleur when that tool is delegated): confirmed memory, mission, Drive search, actual Orpailleur content analysis, then user selection only if unresolved. Distinguish template from active mission document. ASK_USER / NOT_FOUND_YET never means the document does not exist. After human selection, use the application's confirmation action to remember the type, role, mission, file, version and confirmer; never fabricate a confirmation. A changed confirmed version requires reconfirmation. Do not recreate a document or an audit workflow when the firm's real document exists.
 
 PRELOADED TECHNICAL SNAPSHOT FOR THIS RUN:
 ${safeJson(evidence)}
@@ -51,11 +65,12 @@ function makeSpecialist(agentKey, evidence, runtime) {
 export const CONSULT_TOOLS = {
   "mission-controller": "consult_mission_controller",
   "orpailleur": "consult_orpailleur",
-  "sika": "consult_sika"
+  "sika": "consult_sika",
+  "enhanced-auditor": "consult_enhanced_auditor"
 };
 
 // Builds the root agent: GRAND CONTRÔLEUR / OFFICE MANAGER AI.
-// Its specialists are exactly Mission Controller, Orpailleur and Sika.
+// Its specialists: Mission Controller, Orpailleur, Sika and (2026-10-08) Enhanced Auditor.
 // There is no "Grand Contrôleur" specialist and no consult tool for it.
 function makeManager(contexts, runtime, rootContext = {}) {
   const missionController = makeSpecialist(
@@ -73,6 +88,12 @@ function makeManager(contexts, runtime, rootContext = {}) {
   const sika = makeSpecialist(
     "sika",
     contexts.sika,
+    runtime
+  );
+
+  const enhancedAuditor = makeSpecialist(
+    "enhanced-auditor",
+    contexts["enhanced-auditor"],
     runtime
   );
 
@@ -95,6 +116,11 @@ function makeManager(contexts, runtime, rootContext = {}) {
         toolName: CONSULT_TOOLS.sika,
         toolDescription:
           "Consult Sika for billing, collections, payments and administrative follow-up analysis."
+      }),
+      enhancedAuditor.asTool({
+        toolName: CONSULT_TOOLS["enhanced-auditor"],
+        toolDescription:
+          "Consult Enhanced Auditor for audit intelligence and review: combined risk register (your industry risk briefing + the auditor's risk assessment), missing procedures, evaluation of audit evidence, whether each risk is fully covered, pictures turned into Excel/reports, patterns in working files."
       }),
       ...buildRootTools(runtime)
     ]
@@ -158,6 +184,22 @@ export async function runOfficeManager({
   const normalizedRisk = String(risk || "normal").toLowerCase();
   const runtime = { orgId, runId, storageKeys };
   const isRoot = requestedAgent === ROOT_ROUTE;
+  let quoteEvents = [];
+  if (orgId && (requestedAgent === 'sika' || isRoot) && !contexts.sika?.unavailable) {
+    try {
+      quoteEvents = await (await import('./dossier-actions.js')).quotationInbox(orgId);
+      contexts = { ...contexts, sika: { ...(contexts.sika || {}), quotation_changes: quoteEvents,
+        quotation_notice: 'Versions de cotation à examiner dans les vrais classeurs. Une modification ou une transmission ne vaut pas approbation.' } };
+    } catch { /* An unavailable bus cannot invalidate existing financial work. */ }
+  }
+  async function complete(result) {
+    const consulted = requestedAgent === 'sika' || (result.toolsUsed || []).includes('consult_sika');
+    if (consulted && quoteEvents.length) {
+      try { await (await import('./dossier-actions.js')).acknowledgeQuotations(orgId, quoteEvents); } catch { /* retry on the next real response */ }
+    }
+    return result;
+  }
+
 
   // Claude-only mode remains available as an alternate review/analysis path.
   // The OpenAI Agents SDK is the primary operational orchestration engine.
@@ -176,13 +218,13 @@ export async function runOfficeManager({
       evidence
     });
 
-    return runAI({
+    return complete(await runAI({
       agentKey,
       instructions,
       input,
       provider: "anthropic",
       risk: normalizedRisk
-    });
+    }));
   }
 
   let primary;
@@ -215,14 +257,14 @@ export async function runOfficeManager({
     );
 
   if (!needsIndependentReview) {
-    return primary;
+    return complete(primary);
   }
 
   if (!claudeReady) {
     if (normalizedProvider === "dual") {
       throw new Error("ANTHROPIC_NOT_CONFIGURED_FOR_DUAL_REVIEW");
     }
-    return primary;
+    return complete(primary);
   }
 
   const review = await runAI({
@@ -231,13 +273,15 @@ export async function runOfficeManager({
     risk: normalizedRisk,
     instructions: `You are the independent Claude reviewer for Office Manager AI.
 Review the primary answer for unsupported facts, contradictions, missing material risks, unsafe actions, overconfidence, privacy problems and failure to distinguish REQUESTED / EXECUTED / VERIFIED.
-Return a corrected final answer for the user. Do not invent missing evidence. Do not perform any action.`,
+Return a corrected final answer for the user. Do not invent missing evidence. Do not perform any action.
+
+${ANSWER_STYLE}`,
     input:
       `USER REQUEST:\n${message}\n\n` +
       `PRIMARY OFFICE MANAGER ANSWER:\n${primary.text}`
   });
 
-  return {
+  return complete({
     provider: "dual",
     model: primary.model,
     primary,
@@ -246,8 +290,9 @@ Return a corrected final answer for the user. Do not invent missing evidence. Do
     lastAgent: primary.lastAgent,
     toolsUsed: primary.toolsUsed || [],
     reviewed: true
-  };
+  });
 }
 
 // Exposed for structural tests (no network call).
 export { makeManager as buildManagerAgent, makeSpecialist as buildSpecialistAgent };
+
