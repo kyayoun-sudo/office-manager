@@ -681,3 +681,19 @@ test('team and KYC responsibility are saved together, preserving personal indepe
   await validateTeam('org',{opportunity_id:o.id,members:[{name:'Other',email:'b@cab.ci',role:'Auditeur'}]},actor,d);
   assert.equal((await getOpportunity(o.id,d)).kyc_responsible,null);
 });
+test('independence explanation is required; partner popup, transcribed safeguard and new explanation invalidate prior decision',async()=>{
+ const wb=new ExcelJS.Workbook();await wb.xlsx.load(await buildTemplate());const ws=wb.getWorksheet('03_PHASE_1');ws.getCell('E75').value='Garde-fous / justification';ws.getCell('E75').fill=fill(DARK);ws.getCell('E76').fill=fill(INPUT);
+ const {d,drive}=await setup(Buffer.from(await wb.xlsx.writeBuffer()));const created=await createOpportunity('org',{}, {name:'TDR.pdf',base64:Buffer.from('x').toString('base64')}, {role:'partner',email:'p@cab.ci'},d);const o=await run(created.opportunity.id,d);
+ await validateTeam('org',{opportunity_id:o.id,members:[{name:'A. Senior',email:'senior@cab.ci',role:'Senior'}]},{role:'partner',email:'p@cab.ci'},d);
+ const body={opportunity_id:o.id,answers:{'C.01':'Oui'},certify:true};const person={email:'senior@cab.ci',display_name:'A. Senior'};
+ await assert.rejects(declareIndependence('org',body,person,d),/INDEPENDENCE_EXPLANATION_REQUIRED/);
+ await declareIndependence('org',{...body,details:{'C.01':'Mon conjoint est employé du client.'}},person,d);
+ const light=await myQuestions('org',{role:'partner',email:'p@cab.ci'},{...d,independenceOnly:true,templateStructure:async()=>{throw Error('MUST_NOT_READ_TEMPLATE');},documentRequests:async()=>{throw Error('MUST_NOT_SEARCH_DOCUMENTS');}});assert.ok(light.questions.some(q=>q.kind==='independence_review'));
+ const popup=await myQuestions('org',{role:'partner',email:'p@cab.ci'},d);assert.ok(popup.questions.some(q=>q.kind==='independence_review'));
+ const {independenceReviewAction}=await import('../lib/opportunities.js');const view=await opportunityView('org',o.id,{role:'partner',email:'p@cab.ci'},d),c=view.independence_cases[0];
+ const result=await independenceReviewAction('org',{opportunity_id:o.id,case_id:c.id,version:c.version,action:'independence-decide',selected:['independent_review'],note:'Revue distincte justifiée après analyse'}, {role:'partner',email:'p@cab.ci'},d);
+ assert.equal(result.decision.status,'measures_pending');assert.equal(result.workbook_sync.status,'verified');
+ const cells=await readCells(drive.files.get(o.workbook.id).buffer,[{sheet:'03_PHASE_1',cell:'E76'},{sheet:'03_PHASE_1',cell:'I76'}]);assert.match(cells['03_PHASE_1!E76'],/p@cab.ci/);assert.equal(cells['03_PHASE_1!I76'],'');
+ await declareIndependence('org',{...body,details:{'C.01':'Je détiens aussi des actions.'}},person,d);const after=await opportunityView('org',o.id,{role:'partner',email:'p@cab.ci'},d);assert.equal(after.independence_cases[0].status,'pending');assert.equal(after.declaration_history.length,1);
+ await assert.rejects(independenceReviewAction('org',{opportunity_id:o.id,case_id:c.id,version:c.version,action:'independence-applied',note:'Revu',evidence:'WP'}, {role:'partner',email:'p@cab.ci'},d),/DECLARATION_CHANGED/);
+});

@@ -552,6 +552,7 @@ export const ROUTES = Object.freeze({
       if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
       if (a === 'validate-team') return o.validateTeam(orgId, b, req.account, { req });
       if (a === 'find-specialists') return o.findSpecialists(orgId, b, req.account);
+      if (['independence-decide','independence-applied','independence-override','independence-prohibit'].includes(a)) return o.independenceReviewAction(orgId,b,req.account);
       if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
       if (a === 'declaration-draft') return o.saveDeclarationDraft(orgId, b, req.account);
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
@@ -651,7 +652,8 @@ export const ROUTES = Object.freeze({
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
   // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
   'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => {
-    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account).catch(() => ({ questions: [] }));
+    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account, {independenceOnly:req.query?.independence_only==='1'}).catch(() => ({ questions: [] }));
+    if (req.query?.independence_only === '1') return out;
     // « Ta procédure t'attend » (2026-10-12): the procedures of the validated programmes this person prepares.
     const mine = await (await import('../lib/procedure-work.js')).myProcedures(orgId, req.account).catch(() => ({ procedures: [] }));
     for (const p of mine.procedures.filter(x => ['to_do', 'in_progress', 'returned'].includes(x.status)).slice(0, 5)) out.questions.push({ id: 'proc|' + p.programme_id + '|' + p.code, kind: 'procedure', title: p.mission_name,
@@ -902,7 +904,7 @@ export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
-const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
+const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }

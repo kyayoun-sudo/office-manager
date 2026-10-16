@@ -123,7 +123,7 @@
         <p class="meta">Cette autorisation est conservée dans le journal. Les pièces manquantes et les validations du classeur restent ouvertes.</p>
         <label for="override-target">Action autorisée</label><select id="override-target"><option value="kyc_prepare">Préparer le KYC maintenant</option><option value="mission_start">Commencer la planification de la mission</option><option value="audit_start">Commencer les travaux d’audit</option></select>
         <label for="override-mission">Mission concernée (pour un démarrage)</label><select id="override-mission"><option value="">Créer ou reprendre la mission de cette opportunité</option></select>
-        <label for="override-reason">Motif (facultatif)</label><textarea id="override-reason" rows="2"></textarea>
+        <label for="override-reason">Business reason / justification métier (obligatoire)</label><textarea id="override-reason" required rows="2"></textarea>
         <label for="override-open">Éléments restant ouverts (un par ligne)</label><textarea id="override-open" rows="3"></textarea>
         <button id="override-save" class="btn" type="button">Enregistrer ma décision</button><p id="override-say" class="status" role="status"></p>
       </section>
@@ -186,6 +186,7 @@
   var MAX = 3 * 1024 * 1024, picked = null, wonFile = null, stopPoll = null, current = null;
   var ERR = {
     ACCEPTANCE_TEMPLATE_NOT_FOUND: 'Le classeur d’acceptation du cabinet n’a pas été trouvé dans le Drive : un Associé peut en donner le lien (Paramètres → classeur d’acceptation).',
+    INDEPENDENCE_EXPLANATION_REQUIRED: 'Expliquez chaque réponse Oui avant de certifier votre déclaration.',
     TDR_REQUIRED: 'Choisissez un document ou collez son lien.', FILE_TOO_LARGE: 'Document trop lourd.', PARTNER_DECISION_ONLY: 'Seul un Associé peut remplir cette ligne.',
     MANAGER_ONLY: 'Réservé à un Manager ou à un Associé.', NOTHING_TO_REVIEW: 'Rien de rempli par les agents dans cette section.', NOT_IN_PHASE0: 'La Phase 0 ne peut être refaite qu’avant la décision de l’Associé.', SEPARATION_OF_FUNCTIONS: 'L’Associé qui décide ne peut pas être celui qui a préparé ou revu le dossier.',
     PHASE1_NOT_OPEN: 'La Phase 1 s’ouvre quand le client a confirmé.', PERSONAL_SESSION_REQUIRED: 'Connectez-vous avec votre compte personnel pour répondre.',
@@ -275,6 +276,7 @@
     var first = !current || current.updated_at !== o.updated_at;
     current = o;
     if (window.OMWorkflow) window.OMWorkflow.render(o);
+    if (window.OMIndependence) window.OMIndependence.render(o);
     $('h-opp').textContent = o.title || 'Opportunité';
     $('opp-status').textContent = STATUS[o.status] || o.status;
     $('opp-waiting').textContent = o.status === 'failed' ? 'Arrêt : ' + (o.error || '') : o.status === 'duplicate' ? 'POSSIBLE DUPLICATE — REVIEW REQUIRED : même référence qu’une opportunité existante. Rien n’a été créé.' : (o.summary || '');
@@ -293,9 +295,9 @@
     var role = (o.viewer && o.viewer.role) || '';
     var lead = ['partner', 'owner'].indexOf(role) >= 0;
     var manages = Boolean(o.viewer && o.viewer.may_manage);
-    $('override-card').hidden = !manages || ['removed', 'duplicate', 'running'].indexOf(o.status) >= 0;
-    $('override-target').querySelector('[value="kyc_prepare"]').disabled = role !== 'owner';
-    if (role !== 'owner' && $('override-target').value === 'kyc_prepare') $('override-target').value = 'mission_start';
+    $('override-card').hidden = ['owner','partner'].indexOf(role) < 0 || ['removed', 'duplicate', 'running'].indexOf(o.status) >= 0;
+    $('override-target').querySelector('[value="kyc_prepare"]').disabled = ['owner','partner'].indexOf(role) < 0;
+    if (['owner','partner'].indexOf(role) < 0 && $('override-target').value === 'kyc_prepare') $('override-target').value = 'mission_start';
     $('continuity-card').hidden = !manages;
     var handoff = o.handoff || {}, handoffLabels = { queued: 'Transmission en attente.', transferring: 'Mission Controller transmet les documents.', partial: 'Transmission en cours, reprise automatique.', complete: 'Documents transmis au dossier de mission : ' + (handoff.copied || 0) + ' fichier(s).' };
     $('handoff-status').textContent = handoff.reason || handoffLabels[handoff.status] || '';
@@ -607,6 +609,7 @@
       .catch(function (e) { btn.disabled = false; $('team-say').textContent = msg(e); });
   }
   function drawMyDeclaration(o, t) {
+    if (window.omEditingDeclaration === o.id && o.my_declaration) o = Object.assign({},o,{my_declaration:null});
     // My own declaration (team members only).
     var mine = o.viewer && o.viewer.in_team && t && t.status === 'validated';
     $('indep-card').hidden = !mine || Boolean(o.my_declaration);
@@ -615,20 +618,24 @@
         var row = el('div', null, 'opp-row'); row.appendChild(el('h3', q.ref + ' — ' + q.label));
         var g = el('div', null, 'opp-fields');
         var a = document.createElement('select'); a.dataset.ref = q.ref; a.appendChild(new Option('—', '')); a.appendChild(new Option('Non', 'Non')); a.appendChild(new Option('Oui', 'Oui')); a.setAttribute('aria-label', q.label);
-        var dtl = document.createElement('textarea'); dtl.dataset.detail = q.ref; dtl.placeholder = 'Si « Oui » : précisez'; dtl.rows = 1;
+        var dtl = document.createElement('textarea'); dtl.dataset.detail = q.ref; dtl.placeholder = 'Si « Oui » : précisez'; dtl.rows = 2; dtl.maxLength = 600; dtl.required = a.value === 'Oui'; a.addEventListener('change', function () { dtl.required = a.value === 'Oui'; });
         a.value = o.my_declaration_draft && o.my_declaration_draft.answers[q.ref] || ''; dtl.value = o.my_declaration_draft && o.my_declaration_draft.details[q.ref] || '';
+        dtl.required = a.value === 'Oui';
         var l1 = el('label', 'Votre réponse'); l1.appendChild(a); var l2 = el('label', 'Précision'); l2.appendChild(dtl); g.appendChild(l1); g.appendChild(l2); row.appendChild(g);
         $('indep-qs').appendChild(row);
       });
     }
   }
+  window.addEventListener('om-independence-ready', function () { if(current&&window.OMIndependence)window.OMIndependence.render(current); });
+  window.addEventListener('om-edit-independence', function () { if (!current || !current.my_declaration) return; window.omEditingDeclaration=current.id; var answers={},details={}; Object.keys(current.my_declaration.answers||{}).forEach(function(ref){answers[ref]=current.my_declaration.answers[ref].answer;details[ref]=current.my_declaration.answers[ref].detail||'';}); $('indep-qs').textContent=''; $('indep-certify').checked=false; drawMyDeclaration(Object.assign({},current,{my_declaration:null,my_declaration_draft:{answers:answers,details:details}}),current.team); $('indep-card').scrollIntoView({behavior:'smooth'}); });
   $('indep-send').addEventListener('click', function () {
+    var invalid = Array.from(document.querySelectorAll('#indep-qs textarea')).find(function(t){return t.required && !t.value.trim();}); if(invalid){invalid.reportValidity();invalid.focus();return;}
     var answers = {}, details = {};
     document.querySelectorAll('#indep-qs select').forEach(function (s) { answers[s.dataset.ref] = s.value; });
     document.querySelectorAll('#indep-qs textarea').forEach(function (x) { if (x.value.trim()) details[x.dataset.detail] = x.value.trim(); });
     var b = this; b.disabled = true;
     api({ action: 'declare', opportunity_id: current.id, answers: answers, details: details, certify: $('indep-certify').checked })
-      .then(function (r) { $('indep-say').textContent = r.threats.length ? 'Déclaration enregistrée : ' + r.threats.length + ' situation(s) seront examinées par le Manager et l’Associé.' : 'Déclaration enregistrée : aucune menace.'; window.reloadOpportunity(); })
+      .then(function (r) { window.omEditingDeclaration=null; $('indep-say').textContent = r.threats.length ? 'Déclaration enregistrée : ' + r.threats.length + ' situation(s) seront examinées par le Manager et l’Associé.' : 'Déclaration enregistrée : aucune menace.'; window.reloadOpportunity(); })
       .catch(function (e) { b.disabled = false; $('indep-say').textContent = msg(e); });
   });
   var saveDraft = el('button', 'Enregistrer le brouillon et reprendre plus tard', 'btn ghost'); saveDraft.type = 'button'; $('indep-send').parentNode.appendChild(saveDraft);
@@ -767,9 +774,10 @@
 
   $('won-file').addEventListener('change', function () { wonFile = this.files[0] || null; });
   $('override-save').addEventListener('click', function () {
+    if (!$('override-reason').value.trim()) { $('override-reason').reportValidity(); $('override-reason').focus(); return; }
     var b = this; b.disabled = true;
     api({ action: 'owner-override', opportunity_id: current.id, target: $('override-target').value, mission_id: $('override-mission').value || null, reason: $('override-reason').value, outstanding: $('override-open').value.split('\n').filter(function (s) { return s.trim(); }) })
-      .then(function (r) { $('override-say').textContent = r.override.status === 'pending' ? 'Décision conservée ; le démarrage reste en attente : ' + (r.override.error || '') : 'Décision enregistrée. Les éléments manquants restent ouverts.'; window.reloadOpportunity(); })
+      .then(function (r) { $('override-say').textContent = r.override.status === 'blocked' ? 'Dérogation enregistrée ; la progression reste bloquée par les éléments ouverts affichés dans le dossier.' : r.override.status === 'pending' ? 'Décision conservée ; le démarrage reste en attente : ' + (r.override.error || '') : 'Décision enregistrée. Les éléments manquants restent ouverts.'; window.reloadOpportunity(); })
       .catch(function (e) { $('override-say').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
   $('handoff-retry').addEventListener('click', function () { var b = this; b.disabled = true; api({ action: 'transmit-documents', opportunity_id: current.id }).then(function () { window.reloadOpportunity(); }).catch(function (e) { $('handoff-status').textContent = msg(e); }).then(function () { b.disabled = false; }); });
