@@ -114,6 +114,16 @@ const who = req => req.account?.display_name || req.account?.email || null;
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
+  'personal-learning': {
+    GET: users([...EVERYONE], async (orgId, req) => (await import('../lib/personal-learning.js')).learningView(orgId, req.account)),
+    POST: users([...EVERYONE], async (orgId, req) => {
+      const m = await import('../lib/personal-learning.js'), b = req.body || {};
+      if (b.action === 'start') return m.startLearning(orgId, req.account, b);
+      if (b.action === 'answer') return m.answerLearning(orgId, req.account, b);
+      if (b.action === 'preference') return m.saveLearningPreference(orgId, req.account, b);
+      throw fail('UNKNOWN_ACTION', 400);
+    }), unavailable: 'PERSONAL_LEARNING_UNAVAILABLE'
+  },
   'server-files': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/server-files.js')).serverFiles(orgId, req, req.account)),
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/server-files.js')).serverFiles(orgId, req, req.account)),

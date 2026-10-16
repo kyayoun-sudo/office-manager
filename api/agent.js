@@ -149,6 +149,10 @@ export default async function handler(req, res) {
     }
     assertIsolatedOrg(orgId);
     await loadGoogleConnection(orgId).catch(() => null);
+    // Only a verified bearer identity may supply personal working preferences.
+    const personalAccount = (req.headers?.authorization || req.headers?.Authorization)
+      ? await (await import('../lib/user-auth.js')).currentAccount(req)
+      : null;
 
     const permissions = await getPermissions(orgId);
 
@@ -299,7 +303,8 @@ export default async function handler(req, res) {
       risk,
       orgId,
       runId: run?.id || null,
-      storageKeys
+      storageKeys,
+      personalAccount
     });
 
     const topLevelTools = result.toolsUsed || [];
@@ -375,7 +380,7 @@ export default async function handler(req, res) {
 
     return res
       .status(error.statusCode || 500)
-      .json({ error: error.statusCode === 401 ? "UNAUTHORIZED" : "AGENT_REQUEST_FAILED",
+      .json({ error: error.statusCode === 401 ? (error.message === "TOKEN_EXPIRED" ? "TOKEN_EXPIRED" : "UNAUTHORIZED") : "AGENT_REQUEST_FAILED",
         runId: run?.id || null });
   }
 }

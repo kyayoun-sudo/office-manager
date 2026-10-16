@@ -65,9 +65,9 @@
     if(role==='auditor'||role==='collaborator')document.getElementById('h-mywork').textContent='Mes travaux à réaliser';
     var learning = el('section', null, 'card'); learning.id = 'personal-learning';
     learning.appendChild(el('h2', 'Mon apprentissage et mes agents'));
-    learning.appendChild(el('p', 'Vos retours passent par le questionnaire existant de Shadow. Les simulations restent dans le laboratoire autorisé du cabinet ; elles ne changent jamais une mission réelle.', 'workspace-detail'));
+    learning.appendChild(el('p', 'Trois parcours distincts, adaptés à votre rôle : questions métier, consignes pour votre agent et cas pratiques de collaboration. Vos exercices ne modifient jamais une mission réelle.', 'workspace-detail'));
     var choices = el('div', null, 'workspace-tabs');
-    [['M’améliorer', '/questionnaire.html'], ['Entraîner mon IA : préférences et corrections', '/questionnaire.html'], ['Améliorer ma collaboration avec les agents', '/questionnaire.html']].forEach(function (x) { var a = el('a', x[0], 'btn ghost'); a.href = x[1]; choices.appendChild(a); });
+    [['M’améliorer · trois questions métier', '/apprentissage.html?mode=monthly'], ['Entraîner mon IA', '/apprentissage.html?mode=agent'], ['Mieux travailler avec mon agent', '/apprentissage.html?mode=collaboration']].forEach(function (x) { var a = el('a', x[0], 'btn ghost'); a.href = x[1]; choices.appendChild(a); });
     if (['owner', 'partner', 'it_admin'].indexOf(role) >= 0) { var lab = el('a', 'Simulations et entraînement du cabinet', 'btn ghost'); lab.href = '/entrainement.html'; choices.appendChild(lab); }
     learning.appendChild(choices); main.appendChild(learning);
     var dossierLink=el('a','Mes dossiers : travaux, pièces et prochaines actions →','workspace-preview-link');dossierLink.href='/dossiers.html';intro.appendChild(dossierLink);
