@@ -851,6 +851,12 @@ export const ROUTES = Object.freeze({
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
     unavailable: 'PERMISSIONS_UNAVAILABLE'
   },
+  // First connection (2026-10-17): the agents introduce themselves in Démarrer; the human gives the link, the agent checks it.
+  'agent-intro': {
+    GET: users(['owner', 'partner'], async (orgId, req) => (await import('../lib/agent-intro.js')).introView(orgId, req.account)),
+    POST: users(['owner', 'partner'], async (orgId, req) => (await import('../lib/agent-intro.js')).saveIntro(orgId, req.body || {}, req.account)),
+    unavailable: 'AGENT_INTRO_UNAVAILABLE'
+  },
   'google-callback': {
     GET: open(async (orgId, req) => {
       try {
