@@ -317,6 +317,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   veille et événement `DOCUMENT_SENT`) ; page `secretariat.html` (menu ⚙ « Secrétariat et modèles », raccourci de l'accueil secrétariat),
   route `secretariat`. `exportAsPdf` (Google : Word → PDF, copie temporaire dans l'espace des agents mise à la corbeille).
 
+## Lancement de la mission : documents déplacés, tous les agents prévenus (Paul, 2026-10-17)
+- Quand le Mission Controller crée la mission, les documents de l'opportunité (ceux du Firm Manager : TDR, classeur d'acceptation, lettre ; et ceux déjà liés à la mission) sont **déplacés** dans le dossier de la mission (`handoffOpportunityDocuments`, `mode: 'move'`) : même id de fichier (liens et registres valables), rien de supprimé ni écrasé, un fichier de même nom déjà présent = `review_required`, intention écrite avant le déplacement et vérifiée après (reprise après plantage). Réglage `office_firm_settings.settings.mission_handoff_mode` : `'copy'` revient à l'ancien comportement (copies, originaux gardés) ; défaut `'move'`. La fonction elle-même reste en `copy` par défaut.
+- Seuls les documents du dossier de l'opportunité bougent ; les dossiers propres aux agents (MEMORY/AGENTS, AUDIT LOGS…) restent chez eux.
+- `lib/mission-start.js` : événement `MISSION_STARTED`, un par agent (Firm Manager `grand-controleur`, Enhanced Auditor, Orpailleur, Sika), clé d'idempotence par mission et par agent ; chaque agent écrit SEULEMENT sa propre mémoire (règle d'écrivain unique). Traité dans le tick (`handleMissionStartEvents`). Shadow non prévenu (son labo est à part).
+- Mémoire commune : le fichier partagé (`lib/file-index.js`) garde `placed_by` et `protected` ; `agentPlacedIds` → l'Orpailleur (`tidy-plan.js`) ne reclasse jamais un fichier placé par un agent dans sa mission (renommage seul possible).
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à

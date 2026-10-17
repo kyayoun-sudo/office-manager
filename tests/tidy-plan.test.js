@@ -141,3 +141,37 @@ test('pass: nothing new → done at once, date moves forward; a running first sc
   const r2 = await startChangesPass('org', {}, { ...d, drive: busy });
   assert.equal(r2.reason, 'FIRST_SCAN_RUNNING');
 });
+
+// Shared memory (2026-10-17): a file an agent placed in its mission (Mission Controller) is never re-filed;
+// a clearer name is still allowed. Same harness as the first-scan test above.
+test('a file placed in its mission by an agent is not moved (renamed only); an ordinary file is still proposed for filing', async () => {
+  const run = async placed => {
+    const drive = fakeDrive([{ ...json({ items }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }, { ...json({ status: 'applied', missions: [], answers: [{ question: 'q', answer: 'a' }] }), name: 'OFFICE_MANAGER_FIRM_KNOWLEDGE.json' }]);
+    const actions = [];
+    const d = { drive, folder: 'MEM', fire: async () => true, agentPlacedIds: async () => new Set(placed),
+      runAI: async () => ({ text: JSON.stringify({ decisions: [{ file_id: 'lm', action: 'move_rename', to_folder_id: 'D1', new_name: 'LM_CAC_IvoireLogistique_2026.pdf', reason: 'lettre de mission CAC 2026' }, { file_id: 'amb', action: 'ok' }, { file_id: 'okf', action: 'ok' }] }) }),
+      fetchRows: async (path, o = {}) => { if (o.method === 'POST') { const r = JSON.parse(o.body)[0]; actions.push(r); return [{ id: 'act' + actions.length, ...r }]; } return []; },
+      proposeMessage: async () => ({ id: 'm1' }), getMeta: async () => ({}), askDeps: { members: [], reviewFolderId: null, tidyDrive: { canWrite: () => false } } };
+    await startTidyPlan('org', {}, d);
+    const st = await tidyPlanStep('org', {}, d);
+    return { st, actions: actions.filter(a => a.action_type === 'FILE_MOVE') };
+  };
+  const ordinary = await run([]);
+  assert.equal(ordinary.st.moves, 1); assert.equal(ordinary.actions[0].payload.to_parent, 'D1');
+  const placed = await run(['lm']);
+  assert.equal(placed.st.moves, 0); assert.equal(placed.st.renames, 1);
+  assert.equal(placed.actions.length, 1); assert.equal(placed.actions[0].payload.to_parent, null);
+  assert.equal(placed.actions[0].payload.new_name, 'LM_CAC_IvoireLogistique_2026.pdf');
+});
+
+test('a file placed by an agent is not re-filed even when the AI would create a new mission folder for it', async () => {
+  const drive = fakeDrive([{ ...json({ items }), name: 'OFFICE_MANAGER_SCAN_STATE.json' }, { ...json({ status: 'applied', missions: [], answers: [{ question: 'q', answer: 'a' }] }), name: 'OFFICE_MANAGER_FIRM_KNOWLEDGE.json' }]);
+  const actions = [];
+  const d = { drive, folder: 'MEM', fire: async () => true, agentPlacedIds: async () => new Set(['lm']),
+    runAI: async () => ({ text: JSON.stringify({ decisions: [{ file_id: 'lm', action: 'create_and_move', create_parent_id: 'D1', create_names: ['Nouvelle mission'], reason: 'x' }, { file_id: 'amb', action: 'ok' }, { file_id: 'okf', action: 'ok' }] }) }),
+    fetchRows: async (path, o = {}) => { if (o.method === 'POST') { const r = JSON.parse(o.body)[0]; actions.push(r); return [{ id: 'act' + actions.length, ...r }]; } return []; },
+    proposeMessage: async () => ({ id: 'm1' }), getMeta: async () => ({}), askDeps: { members: [], reviewFolderId: null, tidyDrive: { canWrite: () => false } } };
+  await startTidyPlan('org', {}, d);
+  const st = await tidyPlanStep('org', {}, d);
+  assert.equal(actions.filter(a => a.action_type === 'FILE_MOVE').length, 0); assert.equal(st.moves, 0);
+});
