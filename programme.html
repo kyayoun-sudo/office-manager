@@ -84,13 +84,17 @@
 
     <section class="card" aria-labelledby="h-imp" id="import-card">
       <h2 id="h-imp">Importer votre programme</h2>
-      <p class="meta">Vous avez déjà un programme (Excel ou Word) dans le Drive ? Collez son lien : les codes de procédures qu’il contient (ACH-03, CASH-12…) sont reconnus et cochés. Ce qui n’est pas un code connu est listé, rien n’est deviné. Vérifiez puis enregistrez.</p>
-      <div class="row"><input id="imp-file" type="text" placeholder="https://drive.google.com/file/d/…" aria-label="Lien du programme"><button class="btn ghost" id="imp" type="button">Importer</button></div>
+      <p class="meta">Collez le lien de vos écrits Word, du plan ou de la revue analytique. Mission Controller, avec l’aide d’Enhanced Auditor, propose les procédures de la méthodologie du cabinet : chaque rapprochement reste à examiner. Les documents doivent être dans le dossier de la mission pour les responsables de mission.</p>
+      <div class="row"><input id="imp-file" type="text" placeholder="https://drive.google.com/file/d/…" aria-label="Lien du programme"><button class="btn ghost" id="imp" type="button">Importer les codes existants</button></div>
+      <div class="field"><label for="planning-sources">Autres sources (revue analytique, compte rendu — un lien par ligne, deux maximum)</label><textarea id="planning-sources" rows="2"></textarea></div>
+      <div class="field"><label for="planning-discussion">Discussion avec Mission Controller : décisions, demandes de modification ou questions</label><textarea id="planning-discussion" rows="4" maxlength="6000" placeholder="Ex. Après notre réunion, ajouter une recherche de dettes non enregistrées ; conserver les tests déjà retenus."></textarea></div>
+      <button class="btn" id="planning-analyse" type="button">Proposer / ajuster le programme à partir de nos écrits</button>
+      <p class="meta">Les propositions ne sont pas des travaux exécutés. Rien n’est enregistré ou validé automatiquement. Sans IA disponible, le choix manuel et l’import par codes restent utilisables.</p>
       <p class="status" id="imp-say" role="status" aria-live="polite"></p>
     </section>
 
     <section class="card" aria-labelledby="h-act">
-      <h2 id="h-act">Enregistrer et valider</h2>
+      <h2 id="h-act">Enregistrer et valider</h2><p id="programme-document" class="status" role="status"></p><button class="btn ghost" id="publish-programme" type="button" hidden>Enregistrer / vérifier le programme validé dans le Drive</button>
       <div class="row"><button class="btn ghost" id="save" type="button">Enregistrer le brouillon</button><button class="btn" id="validate" type="button">Valider le programme</button><span class="status" id="say" role="status" aria-live="polite"></span></div>
       <div id="gaps"></div>
       <div id="history"></div>
@@ -117,7 +121,7 @@
   var GAP = { MATERIALITY_REQUIRED: 'Indiquez le seuil de signification.', NO_CYCLE: 'Ajoutez au moins un cycle.', REVIEW_LEVEL_REQUIRED: 'Cochez au moins une revue requise.',
     CYCLE_NA_NEEDS_REASON: 'Cycle non applicable : donnez la raison.', CYCLE_PREPARER_REQUIRED: 'Choisissez qui prépare le cycle.', CYCLE_WITHOUT_PROCEDURE: 'Aucune procédure cochée dans ce cycle.',
     MANDATORY_OFF_NEEDS_REASON: 'Procédure obligatoire décochée : donnez la raison.', RISK_DEPENDENT_NEEDS_REASON: 'Procédure selon le risque activée : donnez la raison.', SAMPLE_SIZE_REQUIRED: 'Fixez la taille de l’échantillon.' };
-  var ERR = { ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas de modifier le programme.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_DRAFT_TO_VALIDATE: 'Rien à valider : enregistrez d’abord le brouillon.',
+  var ERR = { PROGRAMME_EXPORT_BUSY:'Un export est en cours. Réessayez dans quelques instants.', PROGRAMME_EXPORT_LOCK_UNAVAILABLE:'Le verrou documentaire est indisponible. Vérifiez l’installation existante des verrous de lecture ; le programme reste validé dans l’application.', PLANNING_AI_RESPONSE_INVALID:'La réponse de l’IA est illisible. Aucun programme n’a été remplacé ; réessayez ou continuez manuellement.', PROGRAMME_CHANGED_RELOAD:'Le programme a changé depuis son ouverture. Rechargez-le avant d’enregistrer pour préserver les modifications de votre collègue.', PLANNING_LIBRARY_REQUIRED:'Chargez d’abord les procédures du cabinet dans Méthodologie.', PLANNING_MAX_THREE_SOURCES:'Analysez au maximum trois documents à la fois.', PLANNING_REVIEW_NOTE_REQUIRED:'Ajoutez votre décision de revue avant d’enregistrer le rapprochement comme examiné.', AGENTS_NOT_AUTHORIZED:'Le cabinet doit autoriser la lecture et les appels IA dans Paramètres.', NO_AI_PROVIDER_CONFIGURED:'Aucune IA disponible : vous pouvez continuer manuellement.', PLANNING_SOURCE_CHANGED:'Une source a changé : relancez l’analyse et la revue.', PLANNING_SOURCE_OUTSIDE_MISSION:'Placez ce document dans le dossier de cette mission avant de l’analyser.', PLANNING_SOURCE_UNREADABLE:'Le document ne peut pas être lu. Vérifiez son format et ses droits.', PLANNING_SOURCE_OR_DISCUSSION_REQUIRED:'Ajoutez un lien documentaire ou une discussion.', ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas de modifier le programme.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_DRAFT_TO_VALIDATE: 'Rien à valider : enregistrez d’abord le brouillon.',
     PROGRAMME_INCOMPLETE: 'Le programme n’est pas complet :', NO_PROCEDURE_CODE_IN_FILE: 'Aucun code de procédure connu dans ce fichier.', PROGRAMME_FILE_REQUIRED: 'Collez le lien du fichier.', SOP_NOT_IN_LIBRARY: 'Un cycle ne vient plus de la bibliothèque : relisez les SOP.' };
   var msg = function (e) { var m = e && (e.code || e.message) || String(e); return ERR[m] || (e && e.message) || m; };
   var data = null, cycles = [], editable = false;
@@ -145,6 +149,7 @@
       tools.appendChild(el('span', 'Préparé par', 'meta')); tools.appendChild(prep);
       if (editable) { var rm = el('button', 'Retirer', 'btn ghost'); rm.type = 'button'; rm.addEventListener('click', function () { cycles.splice(ci, 1); paintCycles(); paintAdd(); }); tools.appendChild(rm); }
       head.appendChild(tools); card.appendChild(head);
+      (c.planning_questions || []).forEach(function (q) { var l=el('label', 'Point à décider : '+q.text), input=el('textarea'); input.value=q.resolution || ''; input.setAttribute('aria-label','Décision : '+q.text); input.addEventListener('input',function(){q.resolution=input.value;}); l.appendChild(input); card.appendChild(l); });
       if (c.status !== 'IN_SCOPE') {
         var j = el('input'); j.type = 'text'; j.placeholder = c.status === 'N/A_JUSTIFIED' ? 'Pourquoi ce cycle n’est pas applicable' : 'Limite du périmètre'; j.value = c.justification || ''; j.setAttribute('aria-label', 'Justification du cycle');
         j.addEventListener('input', function () { c.justification = j.value; }); card.appendChild(j);
@@ -158,7 +163,16 @@
           cb.addEventListener('change', function () { p.active = cb.checked; paintCycles(); });
           var td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
           var tdc = el('td'); if (data.validated && p.active && data.programme && data.programme.status === 'validated') { var a = el('a', p.code); a.href = '/procedure.html?mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(p.code); tdc.appendChild(a); } else tdc.textContent = p.code;
-          tr.appendChild(tdc); tr.appendChild(el('td', p.title));
+          tr.appendChild(tdc); var titleCell=el('td',p.title);
+          if (p.planning) {
+            var plan=p.planning, detail=el('details'); detail.appendChild(el('summary',plan.origin==='source'?'Rapprochement avec vos écrits':'Complément proposé par l’IA'));
+            detail.appendChild(el('p','Source : '+plan.source_name)); detail.appendChild(el('blockquote',plan.quote)); detail.appendChild(el('p',plan.rationale));
+            if(plan.source_file_id && !/^local:/.test(plan.source_file_id)) { var sl=el('a','Ouvrir la source'); sl.href='https://drive.google.com/file/d/'+encodeURIComponent(plan.source_file_id)+'/view'; sl.target='_blank'; sl.rel='noopener'; detail.appendChild(sl); }
+            if(plan.truncated)detail.appendChild(el('p','Lecture partielle : consultez le document complet avant de décider.'));
+            var review=el('label'), check=el('input'); check.type='checkbox'; check.checked=!!plan.reviewed; check.setAttribute('aria-label','Rapprochement examiné '+p.code); check.onchange=function(){plan.reviewed=check.checked;}; review.appendChild(check); review.appendChild(document.createTextNode('J’ai examiné ce rapprochement, y compris si je ne retiens pas le test.')); detail.appendChild(review);
+            var note=el('textarea'); note.value=plan.review_note || ''; note.setAttribute('aria-label','Décision de revue '+p.code); note.placeholder='Pourquoi retenir, modifier ou écarter cette proposition ?'; note.oninput=function(){plan.review_note=note.value;}; detail.appendChild(note); titleCell.appendChild(detail);
+          }
+          tr.appendChild(titleCell);
           var tt = el('td'); tt.appendChild(el('span', (TYPE[p.type] || '?') + (p.condition ? ' ' + p.condition : ''), 'tag' + (p.type === 'RISK_DEPENDENT' ? ' risk' : ''))); tr.appendChild(tt);
           tr.appendChild(el('td', p.level || '')); tr.appendChild(el('td', MODE[p.sampling_mode] || ''));
           var ts = el('td');
@@ -201,11 +215,11 @@
 
   function body() {
     var reviews = {}; REVIEWS.forEach(function (r) { reviews[r[0]] = $('r-' + r[0]).checked; });
-    return { mission_id: missionId, cycles: cycles, reviews: reviews,
+    return { mission_id: missionId, expected_programme_id: data.programme && data.programme.id || null, expected_updated_at: data.programme && data.programme.updated_at || null, cycles: cycles, reviews: reviews,
       materiality: { overall: $('m-overall').value, performance: $('m-perf').value, trivial: $('m-trivial').value, currency: $('m-cur').value, basis: $('m-basis').value, file: $('m-file').value, workpapers_folder: $('m-wp').value } };
   }
   function post(b) { return OM.api('/api/app?route=work-programme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); }
-  function gapText(g) { return (g.cycle ? g.cycle + (g.code ? ' · ' + g.code : '') + ' : ' : '') + (GAP[g.gap] || g.gap); }
+  function gapText(g) { if (g.gap === 'PLANNING_REVIEW_REQUIRED') return g.code + ' : examinez le rapprochement et justifiez votre décision.'; if (g.gap === 'PLANNING_QUESTION_OPEN') return 'Répondez aux points de discussion ouverts.'; return (g.cycle ? g.cycle + (g.code ? ' · ' + g.code : '') + ' : ' : '') + (GAP[g.gap] || g.gap); }
   function showGaps(list) {
     var box = $('gaps'); box.textContent = '';
     if (!list || !list.length) return;
@@ -219,8 +233,8 @@
   });
   $('validate').addEventListener('click', function () {
     var b = this; b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
-    post(Object.assign(body(), { action: 'save' })).then(function () { return post({ action: 'validate', mission_id: missionId }); }).then(function (r) {
-      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). Le Mission Controller prépare les Working Papers des cycles…'; showGaps([]);
+    post(Object.assign(body(), { action: 'save' })).then(function (saved) { return post({ action: 'validate', mission_id: missionId, expected_programme_id:saved.programme.id,expected_updated_at:saved.programme.updated_at }); }).then(function (r) {
+      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). '+(r.document && r.document.status==='verified'?'Document sauvegardé et vérifié dans le Drive. ':'Document Drive en attente : '+(r.document && r.document.error || 'réessayez l’export')+'. ')+'Préparation des Working Papers…'; showGaps([]);
       return makeWps();
     }).catch(function (e) { $('say').textContent = msg(e); showGaps(e.data && e.data.gaps); }).then(function () { b.disabled = false; });
   });
@@ -239,6 +253,14 @@
     box.appendChild(UI.table(['Cycle', 'Fichier', 'État'], list.map(function (w) { return [w.cycle_code || '', w.url ? UI.safeLink(w.url, w.name) : w.name, (WP_STATUS[w.status] || w.status) + (w.error ? ' : ' + w.error : '')]; })));
   }
   $('make-wps').addEventListener('click', function () { var b = this; b.disabled = true; makeWps().then(function () { b.disabled = false; }); });
+  $('planning-analyse').addEventListener('click',function(){
+    var button=this; button.disabled=true; $('imp-say').textContent='Lecture et proposition du programme… Vos sélections restent conservées.';
+    post(Object.assign(body(),{action:'analyse',file:$('imp-file').value.trim(),supporting_files:$('planning-sources').value.split(/\n/).map(function(x){return x.trim();}).filter(Boolean),discussion:$('planning-discussion').value})).then(function(r){
+      cycles=r.cycles; if(r.sources && r.sources[0] && r.sources[0].file_id) importedFrom=r.sources[0].file_id; paintCycles(); paintAdd();
+      $('imp-say').textContent=r.mappings.length+' rapprochement(s) proposé(s), '+r.questions.length+' point(s) à décider. Examinez les extraits dans les lignes du programme, puis enregistrez le brouillon.'+(r.questions.length && !cycles.length?' '+r.questions.join(' ; '):'');
+    }).catch(function(e){$('imp-say').textContent=msg(e);}).then(function(){button.disabled=false;});
+  });
+  $('publish-programme').addEventListener('click',function(){var button=this;button.disabled=true;post({action:'publish',mission_id:missionId}).then(function(){load(true);}).catch(function(e){$('programme-document').textContent=msg(e);}).then(function(){button.disabled=false;});});
   var importedFrom = null;
   $('imp').addEventListener('click', function () {
     var b = this; b.disabled = true; $('imp-say').textContent = 'Lecture du fichier…';
@@ -267,7 +289,11 @@
     paintCycles(); paintAdd();
     $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
     document.querySelectorAll('#h-mat ~ .grid input, #reviews input').forEach(function (x) { x.disabled = !editable; });
-    var val = data.validated; $('wps-card').hidden = !val; if (val) { paintWps(val.workpapers); $('make-wps').hidden = !data.may_validate; }
+    var val = data.validated;
+    $('publish-programme').hidden = !val || !data.may_validate;
+    var documentBox=$('programme-document'); documentBox.textContent='';
+    if(val) { var doc=val.materiality && val.materiality.programme_document; if(doc && doc.url)documentBox.appendChild(UI.safeLink(doc.url,'Programme validé v'+val.version+' enregistré dans le Drive')); else if(doc && doc.id)documentBox.textContent='Programme enregistré et vérifié : '+doc.name+' (référence '+doc.id+').'; else documentBox.textContent='Programme validé dans l’application ; document Drive à enregistrer / vérifier.'; }
+    $('wps-card').hidden = !val; if (val) { paintWps(val.workpapers); $('make-wps').hidden = !data.may_validate; }
     var h = $('history'); h.textContent = '';
     if (data.history.length > 1) h.appendChild(UI.table(['Version', 'État', 'Validé par', 'Le'], data.history.map(function (x) { return [x.version, { draft: 'brouillon', validated: 'validé', superseded: 'remplacé' }[x.status], x.validated_by || '', x.validated_at ? UI.dateTime(x.validated_at) : '']; })));
   }
