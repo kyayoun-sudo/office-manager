@@ -15,6 +15,8 @@
  async function load(){var r=await OM.api('/api/app?route=shadow&firm=1&mode='+mode.value);data=r.campaign;render();}
  async function act(action,extra){if(busy)return;busy=true;mode.disabled=true;buttons.forEach(b=>b.disabled=true);status.textContent='Exécution…';try{await OM.api('/api/app?route=shadow',{method:'POST',body:JSON.stringify(Object.assign({action:action,mode:mode.value},extra||{}))});await load();return true;}catch(e){status.textContent='Action interrompue : '+e.message+' — la progression déjà enregistrée est conservée.';return false;}finally{busy=false;mode.disabled=false;buttons.forEach(b=>b.disabled=false);}}
  var reportLink=el('a','Voir les résultats de référence déjà calculés');reportLink.href='/cabinet-simulation-resultats.html';panel.appendChild(reportLink);
+ var diskHelp=el('p','Recette locale séparée : fichiers versionnés sur disque, contrôles de population et test des services de procédure. Les deux années métier des agents ne sont pas validées. ');
+ var diskLink=el('a','Instructions de lancement et limites');diskLink.href='/docs/FIRM_SIMULATION_DISK.md';diskHelp.appendChild(diskLink);panel.appendChild(diskHelp);
  var create=button('Créer le cabinet',()=>act('firm-create',{seed:1,max_calls:Number(budget.value)}));
  button('Démarrer / reprendre',()=>act('firm-start'));
  button('Pause',()=>act('firm-pause'));
