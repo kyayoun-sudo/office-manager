@@ -584,7 +584,7 @@ $('back-from-direct').addEventListener(
     if (!picked && !link) { $('say').textContent = ERR.TDR_REQUIRED; return; }
     var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = picked ? 'Envoi du document…' : 'Envoi…';
     (picked ? upload(picked) : Promise.resolve({ file_ids: UI.driveIds(link) }))
-      ..then(function (body) {
+      .then(function (body) {
 
   body.action = 'create';
 
