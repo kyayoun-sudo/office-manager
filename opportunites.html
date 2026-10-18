@@ -118,16 +118,12 @@
 
     <header class="page-head">
       <h1>Opportunités</h1>
-      <p class="lead">Déposez un TDR ou un AMI : le <span data-agent="grand-controleur">Firm Manager</span> remplit le classeur d’acceptation avec ce qu’il trouve. Vous répondez seulement à ce qu’il ne peut pas savoir.</p>
-    </header>
-
-    <div id="list-view" class="stack">
-    <section class="card" aria-labelledby="h-new">
-  <h2 id="h-new">Nouvelle opportunité</h2>
-
-  <p class="meta">
-    Choisissez comment cette opportunité entre dans le cabinet.
-  </p>
+      <p class="lead">
+  Créez une opportunité avec un TDR, un AMI ou un appel d'offres,
+  ou démarrez directement une mission sans TDR.
+  Le <span data-agent="grand-controleur">Firm Manager</span>
+  prépare ensuite le dossier avec les informations disponibles.
+</p>
 
   <!-- DEUX PORTES D'ENTRÉE -->
   <div id="entry-choice" class="opp-entry-choice">
@@ -447,6 +443,38 @@
   var b64 = function (file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); };
 
   // ---- New opportunity ----
+  function showEntryChoice() {
+  $('entry-choice').hidden = false;
+  $('tdr-entry').hidden = true;
+  $('direct-entry').hidden = true;
+  $('say').textContent = '';
+}
+
+$('choose-tdr').addEventListener('click', function () {
+  $('entry-choice').hidden = true;
+  $('tdr-entry').hidden = false;
+  $('direct-entry').hidden = true;
+});
+
+$('choose-direct').addEventListener('click', function () {
+  $('entry-choice').hidden = true;
+  $('tdr-entry').hidden = true;
+  $('direct-entry').hidden = false;
+
+  setTimeout(function () {
+    $('direct-client').focus();
+  }, 0);
+});
+
+$('back-from-tdr').addEventListener(
+  'click',
+  showEntryChoice
+);
+
+$('back-from-direct').addEventListener(
+  'click',
+  showEntryChoice
+);
   var drop = $('drop');
   ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
   ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
@@ -462,11 +490,115 @@
     }).then(function (g) { return { file_ids: [g.id], staged: true }; });
   }
   $('send').addEventListener('click', function () {
-    var link = $('links').value.trim();
+    var link = $('links').value.trim();$('send-direct').addEventListener(
+  'click',
+  function () {
+
+    var client =
+      $('direct-client').value.trim();
+
+    if (!client) {
+      $('say').className = 'status error';
+      $('say').textContent =
+        'Indiquez au moins le nom du client.';
+
+      $('direct-client').focus();
+
+      return;
+    }
+
+    var b = this;
+
+    b.disabled = true;
+
+    $('say').className = 'status';
+
+    $('say').textContent =
+      'Création de l’opportunité…';
+
+    var body = {
+
+      action: 'create',
+
+      // LA NOUVELLE PORTE
+      entry_mode: 'direct',
+
+      client: client,
+
+      title:
+        $('direct-title').value.trim(),
+
+      reference:
+        $('direct-reference').value.trim(),
+
+      kind:
+        $('direct-kind').value,
+
+      period:
+        $('direct-period').value.trim(),
+
+      summary:
+        $('direct-summary').value.trim(),
+
+      source: 'saisie directe'
+    };
+
+    api(body)
+
+      .then(function (r) {
+
+        if (
+          !r ||
+          !r.opportunity ||
+          !r.opportunity.id
+        ) {
+          throw new Error(
+            'OPPORTUNITY_CREATION_FAILED'
+          );
+        }
+
+        location.href =
+          '/opportunites.html?id=' +
+          encodeURIComponent(
+            r.opportunity.id
+          );
+
+      })
+
+      .catch(function (e) {
+
+        $('say').className =
+          'status error';
+
+        $('say').textContent =
+          msg(e);
+
+      })
+
+      .then(function () {
+        b.disabled = false;
+      });
+
+  }
+);
     if (!picked && !link) { $('say').textContent = ERR.TDR_REQUIRED; return; }
     var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = picked ? 'Envoi du document…' : 'Envoi…';
     (picked ? upload(picked) : Promise.resolve({ file_ids: UI.driveIds(link) }))
-      .then(function (body) { body.action = 'create'; body.notes = $('notes').value.trim(); if (fromTender) body.tender_id = fromTender; return api(body); })
+      ..then(function (body) {
+
+  body.action = 'create';
+
+  // NOUVEAU :
+  body.entry_mode = 'tdr';
+
+  body.notes = $('notes').value.trim();
+
+  if (fromTender) {
+    body.tender_id = fromTender;
+  }
+
+  return api(body);
+})
       .then(function (r) {
         if (r.duplicate) { $('say').textContent = 'Ce document a déjà ouvert une opportunité.'; location.href = '/opportunites.html?id=' + r.opportunity.id; return; }
         location.href = '/opportunites.html?id=' + r.opportunity.id;
@@ -478,7 +610,7 @@
   function loadList() {
     OM.api('/api/app?route=opportunities').then(function (d) {
       var box = $('list'); box.textContent = '';
-      if (!d.opportunities.length) box.appendChild(el('p', 'Aucune opportunité pour l’instant : déposez un TDR ci-dessus.', 'empty'));
+      if (!d.opportunities.length) box.appendChild(el('p', 'Aucune opportunité pour l’instant : créez-en une ci-dessus.', 'empty'));
       d.opportunities.forEach(function (o) {
         var a = el('a', null, 'item link-item'); a.href = '/opportunites.html?id=' + o.id;
         var t = el('div', null, 't'); t.appendChild(el('span', o.title || 'Opportunité'));
@@ -493,7 +625,12 @@
         t.appendChild(s.url ? UI.safeLink(s.url, s.name) : el('span', s.name)); t.appendChild(el('span', 'Apparu le ' + UI.dateTime(s.at) + (s.by ? ' (' + s.by + ')' : ''), 'meta'));
         it.appendChild(t);
         var go = el('button', 'Créer l’opportunité', 'btn'); go.type = 'button';
-        go.addEventListener('click', function () { go.disabled = true; api({ action: 'create', file_ids: [s.file_id], source: 'Drive' }).then(function (r) { api({ action: 'dismiss-signal', file_id: s.file_id }); location.href = '/opportunites.html?id=' + r.opportunity.id; }).catch(function (e) { go.disabled = false; alertBox(it, msg(e)); }); });
+        go.addEventListener('click', function () { go.disabled = true; api({
+  action: 'create',
+  entry_mode: 'tdr',
+  file_ids: [s.file_id],
+  source: 'Drive'
+}).then(function (r) { api({ action: 'dismiss-signal', file_id: s.file_id }); location.href = '/opportunites.html?id=' + r.opportunity.id; }).catch(function (e) { go.disabled = false; alertBox(it, msg(e)); }); });
         var no = el('button', 'Ignorer', 'btn ghost'); no.type = 'button';
         no.addEventListener('click', function () { api({ action: 'dismiss-signal', file_id: s.file_id }).then(loadList); });
         var row = el('div', null, 'btn-row'); row.appendChild(go); row.appendChild(no); it.appendChild(row);
@@ -560,7 +697,10 @@
     $('technical-offer').textContent = o.commercial && o.commercial.document_kind === 'mi' ? 'Préparer la manifestation d’intérêt et les CV' : 'Préparer l’offre technique et les CV';
     $('engagement-letter').href = '/secretariat.html?opportunity_id=' + encodeURIComponent(o.id) + '&kind=lettre_mission';
     if (manages && $('override-mission').options.length === 1) OM.api('/api/missions').then(function (r) { (r.missions || []).forEach(function (m) { var option = document.createElement('option'); option.value = m.id; option.textContent = m.name || m.id; $('override-mission').appendChild(option); }); }).catch(function () {});
-    $('reception-edit').hidden = ['owner', 'partner', 'manager', 'bdm', 'secretary'].indexOf(role) < 0;
+    $('reception-edit').hidden =
+  o.entry_mode === 'direct' ||
+  ['owner', 'partner', 'manager', 'bdm', 'secretary']
+    .indexOf(role) < 0;;
     $('reception-date').value = o.tdr_received_at || '';
     $('won-card').hidden = !(['go', 'phase0', 'phase1'].indexOf(o.status) >= 0 && (lead || role === 'manager') && (!o.commercial || ['proposal_prepare', 'proposal_waiting'].indexOf(o.commercial.stage) >= 0));
     drawMine(o, role);
