@@ -28,6 +28,8 @@ test('a Working File has a PBC sheet but its own signature says it is not the li
   const v = recognizePbcText(text);
   assert.equal(v.is_pbc_list, false); assert.equal(v.level, 'identity');
   assert.equal(identityOf(text).document_type, 'WORKING_FILE');
+  // Even when its AUDIT_META only carries its model identifier.
+  assert.equal(recognizePbcText(text.replace('Document_Type\tWORKING_FILE', 'WF_ID\tAG-WF01\nCycle_ID\tCASH')).is_pbc_list, false);
 });
 
 test('a client list in another format is recognised by its content, with a certainty below 100', () => {
