@@ -348,6 +348,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `multiModel` inchangé (pas de coût en double). `lib/ai.js` `runAI` : en mode `auto`, si ChatGPT / Claude manquent ou
   échouent → OpenRouter (`fallback_from` gardé) ; un fournisseur explicite n'est jamais remplacé.
 - Visible : `auditeur.html` (« OpenRouter (soutien) »), texte de `pilotage.html`, `api/health.js`. Test : `tests/openrouter-support.test.js`.
+- **OpenRouter est le principal (Paul, 2026-10-19 : « c'est lui le majeur, il fait 45 %, les autres moins »)** : `OPENROUTER_SHARE`
+  (0-100, défaut 45) = part des demandes envoyées d'abord à OpenRouter (`openRouterFirst`, dans `firstAvailable` et `runAI` auto) ;
+  les autres le soutiennent, et lui les soutient pour le reste. Les pastilles de Pilotage → Modèles d'IA montrent OpenRouter et sa part.
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
