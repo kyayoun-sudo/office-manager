@@ -341,6 +341,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Reste : `lib/mission-engine.js` et `lib/agent-tools.js` lisent encore une feuille nommée `PBC_MASTER` (en-tête ligne 4) ;
   à faire lire par les colonnes que la reconnaissance a trouvées (`columns`, `header_row`).
 
+## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
+- Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).
+- `lib/ai-plus.js` : fournisseur `openrouter` (texte, images, PDF, recherche web `plugins: [{ id: 'web' }]`, sources) ;
+  `firstAvailable` l'ajoute EN DERNIER à tout ordre qui ne le nomme pas (soutien, jamais à la place d'une IA qui répond) ;
+  `multiModel` inchangé (pas de coût en double). `lib/ai.js` `runAI` : en mode `auto`, si ChatGPT / Claude manquent ou
+  échouent → OpenRouter (`fallback_from` gardé) ; un fournisseur explicite n'est jamais remplacé.
+- Visible : `auditeur.html` (« OpenRouter (soutien) »), texte de `pilotage.html`, `api/health.js`. Test : `tests/openrouter-support.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

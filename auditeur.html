@@ -172,7 +172,7 @@
     }).catch(function (e) { $('say').className = 'status error'; $('say').textContent = ERR[e.message] || e.message; });
     OM.api('/api/app?route=ai-providers').then(function (p) {
       var box = $('providers'); box.textContent = '';
-      [['anthropic', 'Claude'], ['openai', 'ChatGPT'], ['gemini', 'Gemini (images)']].forEach(function (x) { box.appendChild(el('span', x[1] + (p[x[0]] ? ' : prêt' : ' : clé à ajouter'), p[x[0]] ? 'on' : '')); });
+      [['anthropic', 'Claude'], ['openai', 'ChatGPT'], ['gemini', 'Gemini (images)'], ['openrouter', 'OpenRouter (soutien)']].forEach(function (x) { box.appendChild(el('span', x[1] + (p[x[0]] ? ' : prêt' : ' : clé à ajouter'), p[x[0]] ? 'on' : '')); });
     }).catch(function () {});
     loadPast();
   }
