@@ -115,6 +115,11 @@ const who = req => req.account?.display_name || req.account?.email || null;
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
+  'sika-expenses': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/sika-expenses.js')).expenseView(orgId, req.query || {}, req.account)),
+    POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/sika-expenses.js')).expenseAction(orgId, req.body || {}, req.account)),
+    unavailable: 'SIKA_EXPENSES_UNAVAILABLE'
+  },
   'personal-learning': {
     GET: users([...EVERYONE], async (orgId, req) => (await import('../lib/personal-learning.js')).learningView(orgId, req.account)),
     POST: users([...EVERYONE], async (orgId, req) => {
@@ -178,6 +183,9 @@ export const ROUTES = Object.freeze({
       if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
       if (String(b.action).startsWith('firm-')) return (await import('../lib/firm-simulation-service.js')).firmAction(orgId, req.account, b);
       if (String(b.action).startsWith('sandbox-')) return (await import('../lib/audit-sandbox.js')).sandboxAction(orgId, req.account, b);
+      // Keep what Shadow learnt when the firm is erased (2026-10-18): partners export / import its lessons and tests.
+      if (b.action === 'lab-export') return (await import('../lib/shadow-transfer.js')).exportLab(who(req) || 'associé');
+      if (b.action === 'lab-import') return (await import('../lib/shadow-transfer.js')).importLab(orgId, b.file, who(req) || 'associé');
       if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
       // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
       if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
@@ -218,7 +226,9 @@ export const ROUTES = Object.freeze({
     POST: users(MANAGERS, async (orgId, req) => {
       const w = await import('../lib/work-programme.js'); const b = req.body || {}; const id = String(b.mission_id || '');
       if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
-      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account);
+      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account, Object.hasOwn(b,'expected_programme_id') ? {expected:{id:b.expected_programme_id,updated_at:b.expected_updated_at}} : {});
+      if (b.action === 'analyse') return w.planProgramme(orgId, id, b, req.account);
+      if (b.action === 'publish') return w.publishProgramme(orgId, id, req.account);
       if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
       if (b.action === 'workpapers') { if (!w.VALIDATORS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return (await import('../lib/cycle-workpapers.js')).prepareCycleWorkpapers(orgId, id, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
@@ -552,6 +562,7 @@ export const ROUTES = Object.freeze({
       if (a === 'propose-team') { if (!MANAGERS.includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.proposeTeam(orgId, req, b); }
       if (a === 'validate-team') return o.validateTeam(orgId, b, req.account, { req });
       if (a === 'find-specialists') return o.findSpecialists(orgId, b, req.account);
+      if (['independence-decide','independence-applied','independence-override','independence-prohibit'].includes(a)) return o.independenceReviewAction(orgId,b,req.account);
       if (a === 'declare') return o.declareIndependence(orgId, b, req.account);
       if (a === 'declaration-draft') return o.saveDeclarationDraft(orgId, b, req.account);
       if (a === 'won') { if (!PARTNERS.concat('manager').includes(req.account?.role)) throw fail('MANAGERS_ONLY', 403); return o.markWon(orgId, req, b, req.account); }
@@ -651,7 +662,8 @@ export const ROUTES = Object.freeze({
   notifications: { GET: users(ALL_ROLES, (orgId, req) => notifications(orgId, req.account)), unavailable: 'NOTIFICATIONS_UNAVAILABLE' },
   // The questions that pop up on any page for the person signed in (independence, agents' questions, decision).
   'my-questions': { GET: users(ALL_ROLES, async (orgId, req) => {
-    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account).catch(() => ({ questions: [] }));
+    const out = await (await import('../lib/opportunities.js')).myQuestions(orgId, req.account, {independenceOnly:req.query?.independence_only==='1'}).catch(() => ({ questions: [] }));
+    if (req.query?.independence_only === '1') return out;
     // « Ta procédure t'attend » (2026-10-12): the procedures of the validated programmes this person prepares.
     const mine = await (await import('../lib/procedure-work.js')).myProcedures(orgId, req.account).catch(() => ({ procedures: [] }));
     for (const p of mine.procedures.filter(x => ['to_do', 'in_progress', 'returned'].includes(x.status)).slice(0, 5)) out.questions.push({ id: 'proc|' + p.programme_id + '|' + p.code, kind: 'procedure', title: p.mission_name,
@@ -661,6 +673,9 @@ export const ROUTES = Object.freeze({
     for (const x of rv.reviews.slice(0, 5)) out.questions.push({ id: 'rev|' + x.mission_id + '|' + x.code + '|' + x.level, kind: 'procedure', title: x.mission_name,
       question: 'Revue ' + ({ senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }[x.level] || '') + ' à faire : ' + x.code, context: x.cycle_code + ' · préparée par ' + (x.preparer || '?'),
       href: '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue' });
+    // First connection (2026-10-17): the agents' questions that fit this person's position, answered on « Faire connaissance ».
+    const intro = await (await import('../lib/agent-intro.js')).personView(orgId, req.account).catch(() => null);
+    if (intro?.pending?.length) out.questions.push({ id: 'intro|' + intro.pending[0].key, kind: 'procedure', title: 'Faire connaissance avec les agents', question: 'Les agents ont ' + intro.pending.length + ' question(s) pour vous, adaptées à votre poste.', context: 'Une question à la fois, quelques secondes.', href: '/bienvenue.html' });
     return out;
   }), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
@@ -842,6 +857,24 @@ export const ROUTES = Object.freeze({
     POST: users(['owner', 'partner'], (orgId, req) => grantAgentPermissions(orgId, req)),
     unavailable: 'PERMISSIONS_UNAVAILABLE'
   },
+  // First connection (2026-10-17): the agents introduce themselves in Démarrer; the human gives the link, the agent checks it.
+  'agent-intro': {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/agent-intro.js');
+      if (req.query?.screen) return m.screenIntro(orgId, req.account, String(req.query.screen));
+      if (req.query?.me === '1') return m.personView(orgId, req.account);
+      if (!['owner', 'partner'].includes(req.account?.role)) throw fail('FORBIDDEN', 403);
+      return m.introView(orgId, req.account);
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/agent-intro.js'); const b = req.body || {};
+      if (b.action === 'me-answer') return m.answerPerson(orgId, req.account, b);
+      if (b.action === 'screen-seen') return m.dismissScreen(orgId, req.account, String(b.screen || ''));
+      if (!['owner', 'partner'].includes(req.account?.role)) throw fail('FORBIDDEN', 403);
+      return m.saveIntro(orgId, b, req.account);
+    }),
+    unavailable: 'AGENT_INTRO_UNAVAILABLE'
+  },
   'google-callback': {
     GET: open(async (orgId, req) => {
       try {
@@ -902,7 +935,7 @@ export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
-const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
+const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
@@ -953,7 +986,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = error.statusCode || 500;
     const route = ROUTES[String(req.query?.route || '')];
-    const shown = [400, 401, 403, 404, 405, 409, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
+    const shown = [400, 401, 403, 404, 405, 409, 422, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
     if (status >= 500) {
       // The real cause, short and without secrets, so the screen (and the logs) say what broke.

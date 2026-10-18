@@ -48,3 +48,21 @@ test('missing quotation model asks for location and denied AI permission sends n
   await assert.rejects(prepareQuotation('org', o, { ...w.d, permissions: async () => ({ granted: false }), ai: async () => { called = true; } }), /AGENTS_NOT_AUTHORIZED/);
   assert.equal(called, false);
 });
+test('zero valid writes never reports a prepared budget; existing copy remains accessible', async () => {
+ const w=await world();const result=await prepareQuotation('org',{id:'opp',folder:{id:'opp'}},{...w.d,ai:async()=>({text:JSON.stringify({writes:[],questions:['Où renseigner les noms ?']})})});
+ assert.equal(result.status,'needs_review');assert.equal(result.written,0);assert.match(result.question,/Aucune cellule/);assert.ok(result.file.url.includes('copy'));assert.deepEqual(w.files.get('master').buffer,w.original);
+});
+test('pricing workbook without acceptance legend fills validated team dropdowns, preserves all formulas and reference sheets', async () => {
+ const w=await world();const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Budget');const ref=wb.addWorksheet('Staff');const roles=wb.addWorksheet('Roles');ref.getCell('D1').value={formula:'"Person A"',result:'Person A'};roles.getCell('A1').value='Engagement Manager';
+ ws.getCell('J15').value='Collaborateur';ws.getCell('J16').value='Rôle sur la mission';ws.getCell('K15').dataValidation={type:'list',formulae:["Staff!$D$1:$D$1"]};ws.getCell('K16').dataValidation={type:'list',formulae:["Roles!$A$1:$A$1"]};ws.getCell('K19').value={formula:'1000*8'};
+ w.files.get('master').buffer=Buffer.from(await wb.xlsx.writeBuffer());const original=w.files.get('master').buffer;
+ const result=await prepareQuotation('org',{id:'a',folder:{id:'opp'},team:{status:'validated',members:[{name:'Person A',role:'Manager'}]}},{...w.d,ai:async()=>{throw Error('AI_MUST_NOT_BE_NEEDED');}});
+ assert.equal(result.written,2);assert.equal(result.status,'prepared');const back=new ExcelJS.Workbook();await back.xlsx.load(w.files.get('copy').buffer);assert.equal(back.getWorksheet('Budget').getCell('K15').value,'Person A');assert.equal(back.getWorksheet('Budget').getCell('K16').value,'Engagement Manager');assert.equal(back.getWorksheet('Budget').getCell('K19').formula,'1000*8');assert.deepEqual(w.files.get('master').buffer,original);assert.equal(back.getWorksheet('Staff').getCell('D1').formula,'"Person A"');assert.equal(back.getWorksheet('Staff').getCell('D1').result,'Person A');const {describeQuotationInputs}=await import('../lib/quotation-inputs.js');assert.equal((await describeQuotationInputs(w.files.get('copy').buffer)).sheets[0].team_slots.length,1);
+});
+test('pricing mapper refuses names outside dropdown, protected cells and replacement of an existing human selection',async()=>{
+ const {describeQuotationInputs,teamInputWrites}=await import('../lib/quotation-inputs.js');const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Budget');ws.getCell('J15').value='Collaborateur';ws.getCell('J16').value='Rôle sur la mission';ws.getCell('K15').dataValidation={type:'list',formulae:['"Person A"']};ws.getCell('K16').dataValidation={type:'list',formulae:['"Manager"']};
+ const structure=await describeQuotationInputs(Buffer.from(await wb.xlsx.writeBuffer()));
+ assert.equal(teamInputWrites(structure,{team:{status:'validated',members:[{name:'Unknown',role:'Manager'}]}},{}).writes.length,0);
+ assert.equal(teamInputWrites(structure,{team:{status:'validated',members:[{name:'Person A',role:'Manager'}]}},{'Budget!K15':'Manual choice'}).writes.length,0);
+ ws.sheetProtection={sheet:true};const protectedStructure=await describeQuotationInputs(Buffer.from(await wb.xlsx.writeBuffer()));assert.equal(protectedStructure.sheets.length,0);
+});

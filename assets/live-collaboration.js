@@ -13,8 +13,9 @@
   document.addEventListener('pointerdown', unlock, { once: true });
   document.addEventListener('keydown', unlock, { once: true });
   button.onclick = function () { enabled = !enabled; localStorage.setItem(key, enabled ? 'on' : 'off'); unlock(); label(); };
-  var host = document.querySelector('.nav') || document.querySelector('main');
-  if (host) host.appendChild(button);
+  var soundHost = document.getElementById('chat-meta');
+  button.className = 'btn ghost';
+  if (soundHost) soundHost.appendChild(button);
   var panel, heading, list;
   var dashboard = location.pathname === '/accueil.html' || location.pathname === '/accueil';
   var space = document.getElementById('myspace');

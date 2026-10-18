@@ -61,6 +61,15 @@ body{background:var(--bg,#F4F5F3)}
     <p class="small" id="s3-msg" role="status" aria-live="polite"></p>
   </section>
 
+  <section class="step off" id="stI">
+    <h2><span class="num">4</span> Les agents se présentent</h2>
+    <p class="small">Chaque agent se présente en quelques lignes et vous demande où se trouve le fichier dont il a besoin. Vous donnez le lien (c’est vous qui validez), l’agent vérifie qu’il existe dans le Drive. Étape à franchir : vous pouvez la passer et la revoir plus tard ; une fois terminée, elle ne revient plus.</p>
+    <label class="small"><input type="checkbox" id="si-it"> Je suis la personne informatique qui connecte le cabinet (les agents ne demanderont que les emplacements techniques)</label>
+    <div id="si-list" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div class="btn-row"><button class="btn" type="button" id="si-finish">J’ai terminé la présentation</button><button class="btn ghost" type="button" id="si-skip">Passer pour l’instant</button></div>
+    <p class="small" id="si-msg" role="status" aria-live="polite"></p>
+  </section>
+
   <section class="step off" id="st4">
     <h2><span class="num">✓</span> C'est prêt</h2>
     <p class="small">Les agents commencent par apprendre votre Drive (cartographie), puis travaillent seuls aux heures du cabinet. Leurs propositions arrivent dans « À valider » : rien n'est déplacé ni envoyé sans votre accord.</p>
@@ -98,7 +107,7 @@ body{background:var(--bg,#F4F5F3)}
       (g.shared_drives || []).forEach(function (d) { var o = document.createElement('option'); o.value = d.id; o.textContent = d.name; hs.appendChild(o); });
       if (g.connected) { step(2, 'done'); $('s2-msg').textContent = 'Google connecté : ' + g.email; $('s2-msg').className = 'small ok'; $('s2-connect').textContent = 'Reconnecter un autre compte'; }
       else step(2, 'on');
-      if (g.firm_drive) { step(3, 'done'); $('s3-msg').textContent = 'Drive utilisé : ' + (g.firm_drive.name || g.firm_drive.id); $('s3-msg').className = 'small ok'; step(4, 'done'); }
+      if (g.firm_drive) { step(3, 'done'); $('s3-msg').textContent = 'Drive utilisé : ' + (g.firm_drive.name || g.firm_drive.id); $('s3-msg').className = 'small ok'; return loadIntro(); }
       else step(3, g.connected ? 'on' : 'off');
     }).catch(function (e) { $('s2-msg').textContent = msg(e); step(2, 'on'); });
   }
@@ -137,6 +146,56 @@ body{background:var(--bg,#F4F5F3)}
         // The owner's go-ahead for the agents (Drive, documents, AI), given with the Drive.
         return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(refresh); }).then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } }).catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
   });
+
+
+  var NEEDS_MSG = { INTRO_NEEDS_OPEN: 'Il reste des fichiers à indiquer : donnez le lien, ou choisissez « Plus tard » pour chacun.', LINK_NOT_RECOGNISED: 'Lien non reconnu : collez l’adresse du fichier ou du dossier.', INTRO_ALREADY_DONE: 'La présentation est déjà terminée.' };
+  function introCall(body) { return OM.api('/api/app?route=agent-intro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  function introErr(e) { var m = String(e && e.message || e); $('si-msg').textContent = NEEDS_MSG[m] || M[m] || m; $('si-msg').className = 'small'; }
+  function renderIntro(v) {
+    var list = $('si-list'); list.textContent = '';
+    $('si-it').checked = v.as_it === true;
+    (v.agents || []).forEach(function (a) {
+      var box = document.createElement('div'); box.className = 'card'; box.style.cssText = 'padding:12px;display:flex;flex-direction:column;gap:8px';
+      var h = document.createElement('strong'); h.textContent = a.name; box.appendChild(h);
+      var p = document.createElement('p'); p.className = 'small'; p.textContent = a.says; box.appendChild(p);
+      a.needs.forEach(function (n) {
+        var row = document.createElement('div'); row.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+        var l = document.createElement('label'); l.className = 'small'; l.textContent = n.label + ' — ' + n.why; row.appendChild(l);
+        var ans = n.answer, state = document.createElement('p'); state.className = 'small';
+        if (ans && ans.status === 'verified') { state.textContent = 'Trouvé dans le Drive : ' + (ans.name || ans.file_id) + ' (' + (ans.kind || 'fichier') + ')'; state.className = 'small ok'; }
+        else if (ans && ans.status === 'not_found') state.textContent = 'L’agent ne retrouve pas ce lien dans le Drive : vérifiez-le ou choisissez « Plus tard ».';
+        else if (ans && ans.status === 'later') state.textContent = 'À indiquer plus tard.';
+        if (ans) row.appendChild(state);
+        if (!ans || ans.status !== 'verified') {
+          var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'mono'; inp.placeholder = 'Lien du fichier ou du dossier'; row.appendChild(inp);
+          var b = document.createElement('div'); b.className = 'btn-row';
+          var give = document.createElement('button'); give.type = 'button'; give.className = 'btn'; give.textContent = 'Donner le lien';
+          give.addEventListener('click', function () { $('si-msg').textContent = 'L’agent vérifie dans le Drive…'; introCall({ action: 'link', need: n.key, link: inp.value }).then(renderIntro).catch(introErr); });
+          var later = document.createElement('button'); later.type = 'button'; later.className = 'btn ghost'; later.textContent = 'Plus tard';
+          later.addEventListener('click', function () { introCall({ action: 'later', need: n.key }).then(renderIntro).catch(introErr); });
+          b.appendChild(give); b.appendChild(later); row.appendChild(b);
+        }
+        box.appendChild(row);
+      });
+      list.appendChild(box);
+    });
+  }
+  // The « C'est prêt » step opens only once the introduction is finished or skipped; skipped can be seen again.
+  function loadIntro() {
+    return OM.api('/api/app?route=agent-intro').then(function (v) {
+      if (v.locked || v.status === 'skipped' && !window.__reviewIntro) {
+        step('I', 'done'); $('si-list').textContent = ''; $('si-finish').hidden = true; $('si-skip').hidden = true; $('si-it').parentNode.hidden = true;
+        var again = v.status === 'skipped';
+        $('si-msg').textContent = again ? 'Présentation passée pour l’instant.' : 'Présentation terminée.'; $('si-msg').className = 'small ok';
+        if (again) { var r = document.createElement('button'); r.type = 'button'; r.className = 'btn ghost'; r.textContent = 'Revoir la présentation'; r.addEventListener('click', function () { window.__reviewIntro = true; r.remove(); $('si-finish').hidden = false; $('si-skip').hidden = false; $('si-it').parentNode.hidden = false; $('stI').classList.remove('done'); renderIntro(v); }); $('stI').appendChild(r); }
+        step(4, 'done'); return;
+      }
+      step('I', 'on'); step(4, 'off'); renderIntro(v);
+    }).catch(function (e) { introErr(e); });
+  }
+  $('si-it').addEventListener('change', function () { introCall({ action: 'role', as_it: this.checked }).then(renderIntro).catch(introErr); });
+  $('si-skip').addEventListener('click', function () { introCall({ action: 'skip' }).then(function () { window.__reviewIntro = false; return loadIntro(); }).catch(introErr); });
+  $('si-finish').addEventListener('click', function () { introCall({ action: 'finish' }).then(function () { window.__reviewIntro = false; return loadIntro(); }).catch(introErr); });
 
   var q = new URLSearchParams(location.search);
   if (q.get('google') === 'error') $('s2-msg').textContent = 'Connexion Google non aboutie : ' + (q.get('code') || '');

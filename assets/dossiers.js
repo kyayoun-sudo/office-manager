@@ -487,8 +487,27 @@
       current.presentation.source === "mission"
     ) {
       active = views[0][0];
-      initialView = false;
     }
+    var sessionUser = (OM.getSession() || {}).user || {};
+    var tabKey =
+      "om-dossier-tab:" +
+      [
+        sessionUser.org_id || "",
+        sessionUser.auth_user_id || sessionUser.id || sessionUser.email || "",
+        current.mission_id || current.opportunity_id || "",
+      ].join(":");
+    try {
+      if (initialView) {
+        var saved = sessionStorage.getItem(tabKey);
+        if (
+          views.some(function (v) {
+            return v[0] === saved;
+          })
+        )
+          active = saved;
+      }
+    } catch (_) {}
+    initialView = false;
     if (
       !views.some(function (v) {
         return v[0] === active;
@@ -501,6 +520,9 @@
       b.setAttribute("aria-pressed", String(active === v[0]));
       b.addEventListener("click", function () {
         active = v[0];
+        try {
+          sessionStorage.setItem(tabKey, active);
+        } catch (_) {}
         render();
       });
     });
@@ -543,11 +565,32 @@
         next.textContent = "";
         next.hidden = !d.next;
         if (d.next) {
-          append(next, "h2", "Prochaine action à examiner");
+          append(next, "h2", "Pour avancer dans ce dossier");
           append(next, "strong", d.next.label);
           append(next, "p", d.next.person + " · " + agentName(d.next.agent));
           link(next, d.next.action + " →", d.next.href, "btn");
         }
+        var helper = document.getElementById("dossier-help");
+        if (!helper) {
+          helper = el("details", null, "card dossier-help");
+          helper.id = "dossier-help";
+          next.insertAdjacentElement("afterend", helper);
+        }
+        var wasOpen = helper.open;
+        helper.textContent = "";
+        helper.open = wasOpen;
+        append(helper, "summary", "Besoin d’aide ? Les agents de ce dossier");
+        var agentLinks = append(helper, "div", null, "links");
+        current.agents.forEach(function (a) {
+          if (a.key === "shadow") return;
+          var item = link(
+            agentLinks,
+            a.name,
+            ctx("/assistant.html") + "&agent=" + encodeURIComponent(a.key),
+            "btn ghost",
+          );
+          if (item) item.title = a.job;
+        });
         render();
       })
       .catch(function (e) {
@@ -557,6 +600,8 @@
           $("dossier-index").textContent = "";
           $("dossier-tabs").hidden = true;
           $("dossier-next").hidden = true;
+          var helper = document.getElementById("dossier-help");
+          if (helper) helper.remove();
         }
         $("dossier-status").textContent = "Dossier indisponible : " + e.message;
       })
@@ -570,7 +615,34 @@
       : "";
     var host = $("dossier-index");
     host.textContent = "";
+    var label = append(host, "label", "Retrouver un dossier");
+    label.htmlFor = "dossier-find";
+    var search = append(host, "input", null, "dossier-find");
+    search.id = "dossier-find";
+    search.type = "search";
+    search.placeholder = "Nom de mission ou opportunité…";
+    var resultCount = append(host, "p", "", "meta");
+    resultCount.setAttribute("role", "status");
     var grid = append(host, "div", null, "dossier-index-grid");
+    search.addEventListener("input", function () {
+      var term = search.value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      var count = 0;
+      grid.querySelectorAll("a.item").forEach(function (a) {
+        a.hidden =
+          a.textContent
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .indexOf(term) < 0;
+        if (!a.hidden) count++;
+      });
+      resultCount.textContent = term
+        ? count + " dossier(s) trouvé(s) dans cette liste."
+        : "";
+    });
     [
       ["Mes opportunités", d.opportunities, "opportunity_id"],
       ["Mes missions", d.missions, "mission_id"],

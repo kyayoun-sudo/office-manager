@@ -148,28 +148,35 @@ const owner = { role: 'owner', email: 'owner@example.org' };
 
 test('owner exception is journaled before starting, keeps missing pieces open and never signs or completes KYC', async () => {
   const { d, state, calls } = opportunityWorld();
-  await assert.rejects(ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'kyc_prepare' }, { role: 'manager', email: 'm@example.org' }, d), /OWNER_ONLY/);
-  const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'kyc_prepare', outstanding: ['Beneficial ownership document'] }, owner, d);
+  await assert.rejects(ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Justification métier documentée pour cet essai', target: 'kyc_prepare' }, { role: 'manager', email: 'm@example.org' }, d), /PARTNER_OR_OWNER_REQUIRED/);
+  const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Justification métier documentée pour cet essai', target: 'kyc_prepare', outstanding: ['Beneficial ownership document'] }, owner, d);
   assert.equal(result.documentation_completed, false); assert.equal(result.override.policy_unchanged, true);
   assert.equal(state().opportunities.opp.phase1.status, 'todo');
   assert.deepEqual(state().opportunities.opp.answers, []);
   assert.deepEqual(state().opportunities.opp.declarations, {});
   assert.ok(result.override.outstanding.includes('Beneficial ownership document'));
+  // Current workflow keeps an override blocked while these prerequisites remain missing.
+  const blocked = await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Demande de démarrage avant réception des pièces', target: 'audit_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d);
+  assert.equal(blocked.override.status, 'blocked');
+  assert.equal(calls.some(c => c.options.method === 'PATCH'), false);
+  // Simulate their later completion before testing the actual transition (no production gate changed).
+  Object.assign(state().opportunities.opp, { workbook: { id: 'acceptance' }, won: { letter: 'client-confirmation' }, phase1: { status: 'ready' }, team: { status: 'validated', members: [] } });
   d.fetchRows = async (query, options = {}) => {
     calls.push({ query, options });
     if (options.method === 'PATCH') assert.ok(state().opportunities.opp.overrides.some(o => o.target === 'audit_start'), 'decision persisted first');
     return [{ id: '11111111-1111-1111-1111-111111111111', status: 'acceptance' }];
   };
-  assert.equal((await ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'audit_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d)).override.status, 'applied');
+  assert.equal((await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Justification métier documentée pour cet essai', target: 'audit_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d)).override.status, 'applied');
   assert.match(calls.at(-1).query, /org_id=eq.org.*status=eq.acceptance/);
   assert.equal(JSON.parse(calls.at(-1).options.body).status, 'fieldwork');
 });
 
 test('failed mission transition stays pending; real TDR reception corrections keep a signed history', async () => {
   const { d, state } = opportunityWorld();
+  Object.assign(state().opportunities.opp, { workbook: { id: 'acceptance' }, won: { letter: 'client-confirmation' }, phase1: { status: 'ready' }, team: { status: 'validated', members: [] } });
   const fetchRows = d.fetchRows;
   d.fetchRows = async (query, options = {}) => options.method === 'PATCH' ? [] : fetchRows(query, options);
-  const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'mission_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d);
+  const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', reason: 'Justification métier documentée pour cet essai', target: 'mission_start', mission_id: '11111111-1111-1111-1111-111111111111' }, owner, d);
   assert.equal(result.override.status, 'pending');
   assert.equal(state().opportunities.opp.overrides[0].status, 'pending');
   await setReceptionDate('org', { opportunity_id: 'opp', tdr_received_at: '2026-10-01' }, owner, d);
@@ -180,28 +187,12 @@ test('failed mission transition stays pending; real TDR reception corrections ke
   assert.equal(opp.reception_history[1].by, owner.email);
 });
 
-test('the named manager can start the opportunity mission without a letter; creation is linked and never duplicated', async () => {
-  const { d, state } = opportunityWorld();
-  const manager = { role: 'manager', email: 'manager@example.org', display_name: 'Manager' };
-  Object.assign(state().opportunities.opp, { title: 'Audit client', client: 'Client', team: { status: 'validated', members: [{ name: 'Manager', email: manager.email, role: 'Manager' }] } });
-  const missions = new Map(); let creations = 0;
-  d.fetchRows = async (query, options = {}) => {
-    if (query.startsWith('office_staff_profiles') || query.startsWith('office_mission_assignments')) return [];
-    if (options.method === 'POST') { const m = JSON.parse(options.body); creations++; missions.set(m.id, m); return [m]; }
-    const match = query.match(/&id=eq.([^&]+)/), m = match && missions.get(decodeURIComponent(match[1]));
-    if (!m) return [];
-    if (options.method === 'PATCH') Object.assign(m, JSON.parse(options.body));
-    return [m];
-  };
-  const result = await ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'audit_start' }, manager, d);
-  assert.equal(result.override.status, 'applied');
-  assert.equal(missions.get(result.mission_id).status, 'fieldwork');
-  assert.equal(state().opportunities.opp.mission_id, result.mission_id);
-  assert.equal(state().opportunities.opp.won, undefined, 'no letter fabricated');
-  assert.deepEqual(state().opportunities.opp.answers, []);
-  assert.ok(result.override.outstanding.some(x => /KYC/.test(x)));
-  await assert.rejects(ownerWorkflowOverride('org', { opportunity_id: 'opp', target: 'audit_start' }, manager, d), /MISSION_ALREADY_STARTED_OR_ENDED/);
-  assert.equal(creations, 1);
+test('a manager cannot exercise a management override or create a mission through it', async () => {
+ const {d,state}=opportunityWorld();const manager={role:'manager',email:'manager@example.org',display_name:'Manager'};
+ Object.assign(state().opportunities.opp,{team:{status:'validated',members:[{name:'Manager',email:manager.email,role:'Manager'}]}});
+ let writes=0;d.fetchRows=async()=>{writes++;return [];};
+ await assert.rejects(ownerWorkflowOverride('org',{opportunity_id:'opp',target:'audit_start',reason:'Urgence commerciale'},manager,d),/PARTNER_OR_OWNER_REQUIRED/);
+ assert.equal(writes,0);assert.equal(state().opportunities.opp.mission_id,undefined);
 });
 
 test('configuration accepts a mission folder and reuses it without treating folder activity as a new model version', async () => {

@@ -283,12 +283,15 @@
   // Questions that POP UP on any page (Paul, 2026-10-11: « pop-up, pas notifications »): the person
   // answers right there with buttons — their independence declaration, the agents' questions, the
   // Associé's decision. « Plus tard » hides them for an hour on this device.
-  function askPopup() {
+  var askLoading = false;
+  function askPopup(onlyIndependence) {
+    if (askLoading || document.hidden || document.querySelector('dialog[open]')) return;
     if (/\/(login|excel)\b/.test(location.pathname) || document.querySelector('dialog.om-ask[open]')) return;
+    askLoading = true;
     var LATER = 'om_ask_later', later = {};
     try { later = JSON.parse(sessionStorage.getItem(LATER) || '{}') || {}; } catch (e) { later = {}; }
     var post = function (body) { return OM.api('/api/app?route=opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); };
-    OM.api('/api/app?route=my-questions').then(function (r) {
+    OM.api('/api/app?route=my-questions' + (onlyIndependence === true ? '&independence_only=1' : '')).then(function (r) {
       var here = new URLSearchParams(location.search).get('id');
       var list = ((r && r.questions) || []).filter(function (q) { return !(later[q.id] > Date.now()) && !(/opportunites/.test(location.pathname) && here === q.opportunity_id) && !(q.kind === 'procedure' && /\/procedure\.html/.test(location.pathname)); });
       if (!list.length) return;
@@ -328,23 +331,27 @@
         } else if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
-          var go = node('a', String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+          var go = node('a', String(q.id).indexOf('intro|') === 0 ? 'Répondre aux questions des agents' : String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+        } else if (q.kind === 'independence_review') {
+          var title = node('h2', q.question); title.id='om-ask-title'; d.appendChild(title);
+          if (window.OMIndependence) window.OMIndependence.form(d,q.review,q.opportunity_id,next);
+          else { d.appendChild(node('p',q.review.explanation)); var reviewLink=node('a','Examiner les garde-fous','btn'); reviewLink.href=q.href; opts.appendChild(reviewLink); }
         } else if (q.kind === 'independence') {
           indep = indep || { k: 0, answers: Object.assign({}, q.draft && q.draft.answers), details: Object.assign({}, q.draft && q.draft.details) };
           var iq = q.questions[indep.k];
           if (iq) {
             var h = node('h2', iq.label); h.id = 'om-ask-title'; d.appendChild(h);
             d.appendChild(node('p', 'Votre déclaration d’indépendance, pour vous-même · ' + (indep.k + 1) + ' sur ' + q.questions.length));
-            var dt = node('input'); dt.type = 'text'; dt.placeholder = 'Si « Oui » : précisez en quelques mots'; dt.className = 'om-ask-note'; d.appendChild(dt);
+            var dt = node('input'); dt.type = 'text'; dt.maxLength = 600; dt.placeholder = 'Si « Oui » : précisez en quelques mots'; dt.className = 'om-ask-note'; d.appendChild(dt);
             dt.value = indep.details[iq.ref] || '';
             dt.addEventListener('input', function () { indep.details[iq.ref] = dt.value.trim(); });
             if (indep.answers[iq.ref]) d.appendChild(node('p', 'Réponse enregistrée : ' + indep.answers[iq.ref]));
             if (indep.k > 0) opts.appendChild(btn('Précédent', 'ghost', function () { indep.details[iq.ref] = dt.value.trim(); indep.k--; draw(); }));
-            ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { indep.answers[iq.ref] = v; indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });
+            ['Non', 'Oui'].forEach(function (v) { opts.appendChild(btn(v, v === 'Oui' ? 'ghost' : '', function () { if (v === 'Oui' && !dt.value.trim()) { dt.required=true; dt.placeholder='Expliquez la situation avant de continuer'; dt.reportValidity(); dt.focus(); return; } indep.answers[iq.ref] = v; indep.details[iq.ref] = dt.value.trim(); indep.k++; draw(); })); });
           } else {
             var h2 = node('h2', 'Je certifie ces réponses'); h2.id = 'om-ask-title'; d.appendChild(h2);
             var n = Object.keys(indep.answers).filter(function (k) { return indep.answers[k] === 'Oui'; }).length;
-            d.appendChild(node('p', n ? n + ' situation(s) déclarée(s) : le Manager et l’Associé les examineront.' : 'Aucune menace déclarée.'));
+            d.appendChild(node('p', n ? n + ' situation(s) déclarée(s) : le Partner ou le Owner décidera des garde-fous.' : 'Aucune menace déclarée.'));
             (q.questions || []).forEach(function (item, index) { opts.appendChild(btn('Corriger : ' + item.label, 'ghost', function () { indep.k = index; draw(); })); });
             opts.appendChild(btn('Je certifie et j’enregistre', '', function () { busy(); post({ action: 'declare', opportunity_id: q.opportunity_id, answers: indep.answers, details: indep.details, certify: true }).then(next).catch(fail); }));
           }
@@ -368,8 +375,23 @@
       }
       d.addEventListener('cancel', function (e) { e.preventDefault(); snooze(); });
       draw(); d.showModal();
-    }).catch(function () {});
+    }).catch(function () {}).finally(function () { askLoading = false; });
   }
+  // Mini-presentation of a screen (2026-10-17): what it is for, by position; once, until « Ne plus afficher ».
+  (function screenIntro() {
+    var screen = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (!screen || /^(login|excel|demarrer|bienvenue|index|presentation)$/.test(screen) || !OM.hasPersonalSession()) return;
+    OM.api('/api/app?route=agent-intro&screen=' + encodeURIComponent(screen)).then(function (r) {
+      if (!r || !r.text || document.getElementById('om-screen-intro')) return;
+      var main = document.querySelector('main'); if (!main) return;
+      var box = node('aside', null, 'card'); box.id = 'om-screen-intro'; box.setAttribute('role', 'note'); box.style.cssText = 'display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px';
+      box.appendChild(node('span', r.text, 'small'));
+      var hide = node('button', 'Ne plus afficher', 'btn ghost'); hide.type = 'button';
+      hide.addEventListener('click', function () { box.remove(); OM.api('/api/app?route=agent-intro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'screen-seen', screen: screen }) }).catch(function () {}); });
+      box.appendChild(hide); main.insertBefore(box, main.firstChild);
+    }).catch(function () {});
+  })();
+  setInterval(function () { if (OM.hasPersonalSession() && (OM.getRole() === 'partner' || OM.getRole() === 'owner')) askPopup(true); }, 30000);
   // Shared notification centre: read state belongs to this person and this firm.
   function addBell(me) {
     if (document.getElementById('bell-btn') || /\/excel\//.test(location.pathname)) return;
@@ -812,6 +834,13 @@
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
+  function startIndependenceReview() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/independence-review.js'; document.head.appendChild(script); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startIndependenceReview); else startIndependenceReview();
+  // SIKA extends the existing mission, accounting workspace and settings; no separate page.
+  function startSikaExpenses() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/assets/sika-expenses.css'; document.head.appendChild(css); var script = document.createElement('script'); script.src = '/assets/sika-expenses.js'; document.head.appendChild(script); }
+  startSikaExpenses();
+  function startWorkExperience() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/assets/work-experience.css'; document.head.appendChild(css); var script = document.createElement('script'); script.src = '/assets/work-experience.js'; document.head.appendChild(script); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startWorkExperience); else startWorkExperience();
   function startCollaboration() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/live-collaboration.js'; document.head.appendChild(script); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startCollaboration); else startCollaboration();
   // Additive dossier navigation: existing screens and their controls remain available.

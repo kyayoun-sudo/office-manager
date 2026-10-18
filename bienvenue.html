@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Faire connaissance</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+body{background:var(--bg,#F4F5F3)}
+.wrap{max-width:620px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:16px}
+.box{background:var(--surface);border:1px solid var(--line,#E3E7E5);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.small{font-size:13px;color:var(--muted,#5B6670);margin:0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1 style="margin:0">Faire connaissance</h1>
+  <p class="small">Chaque agent ne pose que les questions qui concernent votre poste. Une question à la fois ; vous pouvez répondre plus tard. Ce sont des préférences de travail, jamais un jugement sur vous.</p></header>
+  <section class="box" id="box" aria-live="polite"><p class="small">Chargement…</p></section>
+  <p><a href="/accueil.html">Retour à l’accueil</a></p>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, box = document.getElementById('box');
+  function el(t, text, c) { var n = document.createElement(t); if (text) n.textContent = text; if (c) n.className = c; return n; }
+  function call(body) { return OM.api('/api/app?route=agent-intro', body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined); }
+  function draw(v) {
+    box.textContent = '';
+    if (!v.pending.length) { box.appendChild(el('h2', 'Merci, les agents ont ce qu’il leur faut.')); box.appendChild(el('p', v.total + ' réponse(s) enregistrée(s). Vous pourrez les revoir avec votre responsable.', 'small')); return; }
+    var q = v.pending[0];
+    box.appendChild(el('p', q.agent_name + ' · ' + (v.answered + 1) + ' sur ' + v.total, 'small'));
+    box.appendChild(el('h2', q.text));
+    var msg = el('p', '', 'small'); msg.setAttribute('role', 'status');
+    var send = function (a) { if (!a) return; msg.textContent = 'Enregistrement…'; call({ action: 'me-answer', key: q.key, answer: a }).then(draw).catch(function (e) { msg.textContent = e.message; }); };
+    var row = el('div', null, 'btn-row');
+    if (q.options) q.options.forEach(function (o) { var b = el('button', o, 'btn'); b.type = 'button'; b.addEventListener('click', function () { send(o); }); row.appendChild(b); });
+    else { var i = el('input'); i.type = 'text'; i.maxLength = 400; i.setAttribute('aria-label', q.text); box.appendChild(i); var b2 = el('button', 'Enregistrer', 'btn'); b2.type = 'button'; b2.addEventListener('click', function () { send(i.value.trim()); }); row.appendChild(b2); }
+    box.appendChild(row); box.appendChild(msg);
+  }
+  OM.api('/api/app?route=agent-intro&me=1').then(draw).catch(function (e) { box.textContent = 'Connectez-vous pour répondre (' + e.message + ').'; });
+})();
+</script>
+</body>
+</html>

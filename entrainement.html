@@ -26,6 +26,7 @@
 .small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 table.by-day td,table.by-day th{text-align:center}
 table.by-day td:first-child,table.by-day th:first-child{text-align:left}
+.training-nav{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 24px}.training-panel[hidden]{display:none!important}.training-exercise{margin:16px 0}.training-exercise>summary{cursor:pointer;padding:8px 0;line-height:1.6}.training-exercise>summary span{display:block;color:var(--muted);font-size:14px;margin-top:4px}.training-exercise[open]>summary{margin-bottom:18px}.training-steps{display:flex;gap:18px;flex-wrap:wrap;padding:14px 18px;background:var(--surface-2);border-radius:10px}.training-mode{font-weight:600;color:var(--brand-ink)}.training-table{overflow-x:auto}.training-table table{width:100%;border-collapse:collapse}.training-table td,.training-table th{text-align:left;padding:10px;border-bottom:1px solid var(--line)}.training-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}.training-settings{margin:14px 0}.training-settings label{display:block;margin:8px 0}.training-settings input,.training-settings select{font:inherit;min-height:42px;max-width:100%;padding:8px}.training-metrics{display:flex;flex-wrap:wrap;gap:12px}.training-metrics p{padding:12px 16px;background:var(--surface-2);border-radius:8px}.training-log{border-bottom:1px solid var(--line);padding:12px 0}
 </style>
 </head>
 <body>
@@ -55,8 +56,8 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
     </section>
 
     <header class="page-head">
-      <h1>Entraînement des agents</h1>
-      <p class="lead">Pendant 5 jours, des missions d'audit fictives arrivent chaque matin dans le dossier d'entraînement du Drive. Les agents les reconnaissent, Claude note leur travail, et chaque jour ils repartent avec les leçons de la veille. Vous pouvez aussi y déposer de vraies missions : l'agent s'entraîne dessus et l'équipe confirme ou corrige.</p>
+      <h1>Entraîner mes agents</h1>
+      <p class="lead">Faites travailler vos agents dans un cabinet fictif de 15 personnes sur deux années virtuelles, puis consultez leurs travaux et leurs erreurs.</p>
     </header>
 
     <div class="callout" id="need-login" hidden style="text-decoration:none">
@@ -64,7 +65,25 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       <span class="callout-text">Connectez-vous avec votre e-mail et votre mot de passe pour voir l'entraînement.</span>
     </div>
 
-    <div id="area" class="stack" style="gap:20px" hidden>
+    <nav class="training-nav" aria-label="Choisir un espace d’entraînement">
+      <button type="button" class="btn" data-training-view="cabinet" aria-controls="training-cabinet" aria-pressed="true">Cabinet virtuel</button>
+      <button type="button" class="btn ghost" data-training-view="specialized" aria-controls="training-specialized" aria-pressed="false">Tests spécialisés</button>
+      <button type="button" class="btn ghost" data-training-view="shadow" aria-controls="training-shadow" aria-pressed="false">Leçons et suivi</button>
+    </nav>
+    <section id="training-cabinet" class="training-panel" aria-labelledby="training-cabinet-title">
+      <h2 id="training-cabinet-title" class="sr">Cabinet virtuel</h2>
+      <div id="firm-simulation-host"><p class="small" id="firm-access-note">Connectez-vous avec un compte propriétaire ou associé pour piloter le cabinet virtuel.</p></div>
+    </section>
+    <section id="training-specialized" class="training-panel" aria-labelledby="training-specialized-title" hidden>
+      <h2 id="training-specialized-title">Tests spécialisés</h2>
+      <p class="lead">Choisissez un exercice ciblé. Chaque exercice conserve sa propre campagne et ses propres résultats.</p>
+      <details class="card training-exercise">
+        <summary><strong>Analyse comptable — cinq organisations fictives</strong><span>Grand livre, échantillonnage, pièces et anomalies.</span></summary>
+        <div id="audit-sandbox-host"></div>
+      </details>
+      <details class="card training-exercise">
+        <summary><strong>Exercices sur cinq jours</strong><span>Missions quotidiennes, suivi par agent et revue des réponses. Connexion Drive selon la configuration.</span></summary>
+        <div id="area" class="stack" style="gap:20px" hidden>
       <section class="card" aria-labelledby="h-state">
         <h2 id="h-state">Campagne <span class="meta" id="state-meta"></span></h2>
         <div class="kpis" id="state-kpis"></div>
@@ -76,7 +95,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       </section>
 
       <section class="card" aria-labelledby="h-owner" id="owner-card" hidden>
-        <h2 id="h-owner">Piloter l'entraînement</h2>
+        <h2 id="h-owner">Piloter les exercices sur cinq jours</h2>
         <div id="start-box" class="stack" style="gap:12px">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
             <div class="field"><label for="parent">Dossier Drive où créer l'entraînement (lien ou identifiant)</label>
@@ -125,6 +144,16 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         <ul id="lessons" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px"></ul>
       </section>
 
+      <section class="card" aria-labelledby="h-cases">
+        <h2 id="h-cases">Missions</h2>
+        <div id="cases" class="stack" style="gap:16px"></div>
+      </section>
+        </div>
+      </details>
+    </section>
+    <section id="training-shadow" class="training-panel" aria-labelledby="training-shadow-title" hidden>
+      <h2 id="training-shadow-title">Leçons et suivi</h2>
+      <p class="lead">Retrouvez les observations de Shadow, les corrections et les propositions d’amélioration.</p>
       <section class="card" aria-labelledby="h-shadow" id="shadow-card" hidden>
         <h2 id="h-shadow">Shadow — le laboratoire d'apprentissage</h2>
         <p class="small">Shadow connaît l’objectif final de chaque agent (lui compris) et mesure l’écart : examen de rangement de l’Orpailleur sur son vrai cerveau, corrections faites par l’équipe, passages incomplets, enquêtes sur les causes (consignes, données, code), bonnes pratiques internationales, propositions de code en pull request que vous relisez. Il observe le travail réel et les entraînements, les erreurs et vos corrections, en tire des leçons courtes, les teste sur des cas permanents (golden tests), et vous propose les changements importants. Il ne travaille jamais sur une vraie mission, n'écrit à personne et ne touche pas au Drive. Les leçons sûres (un fait prouvé, une correction de l'équipe) s'appliquent tout de suite ; le reste attend votre décision. Aucun agent ne peut s'accorder plus de droits.</p>
@@ -142,14 +171,16 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           <button type="button" class="chip" data-p="history" aria-pressed="false">Historique</button>
         </div>
         <div id="sh-body" class="stack" style="margin-top:12px"></div>
+        <details class="card" id="sh-keep" style="margin-top:12px"><summary>Garder ce que Shadow a appris (associés)</summary>
+          <p class="small">Avant « Repartir de zéro », exportez les leçons et les tests de Shadow dans un fichier. Après le redémarrage, importez-le : rien n’est écrasé, une leçon en attente d’un associé reste en attente.</p>
+          <div class="btn-row"><button class="btn" type="button" id="sh-export">Exporter les leçons et tests</button>
+          <label class="btn ghost" for="sh-import">Importer un fichier</label><input type="file" id="sh-import" accept="application/json,.json" hidden></div>
+          <p class="status" id="sh-keep-msg" role="status" aria-live="polite"></p></details>
         <p class="status" id="sh-status" role="status" aria-live="polite"></p>
       </section>
 
-      <section class="card" aria-labelledby="h-cases">
-        <h2 id="h-cases">Missions</h2>
-        <div id="cases" class="stack" style="gap:16px"></div>
-      </section>
-    </div>
+
+    </section>
   </main>
 </div>
 
@@ -516,6 +547,31 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 </body>
 </html>
 
+<script src="/assets/training-navigation.js"></script>
 <script src="/assets/audit-sandbox.js"></script>
 
-<script src="/assets/firm-simulation.js"></script>
+<script src="/assets/firm-simulation.js">  (function () {
+    var OM = window.OfficeManager;
+    var msg = function (t) { var n = document.getElementById('sh-keep-msg'); if (n) n.textContent = t; };
+    var ex = document.getElementById('sh-export'), im = document.getElementById('sh-import');
+    if (ex) ex.addEventListener('click', function () {
+      msg('Préparation…');
+      OM.api('/api/app?route=shadow', { method: 'POST', body: JSON.stringify({ action: 'lab-export' }) }).then(function (f) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(f, null, 1)], { type: 'application/json' }));
+        a.download = 'shadow-lecons-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
+        msg('Exporté : ' + f.counts.lessons + ' leçons (' + f.counts.active + ' actives), ' + f.counts.tests + ' tests. Gardez le fichier en lieu sûr.');
+      }).catch(function (e) { msg(e.message === 'PARTNERS_ONLY' ? 'Réservé aux associés.' : e.message); });
+    });
+    if (im) im.addEventListener('change', function () {
+      var file = im.files && im.files[0]; if (!file) return; msg('Lecture…');
+      var r = new FileReader();
+      r.onload = function () {
+        var obj; try { obj = JSON.parse(String(r.result)); } catch (x) { msg('Ce fichier n’est pas un JSON valide.'); return; }
+        OM.api('/api/app?route=shadow', { method: 'POST', body: JSON.stringify({ action: 'lab-import', file: obj }) }).then(function (o) {
+          msg('Importé : ' + o.lessons_added + ' leçons ajoutées, ' + o.lessons_skipped + ' déjà présentes, ' + o.lessons_refused + ' refusées, ' + o.tests_added + ' tests ajoutés.');
+        }).catch(function (e) { msg({ NOT_A_SHADOW_EXPORT: 'Ce fichier n’est pas une sauvegarde de Shadow.', EXPORT_ALTERED_OR_CORRUPT: 'Le fichier a été modifié ou est abîmé : import refusé.', PARTNERS_ONLY: 'Réservé aux associés.' }[e.message] || e.message); });
+      };
+      r.readAsText(file); im.value = '';
+    });
+  })();
+</script>
