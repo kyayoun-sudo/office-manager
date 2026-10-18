@@ -45,6 +45,49 @@
   .spec-gap{padding:4px 0 8px}
   .team-checks{margin:6px 0 0;padding-left:0;list-style:none;font-size:13px;line-height:1.5;color:var(--muted)}
   .team-checks .miss{color:var(--danger, #A33)}
+  .opp-entry-choice{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:14px;
+  margin-top:16px;
+}
+
+.opp-entry-card{
+  appearance:none;
+  font:inherit;
+  text-align:left;
+  background:var(--surface);
+  color:var(--ink);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:20px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-height:120px;
+  transition:.15s ease;
+}
+
+.opp-entry-card:hover{
+  border-color:var(--brand);
+  transform:translateY(-1px);
+}
+
+.opp-entry-card strong{
+  font-size:17px;
+}
+
+.opp-entry-card span{
+  color:var(--muted);
+  font-size:13.5px;
+  line-height:1.5;
+}
+
+#tdr-entry,
+#direct-entry{
+  margin-top:18px;
+}
 </style>
 </head>
 <body>
@@ -79,16 +122,220 @@
     </header>
 
     <div id="list-view" class="stack">
-      <section class="card" aria-labelledby="h-new">
-        <h2 id="h-new">Nouvelle opportunité</h2>
-        <label class="opp-drop" id="drop" for="file">Glissez le TDR ici, ou cliquez pour le choisir (PDF, Word, scan, photo)</label>
-        <input id="file" type="file" hidden>
-        <div class="field"><label for="links">Ou collez le lien Drive du document</label><input id="links" type="text" placeholder="https://drive.google.com/file/d/…"></div>
-        <div class="field"><label for="notes">Précisions pour le Firm Manager (facultatif)</label><textarea id="notes" style="min-height:60px" placeholder="Exemple : reçu par e-mail du bailleur ; date limite à confirmer."></textarea></div>
-        <div><button class="btn" id="send" type="button">Envoyer au Firm Manager</button></div>
-        <p class="status" id="say" role="status"></p>
-      </section>
+    <section class="card" aria-labelledby="h-new">
+  <h2 id="h-new">Nouvelle opportunité</h2>
 
+  <p class="meta">
+    Choisissez comment cette opportunité entre dans le cabinet.
+  </p>
+
+  <!-- DEUX PORTES D'ENTRÉE -->
+  <div id="entry-choice" class="opp-entry-choice">
+
+    <button
+      class="opp-entry-card"
+      id="choose-tdr"
+      type="button"
+    >
+      <strong>Avec TDR</strong>
+      <span>
+        Déposer un TDR, un AMI, un appel d'offres
+        ou une demande de proposition.
+      </span>
+    </button>
+
+    <button
+      class="opp-entry-card"
+      id="choose-direct"
+      type="button"
+    >
+      <strong>Sans TDR</strong>
+      <span>
+        Créer directement une opportunité ou reprendre
+        une mission sans passer par un TDR.
+      </span>
+    </button>
+
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- PORTE 1 : AVEC TDR       -->
+  <!-- ========================= -->
+
+  <div id="tdr-entry" hidden>
+
+    <div class="btn-row">
+      <button
+        class="btn ghost"
+        id="back-from-tdr"
+        type="button"
+      >
+        ← Retour
+      </button>
+    </div>
+
+    <h3>Créer avec TDR</h3>
+
+    <label
+      class="opp-drop"
+      id="drop"
+      for="file"
+    >
+      Glissez le TDR ici, ou cliquez pour le choisir
+      (PDF, Word, scan, photo)
+    </label>
+
+    <input
+      id="file"
+      type="file"
+      hidden
+    >
+
+    <div class="field">
+      <label for="links">
+        Ou collez le lien Drive du document
+      </label>
+
+      <input
+        id="links"
+        type="text"
+        placeholder="https://drive.google.com/file/d/…"
+      >
+    </div>
+
+    <div class="field">
+      <label for="notes">
+        Précisions pour le Firm Manager (facultatif)
+      </label>
+
+      <textarea
+        id="notes"
+        style="min-height:60px"
+        placeholder="Exemple : reçu par e-mail du bailleur ; date limite à confirmer."
+      ></textarea>
+    </div>
+
+    <div>
+      <button
+        class="btn"
+        id="send"
+        type="button"
+      >
+        Envoyer au Firm Manager
+      </button>
+    </div>
+
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- PORTE 2 : SANS TDR       -->
+  <!-- ========================= -->
+
+  <div id="direct-entry" hidden>
+
+    <div class="btn-row">
+      <button
+        class="btn ghost"
+        id="back-from-direct"
+        type="button"
+      >
+        ← Retour
+      </button>
+    </div>
+
+    <h3>Créer sans TDR</h3>
+
+    <p class="meta">
+      Vous pouvez commencer une mission directement.
+      Le TDR n'est pas obligatoire.
+    </p>
+
+    <div class="opp-fields">
+
+      <label>
+        Client *
+        <input
+          id="direct-client"
+          type="text"
+          placeholder="Premier Food SARL"
+        >
+      </label>
+
+      <label>
+        Nom de la mission
+        <input
+          id="direct-title"
+          type="text"
+          placeholder="Audit Premier Food FY2025/2026"
+        >
+      </label>
+
+      <label>
+        Référence
+        <input
+          id="direct-reference"
+          type="text"
+          placeholder="PF-2025-2026"
+        >
+      </label>
+
+      <label>
+        Type de mission
+        <select id="direct-kind">
+          <option value="">Choisir</option>
+          <option value="Audit légal">Audit légal</option>
+          <option value="Audit contractuel">Audit contractuel</option>
+          <option value="Expertise comptable">Expertise comptable</option>
+          <option value="Conseil">Conseil</option>
+          <option value="Due diligence">Due diligence</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </label>
+
+      <label>
+        Période
+        <input
+          id="direct-period"
+          type="text"
+          placeholder="01/04/2025 - 31/03/2026"
+        >
+      </label>
+
+    </div>
+
+    <div class="field">
+      <label for="direct-summary">
+        Description / contexte
+      </label>
+
+      <textarea
+        id="direct-summary"
+        style="min-height:80px"
+        placeholder="Exemple : reprise d'une ancienne mission pour continuer les travaux d'audit."
+      ></textarea>
+    </div>
+
+    <div>
+      <button
+        class="btn"
+        id="send-direct"
+        type="button"
+      >
+        Créer l'opportunité
+      </button>
+    </div>
+
+  </div>
+
+  <p
+    class="status"
+    id="say"
+    role="status"
+  ></p>
+
+</section>
       <section class="card" aria-labelledby="h-signals" id="signals-card" hidden>
         <h2 id="h-signals">Trouvés dans le Drive</h2>
         <p class="meta">Documents qui ressemblent à un TDR ou un AMI, apparus dans le dossier des appels d’offres depuis la dernière ronde du Firm Manager.</p>
