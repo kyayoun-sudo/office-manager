@@ -56,8 +56,10 @@ body{background:var(--bg,#F4F5F3)}
     <p class="small">Collez l’adresse d’un Drive partagé ou d’un dossier (copiée en haut du navigateur), ou choisissez « Tout mon Google Drive ».</p>
     <div class="field"><label for="drive">Adresse du Drive</label><input id="drive" type="text" class="mono" placeholder="https://drive.google.com/drive/folders/…"></div>
     <button class="btn" type="button" id="s3-save">Utiliser ce Drive</button>
-            <button class="btn" type="button" id="s3-save-all">Tout mon Google Drive</button>
-    <div class="field"><label for="home">Avec « Tout mon Google Drive » : le Drive partagé qui garde la mémoire des agents (dossier 00_OFFICE_MANAGER)</label><select id="home"></select></div>
+    <p class="small">Ou utiliser tous les fichiers accessibles à votre compte Google :</p>
+    <div class="field"><label for="home">Choisissez le Drive partagé où les agents garderont leur mémoire</label><select id="home"><option value="">Choisir un Drive partagé…</option></select></div>
+    <p class="small" id="home-help">Cette liste vient de votre compte Google. Un Drive proposé ici n’est pas encore sélectionné pour le cabinet. Réinitialiser l’application ne supprime pas vos Drives Google.</p>
+    <button class="btn" type="button" id="s3-save-all">Utiliser tout mon Google Drive</button>
     <p class="small" id="s3-msg" role="status" aria-live="polite"></p>
   </section>
 
@@ -91,7 +93,7 @@ body{background:var(--bg,#F4F5F3)}
     DRIVE_NOT_VISIBLE_TO_CONNECTED_ACCOUNT: 'Votre compte Google ne voit pas ce Drive.', DRIVE_MUST_BE_SHARED_DRIVE: 'Il faut un Drive partagé du cabinet (pas « Mon Drive »).',
     GOOGLE_NOT_CONNECTED: 'Connectez d’abord votre Google (étape 2).', TEST_MODE_REAL_DRIVE_REFUSED: 'Dans l’aperçu de test, le Drive réel du cabinet reste protégé : collez un Drive de test.'
   };
-  var msg = function (e) { var m = String(e && e.message || e); return M[m] || m; };
+  var msg = function (e) { var m = String(e && (e.code || e.message) || e); return M[m] || (e && e.message) || m; };
   function post(route, body, headers) {
     return fetch('/api/app?route=' + route, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}), body: JSON.stringify(body) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || 'HTTP_' + r.status); return d; }); });
@@ -103,12 +105,15 @@ body{background:var(--bg,#F4F5F3)}
     if (!s || !OM.isOwner()) { step(1, 'on'); step(2, 'off'); step(3, 'off'); step(4, 'off'); return; }
     step(1, 'done'); $('s1-form').hidden = true; $('s1-msg').textContent = 'Connecté : ' + (s.user.display_name || s.user.email) + ' — propriétaire du cabinet.'; $('s1-msg').className = 'small ok';
     return OM.api('/api/app?route=google', { headers: owner() }).then(function (g) {
-      var hs = $('home'); hs.textContent = '';
+      var hs = $('home'), previous = hs.value; hs.textContent = '';
+      var placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choisir un Drive partagé…'; hs.appendChild(placeholder);
       (g.shared_drives || []).forEach(function (d) { var o = document.createElement('option'); o.value = d.id; o.textContent = d.name; hs.appendChild(o); });
+      hs.value = (g.shared_drives || []).some(function (d) { return d.id === previous; }) ? previous : '';
+      $('home-help').textContent = 'Drives visibles par ' + (g.email || 'le compte Google connecté') + '. Un Drive proposé ici n’est pas encore sélectionné pour le cabinet. Réinitialiser l’application ne supprime pas vos Drives Google.';
       if (g.connected) { step(2, 'done'); $('s2-msg').textContent = 'Google connecté : ' + g.email; $('s2-msg').className = 'small ok'; $('s2-connect').textContent = 'Reconnecter un autre compte'; }
       else step(2, 'on');
       if (g.firm_drive) { step(3, 'done'); $('s3-msg').textContent = 'Drive utilisé : ' + (g.firm_drive.name || g.firm_drive.id); $('s3-msg').className = 'small ok'; return loadIntro(); }
-      else step(3, g.connected ? 'on' : 'off');
+      else { step(3, g.connected ? 'on' : 'off'); step(4, 'off'); $('s3-msg').textContent = 'Aucun Drive enregistré pour ce cabinet. Choisissez un Drive ci-dessus.'; $('s3-msg').className = 'small'; }
     }).catch(function (e) { $('s2-msg').textContent = msg(e); step(2, 'on'); });
   }
 
@@ -131,21 +136,27 @@ body{background:var(--bg,#F4F5F3)}
     OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'connect', return_to: '/demarrer.html', by: OM.getUserName() || null }) })
       .then(function (r) { location.assign(r.url); }).catch(function (e) { $('s2-msg').textContent = msg(e); });
   });
-  $('s3-save-all').addEventListener('click', function () {
-    var b = this; b.disabled = true; $('s3-msg').textContent = 'Les agents vont lire tout votre Google Drive…';
-    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', all: true, home: $('home').value, by: OM.getUserName() || null }) })
-      .then(function (r) { window.__mapping = r && r.mapping_started;
-        return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(refresh); })
-      .then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Google Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } })
-      .catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
-  });
-  $('s3-save').addEventListener('click', function () {
-    var b = this; b.disabled = true; $('s3-msg').textContent = 'Vérification auprès de Google…'; $('s3-msg').className = 'small';
-    OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', link: $('drive').value, by: OM.getUserName() || null }) })
-      .then(function (r) { window.__mapping = r && r.mapping_started;
-        // The owner's go-ahead for the agents (Drive, documents, AI), given with the Drive.
-        return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(function () {}).then(refresh); }).then(function () { if (window.__mapping) { $('s4-msg').textContent = 'La cartographie de votre Drive a démarré (quelques minutes).'; $('s4-msg').className = 'small ok'; } }).catch(function (e) { $('s3-msg').textContent = msg(e); }).then(function () { b.disabled = false; });
-  });
+  function saveDrive(all) {
+    if (all && !$('home').value) { $('s3-msg').textContent = M.HOME_DRIVE_REQUIRED; return; }
+    if (!all && !$('drive').value.trim()) { $('s3-msg').textContent = 'Collez une adresse pour utiliser ce Drive précis, ou choisissez le Drive de mémoire puis « Utiliser tout mon Google Drive ».'; return; }
+    $('s3-save').disabled = true; $('s3-save-all').disabled = true;
+    $('s3-msg').textContent = 'Vérification et enregistrement du Drive auprès de Google…'; $('s3-msg').className = 'small';
+    var recorded = false, mapping = false;
+    return OM.api('/api/app?route=google', { method: 'POST', headers: owner(), body: JSON.stringify({ action: 'set-drive', all: all, home: all ? $('home').value : undefined, link: all ? undefined : $('drive').value.trim(), by: OM.getUserName() || null }) })
+      .then(function (r) {
+        recorded = true; mapping = Boolean(r && r.mapping_started);
+        $('s3-msg').textContent = 'Drive enregistré. Autorisation des agents…';
+        return OM.api('/api/app?route=agent-permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      }).then(refresh).then(function () {
+        $('s4-msg').textContent = mapping ? 'La cartographie du Drive a démarré. Vous pouvez suivre son avancement dans Mise en service.' : 'Drive enregistré. Vérifiez le lancement de la cartographie dans Mise en service.';
+        $('s4-msg').className = 'small ok';
+      }).catch(function (e) {
+        $('s3-msg').textContent = (recorded ? 'Le Drive a été enregistré, mais l’autorisation des agents n’a pas abouti : ' : '') + msg(e);
+        if (recorded) { step(3, 'done'); step(4, 'off'); $('s4-msg').textContent = 'Reprenez l’autorisation des agents dans Paramètres.'; }
+      }).then(function () { $('s3-save').disabled = false; $('s3-save-all').disabled = false; });
+  }
+  $('s3-save-all').addEventListener('click', function () { saveDrive(true); });
+  $('s3-save').addEventListener('click', function () { saveDrive(false); });
 
 
   var NEEDS_MSG = { INTRO_NEEDS_OPEN: 'Il reste des fichiers à indiquer : donnez le lien, ou choisissez « Plus tard » pour chacun.', LINK_NOT_RECOGNISED: 'Lien non reconnu : collez l’adresse du fichier ou du dossier.', INTRO_ALREADY_DONE: 'La présentation est déjà terminée.' };

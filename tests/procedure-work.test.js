@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { buildCycleWorkpaper } from '../lib/cycle-workpapers.js';
 import * as P from '../lib/procedure-work.js';
+import { askProcedure, executeProcedureActions } from '../lib/procedure-workspace.js';
 
 const M = '11111111-1111-1111-1111-111111111111';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -14,6 +15,47 @@ const cycle = { cycle_code: 'ACH', cycle_title: 'Achats', status: 'IN_SCOPE', pr
   { code: 'ACH-02', title: 'Walkthrough', type: 'CORE', active: true, sampling_mode: 'walkthrough', preparer: 'sam@c.ci' }] };
 const programme = { id: 'prog1', office_mission_id: M, version: 1, status: 'validated', cycles: [cycle], reviews: { manager: true }, materiality: { overall: 10000000, performance: 5000000, currency: 'FCFA' }, workpapers: [{ cycle_code: 'ACH', file_id: 'WP1' }] };
 const ali = { role: 'auditor', email: 'ali@c.ci' };
+
+test('conversation continues real evidence preparation into Excel, adds the auditor note, and leaves test decisions human', async () => {
+  let pass = 0;
+  const { t, d } = world({ ai: async (_, options) => {
+    if (options.input.includes('PIÈCES :')) return { text: JSON.stringify({ attributes: [{ name: 'Montant' }], reason: 'Le montant de la pièce correspond.', missing: ['Visa du responsable'], proposed_result: 'PASS' }) };
+    pass++;
+    return { text: pass === 1 ? JSON.stringify({ answer: 'Je prépare les observations.', assessment: 'Le visa reste à obtenir.', next: 'Qui peut fournir le visa ?',
+      actions: [{ type: 'prepare-observations', sample_id: 'S01' }, { type: 'write-workpaper' }] }) : 'Les observations sont écrites. Le visa reste à obtenir.' };
+  } });
+  t.files.POPFILEXXXXXXXXXXXXXXXXX = { buf: await populationXlsx(), mt: 'p1' };
+  t.files.WP1 = { buf: await buildCycleWorkpaper({ firm: 'C', mission: { id: M, name: 'Projet' }, programme, cycle, procedures: [{ ...card, ...cycle.procedures[0] }] }), mt: 'w1' };
+  await P.setPopulation('org', M, 'ACH-03', { file: 'POPFILEXXXXXXXXXXXXXXXXX', columns: { ref: 0, date: 1, party: 2, amount: 4 }, gl_total: 7599500.5 }, ali, d);
+  await P.drawSample('org', M, 'ACH-03', {}, ali, d);
+  await P.addEvidence('org', M, 'ACH-03', { sample_id: 'S01', name: 'Facture.docx', mime: 'application/msword', base64: Buffer.from('facture').toString('base64') }, ali, d);
+  const result = await askProcedure('org', M, 'ACH-03', { message: 'Continue, remplis les observations et écris dans Excel.' }, ali, d);
+  assert.deepEqual(result.outcomes.map(o => o.status), ['done', 'done']);
+  assert.equal(result.outcomes[1].verified, true);
+  assert.equal(result.work.items[0].result, null);
+  assert.equal(result.work.conclusion, undefined);
+  assert.match(result.work.items[0].comment, /Observation IA à revoir/);
+  assert.deepEqual(result.work.items[0].observation_prepared.evidence_ids.length, 1);
+  assert.equal(result.brief.received.length, 1);
+  assert.deepEqual(result.brief.observed[0].missing, ['Visa du responsable']);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(t.files.WP1.buf);
+  let found = false; wb.getWorksheet('ACH-03').eachRow(r => r.eachCell(c => { if (String(c.value).includes('Observation IA à revoir')) found = true; }));
+  assert.ok(found, 'prepared observation was really saved in the workbook');
+  const before = result.work.items[0].comment;
+  const note = await executeProcedureActions('org', M, 'ACH-03', [{ type: 'add-note', sample_id: 'S01', note: 'Le responsable revient lundi.' }], 'Ajoute : Le responsable revient lundi.', ali, d);
+  assert.equal(note[0].status, 'done');
+  const current = await P.procedureView('org', M, 'ACH-03', ali, d);
+  assert.equal(current.work.items[0].comment, before + '\nLe responsable revient lundi.');
+  assert.equal(current.work.items[0].result, null);
+  const redo = await P.prepareObservation('org', M, 'ACH-03', { sample_id: 'S01' }, ali, d);
+  assert.equal(redo.changed, false, 'existing observations are preserved');
+  const forged = await executeProcedureActions('org', M, 'ACH-03', [{ type: 'add-note', sample_id: 'S01', note: 'Invented approval' }, { type: 'write-workpaper' }], 'Ajoute ma précision', ali, d);
+  assert.equal(forged.length, 1); assert.equal(forged[0].reason, 'NOTE_MUST_COME_FROM_AUDITOR');
+  await assert.rejects(P.prepareObservation('org', M, 'ACH-03', { sample_id: 'S01', user_note: 'x' }, { role: 'auditor', email: 'outsider@example.test' }, d), /NOT_YOUR_PROCEDURE/);
+  t.work[0].status = 'submitted';
+  const locked = await executeProcedureActions('org', M, 'ACH-03', [{ type: 'write-workpaper' }], 'Continue', ali, d);
+  assert.equal(locked[0].status, 'blocked');
+});
 
 async function populationXlsx() {
   const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('GL');

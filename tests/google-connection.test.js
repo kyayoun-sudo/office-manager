@@ -158,6 +158,22 @@ test('existing connection of 2026-10-05 (Supabase taty-google-oauth) is used dir
   resetGoogleConnectionCache();
 });
 
+test('a reset firm never resurrects a retained legacy secret without an active integration record', async () => {
+  for (const record of [null, { status: 'disconnected' }, { status: null }]) {
+    resetGoogleConnectionCache(); let secretReads = 0;
+    const fetchRows = async path => {
+      if (path.startsWith('office_integration_connections')) return record ? [record] : [];
+      if (path === 'rpc/office_get_google_drive_secret') { secretReads++; return [{ client_id: 'old', client_secret: 'old', refresh_token: 'retained' }]; }
+      return [];
+    };
+    assert.equal(await loadGoogleConnection('reset-org', { env: ENV, fetchRows }), null);
+    assert.equal(secretReads, 0, 'the old secret is not even requested');
+    const status = await googleStatus('reset-org', { env: ENV, fetchRows });
+    assert.equal(status.connected, false); assert.equal(status.firm_drive, null);
+  }
+  resetGoogleConnectionCache();
+});
+
 test('a firm connected in the app comes first; the old relay connection does not count as the firm’s own', async () => {
   resetGoogleConnectionCache();
   const fetchRows = async (path, o = {}) => {

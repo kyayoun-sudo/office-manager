@@ -6,6 +6,7 @@
 <title>Ma procédure</title>
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
+<link rel="stylesheet" href="/assets/procedure-workspace.css">
 <style>
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .row input[type=text],.row input[type=number],.row select,.it input,.it select,.it textarea,textarea.big{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
@@ -50,6 +51,44 @@
       <p class="status" id="state" role="status" aria-live="polite"></p>
     </header>
 
+    <section id="procedure-workspace" hidden aria-label="Travail avec l’Enhanced Auditor">
+      <aside class="card audit-dialogue" aria-labelledby="h-dialogue">
+        <h2 id="h-dialogue">Avec mon agent</h2>
+        <p id="audit-context" class="meta"></p>
+        <div id="audit-conversation" role="log" aria-label="Conversation de la procédure" aria-live="polite"></div>
+        <form id="audit-ask">
+          <label for="audit-question">Votre question ou votre demande</label>
+          <textarea id="audit-question" maxlength="4000" required placeholder="Quelles informations manquent pour réaliser ce test ?"></textarea>
+          <button class="btn" id="audit-send" type="submit">Demander à l’agent</button>
+        </form>
+        <p id="audit-message" class="status" role="status"></p>
+        <div class="row">
+          <button class="btn ghost" id="audit-continue" type="button">Continue avec les pièces disponibles</button>
+          <button class="btn ghost" id="audit-explain" type="button">Je ne comprends pas, explique</button>
+        </div>
+        <section id="audit-brief" aria-label="Point de travail de l’agent" hidden></section>
+        <div class="row">
+          <button class="btn ghost" id="audit-next" type="button">Faire le point sur ce test</button>
+          <button class="btn ghost" id="audit-write" type="button">Écrire les travaux enregistrés dans Excel</button>
+        </div>
+        <p class="meta">Demandez à l’agent de remplir les observations documentées, d’ajouter votre précision ou de poursuivre. Il indique ce qu’il a réalisé et ce qu’il lui manque.</p>
+      </aside>
+      <section class="card audit-workbook" aria-labelledby="h-workbook">
+        <h2 id="h-workbook">Mon fichier Excel</h2>
+        <div class="row">
+          <select id="audit-sheet" aria-label="Feuille du classeur"></select>
+          <button class="btn ghost" id="audit-refresh" type="button">Actualiser le fichier</button>
+        </div>
+        <p id="audit-file-status" class="meta" role="status"></p>
+        <p id="audit-selection" class="meta">Sélectionnez une cellule pour en parler avec l’agent.</p>
+        <div id="audit-grid" tabindex="0" aria-label="Vue consultable du classeur Excel"></div>
+        <div class="row audit-pagination">
+          <button class="btn ghost" id="audit-prev" type="button">Lignes précédentes</button>
+          <button class="btn ghost" id="audit-more" type="button">Lignes suivantes</button>
+        </div>
+        <p class="meta">Vue consultable du fichier enregistré. Complétez les formulaires ci-dessous puis écrivez les travaux dans Excel. Jaune : champ d’entrée du modèle ; ƒ : formule.</p>
+      </section>
+    </section>
     <section class="card" aria-labelledby="h-card">
       <details id="card-box"><summary><h2 id="h-card" style="display:inline">Ce que dit le SOP</h2></summary><div id="card"></div></details>
     </section>
@@ -121,6 +160,7 @@
 </div>
 <script src="/assets/brand-theme.js"></script>
 <script src="/assets/screens.js"></script>
+<script src="/assets/procedure-workspace.js"></script>
 <script>
 (function () {
   var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
@@ -141,7 +181,7 @@
   function post(b) { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ mission_id: missionId, code: code }, b)) }); }
   function act(btn, body, sayEl, done) {
     if (btn) btn.disabled = true; if (sayEl) { sayEl.className = 'status'; sayEl.textContent = 'Un instant…'; }
-    return post(body).then(function (r) { if (r && r.work) { data.work = r.work; } if (sayEl) sayEl.textContent = ''; if (done) done(r); else paint(); return r; })
+    return post(body).then(function (r) { if (r && r.work) { data.work = r.work; window.dispatchEvent(new CustomEvent('procedure-updated', { detail: data })); } if (r && r.wp_sync) window.dispatchEvent(new Event('procedure-written')); if (sayEl) sayEl.textContent = ''; if (done) done(r); else paint(); return r; })
       .catch(function (e) { if (sayEl) { sayEl.className = 'status error'; sayEl.textContent = msg(e); } showGaps(e.data && e.data.gaps); })
       .then(function (r) { if (btn) btn.disabled = false; return r; });
   }
@@ -307,7 +347,7 @@
   var RERR = { NOT_THIS_REVIEW_LEVEL: 'Ce n’est pas à votre niveau de revoir maintenant.', NO_SELF_REVIEW: 'Vous avez préparé cette procédure : une autre personne la revoit.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.',
     OPEN_REVIEW_POINTS: 'Des points de revue sont encore ouverts.', POINT_NOT_ANSWERED: 'Le préparateur n’a pas encore répondu à ce point.', REVIEW_POINT_REQUIRED: 'Écrivez au moins un point.', NOTHING_TO_REVIEW: 'Rien à revoir pour l’instant.', ALREADY_REVIEWED: 'Toutes les revues requises sont faites.' };
   var rmsg = function (e) { var c = e && (e.code || e.message); return RERR[c] || msg(e); };
-  function postR(b, sayEl, done) { return post(b).then(function (r) { if (r && r.work) data.work = r.work; if (done) done(r); else { paint(); loadReview(); } }).catch(function (e) { sayEl.className = 'status error'; sayEl.textContent = rmsg(e); }); }
+  function postR(b, sayEl, done) { return post(b).then(function (r) { if (r && r.work) { data.work = r.work; window.dispatchEvent(new CustomEvent('procedure-updated', { detail: data })); } if (done) done(r); else { paint(); loadReview(); } }).catch(function (e) { sayEl.className = 'status error'; sayEl.textContent = rmsg(e); }); }
   function loadReview() {
     OM.api('/api/app?route=procedure&review=1&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (v) {
       var lv = v.levels.map(function (l) { var s = v.signed.filter(function (x) { return x.level === l; })[0]; return LV[l] + (s ? ' : signé par ' + (s.name || s.by) + ' le ' + UI.dateTime(s.at) : v.next === l ? ' : à faire maintenant' : ' : en attente'); });
@@ -349,8 +389,14 @@
     if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
     OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
       data = d; paintCard(); paint(); loadReview();
+      window.dispatchEvent(new CustomEvent('procedure-ready', { detail: d }));
     }).catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
   }
+  window.addEventListener('procedure-assistant-updated', function (e) {
+    if (!data || !e.detail.work) return;
+    data.work = e.detail.work; paint();
+    window.dispatchEvent(new CustomEvent('procedure-updated', { detail: data }));
+  });
   UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });
 })();
 </script>

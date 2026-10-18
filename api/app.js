@@ -246,6 +246,8 @@ export const ROUTES = Object.freeze({
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'workbook-view') return (await import('../lib/procedure-workspace.js')).workbookView(orgId, m, c, b, a);
+      if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);
       if (b.action === 'population-preview') return w.populationPreview(orgId, m, c, b, a);
       if (b.action === 'population') return w.setPopulation(orgId, m, c, b, a);
       if (b.action === 'sample') return w.drawSample(orgId, m, c, b, a);

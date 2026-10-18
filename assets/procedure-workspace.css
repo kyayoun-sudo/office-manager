@@ -1,0 +1,23 @@
+#procedure-workspace{display:grid;grid-template-columns:minmax(280px,32%) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:24px}
+#procedure-workspace[hidden]{display:none}
+#procedure-workspace>.card{margin:0;min-width:0}
+.audit-dialogue{resize:horizontal;overflow:auto;max-width:100%;min-width:260px}
+#audit-conversation{max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.audit-bubble{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;border-radius:10px;background:var(--surface-2)}
+.audit-bubble.user{background:var(--soft);border-left:3px solid var(--brand)}
+#audit-question{width:100%;min-height:95px;font:inherit;margin:8px 0 12px}
+#audit-brief{margin:16px 0;padding:12px;background:var(--surface-2);border-radius:10px;font-size:13px;overflow-wrap:anywhere;max-height:360px;overflow:auto}
+#audit-brief h3{font-size:14px;margin:14px 0 6px}
+#audit-brief h3:first-child{margin-top:0}
+#audit-brief p{white-space:pre-wrap;margin:4px 0 8px}
+#audit-grid{overflow:auto;max-height:620px;border:1px solid var(--line);margin:12px 0}
+#audit-grid table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:13px}
+#audit-grid th{position:sticky;top:0;background:var(--surface-2);z-index:1}
+#audit-grid th,#audit-grid td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:115px;max-width:270px;padding:7px;text-align:left;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}
+#audit-grid th:first-child{min-width:42px;position:sticky;left:0}
+#audit-grid td button{font:inherit;color:inherit;background:none;border:0;text-align:left;white-space:pre-wrap;width:100%;min-height:24px;cursor:pointer}
+#audit-grid td.input{background:#fff2b3;color:#282300}
+#audit-grid td.selected{outline:2px solid var(--brand);outline-offset:-2px;background:var(--soft)}
+.audit-pagination{justify-content:space-between}
+body:has(#procedure-workspace) .main{max-width:none}
+@media(max-width:900px){#procedure-workspace{grid-template-columns:1fr}.audit-dialogue{resize:none}#audit-grid{max-height:450px}}
