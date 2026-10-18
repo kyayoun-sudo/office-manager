@@ -325,6 +325,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 - **Garder ce que Shadow a appris (Paul, 2026-10-18)** : « Repartir de zéro » efface `SHADOW_LAB.json` (leçons, tests). Entraînement → « Garder ce que Shadow a appris » : exporter / importer (`lib/shadow-transfer.js`, actions `lab-export` / `lab-import` de la route `shadow`, associés seulement). L'export ne contient que leçons, tests, historique des agents et bonnes pratiques (ni problèmes bruts, ni réponses au questionnaire, ni sources) ; somme de contrôle ; import : jamais d'écrasement (même id ignoré), garde « zone protégée » sur chaque leçon, statut conservé (une leçon en attente reste en attente), tracé `SHADOW_LAB_IMPORTED`.
 
+## Première connexion (Paul, 2026-10-17)
+- `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
+- Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à

@@ -673,6 +673,9 @@ export const ROUTES = Object.freeze({
     for (const x of rv.reviews.slice(0, 5)) out.questions.push({ id: 'rev|' + x.mission_id + '|' + x.code + '|' + x.level, kind: 'procedure', title: x.mission_name,
       question: 'Revue ' + ({ senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }[x.level] || '') + ' à faire : ' + x.code, context: x.cycle_code + ' · préparée par ' + (x.preparer || '?'),
       href: '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue' });
+    // First connection (2026-10-17): the agents' questions that fit this person's position, answered on « Faire connaissance ».
+    const intro = await (await import('../lib/agent-intro.js')).personView(orgId, req.account).catch(() => null);
+    if (intro?.pending?.length) out.questions.push({ id: 'intro|' + intro.pending[0].key, kind: 'procedure', title: 'Faire connaissance avec les agents', question: 'Les agents ont ' + intro.pending.length + ' question(s) pour vous, adaptées à votre poste.', context: 'Une question à la fois, quelques secondes.', href: '/bienvenue.html' });
     return out;
   }), unavailable: 'OPPORTUNITIES_UNAVAILABLE' },
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
@@ -856,8 +859,20 @@ export const ROUTES = Object.freeze({
   },
   // First connection (2026-10-17): the agents introduce themselves in Démarrer; the human gives the link, the agent checks it.
   'agent-intro': {
-    GET: users(['owner', 'partner'], async (orgId, req) => (await import('../lib/agent-intro.js')).introView(orgId, req.account)),
-    POST: users(['owner', 'partner'], async (orgId, req) => (await import('../lib/agent-intro.js')).saveIntro(orgId, req.body || {}, req.account)),
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/agent-intro.js');
+      if (req.query?.screen) return m.screenIntro(orgId, req.account, String(req.query.screen));
+      if (req.query?.me === '1') return m.personView(orgId, req.account);
+      if (!['owner', 'partner'].includes(req.account?.role)) throw fail('FORBIDDEN', 403);
+      return m.introView(orgId, req.account);
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/agent-intro.js'); const b = req.body || {};
+      if (b.action === 'me-answer') return m.answerPerson(orgId, req.account, b);
+      if (b.action === 'screen-seen') return m.dismissScreen(orgId, req.account, String(b.screen || ''));
+      if (!['owner', 'partner'].includes(req.account?.role)) throw fail('FORBIDDEN', 403);
+      return m.saveIntro(orgId, b, req.account);
+    }),
     unavailable: 'AGENT_INTRO_UNAVAILABLE'
   },
   'google-callback': {

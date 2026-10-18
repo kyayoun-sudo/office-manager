@@ -331,7 +331,7 @@
         } else if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
-          var go = node('a', String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
+          var go = node('a', String(q.id).indexOf('intro|') === 0 ? 'Répondre aux questions des agents' : String(q.id).indexOf('file|') === 0 ? 'Indiquer l’emplacement du fichier' : String(q.id).indexOf('rev|') === 0 ? 'Ouvrir la revue' : 'Ouvrir ma procédure', 'btn'); go.href = q.href; opts.appendChild(go);
         } else if (q.kind === 'independence_review') {
           var title = node('h2', q.question); title.id='om-ask-title'; d.appendChild(title);
           if (window.OMIndependence) window.OMIndependence.form(d,q.review,q.opportunity_id,next);
@@ -377,6 +377,20 @@
       draw(); d.showModal();
     }).catch(function () {}).finally(function () { askLoading = false; });
   }
+  // Mini-presentation of a screen (2026-10-17): what it is for, by position; once, until « Ne plus afficher ».
+  (function screenIntro() {
+    var screen = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (!screen || /^(login|excel|demarrer|bienvenue|index|presentation)$/.test(screen) || !OM.hasPersonalSession()) return;
+    OM.api('/api/app?route=agent-intro&screen=' + encodeURIComponent(screen)).then(function (r) {
+      if (!r || !r.text || document.getElementById('om-screen-intro')) return;
+      var main = document.querySelector('main'); if (!main) return;
+      var box = node('aside', null, 'card'); box.id = 'om-screen-intro'; box.setAttribute('role', 'note'); box.style.cssText = 'display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px';
+      box.appendChild(node('span', r.text, 'small'));
+      var hide = node('button', 'Ne plus afficher', 'btn ghost'); hide.type = 'button';
+      hide.addEventListener('click', function () { box.remove(); OM.api('/api/app?route=agent-intro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'screen-seen', screen: screen }) }).catch(function () {}); });
+      box.appendChild(hide); main.insertBefore(box, main.firstChild);
+    }).catch(function () {});
+  })();
   setInterval(function () { if (OM.hasPersonalSession() && (OM.getRole() === 'partner' || OM.getRole() === 'owner')) askPopup(true); }, 30000);
   // Shared notification centre: read state belongs to this person and this firm.
   function addBell(me) {

@@ -45,3 +45,23 @@ test('unknown need and unreadable link are refused', async () => {
   await assert.rejects(saveIntro('o', { action: 'link', need: 'pbc_master', link: 'abc' }, acc, s.d), /LINK_NOT_RECOGNISED/);
   assert.equal(driveIdFromLink('https://drive.google.com/drive/folders/GOODFILEID1234567890ABC?usp=sharing'), 'GOODFILEID1234567890ABC');
 });
+
+import { personView, answerPerson, screenIntro, dismissScreen, PERSON_QUESTIONS } from '../lib/agent-intro.js';
+test('each person gets only the questions of their position, the work-style one first; answers are kept per person', async () => {
+  const s = store(); const aud = { email: 'a@x.fr', role: 'auditor' }, sec = { email: 's@x.fr', role: 'secretary' };
+  const v = await personView('o', aud, s.d);
+  assert.equal(v.pending[0].key, 'work_style'); assert.ok(v.pending.every(q => PERSON_QUESTIONS.find(x => x.key === q.key).roles.includes('auditor')));
+  assert.ok(!v.pending.some(q => q.key === 'billing_who'));
+  const after = await answerPerson('o', aud, { key: 'work_style', answer: 'Autonomie' }, s.d);
+  assert.ok(!after.pending.some(q => q.key === 'work_style'));
+  assert.ok((await personView('o', sec, s.d)).pending.some(q => q.key === 'work_style'));   // the secretary's own answers are separate
+  await assert.rejects(answerPerson('o', aud, { key: 'billing_who', answer: 'x' }, s.d), /UNKNOWN_QUESTION/);
+  await assert.rejects(answerPerson('o', aud, { key: 'work_style', answer: 'n’importe quoi' }, s.d), /ANSWER_NOT_IN_OPTIONS/);
+});
+test('a screen presentation depends on the position and is shown until « Ne plus afficher »', async () => {
+  const s = store(); const aud = { email: 'a@x.fr', role: 'auditor' }, par = { email: 'p@x.fr', role: 'partner' };
+  assert.match((await screenIntro('o', aud, 'accueil', s.d)).text, /Mon travail/); assert.match((await screenIntro('o', par, 'accueil', s.d)).text, /Accueil du cabinet/);
+  await dismissScreen('o', aud, 'accueil', s.d);
+  assert.equal((await screenIntro('o', aud, 'accueil', s.d)).text, null); assert.ok((await screenIntro('o', par, 'accueil', s.d)).text);
+  assert.equal((await screenIntro('o', aud, 'inconnu', s.d)).text, null);
+});
