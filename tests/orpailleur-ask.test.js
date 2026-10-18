@@ -126,12 +126,17 @@ test('same name at the destination: both versions kept, anomaly reported; the mo
 
 test('the PBC master and the mission checklist are given to the Orpailleur', async () => {
   const { pbcContext } = await import('../lib/tidy-plan.js');
+  // Names say nothing (« Classeur1 », « suivi client ») : the master is known by its signature, the mission list by its content.
+  const S = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const items = [
-    { id: 'pm', name: 'TATY_PBC_MASTER_SYSCOHADA_ISA', mimeType: 'sheet', path: '/06_METHODES/TATY_PBC_MASTER_SYSCOHADA_ISA' },
-    { id: 'ck', name: 'BLE_TRANSIT_AUDIT_2025_PBC_CHECKLIST', mimeType: 'sheet', path: '/01/BLE_TRANSIT_AUDIT_2025/BLE_TRANSIT_AUDIT_2025_PBC_CHECKLIST' },
-    { id: 'ck2', name: 'NOVA_PBC_CHECKLIST', mimeType: 'sheet', path: '/01/NOVA/NOVA_PBC_CHECKLIST' }
+    { id: 'pm', name: 'Classeur1.xlsx', mimeType: S, path: '/06_METHODES/Classeur1.xlsx' },
+    { id: 'ck', name: 'suivi client.xlsx', mimeType: S, path: '/01/BLE_TRANSIT_AUDIT_2025/suivi client.xlsx' },
+    { id: 'ck2', name: 'suivi.xlsx', mimeType: S, path: '/01/NOVA/suivi.xlsx' }
   ];
-  const t = await pbcContext(items, [{ path: '/01/BLE_TRANSIT_AUDIT_2025/04_PBC/x.pdf' }], async id => 'contenu ' + id);
-  assert.match(t, /RÉFÉRENTIEL PBC DU CABINET.*contenu pm/s);
-  assert.match(t, /contenu ck/); assert.doesNotMatch(t, /contenu ck2/);
+  const list = id => 'Réf\tDocument demandé\tÉchéance\tReçu ?\tStatut\nPBC-01\tRelevés bancaires décembre ' + id + '\t15/01\tNon\tDemandé\nPBC-02\tBalance générale\t15/01\tOui\tReçu';
+  const texts = { pm: 'Type\tLibellé\nDocument_Type\tPBC_MASTER_CHECKLIST\nFamille\tAG', ck: list('ck'), ck2: list('ck2') };
+  const registry = { st: {}, load: async () => registry.st, update: async fn => { registry.st = fn(registry.st) || registry.st; } };
+  const t = await pbcContext(items, [{ path: '/01/BLE_TRANSIT_AUDIT_2025/04_PBC/x.pdf' }], async id => texts[id], { pbcRegistry: registry, pbcSearch: async q => q === 'PBC_MASTER_CHECKLIST' ? [{ id: 'pm' }] : [] });
+  assert.match(t, /RÉFÉRENTIEL PBC DU CABINET.*signature.*PBC_MASTER_CHECKLIST/s);
+  assert.match(t, /CHECKLIST PBC DE LA MISSION.*contenu.*Relevés bancaires décembre ck/s); assert.doesNotMatch(t, /décembre ck2/);
 });

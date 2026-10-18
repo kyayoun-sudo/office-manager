@@ -282,6 +282,11 @@ export const ROUTES = Object.freeze({
         if (b.action === 'unavailable-document') return index.confirmDocumentUnavailable(orgId, b, a);
         return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
       }
+      // A PBC list recognised by its content: the person confirms once, or says it is not one (lib/pbc-lists.js).
+      if (b.action === 'pbc-list-decide') {
+        if (b.mission_id) await requireMissionAccess(orgId, b.mission_id, a);
+        return (await import('../lib/pbc-lists.js')).decidePbcList(orgId, b, a);
+      }
       if (b.action === 'upload-template') return (await T()).uploadTemplate(orgId, b, a);
       if (b.action === 'register-reference-template') return (await T()).registerTemplateReference(orgId, b, a);
       if (b.action === 'prepare') return (await T()).prepareValues(orgId, b, a);
@@ -675,6 +680,17 @@ export const ROUTES = Object.freeze({
     for (const x of rv.reviews.slice(0, 5)) out.questions.push({ id: 'rev|' + x.mission_id + '|' + x.code + '|' + x.level, kind: 'procedure', title: x.mission_name,
       question: 'Revue ' + ({ senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' }[x.level] || '') + ' à faire : ' + x.code, context: x.cycle_code + ' · préparée par ' + (x.preparer || '?'),
       href: '/procedure.html?mission_id=' + encodeURIComponent(x.mission_id) + '&code=' + encodeURIComponent(x.code) + '#revue' });
+    // A PBC list recognised by its content, whatever its name (2026-10-18): confirmed once by someone of the mission.
+    const toConfirm = ['owner', 'partner', 'quality_reviewer', 'manager', 'supervisor', 'senior', 'auditor'].includes(req.account?.role)
+      ? await (await import('../lib/pbc-lists.js')).pbcListsToConfirm().catch(() => []) : [];
+    for (const l of toConfirm.slice(0, 3)) {
+      if (l.mission_id) { try { await requireMissionAccess(orgId, l.mission_id, req.account); } catch { continue; } }
+      else if (req.account.role === 'auditor') continue;
+      out.questions.push({ id: 'pbc-list|' + l.file_id + '|' + (l.version || ''), kind: 'pbc_list', title: 'Liste PBC reconnue par son contenu',
+        question: 'Ce fichier est-il bien une liste PBC (les pièces demandées au client) ?', file_id: l.file_id, mission_id: l.mission_id || null,
+        context: (l.path || l.name || l.file_id) + ' · certitude ' + l.confidence + ' % · ' + (l.evidence || []).slice(0, 2).join(' · '),
+        href: /^local:/.test(l.file_id) ? null : 'https://drive.google.com/open?id=' + encodeURIComponent(l.file_id) });
+    }
     // First connection (2026-10-17): the agents' questions that fit this person's position, answered on « Faire connaissance ».
     const intro = await (await import('../lib/agent-intro.js')).personView(orgId, req.account).catch(() => null);
     if (intro?.pending?.length) out.questions.push({ id: 'intro|' + intro.pending[0].key, kind: 'procedure', title: 'Faire connaissance avec les agents', question: 'Les agents ont ' + intro.pending.length + ' question(s) pour vous, adaptées à votre poste.', context: 'Une question à la fois, quelques secondes.', href: '/bienvenue.html' });

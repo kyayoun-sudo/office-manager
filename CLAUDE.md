@@ -325,6 +325,22 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 - **Garder ce que Shadow a appris (Paul, 2026-10-18)** : « Repartir de zéro » efface `SHADOW_LAB.json` (leçons, tests). Entraînement → « Garder ce que Shadow a appris » : exporter / importer (`lib/shadow-transfer.js`, actions `lab-export` / `lab-import` de la route `shadow`, associés seulement). L'export ne contient que leçons, tests, historique des agents et bonnes pratiques (ni problèmes bruts, ni réponses au questionnaire, ni sources) ; somme de contrôle ; import : jamais d'écrasement (même id ignoré), garde « zone protégée » sur chaque leçon, statut conservé (une leçon en attente reste en attente), tracé `SHADOW_LAB_IMPORTED`.
 
+## Liste PBC reconnue quel que soit son nom (Paul, 2026-10-18)
+- `lib/pbc-lists.js` (code, sans IA) : 1) signature des modèles du cabinet (feuille masquée AUDIT_META `Document_Type =
+  PBC_MASTER_CHECKLIST`, ou mots-clés du fichier) → certitude 100 % ; avec `Mission_Code` = liste de la mission, sans = référentiel
+  du cabinet ; un autre `Document_Type` (Working File…) = PAS une liste, même s'il a une feuille PBC. 2) Autre format (client, ancien
+  modèle, Word, PDF, CSV) : ligne d'en-tête « document demandé » + référence / statut / reçu / échéance / date de demande, lignes =
+  pièces d'audit → certitude < 100 %, statut `to_confirm`. 3) Retenue par son ID Drive dans `OFFICE_MANAGER_FILE_INDEX.json`
+  (`pbc_lists`, `pbc_not_lists` par version) : renommée ou déplacée, elle est retrouvée sans relecture. Le nom et le dossier ne
+  servent qu'à l'ordre de lecture, jamais de preuve. Modèles renommés ailleurs : recherche plein texte Drive de la signature, une
+  fois par jour tant qu'aucun référentiel n'est connu (piste seulement, le contenu prouve).
+- Coût : les fichiers du lot déjà lus par l'Orpailleur sont jugés sur ce texte (`pbcKnownTexts`) ; au plus 3 lectures en plus par lot.
+- `pbcContext` (`lib/tidy-plan.js`) n'utilise plus aucune expression sur le nom. Confirmation une fois : pop-up `pbc_list`
+  (`my-questions`, personnes de la mission), action `pbc-list-decide` de la route `secretariat` → `confirmed` / `rejected` (jamais
+  reproposé), événements `PBC_LIST_CONFIRMED` / `PBC_LIST_REJECTED`, audit log.
+- Reste : `lib/mission-engine.js` et `lib/agent-tools.js` lisent encore une feuille nommée `PBC_MASTER` (en-tête ligne 4) ;
+  à faire lire par les colonnes que la reconnaissance a trouvées (`columns`, `header_row`).
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

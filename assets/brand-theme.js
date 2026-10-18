@@ -328,6 +328,13 @@
             busy(); OM.api('/api/app?route=secretariat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({}, q.document_request, { action: 'confirm-document', file_link: locationInput.value.trim() })) }).then(next).catch(fail);
           }));
           var advanced = node('a', 'Rechercher ou choisir parmi les fichiers', 'om-ask-link'); advanced.href = q.href; opts.appendChild(advanced);
+        } else if (q.kind === 'pbc_list') {
+          var hl = node('h2', q.question); hl.id = 'om-ask-title'; d.appendChild(hl);
+          if (q.context) d.appendChild(node('p', q.context));
+          if (q.href) { var openFile = node('a', 'Ouvrir le fichier', 'om-ask-link'); openFile.href = q.href; openFile.target = '_blank'; openFile.rel = 'noopener'; d.appendChild(openFile); }
+          var decide = function (decision) { return function () { busy(); OM.api('/api/app?route=secretariat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pbc-list-decide', file_id: q.file_id, mission_id: q.mission_id, decision: decision }) }).then(next).catch(fail); }; };
+          opts.appendChild(btn('Oui, c’est une liste PBC', '', decide('confirm')));
+          opts.appendChild(btn('Non, ce n’en est pas une', 'secondary', decide('reject')));
         } else if (q.kind === 'procedure') {
           var hp = node('h2', q.question); hp.id = 'om-ask-title'; d.appendChild(hp);
           if (q.context) d.appendChild(node('p', q.context));
