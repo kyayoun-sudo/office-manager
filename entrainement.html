@@ -171,6 +171,11 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           <button type="button" class="chip" data-p="history" aria-pressed="false">Historique</button>
         </div>
         <div id="sh-body" class="stack" style="margin-top:12px"></div>
+        <details class="card" id="sh-keep" style="margin-top:12px"><summary>Garder ce que Shadow a appris (associés)</summary>
+          <p class="small">Avant « Repartir de zéro », exportez les leçons et les tests de Shadow dans un fichier. Après le redémarrage, importez-le : rien n’est écrasé, une leçon en attente d’un associé reste en attente.</p>
+          <div class="btn-row"><button class="btn" type="button" id="sh-export">Exporter les leçons et tests</button>
+          <label class="btn ghost" for="sh-import">Importer un fichier</label><input type="file" id="sh-import" accept="application/json,.json" hidden></div>
+          <p class="status" id="sh-keep-msg" role="status" aria-live="polite"></p></details>
         <p class="status" id="sh-status" role="status" aria-live="polite"></p>
       </section>
 
@@ -545,4 +550,28 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 <script src="/assets/training-navigation.js"></script>
 <script src="/assets/audit-sandbox.js"></script>
 
-<script src="/assets/firm-simulation.js"></script>
+<script src="/assets/firm-simulation.js">  (function () {
+    var OM = window.OfficeManager;
+    var msg = function (t) { var n = document.getElementById('sh-keep-msg'); if (n) n.textContent = t; };
+    var ex = document.getElementById('sh-export'), im = document.getElementById('sh-import');
+    if (ex) ex.addEventListener('click', function () {
+      msg('Préparation…');
+      OM.api('/api/app?route=shadow', { method: 'POST', body: JSON.stringify({ action: 'lab-export' }) }).then(function (f) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(f, null, 1)], { type: 'application/json' }));
+        a.download = 'shadow-lecons-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
+        msg('Exporté : ' + f.counts.lessons + ' leçons (' + f.counts.active + ' actives), ' + f.counts.tests + ' tests. Gardez le fichier en lieu sûr.');
+      }).catch(function (e) { msg(e.message === 'PARTNERS_ONLY' ? 'Réservé aux associés.' : e.message); });
+    });
+    if (im) im.addEventListener('change', function () {
+      var file = im.files && im.files[0]; if (!file) return; msg('Lecture…');
+      var r = new FileReader();
+      r.onload = function () {
+        var obj; try { obj = JSON.parse(String(r.result)); } catch (x) { msg('Ce fichier n’est pas un JSON valide.'); return; }
+        OM.api('/api/app?route=shadow', { method: 'POST', body: JSON.stringify({ action: 'lab-import', file: obj }) }).then(function (o) {
+          msg('Importé : ' + o.lessons_added + ' leçons ajoutées, ' + o.lessons_skipped + ' déjà présentes, ' + o.lessons_refused + ' refusées, ' + o.tests_added + ' tests ajoutés.');
+        }).catch(function (e) { msg({ NOT_A_SHADOW_EXPORT: 'Ce fichier n’est pas une sauvegarde de Shadow.', EXPORT_ALTERED_OR_CORRUPT: 'Le fichier a été modifié ou est abîmé : import refusé.', PARTNERS_ONLY: 'Réservé aux associés.' }[e.message] || e.message); });
+      };
+      r.readAsText(file); im.value = '';
+    });
+  })();
+</script>

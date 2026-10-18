@@ -323,6 +323,8 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - `lib/mission-start.js` : événement `MISSION_STARTED`, un par agent (Firm Manager `grand-controleur`, Enhanced Auditor, Orpailleur, Sika), clé d'idempotence par mission et par agent ; chaque agent écrit SEULEMENT sa propre mémoire (règle d'écrivain unique). Traité dans le tick (`handleMissionStartEvents`). Shadow non prévenu (son labo est à part).
 - Mémoire commune : le fichier partagé (`lib/file-index.js`) garde `placed_by` et `protected` ; `agentPlacedIds` → l'Orpailleur (`tidy-plan.js`) ne reclasse jamais un fichier placé par un agent dans sa mission (renommage seul possible).
 
+- **Garder ce que Shadow a appris (Paul, 2026-10-18)** : « Repartir de zéro » efface `SHADOW_LAB.json` (leçons, tests). Entraînement → « Garder ce que Shadow a appris » : exporter / importer (`lib/shadow-transfer.js`, actions `lab-export` / `lab-import` de la route `shadow`, associés seulement). L'export ne contient que leçons, tests, historique des agents et bonnes pratiques (ni problèmes bruts, ni réponses au questionnaire, ni sources) ; somme de contrôle ; import : jamais d'écrasement (même id ignoré), garde « zone protégée » sur chaque leçon, statut conservé (une leçon en attente reste en attente), tracé `SHADOW_LAB_IMPORTED`.
+
 ## Règles de travail
 
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à

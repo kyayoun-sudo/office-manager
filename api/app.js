@@ -183,6 +183,9 @@ export const ROUTES = Object.freeze({
       if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
       if (String(b.action).startsWith('firm-')) return (await import('../lib/firm-simulation-service.js')).firmAction(orgId, req.account, b);
       if (String(b.action).startsWith('sandbox-')) return (await import('../lib/audit-sandbox.js')).sandboxAction(orgId, req.account, b);
+      // Keep what Shadow learnt when the firm is erased (2026-10-18): partners export / import its lessons and tests.
+      if (b.action === 'lab-export') return (await import('../lib/shadow-transfer.js')).exportLab(who(req) || 'associé');
+      if (b.action === 'lab-import') return (await import('../lib/shadow-transfer.js')).importLab(orgId, b.file, who(req) || 'associé');
       if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
       // Code proposals (2026-10-10): a branch + draft pull request; Shadow never merges nor deploys.
       if (b.action === 'code') return (await import('../lib/shadow-code.js')).requestCodeChange(orgId, req, { agent: b.agent, goal: b.goal }, who(req) || 'propriétaire');
