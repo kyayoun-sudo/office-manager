@@ -629,19 +629,379 @@ async function stagingFolder(d) {
 }
 
 export async function createOpportunity(orgId, req, body = {}, account = null, d = {}) {
-  const reception = receptionDate(body.tdr_received_at || null);
+  // Deux portes d'entrée :
+  // - tdr    : workflow historique avec TDR
+  // - direct : création d'une Opportunity sans TDR
+  const entryMode = body.entry_mode === 'direct' ? 'direct' : 'tdr';
+
   const drive = d.drive || driveAdapter;
   const files = [];
-  if (body.base64) {
-    const name = cut(String(body.name || '').trim(), 200);
-    if (!name) throw fail('FILE_NAME_REQUIRED');
-    const buffer = Buffer.from(String(body.base64), 'base64');
-    if (!buffer.length) throw fail('FILE_EMPTY');
-    if (buffer.length > MAX_BYTES) throw fail('FILE_TOO_LARGE');
-    const parent = await stagingFolder(d);
-    const f = await drive.createBinary({ name, parentId: parent, buffer, mimeType: cut(body.mime || 'application/octet-stream', 120) });
-    files.push({ id: f.id, name, staged: true });
+
+  // La date de réception n'existe que pour une entrée avec TDR.
+  const reception =
+    entryMode === 'tdr'
+      ? receptionDate(body.tdr_received_at || null)
+      : null;
+
+  // ---------------------------------------------------------
+  // PORTE 1 — AVEC TDR
+  // ---------------------------------------------------------
+
+  if (entryMode === 'tdr') {
+    if (body.base64) {
+      const name = cut(String(body.name || '').trim(), 200);
+
+      if (!name) throw fail('FILE_NAME_REQUIRED');
+
+      const buffer = Buffer.from(String(body.base64), 'base64');
+
+      if (!buffer.length) throw fail('FILE_EMPTY');
+      if (buffer.length > MAX_BYTES) throw fail('FILE_TOO_LARGE');
+
+      const parent = await stagingFolder(d);
+
+      const f = await drive.createBinary({
+        name,
+        parentId: parent,
+        buffer,
+        mimeType: cut(
+          body.mime || 'application/octet-stream',
+          120
+        )
+      });
+
+      files.push({
+        id: f.id,
+        name,
+        staged: true
+      });
+    }
+
+    for (
+      const id of (
+        Array.isArray(body.file_ids)
+          ? body.file_ids
+          : []
+      )
+        .map(x => (String(x).match(/[-\w]{25,}/) || [])[0])
+        .filter(Boolean)
+        .slice(0, 6)
+    ) {
+      files.push({
+        id,
+        staged: Boolean(body.staged)
+      });
+    }
+
+    // IMPORTANT :
+    // Le TDR est obligatoire UNIQUEMENT pour cette porte.
+    if (!files.length) {
+      throw fail('TDR_REQUIRED');
+    }
   }
+
+  // ---------------------------------------------------------
+  // PORTE 2 — SANS TDR
+  // ---------------------------------------------------------
+
+  if (entryMode === 'direct') {
+    const client = cut(
+      String(body.client || '').trim(),
+      200
+    );
+
+    if (!client) {
+      throw fail('CLIENT_REQUIRED');
+    }
+  }
+
+  // ---------------------------------------------------------
+  // CONTRÔLE DOUBLON DOCUMENT
+  // Seulement pour les entrées TDR
+  // ---------------------------------------------------------
+
+  const all = await loadAll(d);
+
+  if (entryMode === 'tdr') {
+    const already = Object.values(
+      all.opportunities || {}
+    ).find(
+      o =>
+        o.status !== 'removed' &&
+        (o.tdr_files || []).some(f =>
+          files.some(x => x.id === f.id)
+        )
+    );
+
+    if (already) {
+      return {
+        opportunity: {
+          id: already.id,
+          status: already.status
+        },
+        duplicate: true
+      };
+    }
+  }
+
+  const who =
+    account?.display_name ||
+    account?.email ||
+    'Firm Manager';
+
+  // ---------------------------------------------------------
+  // INFORMATIONS DIRECTES
+  // ---------------------------------------------------------
+
+  const directClient =
+    entryMode === 'direct'
+      ? cut(body.client, 200)
+      : null;
+
+  const directReference =
+    entryMode === 'direct'
+      ? cut(body.reference, 120) || null
+      : null;
+
+  const directKind =
+    entryMode === 'direct'
+      ? cut(
+          body.kind ||
+          body.service ||
+          'Mission directe',
+          80
+        )
+      : null;
+
+  const directSummary =
+    entryMode === 'direct'
+      ? cut(
+          body.summary ||
+          body.description ||
+          body.notes,
+          1500
+        )
+      : null;
+
+  const directDeadline =
+    entryMode === 'direct' &&
+    body.deadline
+      ? receptionDate(body.deadline)
+      : null;
+
+  const directFacts =
+    entryMode === 'direct'
+      ? {
+          ...(body.country
+            ? { country: cut(body.country, 120) }
+            : {}),
+
+          ...(body.sector
+            ? { sector: cut(body.sector, 200) }
+            : {}),
+
+          ...(body.service || body.kind
+            ? {
+                service: cut(
+                  body.service || body.kind,
+                  200
+                )
+              }
+            : {}),
+
+          ...(body.object
+            ? { object: cut(body.object, 500) }
+            : {}),
+
+          ...(body.period
+            ? { period: cut(body.period, 200) }
+            : {}),
+
+          ...(body.contact
+            ? { contact: cut(body.contact, 200) }
+            : {}),
+
+          ...(body.contact_details
+            ? {
+                contact_details: cut(
+                  body.contact_details,
+                  300
+                )
+              }
+            : {})
+        }
+      : {};
+
+  const o = {
+    id: randomUUID(),
+
+    // NOUVEAU
+    entry_mode: entryMode,
+
+    title:
+      entryMode === 'direct'
+        ? cut(
+            body.title ||
+            directClient ||
+            'Nouvelle mission',
+            200
+          )
+        : cut(
+            body.title ||
+            files[0]?.name ||
+            'Nouvelle opportunité',
+            200
+          ),
+
+    client: directClient,
+
+    reference: directReference,
+
+    kind: directKind,
+
+    source:
+      entryMode === 'direct'
+        ? 'saisie directe'
+        : cut(
+            body.source ||
+            (body.base64
+              ? 'dépôt'
+              : 'lien Drive'),
+            40
+          ),
+
+    notes: cut(body.notes, 2000),
+
+    summary: directSummary,
+
+    deadline: directDeadline,
+
+    facts: directFacts,
+
+    requirements: [],
+
+    fiche_values: [],
+
+    created_by: who,
+
+    created_at: now(),
+
+    tdr_received_at: reception,
+
+    tdr_reception_source:
+      entryMode === 'tdr'
+        ? reception
+          ? 'manual'
+          : 'unknown'
+        : null,
+
+    status: 'running',
+
+    // TDR -> read
+    // DIRECT -> file
+    stage:
+      entryMode === 'tdr'
+        ? 'read'
+        : 'file',
+
+    tdr_files:
+      entryMode === 'tdr'
+        ? files
+        : [],
+
+    log: [
+      {
+        at: now(),
+        m:
+          entryMode === 'direct'
+            ? 'Opportunité créée directement sans TDR par ' + who + '.'
+            : 'Opportunité créée avec TDR par ' + who + '.'
+      }
+    ],
+
+    proposals: {},
+
+    answers: []
+  };
+
+  // ---------------------------------------------------------
+  // Tender Watch
+  // ---------------------------------------------------------
+
+  const tenderId = ID.test(
+    String(body.tender_id || '')
+  )
+    ? String(body.tender_id)
+    : null;
+
+  if (tenderId) {
+    o.tender_id = tenderId;
+    o.source = 'veille';
+  }
+
+  await saveOpp(o, d);
+
+  if (tenderId) {
+    await (
+      d.linkTender ||
+      (async (...a) =>
+        (await import('./tender-watch.js'))
+          .linkOpportunity(...a))
+    )(
+      tenderId,
+      o.id,
+      account,
+      d
+    ).catch(() => null);
+  }
+
+  await (
+    d.audit ||
+    (async (...a) =>
+      (await import('./audit-log.js'))
+        .audit(...a))
+  )(
+    orgId,
+    {
+      agent: 'firm-manager',
+      action_type: 'OPPORTUNITY_CREATED',
+      source_ref: 'opportunity:' + o.id,
+
+      decision:
+        entryMode === 'direct'
+          ? 'Opportunity créée directement sans TDR par ' + who
+          : 'TDR reçu (' +
+            o.source +
+            ') par ' +
+            who,
+
+      status: 'started'
+    }
+  ).catch(() => null);
+
+  // On lance le même moteur.
+  // Il commence simplement à une étape différente.
+  await (
+    d.fire ||
+    (await import('./agent-passes.js'))
+      .fireInternal
+  )(
+    req,
+    '/api/app?route=opportunity-step',
+    {
+      opportunity_id: o.id
+    }
+  );
+
+  return {
+    opportunity: {
+      id: o.id,
+      status: o.status,
+      stage: o.stage,
+      entry_mode: o.entry_mode
+    }
+  };
+}
   for (const id of (Array.isArray(body.file_ids) ? body.file_ids : []).map(x => (String(x).match(/[-\w]{25,}/) || [])[0]).filter(Boolean).slice(0, 6)) files.push({ id, staged: Boolean(body.staged) });
   if (!files.length) throw fail('TDR_REQUIRED');
   // The same file never opens two opportunities.
@@ -721,6 +1081,13 @@ export async function opportunityStep(orgId, req, body = {}, d = {}) {
     const { template, structure } = await (d.templateStructure || templateStructure)(d);
     const fiche = structure.sheets.find(s => sheetOwner(s) === 'firm-manager' && !/PHASE[ _]?0/i.test(s.name + s.title)) || structure.sheets[0];
     if (o.stage === 'read') {
+      if (o.entry_mode === 'direct') {
+  say(
+    'Entrée directe sans TDR : étape de lecture TDR ignorée.'
+  );
+
+  return next('file');
+}
       const files = [];
       for (const f of o.tdr_files) { try { files.push(await (d.fileForAI || fileForAI)(f.id)); } catch (e) { say('Document illisible (' + (f.name || f.id) + ') : ' + cut(e.message || e, 80)); } }
       if (!files.length) throw fail('TDR_UNREADABLE', 422);
@@ -866,7 +1233,14 @@ export function ficheWrites(fiche, o) {
   const byLabel = re => fiche.rows.find(r => re.test(r.label || ''))?.fields?.[0]?.cell;
   const put = (re, value) => { const c = byLabel(re); if (c && value && !writes.some(w => w.cell === c)) writes.push({ sheet: fiche.name, cell: c, value }); };
   put(/^Nom du prospect/i, o.client); put(/^R[ée]f[ée]rence de l.opportunit/i, o.reference); put(/^Date limite de soumission/i, o.deadline);
-  put(/^TDR re[çc]u/i, tdr ? 'Oui' : null); put(/Nom du fichier TDR/i, tdr?.name); put(/Lien Drive vers le TDR/i, tdr?.url); put(/Lien Drive du dossier/i, o.folder?.url);
+ put(
+  /^TDR re[çc]u/i,
+  tdr
+    ? 'Oui'
+    : o.entry_mode === 'direct'
+      ? 'Non'
+      : null
+); put(/Nom du fichier TDR/i, tdr?.name); put(/Lien Drive vers le TDR/i, tdr?.url); put(/Lien Drive du dossier/i, o.folder?.url);
   put(/Date de r[ée]ception/i, o.tdr_received_at || null);
   // What the TDR says, by the fiche's own rubric titles (does not depend on the AI giving cell numbers).
   const f = o.facts || {};
@@ -1307,8 +1681,26 @@ export async function prepareAgain(orgId, req, body = {}, account = null, d = {}
   const o = await getOpportunity(String(body.opportunity_id || ''), d);
   if (!mayFill('manager', account?.role)) throw fail('MANAGER_ONLY', 403);
   if (o.status !== 'phase0' || !o.workbook) throw fail('NOT_IN_PHASE0', 409);
-  o.status = 'running'; o.stage = 'read';
-  o.log = [...(o.log || []), { at: now(), m: 'TDR relu et Phase 0 à refaire, demandé par ' + (account?.display_name || account?.email || '?') + ' : le Firm Manager remplit ce qu’il trouve (cases vides seulement).' }].slice(-80);
+  o.status = 'running';
+
+o.stage =
+  o.entry_mode === 'direct'
+    ? 'file'
+    : 'read';
+o.log = [
+  ...(o.log || []),
+  {
+    at: now(),
+    m:
+      o.entry_mode === 'direct'
+        ? 'Préparation de l’opportunité directe relancée par ' +
+          (account?.display_name || account?.email || '?') +
+          '.'
+        : 'TDR relu et Phase 0 à refaire, demandé par ' +
+          (account?.display_name || account?.email || '?') +
+          ' : le Firm Manager remplit ce qu’il trouve.'
+  }
+].slice(-80);
   await saveOpp(o, d);
   await (d.fire || (await import('./agent-passes.js')).fireInternal)(req, '/api/app?route=opportunity-step', { opportunity_id: o.id });
   return { status: 'running' };
