@@ -85,6 +85,12 @@
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><button class="btn ghost" id="u-add" type="button">Créer le compte</button><span class="status" id="u-status" role="status" aria-live="polite"></span></div>
       <div id="perf-setting" hidden style="border-top:1px solid var(--line);padding-top:12px">
         <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px"><input type="checkbox" id="s-reports"> <span>Un manager ou un superviseur voit les indicateurs de performance des personnes qui lui rendent compte directement (et seulement elles). Sinon, chacun ne voit que les siens ; les associés voient tout le cabinet.</span></label>
+        <label for="s-supervisor" style="display:block;font-size:14px;margin-top:12px">Dans votre cabinet, le superviseur est :</label>
+        <select id="s-supervisor" style="margin-top:4px">
+          <option value="above_manager">au-dessus du manager (revues : Senior → Manager → Superviseur → Associé)</option>
+          <option value="below_manager">en dessous du manager (revues : Senior → Superviseur → Manager → Associé)</option>
+        </select>
+        <p class="small" style="margin:4px 0 0">Décide l'ordre des revues sur toutes les missions et qui est qualifié pour signer : chaque grade signe son niveau et ceux en dessous. Réglé par un associé, tracé dans le journal d'audit. Les signatures déjà données restent.</p>
       </div>
     </section>
 
@@ -799,7 +805,11 @@
   function loadPerfSetting() {
     if (!OM.isOwner()) return;
     $('perf-setting').hidden = false;
-    OM.api('/api/app?route=firm-settings').then(function (st) { $('s-reports').checked = Boolean(st.managers_see_direct_reports); }).catch(function () {});
+    OM.api('/api/app?route=firm-settings').then(function (st) { $('s-reports').checked = Boolean(st.managers_see_direct_reports); $('s-supervisor').value = st.supervisor_position === 'below_manager' ? 'below_manager' : 'above_manager'; }).catch(function () {});
+    $('s-supervisor').addEventListener('change', function () {
+      OM.api('/api/app?route=firm-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ supervisor_position: $('s-supervisor').value }) })
+        .then(function () { uSay('Ordre des revues enregistré.'); }).catch(function (err) { uSay(explain(err), true); });
+    });
     $('s-reports').addEventListener('change', function () {
       OM.api('/api/app?route=firm-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ managers_see_direct_reports: $('s-reports').checked }) })
         .then(function () { uSay('Réglage enregistré.'); }).catch(function (err) { uSay(explain(err), true); });

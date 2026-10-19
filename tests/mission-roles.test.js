@@ -139,3 +139,38 @@ test('without db/mission-functions.sql nothing changes and the reviews fall back
   await assert.rejects(setMissionFunction('org', { mission_id: M, assignment_id: 'w', function: 'senior' }, { role: 'partner', email: 'p@c.ci' }, { fetchRows }), /MISSION_FUNCTION_SQL_NOT_INSTALLED/);
   assert.equal(reviewAuthority(awa, 'manager', [{ email: 'awa@c.ci', mission_role: 'Senior' }]), null, 'a label alone: the grade decides');
 });
+
+// Paul, 2026-10-19: « réglable par cabinet » — the supervisor above the manager (specification §29, default) or below it.
+test('the firm chooses where the supervisor stands: order of the reviews and who is qualified follow', async () => {
+  const { reviewHierarchy } = await import('../lib/mission-function.js');
+  const above = reviewHierarchy(), below = reviewHierarchy('below_manager');
+  assert.deepEqual(R.requiredLevels({ reviews: { senior: true, manager: true, supervisor: true, partner: true } }, above.order), ['senior', 'manager', 'supervisor', 'partner']);
+  assert.deepEqual(R.requiredLevels({ reviews: { senior: true, manager: true, supervisor: true, partner: true } }, below.order), ['senior', 'supervisor', 'manager', 'partner']);
+  // Awa (manager grade) holds the supervisor function on mission C.
+  assert.equal(reviewAuthority(awa, 'supervisor', missionC, above), 'NOT_QUALIFIED_FOR_LEVEL', 'supervisor above: a manager is not qualified');
+  assert.equal(reviewAuthority(awa, 'supervisor', missionC, below), null, 'supervisor below: a manager is qualified');
+  const sup = { role: 'supervisor', email: 'sup@c.ci' }, team = [{ email: 'sup@c.ci', mission_function: 'manager' }];
+  assert.equal(reviewAuthority(sup, 'manager', team, above), null, 'supervisor above: may hold the manager review');
+  assert.equal(reviewAuthority(sup, 'manager', team, below), 'NOT_QUALIFIED_FOR_LEVEL');
+  // Unknown or missing setting: the specification's order.
+  assert.equal(reviewHierarchy('nonsense').position, 'above_manager');
+});
+
+test('the reviews of a procedure read the firm setting; changing it is refused unless known, and traced', async () => {
+  const { t, d } = await world({ a: 'auditor', w: 'supervisor', k: 'manager' });
+  const prog2 = { reviews: { manager: true, supervisor: true } };
+  const settings = (pos) => async (path, o) => path.startsWith('office_firm_settings') ? [{ settings: { supervisor_position: pos } }]
+    : path.startsWith('office_work_programmes') ? [{ ...programme, ...prog2 }] : d.fetchRows(path, o);
+  const below = await R.reviewView('org', M, 'ACH-03', awa, { ...d, fetchRows: settings('below_manager') });
+  assert.deepEqual(below.levels, ['supervisor', 'manager']); assert.equal(below.next, 'supervisor'); assert.equal(below.supervisor_position, 'below_manager');
+  const above = await R.reviewView('org', M, 'ACH-03', awa, { ...d, fetchRows: settings('above_manager') });
+  assert.deepEqual(above.levels, ['manager', 'supervisor']); assert.equal(above.next, 'manager');
+  void t;
+  const { saveFirmSettings } = await import('../lib/roles.js');
+  const writes = [];
+  const fr = async (path, o) => { if (o?.method) writes.push(path); return path.startsWith('office_firm_settings?org_id') ? [{ settings: { supervisor_position: 'above_manager' } }] : []; };
+  await assert.rejects(saveFirmSettings('org', { supervisor_position: 'beside' }, 'p@c.ci', fr), /UNKNOWN_SUPERVISOR_POSITION/);
+  const saved = await saveFirmSettings('org', { supervisor_position: 'below_manager' }, 'p@c.ci', fr);
+  assert.equal(saved.supervisor_position, 'below_manager');
+  assert.ok(writes.some(p => p.startsWith('office_audit_events')), 'the change is in the audit log');
+});

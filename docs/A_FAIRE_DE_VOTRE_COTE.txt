@@ -97,14 +97,20 @@ Règles à connaître :
 Vérification : sur une procédure soumise, la section « Revues » doit indiquer « Revue attendue de : <nom> ».
 
 
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+5. [ ] CHOISIR OÙ SE PLACE LE SUPERVISEUR DANS VOTRE CABINET                      (réglage, pour chaque cabinet)
 -----------------------------------------------------------------------------------------------------------------
-5. [ ] DÉCISION À PRENDRE : MANAGER OU SUPERVISEUR, LEQUEL EST AU-DESSUS ?
------------------------------------------------------------------------------------------------------------------
-Le code des revues place le Superviseur APRÈS le Manager, mais la validation du programme est réservée au Manager.
-Aujourd'hui rien n'est supposé : un manager nommé Superviseur sur une mission ne peut pas signer la revue Superviseur.
-Comment faire : répondre à Claude « le superviseur est au-dessus du manager » ou l'inverse (ou « ce sont deux
-chemins différents »). Claude ajustera la règle et les tests.
+Pourquoi : la spécification met la revue du Superviseur APRÈS celle du Manager ; beaucoup de cabinets ont au contraire
+le grade Superviseur EN DESSOUS du Manager. C'est maintenant un réglage du cabinet (par défaut : au-dessus du manager,
+comme la spécification). Il décide l'ordre des revues sur toutes les missions et qui est qualifié pour signer
+(chaque grade signe son niveau et ceux en dessous).
 
+Comment faire (le propriétaire ou un associé, après le point 2) :
+  1. Paramètres → carte « Comptes, rôles et positions » → en bas, « Dans votre cabinet, le superviseur est : ».
+  2. Choisir « au-dessus du manager » ou « en dessous du manager ». C'est enregistré tout de suite
+     (message « Ordre des revues enregistré. ») et tracé dans le journal d'audit (REVIEW_ORDER_CHANGED).
+  3. Vérification : sur une procédure soumise dont le programme demande les revues Manager et Superviseur, la section
+     « Revues » affiche les niveaux dans le nouvel ordre. Les signatures déjà données restent.
 
 -----------------------------------------------------------------------------------------------------------------
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)

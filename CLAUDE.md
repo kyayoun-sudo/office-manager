@@ -555,7 +555,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   par le manager ou l'associé nommé. Changer une fonction : carte Équipe de `mission.html`, action `function` de `mission-quick`
   (`setMissionFunction` : associé ou manager / associé de la mission, jamais la sienne, audit `MISSION_FUNCTION_CHANGED`) ; les revues en
   attente suivent tout de suite (calculées), les signatures données restent. « Superviseur » n'est plus lu comme « senior ».
-  Ordre manager ↔ superviseur NON décidé (aucune qualification croisée). Les anciennes routes (secrétariat, mails) restent sur le grade.
+  Ordre manager ↔ superviseur = RÉGLAGE DU CABINET (Paul, 2026-10-19 : la spécification §29 met le superviseur après le manager, le
+  marché le met souvent en dessous) : `office_firm_settings.settings.supervisor_position` (`above_manager` par défaut / `below_manager`),
+  Paramètres → Comptes, audit `REVIEW_ORDER_CHANGED` ; `reviewHierarchy` donne l'ordre des revues et les grades qualifiés (son niveau et
+  ceux en dessous). Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
   elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
