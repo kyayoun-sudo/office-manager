@@ -232,7 +232,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'analyse') return w.planProgramme(orgId, id, b, req.account);
       if (b.action === 'publish') return w.publishProgramme(orgId, id, req.account);
       if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
-      if (b.action === 'workpapers') { if (!w.VALIDATORS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return (await import('../lib/cycle-workpapers.js')).prepareCycleWorkpapers(orgId, id, req.account); }
+      if (b.action === 'workpapers') { await w.mayPrepareWorkpapers(orgId, id, req.account); return (await import('../lib/cycle-workpapers.js')).prepareCycleWorkpapers(orgId, id, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'WORK_PROGRAMME_UNAVAILABLE'
@@ -802,6 +802,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'followup') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setFollowup(orgId, b, req.account); }
       if (b.action === 'folder') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); const r = await m.setMissionFolder(orgId, b, req.account);
         return { ...r, workspace: await m.requestDirectWorkspace(orgId, req, String(b.mission_id), req.account).catch(e => ({ status: 'failed', error: String(e.message || e).slice(0, 120) })) }; }
+      if (b.action === 'details') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDetails(orgId, b, req.account); }
       if (b.action === 'dates') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDates(orgId, b, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
     }),

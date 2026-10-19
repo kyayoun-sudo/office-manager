@@ -317,7 +317,7 @@
     $('title').textContent = 'Programme de travail — ' + data.mission.name;
     $('back').href = '/mission.html?id=' + encodeURIComponent(missionId);
     var state = !p ? 'Pas encore de programme.' : p.status === 'draft' ? 'Brouillon, version ' + p.version + (v ? ' (la version ' + v.version + ' validée reste en vigueur jusqu’à la validation de celle-ci)' : '') + '.'
-      : 'Validé, version ' + p.version + ', par ' + (p.validated_by || '?') + ' le ' + UI.dateTime(p.validated_at) + '. Une modification enregistrée crée la version ' + (p.version + 1) + '.';
+      : 'Validé, version ' + p.version + ', par ' + (p.validated_by || '?') + ' le ' + UI.dateTime(p.validated_at) + '. Une modification enregistrée crée la version ' + (p.version + 1) + '. Suite : le Mission Controller prépare les Working Papers des cycles (aussi au prochain passage si cette page est fermée) ; chaque préparateur retrouve ses tests dans l’accueil, « Mes procédures ».';
     $('state').textContent = state;
     editable = !!data.may_edit;
     var m = (p && p.materiality) || {};

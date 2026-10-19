@@ -458,6 +458,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   d'une mission directe, s'il est sur l'équipe, prépare ET valide son programme même auditeur (`isDirectMissionLead`,
   `lib/work-programme.js`, lu dans la mission : `created_by` + `origin` + affectation).
 
+- **Corriger une mission, et le programme validé déclenche la suite (Paul, 2026-10-19 : « j'ai mis audit, c'était un audit de projet ;
+  je ne peux pas changer le nom ; j'ai mis le programme de travail, rien n'a été fait »)** : bouton « Corriger la mission »
+  (`mission.html`, action `details` de `mission-quick`, `setMissionDetails`) = nom, client, type, période ; manager / associé ou
+  créateur ; avant → après dans l'audit log (`MISSION_DETAILS_CORRECTED`) ; même client + même nom = `POSSIBLE_DUPLICATE` sauf
+  confirmation ; dossier Drive jamais renommé. `WORK_PROGRAMME_VALIDATED` n'avait AUCUN traitement (événement « ignoré ») : le Mission
+  Controller (`lib/mission-events.js`) prépare maintenant les Working Papers lui-même au passage suivant (même code que le bouton,
+  jamais d'écrasement) et note qui prépare quoi ; le bouton « Créer les Working Papers » accepte aussi le responsable d'une mission
+  directe (`mayPrepareWorkpapers`). Test : `tests/mission-correct-and-programme-followup.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

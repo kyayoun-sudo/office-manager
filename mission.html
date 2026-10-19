@@ -75,6 +75,18 @@
         <a href="/mission.html">← Toutes les missions</a>
         <h1 id="m-name">Mission</h1>
         <p class="meta" id="m-meta"></p>
+        <button class="btn ghost" id="edit-open" type="button">Corriger la mission</button>
+        <div class="card stack" id="edit-box" hidden style="margin-top:10px">
+          <p class="meta">Nom, client, type et période. Le dossier Drive garde son nom et son lien ; le programme de travail déjà fait reste et se modifie sur sa page.</p>
+          <div class="form-grid">
+            <label>Nom de la mission<input id="e-name" maxlength="160"></label>
+            <label>Client<input id="e-client" maxlength="200"></label>
+            <label>Type de mission<select id="e-type"></select></label>
+            <label>Période<input id="e-period" maxlength="80" placeholder="ex. exercice 2025"></label>
+          </div>
+          <div class="row"><button class="btn" id="e-save" type="button">Enregistrer</button><button class="btn ghost" id="e-cancel" type="button">Annuler</button></div>
+          <p class="note" id="e-status" role="status" aria-live="polite"></p>
+        </div>
         <div class="status-line"><span class="tag" id="m-phase"></span><span class="tag neutral" id="m-status"></span>
           <span class="status-move" id="move-box" hidden><label for="move-to" class="sr">Proposer un changement de statut</label><select id="move-to"></select><button class="btn ghost" id="move" type="button">Proposer ce statut</button></span></div>
         <p class="note" id="move-status" role="status" aria-live="polite"></p>
@@ -316,7 +328,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var missionId = params.get('id');
-  var current = null;
+  var current = null, lastFollowups = null;
   var ROLES = { cfo: 'Directeur financier (CFO)', ceo: 'Directeur général (CEO)', tcwg: 'Gouvernance (TCWG)', achats: 'Responsable achats', ventes: 'Responsable ventes', tresorerie: 'Trésorerie', it: 'Informatique (IT)', paie: 'Paie / RH', comptabilite: 'Comptabilité', juridique: 'Juridique', cycle: 'Responsable de cycle', autre: 'Autre interlocuteur' };
   var LABELS = { opportunity: 'Proposition soumise', acceptance: 'Gagnée', planning: 'Planification', fieldwork: 'Terrain', review: 'Revue', partner_review: 'Revue associé', report_issued: 'Rapport émis', closed: 'Clôturée', archived: 'Archivée', cancelled: 'Annulée' };
   var LEGACY = { active: 'fieldwork', planned: 'planning', proposal: 'opportunity', prospect: 'opportunity', tender: 'opportunity', won: 'acceptance', completed: 'closed', done: 'closed', canceled: 'cancelled', merged: 'cancelled' };
@@ -697,6 +709,29 @@
       $('n-status').textContent = 'Impossible : ' + e.message;
     });
   }
+  // ---- Correct the mission (name, client, type, period) ----
+  Array.prototype.forEach.call($('n-type').options, function (o) { $('e-type').appendChild(new Option(o.textContent, o.value)); });
+  function openEdit(on) {
+    $('edit-box').hidden = !on; $('e-status').textContent = '';
+    if (!on) return;
+    var m = (current && current.mission) || {}, f = lastFollowups || {};
+    $('e-name').value = m.name || ''; $('e-client').value = (current && current.client) || m.client_name || '';
+    $('e-type').value = f.engagement_type || ''; $('e-period').value = f.period || '';
+  }
+  function saveEdit(force) {
+    $('e-status').textContent = 'Enregistrement…';
+    OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'details', mission_id: missionId, name: $('e-name').value.trim(), client: $('e-client').value.trim(),
+      engagement_type: $('e-type').value, period: $('e-period').value.trim(), confirm_duplicate: force === true }) })
+      .then(function (r) { $('e-status').textContent = r.changed.length ? 'Mission corrigée.' : 'Rien à changer.'; openEdit(false); reload(); loadFollowups(); })
+      .catch(function (e) {
+        if (e.code === 'POSSIBLE_DUPLICATE') { $('e-status').textContent = 'Une autre mission de ce client porte déjà ce nom. '; var b = el('button', 'Enregistrer quand même', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { saveEdit(true); }); $('e-status').appendChild(b); return; }
+        $('e-status').textContent = e.code === 'ROLE_NOT_ALLOWED' ? 'Seuls un manager, un associé ou la personne qui a créé la mission peuvent la corriger.' : 'Impossible : ' + e.message;
+      });
+  }
+  $('edit-open').addEventListener('click', function () { openEdit($('edit-box').hidden); });
+  $('e-cancel').addEventListener('click', function () { openEdit(false); });
+  $('e-save').addEventListener('click', function () { saveEdit(false); });
+
   $('new-open').addEventListener('click', function () { openNew($('new-mission').hidden); });
   $('n-cancel').addEventListener('click', function () { openNew(false); });
   $('n-create').addEventListener('click', function () { createMission(false); });
@@ -897,7 +932,7 @@
   });
 
   function loadFollowups() {
-    OM.api('/api/app?route=mission-quick&mission_id=' + encodeURIComponent(missionId)).then(function (f) { drawFollowups(f); drawPieces(f); })
+    OM.api('/api/app?route=mission-quick&mission_id=' + encodeURIComponent(missionId)).then(function (f) { lastFollowups = f; drawFollowups(f); drawPieces(f); })
       .catch(function () { drawPieces(current && current.mission && current.mission.drive_folder_id ? { folder_id: current.mission.drive_folder_id } : null); });
   }
 
