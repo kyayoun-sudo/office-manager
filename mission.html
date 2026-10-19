@@ -208,6 +208,7 @@
             <button class="btn ghost" id="pl-plan" type="button">1. Préparer les besoins</button>
             <button class="btn ghost" id="pl-existing" type="button">2. Chercher les pièces déjà reçues</button>
             <button class="btn ghost" id="pl-replies" type="button">Lire les réponses maintenant</button>
+            <button class="btn ghost" id="pl-control" type="button">Contrôler les pièces reçues</button>
           </div>
           <div class="btn-row" style="margin-top:6px">
             <label style="flex:1 1 320px">Destinataire(s) de la demande (contacts validés)<input id="pl-to" placeholder="adresse@client.com, …"></label>
@@ -987,7 +988,8 @@
   // The missing-documents loop (point 7): the register of the mission.
   var PERR = { PBC_SQL_NOT_INSTALLED: 'La base n’a pas encore le registre des pièces (db/pbc-requests.sql) : voir docs/A_FAIRE_DE_VOTRE_COTE.txt.',
     PROGRAMME_NOT_VALIDATED: 'Validez d’abord le programme de travail : les besoins viennent des SOP de ses cycles.', NOTHING_TO_REQUEST: 'Aucune pièce à demander (toutes sont demandées, trouvées ou confirmées).',
-    RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_PIECE_TO_CONFIRM: 'Aucune pièce à confirmer sur cette ligne.', REASON_REQUIRED: 'Indiquez la raison.' };
+    RECIPIENTS_REQUIRED: 'Indiquez au moins un destinataire.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_PIECE_TO_CONFIRM: 'Aucune pièce à confirmer sur cette ligne.', REASON_REQUIRED: 'Indiquez la raison.',
+    REASON_REQUIRED_CHECK_NOT_CONFORME: 'Le contrôle ne la juge pas conforme : indiquez pourquoi vous la confirmez.', NOT_WAITING_FOR_COMPLEMENT: 'Cette ligne n’attend pas de complément.', COMPLEMENT_TEXT_REQUIRED: 'Écrivez le texte du complément.', REPLY_NOT_WAITING_FOR_A_PERSON: 'Cette réponse a déjà été traitée.' };
   function pmsg(e) { return PERR[e.code || e.message] || e.message; }
   function pbcPost(body, ok) {
     $('pl-sum').textContent = 'En cours…';
@@ -1019,7 +1021,21 @@
         function act(label, body, cls) { var b = el('button', label, cls || 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () {
           if (body.decision === 'not_applicable') { var why = prompt('Pourquoi cette pièce est-elle sans objet ?'); if (!why) return; body.reason = why; }
           b.disabled = true; pbcPost(Object.assign({ action: 'decide', id: r.id }, body), function () { return 'Enregistré.'; }); }); acts.appendChild(b); }
-        if (r.status === 'to_confirm' && (r.pieces || []).length) act('Confirmer la pièce', { decision: 'accept' }, 'btn');
+        var VERDICT = { conforme: 'conforme', partiel: 'incomplète', mauvaise_periode: 'mauvaise période', autre_document: 'autre document', a_verifier: 'à vérifier', illisible: 'non lue par l’application' };
+        if (r.control && r.control.proposed && r.status === 'to_confirm') t.appendChild(el('span', 'Contrôle proposé (' + (r.control.by === 'code+ia' ? 'code et IA' : 'code') + ') : ' + (VERDICT[r.control.proposed] || r.control.proposed), r.control.proposed === 'conforme' ? 'tag' : 'tag warn'));
+        if (r.status === 'to_confirm' && (r.pieces || []).length) {
+          var b0 = el('button', 'Confirmer la pièce', 'btn'); b0.type = 'button';
+          b0.addEventListener('click', function () { var body = { action: 'decide', id: r.id, decision: 'accept' };
+            if (r.control && r.control.proposed && r.control.proposed !== 'conforme') { var why = prompt('Le contrôle propose « ' + (VERDICT[r.control.proposed] || r.control.proposed) + ' ». Pourquoi confirmer quand même ?'); if (!why) return; body.reason = why; }
+            b0.disabled = true; pbcPost(body, function () { return 'Pièce confirmée à votre nom.'; }); });
+          acts.appendChild(b0);
+        }
+        if (['to_confirm', 'reply_without_piece', 'reply_received'].indexOf(r.status) >= 0) {
+          var bc = el('button', 'Demander un complément', 'btn ghost'); bc.type = 'button';
+          bc.addEventListener('click', function () { var text = prompt('Texte du complément (envoyé dans la même conversation après validation par un manager) :', (r.control && r.control.complement_text) || ''); if (!text) return;
+            bc.disabled = true; pbcPost({ action: 'complement', id: r.id, text: text }, function (x) { return 'Complément préparé · ' + (x.status === 'pending_approval' ? 'en attente de validation (À valider)' : x.status) + '.'; }); });
+          acts.appendChild(bc);
+        }
         if (['needed', 'to_confirm', 'reply_without_piece'].indexOf(r.status) >= 0) act('Sans objet', { decision: 'not_applicable' });
         if (['accepted', 'not_applicable', 'to_confirm'].indexOf(r.status) >= 0) act('Rouvrir', { decision: 'reopen' });
         it.appendChild(acts); box.appendChild(it);
@@ -1035,6 +1051,7 @@
       var to = $('pl-to').value.split(/[,;\s]+/).filter(Boolean);
       pbcPost({ action: 'request', to: to }, function (r) { return r.items + ' pièce(s) dans la demande · ' + (r.status === 'pending_approval' ? 'en attente de validation par un manager (À valider)' : r.status === 'sent' ? 'envoyée' : r.status) + '.'; });
     });
+    $('pl-control').addEventListener('click', function () { pbcPost({ action: 'control' }, function (r) { return r.checked + ' pièce(s) contrôlée(s)' + (r.ai ? ' (code et IA)' : ' (code seulement : IA non autorisée)') + ' — à confirmer.'; }); });
     $('pl-replies').addEventListener('click', function () { pbcPost({ action: 'replies' }, function (r) { return r.reason === 'mail_not_configured' ? 'La boîte mail des agents n’est pas configurée.' : r.replies + ' réponse(s) lue(s) dans ' + r.conversations + ' conversation(s).'; }); });
     loadPbc(false);
   }

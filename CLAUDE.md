@@ -594,7 +594,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   conversation Gmail de la demande (lien durable = le fil, jamais l'objet ni l'expéditeur), toute réponse gardée avec ou sans pièce
   (`reply_without_piece` reste suivie), pièces déposées dans PIECES_RECUES sous un nom fixé par le message (`storeReceivedPiece`, rejouable
   sans doublon) puis lues par les agents (`piecesReceived`), rattachées par leur nom ou « à trier » ; passage planifié `pbcPass` ; le
-  scanner par libellé ignore ces fils (`waitingThreads`). RESTE : 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
+  scanner par libellé ignore ces fils (`waitingThreads`). Dépôt direct SEULEMENT d'un expéditeur vérifié (destinataire de la demande ou
+  d'un complément, contact client de la mission, et pas `dmarc/dkim/spf=fail`) ; sinon réponse « à vérifier », rien déposé ni lu,
+  jusqu'à `trustReply` par une personne de la mission (revue de sécurité). ÉTAPE 3 FAITE : `controlPieces` — le code lit les dates
+  (`periodCheck` : mauvaise période, incomplète si les mois s'arrêtent avant 12, sans date, période inconnue), l'IA (si autorisée) dit
+  quel document et quelle demande il satisfait, avec un passage vérifié mot pour mot (sinon avis écarté) ; verdict PROPOSÉ (`conforme`,
+  `partiel`, `mauvaise_periode`, `autre_document`, `a_verifier`, `illisible`), confirmer contre le contrôle exige une raison ;
+  `requestComplement` = texte précis dans la MÊME conversation (`reply_to` passé par `mission-write.submit`), validé par un manager.
+  RESTE : 4 (renommage, classement,
   working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon).
 
 ## Première connexion (Paul, 2026-10-17)

@@ -172,3 +172,64 @@ test('a reply from an unknown sender, or failing authentication, is kept « à v
   assert.equal(resp.trusted_by, 'm@c.ci'); assert.ok(resp.processed);
   assert.equal(w.t.rows[0].responses.filter(x => x.gmail_id === 'x-1').length, 1, 'one entry per message');
 });
+
+// Step 3 and the acceptance test of point 11: a ledger of the wrong year first, then the right one.
+async function withContents() {
+  const w = await requested();
+  w.contents = {}; w.files = {}; w.sentComplements = [];
+  w.d.gmail = async path => {
+    if (/^\/messages\/[^/?]+\?format=minimal/.test(path)) return { threadId: 'T1' };
+    if (path.startsWith('/threads/')) return { messages: w.thread };
+    const msg = path.match(/^\/messages\/([^/]+)\/attachments/)?.[1];
+    return { data: Buffer.from(w.contents[msg] || '').toString('base64') };
+  };
+  w.d.storePiece = async (o, mid, f) => { const id = 'D' + (Object.keys(w.files).length + 1); w.files[id] = { name: f.name, buffer: f.buffer }; w.stored.push({ file_id: id, name: f.name }); return { file_id: id, name: f.name }; };
+  w.d.drive = { getMeta: async id => ({ id, name: w.files[id].name.replace(/\.pdf$/, '.csv'), mimeType: 'text/csv' }), downloadBuffer: async id => w.files[id].buffer };
+  w.d.permissions = async () => ({ granted: true });
+  w.d.ai = async (order, o) => { const year = /2025/.test(o.input.split('PIÈCE :')[1]) ? '2025' : '2024';
+    return { provider: 'mock', text: JSON.stringify({ answers: 0, document_type: 'grand livre', matches: year === '2025' ? 'yes' : 'yes', missing: [], excerpt: 'Grand livre fournisseurs ' + year }) }; };
+  const realSubmit = w.d.submit;
+  w.d.submit = async (o, m, input, account) => { if (input.purpose === 'relance_pbc') w.sentComplements.push(input); return realSubmit(o, m, input, account); };
+  return w;
+}
+const ledger = (year, months = 12) => 'Grand livre fournisseurs ' + year + '\n' + Array.from({ length: 24 }, (_, i) => `${String((i % 28) + 1).padStart(2, '0')}/${String((i % months) + 1).padStart(2, '0')}/${year};401000;Fournisseur;100`).join('\n');
+
+test('recette: a ledger of 2024 → « mauvaise période » and a precise complement in the same conversation; the 2025 one → conforme, confirmed by a person', async () => {
+  const w = await withContents();
+  // Only the ledger is asked here: the invoices line is out of scope for this test.
+  await P.decide('org', M, { id: 'r2', decision: 'not_applicable', reason: 'Hors test' }, manager, w.d);
+  w.thread.push(gmailMsg('c-1', 'CFO <cfo@client.com>', '2026-10-20T09:00:00Z', 'Voici le GL.', ['Grand livre fournisseurs.pdf']));
+  w.contents['c-1'] = ledger(2024);
+  await P.syncReplies('org', M, w.d);
+  const control = await P.controlPieces('org', M, w.d);
+  assert.equal(control.checked, 1);
+  const gl = w.t.rows[0];
+  assert.equal(gl.status, 'to_confirm'); assert.equal(gl.control.proposed, 'mauvaise_periode');
+  assert.match(gl.control.complement_text, /2024.*Exercice 2025/);
+  await assert.rejects(P.decide('org', M, { id: 'r1', decision: 'accept' }, manager, w.d), /REASON_REQUIRED_CHECK_NOT_CONFORME/, 'a wrong piece is never confirmed without a reason');
+  const c = await P.requestComplement('org', M, { id: 'r1' }, manager, w.d);
+  assert.equal(w.sentComplements[0].reply_to, 'c-1', 'answered in the same conversation');
+  assert.match(w.sentComplements[0].body, /celle de Exercice 2025/);
+  assert.equal(gl.status, 'complement_pending');
+  w.t.messages[c.message_id] = { id: c.message_id, status: 'sent', sent_at: '2026-10-20T10:00:00Z', provider_message_id: 'gm-2' };
+  await P.syncSending('org', M, w.d);
+  assert.equal(w.t.rows[0].status, 'complement_requested');
+  w.thread.push(gmailMsg('c-2', 'CFO <cfo@client.com>', '2026-10-21T09:00:00Z', 'Pardon, voici 2025.', ['Grand livre fournisseurs 2025.pdf']));
+  w.contents['c-2'] = ledger(2025);
+  await P.syncReplies('org', M, w.d);
+  await P.controlPieces('org', M, w.d);
+  const after = w.t.rows[0];
+  assert.equal(after.control.proposed, 'conforme'); assert.equal(after.control.by, 'code+ia');
+  assert.equal(after.pieces.length, 2, 'both pieces kept (nothing deleted)');
+  assert.notEqual(after.status, 'accepted', 'a person confirms');
+  await P.decide('org', M, { id: 'r1', decision: 'accept' }, manager, w.d);
+  assert.equal(w.t.rows[0].status, 'accepted');
+});
+
+test('a ledger stopping in June is « incomplète »; a piece the code cannot read is never conforme', () => {
+  const need = { document: 'Grand livre', period_start: '2025-01-01', period_end: '2025-12-31', period_label: 'Exercice 2025' };
+  const partial = P.periodCheck(ledger(2025, 6), need);
+  assert.equal(partial.result, 'partial'); assert.match(P.complementText(need, 'partiel', partial), /incomplète \(écritures jusqu’au mois 6\)/);
+  assert.equal(P.periodCheck('Facture sans date', need).result, 'no_dates');
+  assert.equal(P.periodCheck(ledger(2025), { ...need, period_start: null }).result, 'period_unknown');
+});
