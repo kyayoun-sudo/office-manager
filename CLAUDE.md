@@ -1,5 +1,7 @@
 # Office Manager AI — à lire avant toute modification
 
+**Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.
+
 **Corrections Codex du 12 octobre 2026** : lire [le message pour Claude](docs/NOTE_POUR_CLAUDE_CORRECTIONS_2026-10-12.md) avant de poursuivre. Les corrections sont sur des branches dédiées ; les parcours métier sont conservés.
 
 Projet de Paul KOMENAN (cabinet TATY & Associés, premier cabinet utilisateur). **Le produit est pour tous les cabinets
