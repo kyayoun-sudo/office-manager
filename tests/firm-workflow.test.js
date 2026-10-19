@@ -224,7 +224,9 @@ test('overview: missions carry their opportunity; open opportunities show their 
   assert.equal(zoe.items.length, 0, 'not on its team: not shown');
   const awa = await W.workflowOverview('org', { role: 'manager', email: 'awa@c.ci' }, deps);
   assert.ok(awa.items.some(x => x.opportunity_id === 'O2'), 'on its team: shown');
-  const awaNoMission = await W.workflowOverview('org', { role: 'auditor', email: 'awa@c.ci' }, { ...deps, accessibleMissionIds: async () => new Set() });
+  const awaNoMission = await W.workflowOverview('org', { role: 'senior', email: 'awa@c.ci' }, { ...deps, accessibleMissionIds: async () => new Set() });
   assert.deepEqual(awaNoMission.items.map(x => x.opportunity_id), ['O2'], 'no mission yet: the opportunity of her team still shows');
+  const auditorTeam = await W.workflowOverview('org', { role: 'auditor', email: 'awa@c.ci' }, { ...deps, accessibleMissionIds: async () => new Set() });
+  assert.equal(auditorTeam.items.length, 0, 'the firm gives auditors no Opportunités screen: not shown (security review)');
   assert.equal((await W.workflowOverview('org', { role: 'partner', email: 'paul@c.ci' }, { ...deps, missionIds: ['M1'] })).items.length, 1, 'one mission asked: only it');
 });
