@@ -230,12 +230,12 @@ test('« Tout mon Google Drive »: memory folder 00_OFFICE_MANAGER found or crea
   resetGoogleConnectionCache();
 });
 
-test('clean Drive: one copy of each agent file, moved into 00_OFFICE_MANAGER; older copies binned; nothing searched outside the firm\'s own places', async () => {
+test('clean Drive: one copy of each agent file, moved into 00_OFFICE_MANAGER; older copies KEPT renamed, never binned (2026-10-19); nothing searched outside the firm\'s own places', async () => {
   const { consolidateMemory } = await import('../lib/google-connection.js');
   const calls = [];
   const files = { MEM: [], ROOT: [{ id: 'mapOld', name: 'OFFICE_MANAGER_MAP.xlsx', modifiedTime: '2026-10-01' }], OLDMY: [{ id: 'mapNew', name: 'OFFICE_MANAGER_MAP.xlsx', modifiedTime: '2026-10-07' }] };
   const fetchImpl = async (url, o = {}) => {
-    calls.push([o.method || 'GET', url]);
+    calls.push([o.method || 'GET', url, o.body]);
     const u = new URL(url); const qq = u.searchParams.get('q') || '';
     if (qq.includes("Office Manager - mémoire des agents")) return { ok: true, json: async () => ({ files: [{ id: 'OLDMY' }] }) };
     const m = qq.match(/name = '([^']+)' and '([^']+)' in parents/);
@@ -244,9 +244,10 @@ test('clean Drive: one copy of each agent file, moved into 00_OFFICE_MANAGER; ol
     return { ok: true, json: async () => ({}) };
   };
   const r = await consolidateMemory('MEM', ['ROOT'], { headers: {} }, fetchImpl);
-  assert.deepEqual(r, { moved: ['OFFICE_MANAGER_MAP.xlsx'], binned: ['OFFICE_MANAGER_MAP.xlsx'] });
+  assert.deepEqual(r, { moved: ['OFFICE_MANAGER_MAP.xlsx'], binned: [], kept: ['OFFICE_MANAGER_MAP.xlsx'] });
   assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapNew') && c[1].includes('addParents=MEM')), 'the newest copy is moved into the memory folder');
-  assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapOld')), 'the older copy goes to the bin');
+  assert.ok(calls.some(c => c[0] === 'PATCH' && c[1].includes('/files/mapOld')), 'the older copy is renamed');
+  assert.ok(!calls.some(c => c[0] === 'PATCH' && /mapOld|mapNew/.test(c[1]) && /trashed/.test(String(c[2] || ''))), 'no memory file goes to the bin (an emptied old folder may)');
   assert.ok(!calls.some(c => (new URL(c[1]).searchParams.get('q') || '').match(/^name = '[^']+' and trashed/)), 'never a Drive-wide search');
 });
 

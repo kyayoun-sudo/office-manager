@@ -88,6 +88,13 @@
       </div>
     </section>
 
+    <section class="card" id="memory-area" aria-labelledby="h-memory" hidden>
+      <h2 id="h-memory">Mémoire des agents</h2>
+      <p class="hint" style="margin:0">Rassemble la mémoire des agents dans un seul dossier du Drive du cabinet. Si des fichiers des agents ont été mis à la corbeille (méthodologie, leçons de Shadow, carte de l’Orpailleur…), vous choisissez ceux à restaurer : rien n’est remis sans votre choix, rien n’est écrasé.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px"><button class="btn ghost" id="mem-check" type="button">Voir les fichiers des agents dans la corbeille</button><button class="btn ghost" id="mem-home" type="button">Rassembler la mémoire</button><span class="status" id="mem-status" role="status" aria-live="polite"></span></div>
+      <div id="mem-list"></div>
+    </section>
+
     <section class="card" id="reset-area" aria-labelledby="h-reset" hidden style="border-left:4px solid var(--danger)">
       <h2 id="h-reset">Repartir de zéro</h2>
       <p class="hint" style="margin:0">Efface toutes les données du cabinet dans Office Manager : missions, opportunités, personnes et comptes, rôles, décisions, réglages, connexion Google et choix du Drive, veille, journal, et la mémoire des agents dans le Drive (mise à la corbeille du Drive). Les documents du cabinet dans son Drive restent. Vous gardez votre compte et vous refaites la configuration : Google, puis le Drive.</p>
@@ -932,7 +939,7 @@
 (function () {
   var OM = window.OfficeManager, $ = function (id) { return document.getElementById(id); };
   if (!OM || OM.getRole() !== 'owner' || !OM.hasPersonalSession()) return;
-  $('reset-area').hidden = false;
+  $('reset-area').hidden = false; $('memory-area').hidden = false;
   var E = { TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer.', PURGE_SQL_NOT_INSTALLED: 'L’effacement n’est pas encore installé dans Supabase (db/purge.sql ou db/INSTALL_TOUT.sql) : rien n’a été effacé.', OWNER_ONLY: 'Réservé au propriétaire du cabinet.' };
   $('reset-go').addEventListener('click', function () {
     var b = this, st = $('reset-status');
@@ -945,5 +952,39 @@
 })();
 </script>
 <script src="/assets/workflow-reference.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function memApi(body) { return OM.api('/api/app?route=memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  function kb(n) { return n ? (n > 1024 ? Math.round(n / 1024) + ' Ko' : n + ' o') : ''; }
+  $('mem-check').addEventListener('click', function () {
+    var box = $('mem-list'); box.textContent = ''; $('mem-status').textContent = 'Recherche dans la corbeille…';
+    memApi({ action: 'binned' }).then(function (r) {
+      if (!r.files.length) { $('mem-status').textContent = 'Aucun fichier des agents dans la corbeille.'; return; }
+      $('mem-status').textContent = r.files.length + ' fichier(s) des agents dans la corbeille. Cochez ceux à restaurer.';
+      r.files.forEach(function (f) {
+        var l = document.createElement('label'); l.style.display = 'block'; var c = document.createElement('input'); c.type = 'checkbox'; c.value = f.id;
+        l.appendChild(c); l.appendChild(document.createTextNode(' ' + f.name + ' — ' + kb(f.size) + (f.binned_at ? ' — mis à la corbeille le ' + new Date(f.binned_at).toLocaleString('fr-FR') : '') + (f.modified_at ? ' (modifié le ' + new Date(f.modified_at).toLocaleDateString('fr-FR') + ')' : '')));
+        box.appendChild(l);
+      });
+      var go = document.createElement('button'); go.className = 'btn'; go.type = 'button'; go.textContent = 'Restaurer et rassembler';
+      go.addEventListener('click', function () {
+        var ids = Array.prototype.map.call(box.querySelectorAll('input:checked'), function (c) { return c.value; });
+        if (!ids.length) { $('mem-status').textContent = 'Cochez au moins un fichier.'; return; }
+        go.disabled = true; $('mem-status').textContent = 'Restauration…';
+        memApi({ action: 'restore', ids: ids }).then(function (x) { $('mem-status').textContent = x.restored.length + ' fichier(s) restauré(s) et rassemblé(s) dans la mémoire.' + (x.gathered && x.gathered.error ? ' Rassemblement : ' + x.gathered.error : ''); box.textContent = ''; })
+          .catch(function (e) { $('mem-status').textContent = 'Impossible : ' + e.message; go.disabled = false; });
+      });
+      box.appendChild(go);
+    }).catch(function (e) { $('mem-status').textContent = 'Impossible : ' + e.message; });
+  });
+  $('mem-home').addEventListener('click', function () {
+    $('mem-status').textContent = 'Rassemblement…';
+    memApi({ action: 'home' }).then(function (r) { $('mem-status').textContent = r.done ? 'Mémoire rassemblée dans « ' + ((r.memory && r.memory.name) || 'MEMORY') + ' ».' : 'Pas fait : ' + (r.reason || ''); })
+      .catch(function (e) { $('mem-status').textContent = 'Impossible : ' + e.message; });
+  });
+})();
+</script>
+
 </body>
 </html>

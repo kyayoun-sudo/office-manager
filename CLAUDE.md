@@ -343,6 +343,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   nom (jamais la racine du Drive), `SHADOW_LAB.json` suit la mémoire, et une erreur de la base garde le Drive connu. Tests :
   `tests/memory-home-one-drive.test.js`, `tests/memory.test.js`.
 
+- **« Tout disparaît d'un coup » (Paul, 2026-10-19)** : `consolidateMemory` (`lib/google-connection.js`, appelé quand on choisit le Drive)
+  gardait TOUJOURS la copie du dossier mémoire et mettait les autres à la corbeille (carte, état de l'Orpailleur, connaissances du
+  cabinet) ; un fichier vide tout juste recréé effaçait donc la vraie mémoire. Désormais `pickActive` (la plus riche récente) et les
+  autres gardées renommées, jamais à la corbeille. `setFirmDrive` garde la mémoire connue du même Drive si la recherche de l'atelier
+  échoue (avant : mémoire = racine du Drive). `gatherInto` ne fusionne un ancien dossier que s'il s'appelle comme une mémoire.
+  **Récupération** : Paramètres → « Mémoire des agents » (propriétaire) → liste des fichiers des agents dans la corbeille du Drive
+  (`binnedMemoryFiles`, nom / taille / date), la personne coche ceux à restaurer (`restoreMemoryFiles`, jamais un document du
+  cabinet, puis rassemblement, `MEMORY_FILES_RESTORED`) ; un « Repartir de zéro » met aussi ces fichiers à la corbeille, d'où le choix
+  humain. Route `memory`, actions `binned` / `restore` / `home`.
+
 ## Liste PBC reconnue quel que soit son nom (Paul, 2026-10-18)
 - `lib/pbc-lists.js` (code, sans IA) : 1) signature des modèles du cabinet (feuille masquée AUDIT_META `Document_Type =
   PBC_MASTER_CHECKLIST`, ou mots-clés du fichier) → certitude 100 % ; avec `Mission_Code` = liste de la mission, sans = référentiel

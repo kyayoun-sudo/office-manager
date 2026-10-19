@@ -868,6 +868,9 @@ export const ROUTES = Object.freeze({
       }
       if (req.account?.role !== 'owner') throw fail('ROLE_NOT_ALLOWED', 403);
       if (b.action === 'home') return (await import('../lib/memory-home.js')).ensureMemoryHome(orgId, { force: true });
+      // The agents' files found in the Drive's bin; the owner chooses which come back (2026-10-19).
+      if (b.action === 'binned') return { files: await (await import('../lib/memory-home.js')).binnedMemoryFiles(orgId) };
+      if (b.action === 'restore') return (await import('../lib/memory-home.js')).restoreMemoryFiles(orgId, b.ids, who(req));
       if (b.action === 'rebuild') return rebuildAgentMemory(orgId, String(b.agent || ''), who(req), { fetchRows: rest });
       if (b.action === 'refresh_missions') return refreshMissionMemories(orgId, { limit: Math.min(10, Number(b.limit) || 5) });
       throw fail('UNKNOWN_ACTION', 400);

@@ -78,3 +78,22 @@ test('a passing database error does not make the agents forget the firm’s Driv
   const r = await g.loadFirmDrive('org', { fetchRows: async () => { throw new Error('timeout'); } });
   assert.equal(g.firmMemoryId(), 'MEM'); assert.ok(r);
 });
+
+test('agents’ files in the bin are listed for the owner and restored only when chosen', async () => {
+  const { binnedMemoryFiles, restoreMemoryFiles } = await import('../lib/memory-home.js');
+  const bin = [{ id: 'T1', name: 'OFFICE_MANAGER_METHODOLOGY.json', trashedTime: '2026-10-19T10:00:00Z', size: '50000', driveId: 'D' },
+    { id: 'X', name: 'Rapport client.docx', trashedTime: '2026-10-19T10:00:00Z', driveId: 'D' }, { id: 'S', name: 'SHADOW_LAB.json', trashedTime: '2026-10-18T10:00:00Z', driveId: 'D' }];
+  const patched = [];
+  const fetchImpl = async (url, o = {}) => {
+    const u = new URL(url);
+    if (o.method === 'PATCH') { patched.push(u.pathname.split('/').pop()); return { ok: true, json: async () => ({ id: u.pathname.split('/').pop(), name: 'n' }) }; }
+    const qq = u.searchParams.get('q') || '';
+    return { ok: true, json: async () => ({ files: bin.filter(f => qq.includes("contains 'OFFICE_MANAGER_'") ? f.name.startsWith('OFFICE_MANAGER_') : qq.includes("'" + f.name + "'")) }) };
+  };
+  const access = { H: { headers: {} }, kind: 'drive', driveId: 'D' };
+  const list = await binnedMemoryFiles('org', { fetchImpl, access });
+  assert.deepEqual(list.map(f => f.id), ['T1', 'S']);
+  const r = await restoreMemoryFiles('org', ['T1', 'X'], 'Paul', { fetchImpl, access, fetchRows: async () => [], gather: async () => ({ done: true }) });
+  assert.deepEqual(patched, ['T1'], 'a firm document is never restored by this action, only chosen agents’ files');
+  assert.equal(r.restored.length, 1);
+});
