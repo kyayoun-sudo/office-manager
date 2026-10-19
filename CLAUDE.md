@@ -366,10 +366,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   écritures du fichier au même instant → `MEMORY_CONFLICT` (rien d'écrit). `writeWorkpaper` refait alors l'écriture (jusqu'à 5 fois,
   délai croissant) sur le fichier relu, qui contient déjà le travail de l'autre ; seule la feuille du test est touchée. Test ajouté
   dans `tests/procedure-work.test.js`. Limite : deux personnes qui ouvrent le .xlsx dans Excel en même temps ne co-éditent pas (Drive).
-- **À construire demain sur les vrais fichiers (plan validé par Paul, 2026-10-19)** : 1) l'Enhanced Auditor demande une fois où sont
-  les Working Files modèles, les reconnaît par AUDIT_META (WF_ID, cycle) ; 2) le WF de la mission = copie du modèle du cycle dans
-  `05_WORKING_PAPERS` (générique seulement en dernier recours) ; 3) entrée par cycle dans la mission (ses tests d'abord) ; 4) il
-  remplit ce qu'il peut sourcer et DEMANDE à l'auditeur ce que seul l'auditeur sait, partie par partie.
+- **Working Files du cabinet, quelle que soit leur forme (Paul, 2026-10-19 : « il doit me demander où se trouve le dossier » ;
+  « n'importe quelle compagnie, sans reconfiguration, c'est l'IA qui comprend le fichier »)** — jamais de forme de fichier codée.
+  FAIT : `lib/workfile-templates.js` — l'Enhanced Auditor DEMANDE une fois le dossier des modèles (question « document location » du
+  pop-up, `document_type: workfile_templates`, dossier accepté par `confirmDocumentReference`) ; « le cabinet n'en a pas » = réponse
+  valable (`CONFIRMED_NOT_AVAILABLE` → fichier de base) ; le modèle d'un cycle est choisi par son CONTENU (codes des tests actifs du
+  programme trouvés dans le fichier, par code) ; égalité ou rien = aucun choix (`AMBIGUOUS` / `NO_MODEL_FOR_CYCLE`, fichier de base,
+  raison affichée) ; le modèle est COPIÉ dans le dossier des WP de la mission (`CREATED_FROM_MODEL`) ; question posée et sans
+  réponse = `WAITING_MODELS_FOLDER` (pas de fichier de base à la place). Test : `tests/workfile-templates.test.js`.
+  RESTE : 1) compréhension par l'IA de chaque partie d'un modèle quelconque (cases de l'auditeur / de l'agent, feuille de chaque
+  test, carte retenue par version du modèle) — `writeWorkpaper` attend encore la forme du fichier de base ; 2) entrée par cycle
+  dans la mission (ses tests d'abord) ; 3) remplir ce qui est sourcé et DEMANDER à l'auditeur le reste, partie par partie.
 
 ## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
 - Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).

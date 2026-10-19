@@ -333,7 +333,7 @@
     var w = data.work;
     $('title').textContent = data.line.code + ' — ' + data.line.title;
     $('sub').textContent = data.cycle.code + ' · ' + data.cycle.title + ' · préparée par ' + (data.preparer || '?') + ' · programme v' + data.programme.version;
-    $('state').textContent = 'État : ' + (STATUS[w.status] || w.status) + (data.workpaper && data.workpaper.file_id ? '' : ' · Working Paper du cycle introuvable' + (data.workpaper_problem === 'MISSION_FOLDER_NOT_KNOWN' ? ' : le dossier Drive de la mission n’est pas connu (à indiquer dans la mission)' : data.workpaper_problem ? ' (' + data.workpaper_problem + ')' : ''));
+    $('state').textContent = 'État : ' + (STATUS[w.status] || w.status) + (data.workpaper && data.workpaper.file_id ? '' : ' · Working Paper du cycle introuvable' + (data.workpaper_problem === 'MISSION_FOLDER_NOT_KNOWN' ? ' : le dossier Drive de la mission n’est pas connu (à indiquer dans la mission)' : data.workpaper_problem === 'WAITING_MODELS_FOLDER' ? ' : l’Enhanced Auditor a demandé où se trouvent les Working Files modèles du cabinet (question envoyée aux associés et managers)' : data.workpaper_problem ? ' (' + data.workpaper_problem + ')' : ''));
     $('back').href = '/programme.html?mission_id=' + encodeURIComponent(missionId);
     var model = (data.card || {}).conclusion_template;
     $('conc-model').textContent = model ? 'Modèle du SOP : « ' + model + ' »' : '';

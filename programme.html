@@ -240,7 +240,9 @@
   });
   var WP_ERR = { WORKPAPERS_FOLDER_NOT_FOUND: 'Je ne trouve pas le dossier des Working Papers sous la mission : collez son lien dans « Matérialité », enregistrez, puis « Créer les Working Papers ».',
     MISSION_FOLDER_NOT_KNOWN: 'Le dossier Drive de la mission n’est pas connu : collez le lien du dossier des Working Papers dans « Matérialité ».', NO_VALIDATED_PROGRAMME: 'Validez d’abord le programme.' };
-  var WP_STATUS = { CREATED: 'créé et vérifié dans le Drive', CREATED_NOT_VERIFIED: 'créé, pas encore vérifié', ALREADY_EXISTS: 'existait déjà : gardé tel quel', FAILED: 'échec' };
+  var WP_STATUS = { CREATED: 'créé et vérifié dans le Drive (fichier de base)', CREATED_NOT_VERIFIED: 'créé, pas encore vérifié', ALREADY_EXISTS: 'existait déjà : gardé tel quel', FAILED: 'échec',
+    CREATED_FROM_MODEL: 'copié depuis le Working File modèle du cabinet', WAITING_MODELS_FOLDER: 'en attente : l’Enhanced Auditor a demandé où sont les Working Files modèles du cabinet' };
+  var MODEL_NOTE = { NO_MODEL_FOR_CYCLE: 'aucun modèle du cabinet ne contient les tests de ce cycle', AMBIGUOUS: 'plusieurs modèles possibles : aucun choisi au hasard', NO_FIRM_MODELS: 'le cabinet n’a pas de modèles', MODEL_COPY_FAILED: 'la copie du modèle a échoué' };
   function makeWps() {
     $('wp-say').textContent = 'Création des Working Papers…';
     return post({ action: 'workpapers', mission_id: missionId }).then(function (r) {
@@ -250,7 +252,7 @@
   function paintWps(list) {
     var box = $('wps'); box.textContent = '';
     if (!list || !list.length) return;
-    box.appendChild(UI.table(['Cycle', 'Fichier', 'État'], list.map(function (w) { return [w.cycle_code || '', w.url ? UI.safeLink(w.url, w.name) : w.name, (WP_STATUS[w.status] || w.status) + (w.error ? ' : ' + w.error : '')]; })));
+    box.appendChild(UI.table(['Cycle', 'Fichier', 'État'], list.map(function (w) { return [w.cycle_code || '', w.url ? UI.safeLink(w.url, w.name) : w.name, (WP_STATUS[w.status] || w.status) + (w.matched ? ' — ' + w.matched : '') + (w.model_note ? ' — ' + (MODEL_NOTE[w.model_note] || w.model_note) : '') + (w.error ? ' : ' + w.error : '')]; })));
   }
   $('make-wps').addEventListener('click', function () { var b = this; b.disabled = true; makeWps().then(function () { b.disabled = false; }); });
   $('planning-analyse').addEventListener('click',function(){
