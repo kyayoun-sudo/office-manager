@@ -341,6 +341,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Reste : `lib/mission-engine.js` et `lib/agent-tools.js` lisent encore une feuille nommée `PBC_MASTER` (en-tête ligne 4) ;
   à faire lire par les colonnes que la reconnaissance a trouvées (`columns`, `header_row`).
 
+## Une mémoire par Drive, créée par l'application (Paul, 2026-10-19 : « si je donne à une personne, c'est comme ça qu'il va se comporter ? »)
+- Bug corrigé : pour un Drive « dossier de Mon Drive », `findAtelier` cherchait « … AI MANAGER » dans TOUS les Drive du compte
+  Google et pouvait adopter celui d'un autre Drive (ex. le vrai Drive TATY pendant un essai) → écritures refusées en aperçu
+  (`TEST_MODE_WRITE_OUTSIDE_TEST_DRIVE_REFUSED`) ; `gatherInto` et `setFirmDrive` (`consolidateMemory`) pouvaient aussi ramener
+  des fichiers d'un autre Drive.
+- Désormais (`lib/memory-home.js`, `belongsToDrive`) : seul un dossier / fichier DANS le Drive choisi (même `driveId`, ou sous le
+  dossier choisi) est adopté ou rassemblé ; sinon la maison `00_OFFICE_MANAGER_AI/MEMORY` est créée dans le Drive choisi. La
+  mémoire d'un autre Drive n'est jamais déplacée (`left_in_other_drive`). `ensureMemoryHome` ne garde la mémoire connue que si
+  elle est dans le Drive choisi.
+- Premier scan : `startTidyPlan` appelle `ensureMemoryHome(orgId, { verify: true })` avant de démarrer (trace `MEMORY_HOME_CREATED`).
+- Test : `tests/memory-home-one-drive.test.js`.
+
 ## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
 - Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).
 - `lib/ai-plus.js` : fournisseur `openrouter` (texte, images, PDF, recherche web `plugins: [{ id: 'web' }]`, sources) ;

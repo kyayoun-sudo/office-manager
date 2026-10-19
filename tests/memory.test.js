@@ -468,7 +468,8 @@ function fakeRest(files) {
       if (add) f.parents = [...(f.parents || []).filter(p => p !== rm), add];
       Object.assign(f, JSON.parse(init.body || '{}')); return json({ id });
     }
-    if (id) { const f = files.find(x => x.id === id); return f ? json(f) : { ok: false, status: 404, json: async () => ({}) }; }
+    // Like Google, a file of the shared drive « D » says which drive it is in (driveId).
+    if (id) { const f = files.find(x => x.id === id); return f ? json({ driveId: 'D', ...f }) : { ok: false, status: 404, json: async () => ({}) }; }
     const qy = u.searchParams.get('q');
     let list = files.filter(f => !f.trashed);
     const par = /'([^']+)' in parents/.exec(qy); if (par) list = list.filter(f => (f.parents || []).includes(par[1]));
