@@ -325,6 +325,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 - **Garder ce que Shadow a appris (Paul, 2026-10-18)** : « Repartir de zéro » efface `SHADOW_LAB.json` (leçons, tests). Entraînement → « Garder ce que Shadow a appris » : exporter / importer (`lib/shadow-transfer.js`, actions `lab-export` / `lab-import` de la route `shadow`, associés seulement). L'export ne contient que leçons, tests, historique des agents et bonnes pratiques (ni problèmes bruts, ni réponses au questionnaire, ni sources) ; somme de contrôle ; import : jamais d'écrasement (même id ignoré), garde « zone protégée » sur chaque leçon, statut conservé (une leçon en attente reste en attente), tracé `SHADOW_LAB_IMPORTED`.
 
+- **Les leçons et tests de Shadow ne disparaissent plus (Paul, 2026-10-19 : « tous les tests de Shadow ont disparu, pourtant j'ai tout
+  importé »)** : `SHADOW_LAB.json` vit dans le dossier mémoire des agents, qui peut changer (mémoire recréée dans le Drive choisi,
+  démarrage à froid qui lit la racine du Drive avant les réglages : `memoryFolderId()` = `firmMemoryId() || firmDriveId()`). Si le
+  laboratoire courant est absent ou vide, `loadLab` / `changeLab` (`lib/shadow.js`) cherchent les autres `SHADOW_LAB.json` du Drive
+  (hors corbeille : un « Repartir de zéro » reste un départ à zéro) et les FUSIONNENT (`mergeLabs` : union par id, rien remplacé, rien
+  supprimé), puis l'écrivent dans la mémoire actuelle. Test : `tests/shadow-lab-recovery.test.js`. À faire : même filet pour les autres
+  fichiers mémoire (pointeur ou recherche) — cause commune avec la méthodologie.
+
 ## Liste PBC reconnue quel que soit son nom (Paul, 2026-10-18)
 - `lib/pbc-lists.js` (code, sans IA) : 1) signature des modèles du cabinet (feuille masquée AUDIT_META `Document_Type =
   PBC_MASTER_CHECKLIST`, ou mots-clés du fichier) → certitude 100 % ; avec `Mission_Code` = liste de la mission, sans = référentiel
