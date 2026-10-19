@@ -353,6 +353,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   cabinet, puis rassemblement, `MEMORY_FILES_RESTORED`) ; un « Repartir de zéro » met aussi ces fichiers à la corbeille, d'où le choix
   humain. Route `memory`, actions `binned` / `restore` / `home`.
 
+- **CAUSE GÉNÉRALE des pertes de mémoire (Paul, 2026-10-19 : « il recrée de nouveaux documents pour sa mémoire au lieu de mettre à
+  jour les anciens ; même la cartographie se refait quand elle est valide »)** : chaque fichier mémoire était retrouvé par une RECHERCHE
+  Drive par nom ; cette recherche peut rater un fichier existant (cohérence à terme de Drive, ou erreur lue comme « aucun fichier »,
+  `loadJsonFile` : `.catch(() => [])`) → l'agent repartait d'un état vide et CRÉAIT un second fichier du même nom ; ensuite la recherche
+  rendait les copies dans n'importe quel ordre (`found[0]`) → la mémoire basculait entre la pleine et la vide. Corrigé une fois pour
+  tous les agents dans l'adaptateur Drive (`lib/memory-files.js`, `guardMemory` autour de `driveAdapter`) : 1) un fichier mémoire créé
+  est retenu PAR SON ID (`office_firm_settings.settings.memory_files[drive][parent|nom]`) et relu par id quand la recherche ne le voit
+  pas ; 2) créer un fichier mémoire qui existe déjà est REFUSÉ (`MEMORY_FILE_EXISTS`), et rien n'est créé si la recherche échoue
+  (`MEMORY_LOOKUP_FAILED`) ; 3) plusieurs copies → la plus riche récente d'abord, toujours la même (`orderCopies`). Noms concernés :
+  `OFFICE_MANAGER_*`, `SHADOW_LAB.json`, `ORPAILLEUR_JOURNAL.xlsx`, `*_MEMORY.json`, mémoires clients. Rien n'est supprimé. Test :
+  `tests/memory-files-guard.test.js`.
+
 ## Liste PBC reconnue quel que soit son nom (Paul, 2026-10-18)
 - `lib/pbc-lists.js` (code, sans IA) : 1) signature des modèles du cabinet (feuille masquée AUDIT_META `Document_Type =
   PBC_MASTER_CHECKLIST`, ou mots-clés du fichier) → certitude 100 % ; avec `Mission_Code` = liste de la mission, sans = référentiel
