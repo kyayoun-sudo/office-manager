@@ -141,3 +141,105 @@ test('dates filled in later: checked, kept when one is missing', async () => {
   assert.deepEqual(r, { planned_start: '2026-10-20', planned_end: '2026-10-31' });
   assert.equal(followupView(db.missions[0]).items.some(i => i.key === 'dates'), false);
 });
+
+// ---- The Mission Controller creates the mission folder, its structure, and receives the pieces ----
+import { createMissionFolder, directWorkspaceStep, piecesReceived, uploadPiece, missionFolderName, prepareDirectMission } from '../lib/mission-quick.js';
+const ROOT = 'RootMissionsFolder01';
+function fakeDrive(files = {}) {
+  const store = { [ROOT]: { id: ROOT, name: '01_MISSIONS', mimeType: 'application/vnd.google-apps.folder', parents: ['drive'] }, ...files };
+  let n = 0;
+  return {
+    store,
+    getMeta: async id => store[id] || null,
+    findFilesByExactName: async (name, parent) => Object.values(store).filter(f => f.name === name && (f.parents || []).includes(parent)),
+    createBinary: async ({ name, parentId }) => { const id = 'FileCreated' + (++n).toString().padStart(10, '0'); store[id] = { id, name, parents: [parentId], mimeType: 'application/pdf', webViewLink: 'https://drive/' + id }; return store[id]; }
+  };
+}
+const fakeTidy = drive => ({ async findOrCreateFolder(parent, name) {
+  const found = Object.values(drive.store).find(f => f.name === name && (f.parents || []).includes(parent) && f.mimeType === 'application/vnd.google-apps.folder');
+  if (found) return found;
+  const id = 'Folder' + name.replace(/\W/g, '').slice(0, 10).padEnd(10, 'x') + Object.keys(drive.store).length;
+  drive.store[id] = { id, name, parents: [parent], mimeType: 'application/vnd.google-apps.folder', webViewLink: 'https://drive/' + id };
+  return drive.store[id];
+} });
+const rootRef = async () => [{ document_type: 'mission_root', document_role: 'firm_reference', file_id: ROOT }];
+
+test('the Mission Controller creates the mission folder under the firm’s missions root', async () => {
+  assert.equal(missionFolderName({ name: 'Audit des comptes', client_name: 'BLE TRANSIT', period_label: '2025' }), 'BLE TRANSIT — Audit des comptes — 2025');
+  assert.equal(missionFolderName({ name: 'Audit BLE TRANSIT 2025', client_name: 'BLE TRANSIT', period_label: '2025' }), 'Audit BLE TRANSIT 2025');
+  const db = fakeDb(), drive = fakeDrive();
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit des comptes', client: 'BLE TRANSIT', period: '2025' }, auditor, deps(db));
+  const r = await createMissionFolder(ORG, db.missions[0], { fetchRows: db.fetchRows, drive, tidy: fakeTidy(drive), documentReferences: rootRef });
+  assert.equal(r.status, 'created');
+  assert.equal(drive.store[r.id].parents[0], ROOT);
+  assert.equal(db.missions[0].drive_folder_id, r.id);
+  // No root configured: the person is told where to set it, nothing invented.
+  const none = await createMissionFolder(ORG, { id: RID, name: 'X' }, { fetchRows: db.fetchRows, drive, tidy: fakeTidy(drive), documentReferences: async () => [] });
+  assert.equal(none.status, 'configuration_required');
+  assert.match(none.href, /mission_root/);
+});
+
+test('a folder already used by another mission is never taken', async () => {
+  const drive = fakeDrive();
+  const taken = await fakeTidy(drive).findOrCreateFolder(ROOT, 'Alpha — Revue 2025');
+  const db = fakeDb({ missions: [{ id: '55555555-5555-4555-8555-555555555555', name: 'Revue 2025 (ancienne)', client_name: 'Alpha', status: 'closed', drive_folder_id: taken.id }] });
+  const r = await createMissionFolder(ORG, { id: RID, name: 'Revue 2025', client_name: 'Alpha' }, { fetchRows: db.fetchRows, drive, tidy: fakeTidy(drive), documentReferences: rootRef });
+  assert.equal(r.status, 'review_required');
+});
+
+test('creation runs the Mission Controller: folder made, structure queued, all without blocking', async () => {
+  const db = fakeDb(), drive = fakeDrive(); const fired = [];
+  const r = await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Kappa' }, auditor,
+    deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async (req, path, body) => { fired.push([path, body]); return true; } }));
+  assert.equal(r.prepared.folder.status, 'created');
+  assert.ok(db.missions[0].drive_folder_id);
+  assert.equal(db.missions[0].followups.workspace.status, 'queued');
+  assert.deepEqual(fired[0], ['/api/app?route=mission-quick-step', { mission_id: RID }]);
+  assert.equal(r.followups.items.some(i => i.key === 'folder'), false);
+});
+
+test('the structure step runs once, and waits honestly when the agents are not authorised', async () => {
+  const db = fakeDb(), drive = fakeDrive();
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Lambda', engagement_type: 'statutory' }, auditor,
+    deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async () => true }));
+  const no = await directWorkspaceStep(ORG, { mission_id: RID }, { fetchRows: db.fetchRows, permissions: async () => ({ granted: false }) });
+  assert.equal(no.status, 'agents_not_authorized');
+  db.missions[0].followups.workspace.status = 'queued';
+  let ctx = null;
+  const ok = await directWorkspaceStep(ORG, { mission_id: RID }, { fetchRows: db.fetchRows, permissions: async () => ({ granted: true }), run: async a => { ctx = a.contexts['mission-controller']; return { text: 'Structure reprise du modèle', toolsUsed: ['initialize_mission_from_template'] }; } });
+  assert.equal(ok.status, 'reported');
+  assert.equal(ctx.engagement_type, 'Audit légal / commissariat aux comptes');
+  assert.equal(ctx.destination.folder_id, db.missions[0].drive_folder_id);
+  assert.equal((await directWorkspaceStep(ORG, { mission_id: RID }, { fetchRows: db.fetchRows, run: async () => { throw new Error('twice'); } })).status, 'not_queued');
+});
+
+test('pieces received go straight into the mission folder, never overwrite, then the agents read them', async () => {
+  const db = fakeDb(), drive = fakeDrive();
+  const d0 = deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async () => true });
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Mu' }, auditor, d0);
+  const b64 = Buffer.from('%PDF états financiers').toString('base64');
+  const a = await uploadPiece(ORG, { mission_id: RID, name: 'Etats financiers 2025.pdf', base64: b64 }, auditor, d0);
+  const b = await uploadPiece(ORG, { mission_id: RID, name: 'Etats financiers 2025.pdf', base64: b64 }, auditor, d0);
+  assert.equal(a.name, 'Etats financiers 2025.pdf');
+  assert.notEqual(b.name, a.name);   // same name: a dated name, the first file is untouched
+  const received = drive.store[drive.store[a.file_id].parents[0]];
+  assert.equal(received.name, 'PIECES_RECUES');
+  assert.equal(received.parents[0], db.missions[0].drive_folder_id);
+  let started = null, indexed = null, recorded = null;
+  const r = await piecesReceived(ORG, {}, { mission_id: RID, files: [{ id: a.file_id }, { id: b.file_id }, { id: 'SomeOtherFile123' }] }, auditor,
+    { ...d0, startDeposit: async (o, req, body) => { started = body; return { started: true, id: 'dep-1' }; }, recordFiles: async e => { indexed = e; }, recordMissionDocuments: async (m, docs) => { recorded = docs; } });
+  assert.equal(r.received, 2);   // a file outside the mission folder is ignored
+  assert.equal(started.mission_id, RID);
+  assert.equal(started.files.length, 2);
+  assert.ok(indexed.every(x => x.protected && x.placed_by === 'mission-controller' && x.mission_id === RID));
+  assert.ok(recorded.every(x => x.role === 'piece_recue'));
+});
+
+test('no mission folder yet: the deposit says so instead of putting the pieces elsewhere', async () => {
+  const db = fakeDb();
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Nu' }, auditor, deps(db));
+  await assert.rejects(uploadPiece(ORG, { mission_id: RID, name: 'a.pdf', base64: 'QQ==' }, auditor, deps(db, { drive: fakeDrive() })), /MISSION_FOLDER_REQUIRED/);
+  const p = await prepareDirectMission(ORG, null, RID, auditor, { fetchRows: db.fetchRows, drive: fakeDrive(), tidy: fakeTidy(fakeDrive()), documentReferences: async () => [], audit: async () => ({}) });
+  assert.equal(p.folder.status, 'configuration_required');
+  assert.equal(followupView(db.missions[0]).items.find(i => i.key === 'folder').href.includes('mission_root'), true);
+});

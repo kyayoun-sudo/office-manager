@@ -787,14 +787,23 @@ export const ROUTES = Object.freeze({
     GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account); return (await import('../lib/mission-quick.js')).missionFollowups(orgId, id); }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const b = req.body || {}, m = await import('../lib/mission-quick.js');
-      if (b.action === 'create') return m.createMissionQuick(orgId, b, req.account);
+      if (b.action === 'create') return m.createMissionQuick(orgId, b, req.account, { req });
+      // Everything below acts on one mission: the person must be on it (owner / partner: all).
+      if (['prepare', 'piece', 'piece-start', 'pieces-done'].includes(b.action)) await requireMissionAccess(orgId, String(b.mission_id || ''), req.account);
+      if (b.action === 'prepare') return m.prepareDirectMission(orgId, req, String(b.mission_id || ''), req.account);
+      if (b.action === 'piece') return m.uploadPiece(orgId, b, req.account);
+      if (b.action === 'piece-start') return m.startPieceUpload(orgId, b, req.account, req);
+      if (b.action === 'pieces-done') return m.piecesReceived(orgId, req, b, req.account);
       if (b.action === 'followup') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setFollowup(orgId, b, req.account); }
-      if (b.action === 'folder') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionFolder(orgId, b, req.account); }
+      if (b.action === 'folder') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); const r = await m.setMissionFolder(orgId, b, req.account);
+        return { ...r, workspace: await m.requestDirectWorkspace(orgId, req, String(b.mission_id), req.account).catch(e => ({ status: 'failed', error: String(e.message || e).slice(0, 120) })) }; }
       if (b.action === 'dates') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDates(orgId, b, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'MISSION_UNAVAILABLE'
   },
+  // Background step of the Mission Controller: the structure of a directly created mission from the firm's model.
+  'mission-quick-step': { POST: async (orgId, req) => (await import('../lib/mission-quick.js')).directWorkspaceStep(orgId, req.body || {}), unavailable: 'MISSION_UNAVAILABLE' },
   // Client contacts of a mission: found by the agents (proposed), validated by a manager.
   'mission-client-contacts': {
     POST: users(MANAGERS, (orgId, req) => {

@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
-<style>#fu-items .item{flex-wrap:wrap}#fu-items .fu-inline{flex-basis:100%;margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(180px,max-content))}</style>
+<style>#fu-items .item{flex-wrap:wrap}#pc-note{font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius-s,8px);background:var(--surface);color:var(--ink)}.drop-zone{display:flex;align-items:center;justify-content:center;min-height:90px;border:2px dashed var(--line);border-radius:var(--radius-s,8px);cursor:pointer;color:var(--muted);text-align:center;padding:12px}.drop-zone.over{border-color:var(--ink)}#fu-items .fu-inline{flex-basis:100%;margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(180px,max-content))}</style>
 </head>
 <body>
 <div class="shell">
@@ -94,6 +94,25 @@
         <p class="note" id="fu-note"></p>
         <div id="fu-items" class="stack"></div>
         <p class="note" id="fu-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" id="sec-pieces" aria-labelledby="h-pieces">
+        <h2 id="h-pieces">Pièces reçues</h2>
+        <p class="meta" id="pc-folder"></p>
+        <div id="pc-nofolder" hidden>
+          <p class="note" id="pc-nofolder-why">Le dossier de la mission n’existe pas encore dans le Drive.</p>
+          <div class="btn-row"><button class="btn" id="pc-prepare" type="button">Créer le dossier de la mission</button><a class="btn ghost" id="pc-config" href="/secretariat.html?document_type=mission_root&document_role=firm_reference#ref-card" hidden>Indiquer où créer les missions</a></div>
+        </div>
+        <div id="pc-zone" hidden>
+          <p class="note">États financiers, balance, grand livre, relevés, contrats… Déposez-les ici : ils vont directement dans le dossier de la mission (sous-dossier PIECES_RECUES), sans validation. Ensuite les agents les lisent et mettent la mission à jour.</p>
+          <label class="drop-zone" id="pc-drop" for="pc-files"><input id="pc-files" type="file" multiple hidden><span>Glissez les fichiers ici ou <u>choisissez-les</u></span></label>
+          <ul id="pc-picked" class="blockers"></ul>
+          <label for="pc-note" class="sr">Précision pour les agents (facultatif)</label>
+          <input id="pc-note" maxlength="1000" placeholder="Précision pour les agents (facultatif) — ex. reçus du DAF le 18/10, version provisoire" style="width:100%;box-sizing:border-box;margin:6px 0">
+          <div class="btn-row"><button class="btn" id="pc-send" type="button">Déposer dans la mission</button></div>
+        </div>
+        <p class="note" id="pc-status" role="status" aria-live="polite"></p>
+        <div id="pc-results" class="stack"></div>
       </section>
 
       <div class="mission-sections">
@@ -641,7 +660,9 @@
     if (!body.name || !body.client) { $('n-status').textContent = 'Indiquez au moins le nom de la mission et le client.'; return; }
     var b = $('n-create'); b.disabled = true; $('n-status').textContent = 'Création…'; $('n-dups').hidden = true;
     OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
-      var msg = 'Mission créée.';
+      var msg = 'Mission créée.', pf = r.prepared && r.prepared.folder;
+      if (pf && pf.status === 'created') msg += ' Le Mission Controller a créé son dossier « ' + pf.name + ' ».';
+      else if (pf && pf.reason) msg += ' Dossier : ' + pf.reason;
       if (r.folder && !r.folder.verified) msg += ' Le dossier Drive n’a pas pu être vérifié : il reste « à vérifier » dans la mission.';
       $('n-status').textContent = msg + ' Ouverture…';
       location.href = r.url || ('/mission.html?id=' + encodeURIComponent(r.mission.id));
@@ -670,7 +691,7 @@
     if (!f || !f.items) return;
     var shown = f.items.filter(function (i) { return i.status === 'open' || !i.derived; });
     // A mission from an opportunity with nothing open stays as before.
-    if (!f.origin && !f.open) { $('sec-followups').hidden = true; return; }
+    if (!f.origin) { $('sec-followups').hidden = true; return; }
     $('sec-followups').hidden = false;
     $('fu-origin').textContent = [f.origin_label && 'Origine : ' + f.origin_label, f.type_label, f.period && 'Période : ' + f.period, f.created_by && 'Créée par ' + f.created_by].filter(Boolean).join(' · ');
     $('fu-note').textContent = f.note || '';
@@ -691,6 +712,7 @@
         });
         dr.appendChild(ds); dr.appendChild(de); dr.appendChild(dok); it.appendChild(dr);
       }
+      if (i.key === 'folder' && i.href) { var cl = el('a', 'Indiquer où le Mission Controller crée les missions', 'btn ghost'); cl.href = i.href; it.appendChild(cl); }
       if (i.key === 'folder') {
         var fr = el('div', null, 'form-grid fu-inline'), inp = el('input'); inp.placeholder = 'Lien du dossier Drive'; inp.maxLength = 500; inp.setAttribute('aria-label', 'Lien du dossier Drive');
         var ok = el('button', 'Relier ce dossier', 'btn ghost'); ok.type = 'button';
@@ -722,8 +744,71 @@
       box.appendChild(it);
     });
   }
+  // ---- Pieces received: straight into the mission folder (2026-10-19) ----
+  var WS = { queued: 'Le Mission Controller va reprendre la structure du modèle du cabinet dans ce dossier.', preparing: 'Le Mission Controller reprend la structure du modèle du cabinet…',
+    reported: 'Structure du modèle préparée par le Mission Controller (à relire).', agents_not_authorized: 'Structure du modèle en attente : les agents ne sont pas autorisés (Paramètres).', failed: 'La préparation de la structure a échoué : vous pouvez relancer.' };
+  function drawPieces(f) {
+    var hasFolder = Boolean(f && f.folder_id);
+    $('pc-zone').hidden = !hasFolder; $('pc-nofolder').hidden = hasFolder;
+    $('pc-folder').textContent = '';
+    if (hasFolder) {
+      var a = el('a', 'Ouvrir le dossier de la mission dans le Drive'); a.href = 'https://drive.google.com/drive/folders/' + encodeURIComponent(f.folder_id); a.target = '_blank'; a.rel = 'noopener noreferrer';
+      $('pc-folder').appendChild(a);
+      if (f.workspace && WS[f.workspace.status]) $('pc-folder').appendChild(el('span', ' · ' + (f.workspace.error || WS[f.workspace.status])));
+    } else {
+      var mf = (f && f.mission_folder) || {};
+      $('pc-nofolder-why').textContent = mf.reason || 'Le dossier de la mission n’existe pas encore dans le Drive.';
+      $('pc-config').hidden = mf.status !== 'configuration_required';
+    }
+  }
+  $('pc-prepare').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('pc-status').textContent = 'Le Mission Controller crée le dossier…';
+    OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'prepare', mission_id: missionId }) }).then(function (r) {
+      var st = r.folder || {};
+      $('pc-status').textContent = st.status === 'created' ? 'Dossier créé : « ' + st.name + ' ».' : st.status === 'ready' ? 'Le dossier existe déjà.' : (st.reason || 'Dossier non créé.');
+      loadFollowups();
+    }).catch(function (e) { $('pc-status').textContent = 'Impossible : ' + e.message; }).then(function () { b.disabled = false; });
+  });
+  var pieces = [];
+  function showPieces() { var ul = $('pc-picked'); ul.textContent = ''; pieces.forEach(function (x) { ul.appendChild(el('li', x.name + ' (' + Math.max(1, Math.round(x.size / 1024)) + ' Ko)')); }); }
+  function addPieces(list) { Array.prototype.forEach.call(list || [], function (x) { if (x.size > 0 && pieces.length < 150) pieces.push(x); }); showPieces(); }
+  $('pc-files').addEventListener('change', function () { addPieces(this.files); this.value = ''; });
+  ['dragenter', 'dragover'].forEach(function (t) { $('pc-drop').addEventListener(t, function (e) { e.preventDefault(); $('pc-drop').classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { $('pc-drop').addEventListener(t, function (e) { e.preventDefault(); $('pc-drop').classList.remove('over'); if (t === 'drop') addPieces(e.dataTransfer.files); }); });
+  function readB64(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); }
+  function sendOne(file) {
+    if (file.size <= 3 * 1024 * 1024) return readB64(file).then(function (data) {
+      return OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'piece', mission_id: missionId, name: file.name, mime: file.type || 'application/octet-stream', base64: data }) });
+    });
+    // Large file: straight to Google, in the same mission folder.
+    return OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'piece-start', mission_id: missionId, name: file.name, mime: file.type || 'application/octet-stream', size: file.size }) })
+      .then(function (s) { return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) { if (!r.ok) throw new Error('Envoi vers Google refusé (' + r.status + ')'); return r.json(); }).then(function (g) { return { file_id: g.id, name: g.name || s.name }; }); });
+  }
+  $('pc-send').addEventListener('click', function () {
+    if (!pieces.length) { $('pc-status').textContent = 'Choisissez ou glissez au moins un fichier.'; return; }
+    var b = this, list = pieces.slice(), done = [], box = $('pc-results'); b.disabled = true; box.textContent = '';
+    var next = function (i) {
+      if (i >= list.length) {
+        pieces = []; showPieces();
+        if (!done.length) { $('pc-status').textContent = 'Aucune pièce déposée.'; b.disabled = false; return; }
+        $('pc-status').textContent = done.length + ' pièce(s) dans le dossier de la mission. Les agents les lisent…';
+        OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'pieces-done', mission_id: missionId, note: $('pc-note').value.trim(), files: done.map(function (x) { return { id: x.file_id }; }) }) })
+          .then(function (r) { $('pc-status').textContent = r.received + ' pièce(s) déposée(s) dans la mission. ' + (r.analysis && r.analysis.started ? 'Les agents les lisent et mettront la mission à jour.' : 'La lecture par les agents n’a pas pu partir ; les pièces sont bien dans le dossier.'); $('pc-note').value = ''; })
+          .catch(function (e) { $('pc-status').textContent = 'Pièces déposées, mais l’enregistrement a échoué : ' + e.message; })
+          .then(function () { b.disabled = false; });
+        return;
+      }
+      $('pc-status').textContent = 'Dépôt de « ' + list[i].name + ' » (' + (i + 1) + '/' + list.length + ')…';
+      sendOne(list[i]).then(function (r) { done.push(r); box.appendChild(el('div', '« ' + list[i].name + ' » → ' + (r.name || list[i].name), 'item')); })
+        .catch(function (e) { box.appendChild(el('div', '« ' + list[i].name + ' » : non déposé (' + e.message + ')', 'item')); })
+        .then(function () { next(i + 1); });
+    };
+    next(0);
+  });
+
   function loadFollowups() {
-    OM.api('/api/app?route=mission-quick&mission_id=' + encodeURIComponent(missionId)).then(drawFollowups).catch(function () { /* older install: nothing shown */ });
+    OM.api('/api/app?route=mission-quick&mission_id=' + encodeURIComponent(missionId)).then(function (f) { drawFollowups(f); drawPieces(f); })
+      .catch(function () { drawPieces(current && current.mission && current.mission.drive_folder_id ? { folder_id: current.mission.drive_folder_id } : null); });
   }
 
   function reload() {

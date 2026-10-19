@@ -365,6 +365,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   historique gardé. Dates et dossier Drive (vérifié comme dossier dans le Drive, sinon « à vérifier ») complétables après.
 - Doublon même client + même nom → `POSSIBLE_DUPLICATE` avec la liste ; créer quand même = choix explicite. Double clic = même id.
 - SQL : `db/mission-quick.sql` (dans `INSTALL_TOUT.sql`) ; sans lui, la mission est créée quand même (sans origine ni points ouverts).
+- **Comme les autres, le Mission Controller crée la mission (Paul, 2026-10-19)** : à la création directe, `prepareDirectMission` →
+  `createMissionFolder` (même racine que les opportunités : référence `mission_root` / `firm_reference`, trouvé ou créé, jamais le
+  dossier d'une autre mission ; sans racine = `configuration_required` + lien de configuration, rien d'inventé ; un lien Drive vérifié
+  donné à la création est gardé) puis structure du modèle en arrière-plan (`requestDirectWorkspace` → route interne
+  `mission-quick-step` → `directWorkspaceStep`, mêmes outils que `lib/mission-workspace.js`, sans TDR ; une seule fois ; agents non
+  autorisés = attente dite). État dans `followups.mission_folder` / `followups.workspace`.
+- **Pièces reçues** (carte de `mission.html`, toute mission ayant un dossier) : directement dans `<dossier mission>/PIECES_RECUES`, sans
+  « À ranger » ni « À valider » (`piece` ≤ 3 Mo, `piece-start` = envoi direct à Google), même nom = nom daté (jamais écrasé), vérifié
+  dans le Drive ; `pieces-done` : seuls les fichiers réellement dans ce dossier, rôle `piece_recue` dans les documents de la mission,
+  index partagé `placed_by: mission-controller, protected` (l'Orpailleur ne fait que renommer), puis lecture par les agents
+  (`startDepositAnalysis` purpose `understand` + `mission_id` → mission mise à jour).
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
