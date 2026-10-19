@@ -59,6 +59,8 @@
         <button class="btn ghost" id="propose" type="button">Proposer depuis le document du cabinet</button>
       </div>
       <p class="meta">Le document est celui enregistré dans Paramètres → « Workflow et documents de gestion ». L’IA propose ; chaque étape garde la phrase du document d’où elle vient ; rien n’est confirmé sans vous.</p>
+      <div class="row"><label for="stuck">Une étape est « bloquée » après</label><input id="stuck" type="number" min="1" max="90" style="width:80px"><span>jours sans décision</span><button class="btn ghost" id="stuck-save" type="button">Enregistrer</button></div>
+      <p class="meta">Le manager de la mission et les associés en sont prévenus (cloche et accueil).</p>
     </section>
 
     <section class="card" aria-labelledby="h-steps">
@@ -173,6 +175,11 @@
       sel.value = type; paint();
     }).catch(function (e) { UI.fail($('steps'), { message: msg(e) }); });
   }
+  OM.api('/api/app?route=firm-settings').then(function (st) { $('stuck').value = st.workflow_stuck_days || 7; }).catch(function () {});
+  $('stuck-save').addEventListener('click', function () {
+    OM.api('/api/app?route=firm-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workflow_stuck_days: Number($('stuck').value) }) })
+      .then(function () { $('say').textContent = 'Délai enregistré.'; }).catch(function (e) { $('say').textContent = e.code === 'WORKFLOW_STUCK_DAYS_1_TO_90' || e.message === 'WORKFLOW_STUCK_DAYS_1_TO_90' ? 'Choisissez entre 1 et 90 jours.' : msg(e); });
+  });
   $('type').addEventListener('change', function () { type = this.value; paint(); $('say').textContent = ''; });
   $('from-builtin').addEventListener('click', function () { steps = copy(data.builtin); $('steps-what').textContent = '· à partir du parcours intégré (non enregistré)'; renderSteps(); });
   $('from-confirmed').addEventListener('click', function () { var t = current(); if (!t.confirmed) { $('say').textContent = 'Aucune version confirmée pour ce type.'; return; } steps = copy(t.confirmed.steps); $('steps-what').textContent = '· à partir de la version ' + t.confirmed.version + ' (non enregistré)'; renderSteps(); });

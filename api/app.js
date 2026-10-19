@@ -827,11 +827,16 @@ export const ROUTES = Object.freeze({
   workflow: {
     GET: users(ALL_ROLES, async (orgId, req) => {
       const m = await import('../lib/firm-workflow.js'), id = String(req.query?.mission_id || '');
+      // Accueil: the steps waiting for me, and (managers / partners) the steps stuck on my missions.
+      if (req.query?.view === 'overview') { const o = await m.workflowOverview(orgId, req.account);
+        return { ...o, mine: o.items.filter(x => x.mine), stuck: o.items.filter(x => x.stuck && x.lead), items: undefined }; }
       if (!id) return m.listWorkflows(orgId, req.account);
       await requireMissionAccess(orgId, id, req.account);
       const v = await m.missionWorkflow(orgId, id, req.account);
       const step = v.workflow?.steps.find(s => s.id === v.workflow.current);
-      return { workflow: v.workflow, me: step ? { may_act: !m.mayActOnStep(req.account, step, v.team), why_not: m.mayActOnStep(req.account, step, v.team) } : null };
+      const o = step ? (await m.workflowOverview(orgId, req.account, { missionIds: [id] }).catch(() => ({ items: [] }))).items[0] || null : null;
+      return { workflow: v.workflow, waiting: o ? { since: o.since, days: o.days, stuck: o.stuck, waiting_for: o.waiting_for } : null,
+        me: step ? { may_act: !m.mayActOnStep(req.account, step, v.team), why_not: m.mayActOnStep(req.account, step, v.team), mine: m.isMyStep(req.account, step, v.team) } : null };
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const b = req.body || {}, m = await import('../lib/firm-workflow.js');

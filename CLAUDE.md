@@ -569,8 +569,11 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   page `workflow.html`, route `workflow`. Parcours intégré `DEFAULT_STEPS` = les `STEPS` de `dossier-model.js` (sans Shadow) + rapport +
   clôture ; chaque étape garde son « détecteur » = `dossierStates` (même calcul qu'avant). L'IA lit le document `firm_workflow` → BROUILLON
   (extrait de chaque étape vérifié mot pour mot, `unverified` sinon), jamais confirmé seul. Mes dossiers → « Parcours et relais » :
-  étape en cours ▶, boutons des suites (`advanceMission`, `mayActOnStep` = fonction sur la mission, sinon grade). RESTE : faire suivre le
-  workflow par les AUTRES écrans (mission.html, accueil) et les agents (prochaine étape annoncée), alertes d'étape bloquée. Les anciennes routes (secrétariat, mails) restent sur le grade.
+  étape en cours ▶, boutons des suites (`advanceMission`, `mayActOnStep` = fonction sur la mission, sinon grade). Suivi partout (2026-10-19) :
+  `workflowOverview` (une lecture pour toutes les missions ouvertes : étape, qui attend, depuis quand, `stuck` après
+  `settings.workflow_stuck_days`, défaut 7) → accueil « Mes étapes du workflow » (`isMyStep` = fonction sur la mission, sinon grade),
+  cloche `workflow_step` / `workflow_stuck` (manager / associé de la mission et associés), page mission (étape sous le nom), outil
+  `get_mission_workflow` du Mission Controller et du Grand Contrôleur (lecture seule : une personne enregistre la suite). Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
   elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade

@@ -151,6 +151,11 @@ l'étape en cours est marquée ▶ ; les boutons « Poursuivre / Demander un com
 Refuser » enregistrent la suite (raison obligatoire sauf pour Poursuivre ; une porte non vue demande une raison et le
 manager de la mission ou un associé).
 
+Ensuite (facultatif) : sur la page Workflow, régler « Une étape est bloquée après N jours sans décision » (7 par
+défaut). Chacun voit à l'accueil « Mes étapes du workflow » et reçoit dans la cloche « Étape du workflow » quand une
+étape lui revient ; le manager de la mission et les associés reçoivent « Étape bloquée ». La page de la mission
+affiche l'étape en cours sous son nom.
+
 
 -----------------------------------------------------------------------------------------------------------------
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)

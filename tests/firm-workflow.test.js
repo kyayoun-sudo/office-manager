@@ -135,3 +135,53 @@ test('the firm document is read by the AI as a PROPOSAL: a draft, passages check
   assert.equal(t.rows[0].source.name, 'Workflow TATY.docx');
   await assert.rejects(W.proposeFromDocument('org', { mission_type: 'default' }, partner, { ...deps, references: async () => [] }), /WORKFLOW_DOCUMENT_NOT_CONFIGURED/);
 });
+
+// The rest of point 1: the step waiting for each person, stuck steps, the same for the agents and the bell.
+function overviewWorld() {
+  const now = Date.parse('2026-10-19T10:00:00Z');
+  const missions = [
+    { id: 'M1', name: 'Audit projet PRJ', engagement_type: 'project', status: 'fieldwork', created_at: '2026-10-01T00:00:00Z', followups: { acceptance: { status: 'done' } },
+      workflow: { step: 'programme', history: [{ step: 'analytical', outcome: 'continue', at: '2026-10-08T00:00:00Z' }] } },
+    { id: 'M2', name: 'CAC Société X', engagement_type: 'statutory', status: 'fieldwork', created_at: '2026-10-18T00:00:00Z', followups: {}, workflow: {} },
+    { id: 'M3', name: 'Ancienne mission', status: 'archived', created_at: '2025-01-01T00:00:00Z' }
+  ];
+  const fetchRows = async (path) => {
+    if (path.startsWith('office_missions')) return missions;
+    if (path.startsWith('office_mission_assignments')) return [
+      { office_mission_id: 'M1', staff_profile_id: 's1', mission_function: 'manager', status: 'confirmed' },
+      { office_mission_id: 'M2', staff_profile_id: 's2', mission_function: 'manager', status: 'confirmed' },
+      { office_mission_id: 'M2', staff_profile_id: 's1', mission_function: 'senior', status: 'confirmed' }];
+    if (path.startsWith('office_staff_profiles')) return [{ id: 's1', full_name: 'Awa', email: 'awa@c.ci' }, { id: 's2', full_name: 'Kofi', email: 'kofi@c.ci' }];
+    return [];
+  };
+  return { now, d: { fetchRows, now, settings: async () => ({ workflow_stuck_days: 7 }), accessibleMissionIds: async () => null } };
+}
+
+test('overview: where each open mission waits, for whom, since when; stuck after the firm\'s days', async () => {
+  const { d } = overviewWorld();
+  const awa = { role: 'manager', email: 'awa@c.ci' };
+  const o = await W.workflowOverview('org', awa, d);
+  assert.deepEqual(o.items.map(x => x.mission_id), ['M1', 'M2'], 'an archived mission is not followed');
+  const m1 = o.items.find(x => x.mission_id === 'M1');
+  assert.equal(m1.step.id, 'programme'); assert.equal(m1.days, 11); assert.equal(m1.stuck, true);
+  assert.equal(m1.mine, true, 'Awa is the manager of M1, the programme is the manager\'s');
+  assert.deepEqual(m1.waiting_for, ['Awa']);
+  const m2 = o.items.find(x => x.mission_id === 'M2');
+  // M2: a direct mission without acceptance recorded → the acceptance step, which is the manager's (Kofi), not Awa's (senior there).
+  assert.equal(m2.step.id, 'acceptance'); assert.equal(m2.mine, false); assert.equal(m2.stuck, false); assert.deepEqual(m2.waiting_for, ['Kofi']);
+  // The agents see the same, without a person (mine = false).
+  const agents = await W.workflowOverview('org', null, d);
+  assert.equal(agents.items.length, 2); assert.ok(agents.items.every(x => x.mine === false));
+});
+
+test('the bell: « une étape vous attend » for the person, « étape bloquée » for the mission\'s manager and the partners', async () => {
+  const { buildNotifications } = await import('../lib/notifications.js');
+  const { d } = overviewWorld();
+  const o = await W.workflowOverview('org', { role: 'partner', email: 'p@c.ci' }, d);
+  const stuck = o.items.filter(x => x.stuck && x.lead);
+  assert.equal(stuck.length, 1);
+  const n = buildNotifications({ kpis: [] }, { workflowSteps: [o.items[1]], workflowStuck: stuck });
+  assert.deepEqual(n.map(x => x.type).sort(), ['workflow_step', 'workflow_stuck']);
+  assert.ok(n.every(x => x.action_required && x.href.startsWith('/dossiers.html?mission_id=')));
+  assert.match(n.find(x => x.type === 'workflow_stuck').title, /bloquée depuis 11 j/);
+});

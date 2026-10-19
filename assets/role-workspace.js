@@ -44,7 +44,7 @@
     anchor.classList.add('workspace-alerts');document.getElementById('h-myspace').textContent=p.focus;
     document.getElementById('myspace-lead').hidden=true;document.getElementById('myspace-links').hidden=true;
     var columns=el('div',null,'workspace-grid'),left=el('div',null,'workspace-column'),right=el('aside',null,'workspace-column');columns.appendChild(left);columns.appendChild(right);main.insertBefore(columns,anchor);
-    var leftIds=role==='owner'?['myspace','cockpit-section','missions-card','myprocs','myreviews']:['myspace','myreviews','myprocs','mywork','missions-card'];
+    var leftIds=role==='owner'?['myspace','mysteps','cockpit-section','missions-card','myprocs','myreviews']:['myspace','mysteps','myreviews','myprocs','mywork','missions-card'];
     var rightIds=role==='owner'?['pending-card','runs-card','passes-card','mails','shortcuts']:['pending-card','workspace-updates','shortcuts','mails'];
     leftIds.forEach(function(id){var n=document.getElementById(id);if(n)left.appendChild(n);});
     rightIds.forEach(function(id){var n=document.getElementById(id);if(n)right.appendChild(n);});

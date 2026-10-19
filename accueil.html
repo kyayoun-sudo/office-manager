@@ -52,6 +52,12 @@
       <div id="myprocs-list" class="stack"></div>
     </section>
 
+    <section class="card" id="mysteps" aria-labelledby="h-mysteps" hidden>
+      <h2 id="h-mysteps">Mes étapes du workflow</h2>
+      <p class="meta">Les étapes des missions qui vous reviennent (votre fonction sur la mission), et celles qui sont bloquées sur les missions que vous dirigez.</p>
+      <div id="mysteps-list" class="stack"></div>
+    </section>
+
     <section class="card" id="myreviews" aria-labelledby="h-myreviews" hidden>
       <h2 id="h-myreviews">Mes revues</h2>
       <p class="meta">Les procédures soumises qui attendent votre niveau de revue.</p>
@@ -441,6 +447,22 @@
       $('myprocs').hidden = false;
     }).catch(function () {});
   }
+  // The firm's workflow (point 1, 2026-10-19): the steps waiting for me, the stuck ones on the missions I lead.
+  function loadMySteps() {
+    OM.api('/api/app?route=workflow&view=overview').then(function (r) {
+      var mine = (r && r.mine) || [], stuck = (r && r.stuck) || []; if (!mine.length && !stuck.length) return;
+      var box = $('mysteps-list'); box.textContent = '';
+      function row(x, why) {
+        var a = el('a', null, 'item link-item'); a.href = x.href;
+        var t = el('div', null, 't'); t.appendChild(el('span', x.mission_name + ' — ' + x.step.label + (x.step.gate ? ' (porte)' : '')));
+        t.appendChild(el('span', [why, x.step.decision, 'en attente depuis ' + x.days + ' j', x.waiting_for.length ? 'attend : ' + x.waiting_for.join(', ') : null].filter(Boolean).join(' · '), 'meta'));
+        a.appendChild(t); a.appendChild(el('span', x.stuck ? 'bloquée' : 'à faire', x.stuck ? 'tag warn' : 'tag')); box.appendChild(a);
+      }
+      mine.forEach(function (x) { row(x, 'à vous'); });
+      stuck.forEach(function (x) { row(x, 'bloquée depuis plus de ' + r.stuck_days + ' j'); });
+      $('mysteps').hidden = false;
+    }).catch(function () {});
+  }
   // Procedures waiting for my review level (2026-10-12).
   function loadMyReviews() {
     OM.api('/api/app?route=procedure&reviews=1').then(function (r) {
@@ -460,7 +482,7 @@
     if (LEADS_TEXT[role]) $('page-lead').textContent = LEADS_TEXT[role];
     OM.loadBranding().catch(function () {});
     loadMySpace();
-    if (OM.hasPersonalSession && OM.hasPersonalSession()) { loadMyReviews(); setTimeout(loadMyProcsCard, 800); }
+    if (OM.hasPersonalSession && OM.hasPersonalSession()) { loadMySteps(); loadMyReviews(); setTimeout(loadMyProcsCard, 800); }
     // The IT administrator works on accounts and connections, not on the firm's engagements.
     if (role === 'it_admin') { ['search', 'cockpit'].forEach(function (id) { var n = document.getElementById(id); if (n) (n.closest('section') || n).hidden = true; }); document.querySelectorAll('.row').forEach(function (r) { r.hidden = true; }); loadSetup(); return; }
     var lead = LEADS.indexOf(role) >= 0, manage = MANAGE.indexOf(role) >= 0;

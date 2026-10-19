@@ -77,6 +77,7 @@
         <p class="meta" id="m-meta"></p>
         <button class="btn ghost" id="edit-open" type="button">Corriger la mission</button>
         <a class="btn ghost" id="wf-link" href="/dossiers.html">Étape du workflow</a>
+        <p class="meta" id="wf-now" role="status" hidden></p>
         <div class="card stack" id="edit-box" hidden style="margin-top:10px">
           <p class="meta">Nom, client, type et période. Le dossier Drive garde son nom et son lien ; le programme de travail déjà fait reste et se modifie sur sa page.</p>
           <div class="form-grid">
@@ -332,6 +333,14 @@
   var params = new URLSearchParams(location.search);
   var missionId = params.get('id');
   if (missionId && document.getElementById('wf-link')) document.getElementById('wf-link').href = '/dossiers.html?mission_id=' + encodeURIComponent(missionId);
+  // The current step of the firm's workflow (point 1): what, who, since when; the outcome is recorded on the dossier.
+  if (missionId) OM.api('/api/app?route=workflow&mission_id=' + encodeURIComponent(missionId)).then(function (r) {
+    var wf = r && r.workflow, step = wf && (wf.steps || []).filter(function (x) { return x.id === wf.current; })[0], box = document.getElementById('wf-now');
+    if (!box) return;
+    box.textContent = !wf ? '' : wf.status === 'refused' ? 'Workflow : mission refusée.' : !step ? 'Workflow : toutes les étapes sont faites.'
+      : 'Étape en cours : ' + step.label + (step.gate ? ' (porte)' : '') + (r.waiting ? ' · depuis ' + r.waiting.days + ' j' + (r.waiting.stuck ? ' — bloquée' : '') + (r.waiting.waiting_for.length ? ' · attend : ' + r.waiting.waiting_for.join(', ') : '') : '') + (r.me && r.me.mine ? ' · c’est à vous' : '');
+    box.hidden = !box.textContent;
+  }).catch(function () {});
   var current = null, lastFollowups = null;
   var ROLES = { cfo: 'Directeur financier (CFO)', ceo: 'Directeur général (CEO)', tcwg: 'Gouvernance (TCWG)', achats: 'Responsable achats', ventes: 'Responsable ventes', tresorerie: 'Trésorerie', it: 'Informatique (IT)', paie: 'Paie / RH', comptabilite: 'Comptabilité', juridique: 'Juridique', cycle: 'Responsable de cycle', autre: 'Autre interlocuteur' };
   var LABELS = { opportunity: 'Proposition soumise', acceptance: 'Gagnée', planning: 'Planification', fieldwork: 'Terrain', review: 'Revue', partner_review: 'Revue associé', report_issued: 'Rapport émis', closed: 'Clôturée', archived: 'Archivée', cancelled: 'Annulée' };
