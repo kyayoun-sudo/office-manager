@@ -252,6 +252,10 @@ export const ROUTES = Object.freeze({
       if (b.action === 'workbook-view') return (await import('../lib/procedure-workspace.js')).workbookView(orgId, m, c, b, a);
       if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);
       // What this test needs, the zones to deposit each document, and the e-mail for the missing ones (2026-10-19).
+      // The living working file (2026-10-19): the steps of the test, « J'ai compris », run by code, result in a separate sheet.
+      if (b.action === 'steps') return (await import('../lib/step-runner.js')).stepsView(orgId, m, c, a);
+      if (b.action === 'step-plan') return (await import('../lib/step-runner.js')).planStep(orgId, m, c, b, a);
+      if (b.action === 'step-run') return (await import('../lib/step-runner.js')).runStep(orgId, m, c, b, a);
       if (['needs', 'need-piece', 'need-request'].includes(b.action)) await requireMissionAccess(orgId, m, a);
       if (b.action === 'needs') return (await import('../lib/procedure-needs.js')).procedureNeeds(orgId, m, c, a);
       if (b.action === 'need-piece') return (await import('../lib/procedure-needs.js')).depositForNeed(orgId, m, c, b, a, req);

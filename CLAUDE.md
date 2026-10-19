@@ -624,6 +624,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `draftRequest` : texte écrit par le code, destinataire = contact client de la mission, validé par un manager ; un manager peut l'envoyer
   aussitôt). Actions `needs` / `need-piece` / `need-request` de la route `procedure`. Test : `tests/procedure-needs.test.js`.
 
+- **Le working file vivant (Paul, 2026-10-19 : « on exécute les SOP dans les working files ; si le working file dit extraire le GL de la
+  ligne x à y, en appuyant sur le bouton l'Enhanced Auditor le fait directement, les résultats sortent et on analyse ; une capacité de
+  l'agent, peu importe le working file »)** — choix de Paul : résultat dans une FEUILLE À PART, un clic « Exécuter » après « J'ai compris »,
+  toutes les opérations. `lib/step-runner.js` : étapes lues dans la feuille de la procédure du working file lui-même (lignes numérotées,
+  tout modèle ; sinon les étapes du SOP) ; « J'ai compris » = l'IA transforme UNE étape en UNE opération d'une liste fermée (`OPERATIONS` :
+  extraire, rapprocher GL / balance, doublons et anomalies, cut-off) avec le fichier source choisi parmi ceux de la mission (pièces du
+  registre, documents lus — jamais un id tapé) et ses paramètres (lignes, comptes, période, montant, libellé) ; sans IA, la personne choisit ;
+  exécution par le CODE seul (colonnes reconnues par les en-têtes, `ledgerColumns`) ; résultat dans la feuille `<CODE>_E<n>` marquée
+  `RESULT_MARK`, avec sa trace (étape, fichier et version, paramètres, qui, quand) ; jamais par-dessus une feuille d'une personne (autre
+  nom), une feuille de l'application est refaite à sa place ; écrit si le fichier n'a pas changé (sinon relu et refait), relu ; puis la
+  lecture de l'Enhanced Auditor = proposition (ni PASS, ni conclusion). Carte « Exécuter le test dans le working file » de
+  `procedure.html`, actions `steps` / `step-plan` / `step-run` de la route `procedure`, audit `WORKPAPER_STEP_RUN`. Test :
+  `tests/step-runner.test.js`. RESTE : étapes d'un modèle dont les numéros ne sont pas en colonne A/B (lecture par l'IA), opérations
+  supplémentaires (recalcul, comparaison N/N-1, tirage depuis le résultat), report automatique dans les colonnes du test.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

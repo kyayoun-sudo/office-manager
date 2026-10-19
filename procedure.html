@@ -89,6 +89,12 @@
         <p class="meta">Vue consultable du fichier enregistré. Complétez les formulaires ci-dessous puis écrivez les travaux dans Excel. Jaune : champ d’entrée du modèle ; ƒ : formule.</p>
       </section>
     </section>
+    <section class="card" aria-labelledby="h-steps" id="steps-card">
+      <h2 id="h-steps">Exécuter le test dans le working file</h2>
+      <p class="meta">Chaque étape du working file (ou du SOP) peut être faite par l’Enhanced Auditor : il dit ce qu’il a compris (fichier, comptes, période, lignes), vous cliquez « Exécuter », le code fait le travail et écrit le résultat dans une feuille à part du working file. Vous analysez ensuite.</p>
+      <div id="steps-list"></div>
+      <p class="status" id="steps-say" role="status" aria-live="polite"></p>
+    </section>
     <section class="card" aria-labelledby="h-needs" id="needs-card">
       <h2 id="h-needs">Ce que demande ce test</h2>
       <div id="needs-aim"></div>
@@ -449,6 +455,69 @@
     needs.contacts.forEach(function (c) { sel.appendChild(new Option(c, c)); });
     $('needs-ask-all').onclick = function () { askMail(missing.map(function (x) { return x.id; }), $('needs-ask-all')); };
   }
+  // ---- The living working file: steps → « J'ai compris » → Exécuter (2026-10-19) ----
+  var SERR = { PLAN_INCOMPLETE: 'Il manque des éléments : choisissez l’opération et le fichier source.', AMOUNT_COLUMN_NOT_FOUND: 'Colonne des montants introuvable dans le fichier source.', PERIOD_END_REQUIRED: 'Indiquez la date de clôture.', IN_REVIEW_OR_NOT_EDITABLE: 'Procédure en revue ou non modifiable.', NO_WORKPAPER_FOR_CYCLE: 'Le working file du cycle n’existe pas encore.', MEMORY_CONFLICT: 'Le working file a été modifié en même temps : réessayez.' };
+  var smsg = function (e) { var c = e && (e.code || e.message); return SERR[c] || msg(e); };
+  var stepsData = null;
+  function paramsLine(p) { var out = []; if (p.row_from || p.row_to) out.push('lignes ' + (p.row_from || '…') + ' à ' + (p.row_to || '…')); if ((p.accounts || []).length) out.push('comptes ' + p.accounts.join(', ')); if (p.date_from || p.date_to) out.push('du ' + (p.date_from || '…') + ' au ' + (p.date_to || '…')); if (p.period_end) out.push('clôture ' + p.period_end); if (p.min_amount != null) out.push('montant ≥ ' + p.min_amount); if ((p.label_contains || []).length) out.push('libellé : ' + p.label_contains.join(', ')); return out.join(' · '); }
+  function planBox(step, plan, host) {
+    host.textContent = '';
+    var box = el('div', null, 'note'); box.style.cssText = 'margin:6px 0 10px;padding:10px;border:1px solid var(--line);border-radius:10px';
+    box.appendChild(el('p', plan.understood ? 'J’ai compris : ' + plan.understood : (plan.ai === 'AGENTS_NOT_AUTHORIZED' ? 'Les agents ne sont pas autorisés : choisissez vous-même l’opération et le fichier.' : plan.ai === 'AI_UNAVAILABLE' ? 'L’IA ne répond pas : choisissez vous-même l’opération et le fichier.' : 'Choisissez l’opération et le fichier.')));
+    var op = document.createElement('select'); op.setAttribute('aria-label', 'Opération'); op.appendChild(new Option('— opération —', ''));
+    Object.keys(stepsData.operations).forEach(function (k) { op.appendChild(new Option(stepsData.operations[k], k)); }); op.value = plan.operation || '';
+    var src = document.createElement('select'); src.setAttribute('aria-label', 'Fichier source'); src.appendChild(new Option('— fichier source —', ''));
+    stepsData.sources.forEach(function (f) { src.appendChild(new Option(f.name + (f.document ? ' (' + f.document + ')' : ''), f.file_id)); }); src.value = plan.source_file_id || '';
+    var bal = document.createElement('select'); bal.setAttribute('aria-label', 'Balance'); bal.appendChild(new Option('— balance (rapprochement) —', ''));
+    stepsData.sources.forEach(function (f) { bal.appendChild(new Option(f.name, f.file_id)); }); bal.value = plan.balance_file_id || '';
+    var pr = el('input'); pr.type = 'text'; pr.style.minWidth = '260px'; pr.setAttribute('aria-label', 'Paramètres'); pr.value = JSON.stringify(plan.params || {});
+    var row = el('div', null, 'row'); [op, src, bal].forEach(function (x) { row.appendChild(x); }); box.appendChild(row);
+    box.appendChild(el('p', paramsLine(plan.params || {}) || 'Aucun filtre : tout le fichier.', 'meta'));
+    var det = el('details'); det.appendChild(el('summary', 'Modifier les paramètres')); det.appendChild(pr); box.appendChild(det);
+    if (!stepsData.sources.length) box.appendChild(el('p', 'Aucun fichier pour cette mission : déposez le grand livre (ou la balance) dans « Ce que demande ce test » ci-dessous.', 'meta'));
+    var go = el('button', 'Exécuter', 'btn'); go.type = 'button';
+    var out = el('div');
+    go.addEventListener('click', function () {
+      var params; try { params = JSON.parse(pr.value || '{}'); } catch (e) { $('steps-say').textContent = 'Paramètres illisibles.'; return; }
+      go.disabled = true; $('steps-say').textContent = 'L’Enhanced Auditor exécute l’étape ' + step.n + '…';
+      post({ action: 'step-run', plan: { step: step, operation: op.value, source_file_id: src.value, balance_file_id: bal.value, params: params } }).then(function (r) {
+        $('steps-say').textContent = 'Étape ' + step.n + ' exécutée : ' + r.count + ' ligne(s), résultat écrit dans la feuille « ' + r.sheet + ' »' + (r.verified ? ' (vérifié).' : ' (à vérifier).');
+        out.textContent = '';
+        out.appendChild(el('p', 'Totaux : ' + Object.keys(r.totals || {}).map(function (k) { return k + ' ' + (typeof r.totals[k] === 'number' ? fmt(r.totals[k]) : r.totals[k]); }).join(' · '), 'meta'));
+        if ((r.flags || []).length) { var ul = el('ul'); r.flags.slice(0, 30).forEach(function (f) { ul.appendChild(el('li', f.text)); }); out.appendChild(el('strong', 'Points relevés par le code (' + r.flags.length + ')')); out.appendChild(ul); }
+        if (r.analysis) { out.appendChild(el('strong', 'Lecture de l’Enhanced Auditor (proposition, à vous de conclure)')); out.appendChild(el('p', r.analysis.text)); }
+        window.dispatchEvent(new Event('procedure-written')); loadSteps(true);
+      }).catch(function (e) { $('steps-say').textContent = smsg(e) + (e.data && e.data.headers ? ' En-têtes lues : ' + e.data.headers.join(', ') : '') + (e.data && e.data.missing ? ' Manque : ' + e.data.missing.join(', ') : ''); }).then(function () { go.disabled = false; });
+    });
+    box.appendChild(go); box.appendChild(out); host.appendChild(box);
+  }
+  function paintSteps() {
+    var list = $('steps-list'); list.textContent = '';
+    if (!stepsData.steps.length) { list.appendChild(el('p', 'Aucune étape trouvée dans le working file ni dans le SOP.', 'empty')); return; }
+    stepsData.steps.forEach(function (st) {
+      var it = el('div'); it.style.cssText = 'padding:8px 0;border-bottom:1px solid var(--line)';
+      var head = el('div', null, 'row'); head.style.justifyContent = 'space-between';
+      head.appendChild(el('span', st.n + '. ' + st.text + (st.source === 'sop' ? ' (SOP)' : '')));
+      var done = stepsData.runs.filter(function (r) { return r.step.indexOf(st.n + '.') === 0; });
+      var tools = el('div', null, 'row');
+      if (done.length) tools.appendChild(el('span', 'Fait — feuille « ' + done[0].sheet + ' »', 'tag'));
+      var host = el('div');
+      if (stepsData.editable) {
+        var b = el('button', done.length ? 'Refaire' : '▶ Préparer', 'btn ghost'); b.type = 'button';
+        b.addEventListener('click', function () {
+          b.disabled = true; $('steps-say').textContent = 'L’Enhanced Auditor lit l’étape ' + st.n + '…';
+          post({ action: 'step-plan', step: st.n, text: st.text }).then(function (plan) { $('steps-say').textContent = ''; planBox(st, plan, host); })
+            .catch(function (e) { $('steps-say').textContent = smsg(e); }).then(function () { b.disabled = false; });
+        });
+        tools.appendChild(b);
+      }
+      head.appendChild(tools); it.appendChild(head); it.appendChild(host); list.appendChild(it);
+    });
+  }
+  function loadSteps(quiet) {
+    post({ action: 'steps' }).then(function (r) { stepsData = r; paintSteps(); if (r.problem && !quiet) $('steps-say').textContent = smsg({ code: r.problem }); })
+      .catch(function (e) { $('steps-list').textContent = ''; $('steps-list').appendChild(el('p', smsg(e), 'empty')); });
+  }
   function loadNeeds() {
     post({ action: 'needs' }).then(function (r) { needs = r; paintNeeds(); }).catch(function (e) { $('needs-list').textContent = ''; $('needs-list').appendChild(el('p', nmsg(e), 'empty')); });
   }
@@ -456,7 +525,7 @@
   function load() {
     if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
     OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
-      data = d; paintCard(); paint(); loadReview(); loadNeeds();
+      data = d; paintCard(); paint(); loadReview(); loadNeeds(); loadSteps();
       window.dispatchEvent(new CustomEvent('procedure-ready', { detail: d }));
     }).catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
   }
