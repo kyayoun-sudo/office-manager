@@ -99,7 +99,9 @@ test('a person decides: confirm needs a piece; « sans objet » needs a reason; 
 
 // Step 2: replies read in the request's own conversation, with or without a piece; direct deposit; never twice.
 function gmailMsg(id, from, at, text, attachments = []) {
-  return { id, threadId: 'T1', internalDate: String(Date.parse(at)), payload: { headers: [{ name: 'From', value: from }, { name: 'Subject', value: 'Re: Demande' }, { name: 'Message-ID', value: '<' + id + '>' }],
+  const domain = from.match(/@([^>]+)>?$/)?.[1];
+  return { id, threadId: 'T1', internalDate: String(Date.parse(at)), payload: { headers: [{ name: 'From', value: from }, { name: 'Subject', value: 'Re: Demande' }, { name: 'Message-ID', value: '<' + id + '>' },
+    { name: 'Authentication-Results', value: 'mx.google.com; dkim=pass header.i=@' + domain + '; spf=pass; dmarc=pass (p=NONE) header.from=' + domain }],
     parts: [{ mimeType: 'text/plain', body: { data: Buffer.from(text).toString('base64') } },
       ...attachments.map((a, i) => ({ filename: a, mimeType: 'application/pdf', body: { attachmentId: 'A' + i, size: 10 } }))] } };
 }
@@ -156,7 +158,7 @@ test('a reply from an unknown sender, or failing authentication, is kept « à v
   const w = await requested();
   w.thread.push(gmailMsg('x-1', 'Inconnu <attacker@evil.test>', '2026-10-20T08:00:00Z', 'Voici le grand livre.', ['Grand livre fournisseurs 2025.pdf']));
   const spoofed = gmailMsg('x-2', 'CFO <cfo@client.com>', '2026-10-20T08:30:00Z', 'Factures.', ['Factures fournisseurs.pdf']);
-  spoofed.payload.headers.push({ name: 'Authentication-Results', value: 'mx.google.com; dmarc=fail header.from=client.com' });
+  spoofed.payload.headers = spoofed.payload.headers.filter(h => h.name !== 'Authentication-Results').concat([{ name: 'Authentication-Results', value: 'mx.google.com; dkim=none; spf=softfail; dmarc=fail header.from=client.com' }]);
   w.thread.push(spoofed);
   await P.syncReplies('org', M, w.d);
   assert.equal(w.stored.length, 0, 'nothing written to the Drive');
@@ -164,6 +166,15 @@ test('a reply from an unknown sender, or failing authentication, is kept « à v
   const kept = w.t.rows[0].responses.filter(x => x.quarantined);
   assert.deepEqual(kept.map(x => x.gmail_id), ['x-1', 'x-2']);
   assert.match(kept[1].quarantine_reason, /Authentification/);
+  // Fail closed: no authentication at all, two mailboxes, a different « Sender »: never a direct deposit.
+  const strip = m => { m.payload.headers = m.payload.headers.filter(h => h.name !== 'Authentication-Results'); return m; };
+  assert.equal(P.senderCheck(strip(gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''))).ok, false);
+  assert.equal(P.senderCheck(gmailMsg('y', 'CFO <cfo@client.com>, Other <x@evil.test>', '2026-10-20T08:00:00Z', '')).ok, false);
+  const relayed = gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''); relayed.payload.headers.push({ name: 'Sender', value: 'x@evil.test' });
+  assert.equal(P.senderCheck(relayed).ok, false);
+  const signedElsewhere = gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''); signedElsewhere.payload.headers = signedElsewhere.payload.headers.map(h => h.name === 'Authentication-Results' ? { ...h, value: 'mx.google.com; dkim=pass header.i=@evil.test; dmarc=fail header.from=client.com' } : h);
+  assert.equal(P.senderCheck(signedElsewhere).ok, false, 'a DKIM pass for another domain proves nothing');
+  assert.equal(P.senderCheck(gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', '')).ok, true);
   assert.equal((await P.syncReplies('org', M, w.d)).replies, 0, 'not read again by itself');
   await assert.rejects(P.trustReply('org', M, { gmail_id: 'x-1' }, outsider, w.d), /NOT_ON_THIS_MISSION/);
   await P.trustReply('org', M, { gmail_id: 'x-1' }, manager, w.d);
