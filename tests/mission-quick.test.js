@@ -187,21 +187,35 @@ test('a folder already used by another mission is never taken', async () => {
   assert.equal(r.status, 'review_required');
 });
 
-test('creation runs the Mission Controller: folder made, structure queued, all without blocking', async () => {
-  const db = fakeDb(), drive = fakeDrive(); const fired = [];
+test('creation runs the Mission Controller: folder made; without a structure model it says so (2026-10-19: by code, not by AI)', async () => {
+  const db = fakeDb(), drive = fakeDrive();
   const r = await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Kappa' }, auditor,
-    deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async (req, path, body) => { fired.push([path, body]); return true; } }));
+    deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async () => true }));
   assert.equal(r.prepared.folder.status, 'created');
   assert.ok(db.missions[0].drive_folder_id);
-  assert.equal(db.missions[0].followups.workspace.status, 'queued');
-  assert.deepEqual(fired[0], ['/api/app?route=mission-quick-step', { mission_id: RID }]);
+  assert.equal(db.missions[0].followups.workspace.status, 'template_required');
+  assert.match(db.missions[0].followups.workspace.href, /mission_structure/);
   assert.equal(r.followups.items.some(i => i.key === 'folder'), false);
+});
+
+test('with the firm’s structure model given, the folders are copied by code into the mission folder (no AI, PIECES_RECUES untouched)', async () => {
+  const db = fakeDb(), drive = fakeDrive(); let synced = null;
+  drive.store.TPL = { id: 'TPL', name: 'MODELE MISSION', parents: [ROOT], mimeType: 'application/vnd.google-apps.folder' };
+  const refs = async () => [{ document_type: 'mission_root', document_role: 'firm_reference', file_id: ROOT }, { document_type: 'mission_structure', document_role: 'template', file_id: 'TPL', name: 'MODELE MISSION' }];
+  const r = await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Kappa' }, auditor,
+    deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: refs, fire: async () => true,
+      syncFolderFromTemplate: async a => { synced = a; return { root: { id: db.missions[0].drive_folder_id }, foldersCreated: 6, skippedExisting: 0 }; } }));
+  assert.equal(r.prepared.workspace.status, 'structured');
+  assert.equal(synced.foldersOnly, true); assert.equal(synced.templateFolderId, 'TPL');
+  assert.equal(synced.destinationName, drive.store[db.missions[0].drive_folder_id].name);
+  assert.equal(db.missions[0].followups.workspace.folders_created, 6);
 });
 
 test('the structure step runs once, and waits honestly when the agents are not authorised', async () => {
   const db = fakeDb(), drive = fakeDrive();
   await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Lambda', engagement_type: 'statutory' }, auditor,
     deps(db, { req: { headers: { host: 'x' } }, drive, tidy: fakeTidy(drive), documentReferences: rootRef, fire: async () => true }));
+  db.missions[0].followups.workspace.status = 'queued';
   const no = await directWorkspaceStep(ORG, { mission_id: RID }, { fetchRows: db.fetchRows, permissions: async () => ({ granted: false }) });
   assert.equal(no.status, 'agents_not_authorized');
   db.missions[0].followups.workspace.status = 'queued';

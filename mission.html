@@ -798,7 +798,7 @@
   }
   // ---- Pieces received: straight into the mission folder (2026-10-19) ----
   var WS = { queued: 'Le Mission Controller va reprendre la structure du modèle du cabinet dans ce dossier.', preparing: 'Le Mission Controller reprend la structure du modèle du cabinet…',
-    reported: 'Structure du modèle préparée par le Mission Controller (à relire).', agents_not_authorized: 'Structure du modèle en attente : les agents ne sont pas autorisés (Paramètres).', failed: 'La préparation de la structure a échoué : vous pouvez relancer.' };
+    reported: 'Structure du modèle préparée par le Mission Controller (à relire).', structured: 'Structure du modèle du cabinet reprise dans le dossier.', template_required: 'Le modèle de structure des missions n’est pas indiqué.', choose_template: 'Plusieurs modèles de structure : précisez lequel.', agents_not_authorized: 'Structure du modèle en attente : les agents ne sont pas autorisés (Paramètres).', failed: 'La préparation de la structure a échoué : vous pouvez relancer.' };
   function drawPieces(f) {
     var hasFolder = Boolean(f && f.folder_id);
     $('pc-zone').hidden = !hasFolder; $('pc-nofolder').hidden = hasFolder;
@@ -808,7 +808,9 @@
       $('pc-folder').appendChild(a);
       if (f.workspace && WS[f.workspace.status]) $('pc-folder').appendChild(el('span', ' · ' + (f.workspace.error || WS[f.workspace.status])));
       if (f.workspace && f.workspace.summary) { var det = el('details'); det.appendChild(el('summary', 'Compte rendu du Mission Controller')); det.appendChild(el('p', f.workspace.summary, 'note')); $('pc-folder').appendChild(det); }
-      if (!f.workspace || ['failed', 'agents_not_authorized', 'reported'].indexOf(f.workspace.status) >= 0) {
+      if (f.workspace && f.workspace.href) { var hl = el('a', ' Indiquer le modèle'); hl.href = f.workspace.href; $('pc-folder').appendChild(hl); }
+      if (f.workspace && f.workspace.status === 'structured') $('pc-folder').appendChild(el('span', ' (modèle « ' + (f.workspace.template || '') + ' », ' + (f.workspace.folders_created || 0) + ' dossier(s) créé(s))'));
+      if (!f.workspace || ['failed', 'agents_not_authorized', 'reported', 'template_required', 'choose_template'].indexOf(f.workspace.status) >= 0) {
         var again = el('button', f.workspace && f.workspace.status === 'reported' ? 'Refaire la structure du modèle' : 'Lancer la structure du modèle', 'btn ghost'); again.type = 'button';
         again.addEventListener('click', function () { $('pc-prepare').click(); }); $('pc-folder').appendChild(document.createTextNode(' ')); $('pc-folder').appendChild(again);
       }

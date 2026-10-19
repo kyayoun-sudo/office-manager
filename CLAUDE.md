@@ -509,6 +509,19 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `foundProgrammes`) avec « Utiliser ce programme » ; un programme sans aucun code passe tout seul à la lecture par Mission Controller
   (rapprochement proposé, à examiner). Test : `tests/programme-recognition.test.js`.
 
+- **Structure de la mission créée par le code, références qui ne se perdent plus (Paul, 2026-10-19 : « il me dit de renseigner le modèle,
+  je le renseigne ; il ne crée toujours ni la mission ni le dossier ; tout reste dans pièces reçues »)** — causes : 1) la structure d'une
+  mission directe n'était faite QUE par l'agent IA, via `initialize_mission_from_template`, qui exige une pièce « mission démarrée », la
+  carte de l'Orpailleur et le registre maître du pilote → rien n'était jamais créé ; 2) une fois le modèle donné, rien ne relançait ;
+  3) les références (racine des missions, modèle) vivaient seulement dans `OFFICE_MANAGER_FILE_INDEX.json` de la mémoire, perdues avec
+  elle. Désormais : `structureFromModel` (`lib/mission-quick.js`) copie par CODE les dossiers du modèle confirmé (`mission_structure` /
+  `template`, choisi par type de mission si plusieurs) dans le dossier de la mission (`syncFolderFromTemplate`, dossiers seulement,
+  existants réutilisés, rien déplacé ni écrasé) ; sans modèle = `template_required` + lien ; `prepareDirectMission` l'appelle (l'agent IA
+  n'est plus nécessaire) ; confirmer `mission_root` ou `mission_structure` relance les missions directes en attente
+  (`resumeDirectMissions`, route `secretariat`) ; les références du cabinet sont aussi gardées dans
+  `office_firm_settings.settings.references` (`documentReferences` fusionne). Tests : `tests/mission-quick.test.js`,
+  `tests/references-durable.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

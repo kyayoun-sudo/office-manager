@@ -282,7 +282,11 @@ export const ROUTES = Object.freeze({
         const index = await import('../lib/file-index.js');
         if (b.action === 'upload-reference') return index.uploadDocumentReference(orgId, b, a);
         if (b.action === 'unavailable-document') return index.confirmDocumentUnavailable(orgId, b, a);
-        return b.action === 'locate-document' ? index.locateRequiredDocument(orgId, b) : index.confirmDocumentReference(orgId, b, a);
+        const done = b.action === 'locate-document' ? await index.locateRequiredDocument(orgId, b) : await index.confirmDocumentReference(orgId, b, a);
+        // The missing place or model is now given: the direct missions waiting for it are prepared again (2026-10-19).
+        if (b.action === 'confirm-document' && ['mission_root', 'mission_structure'].includes(b.document_type))
+          done.resumed = await (await import('../lib/mission-quick.js')).resumeDirectMissions(orgId, req, a).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+        return done;
       }
       // A PBC list recognised by its content: the person confirms once, or says it is not one (lib/pbc-lists.js).
       if (b.action === 'pbc-list-decide') {
