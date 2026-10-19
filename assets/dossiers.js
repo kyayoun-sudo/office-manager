@@ -470,6 +470,8 @@
       auditor: ["work", "documents", "workflow"],
       senior: ["work", "overview", "workflow"],
       manager: ["overview", "work", "team"],
+      supervisor: ["overview", "work", "team"],
+      quality_reviewer: ["work", "overview"],
       partner: ["overview", "workflow", "work"],
       secretary: ["documents", "workflow", "team"],
       finance: ["finance", "overview"],

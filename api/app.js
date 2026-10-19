@@ -813,6 +813,8 @@ export const ROUTES = Object.freeze({
         return { ...r, workspace: await m.requestDirectWorkspace(orgId, req, String(b.mission_id), req.account).catch(e => ({ status: 'failed', error: String(e.message || e).slice(0, 120) })) }; }
       if (b.action === 'details') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDetails(orgId, b, req.account); }
       if (b.action === 'dates') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDates(orgId, b, req.account); }
+      // The function of a person on THIS mission (manager here, supervisor elsewhere): partner, or the mission's manager / partner.
+      if (b.action === 'function') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return (await import('../lib/mission-function.js')).setMissionFunction(orgId, b, req.account); }
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'MISSION_UNAVAILABLE'

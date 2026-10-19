@@ -548,6 +548,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (dossiers nommés, `ITEM_LIMIT`, échec, en cours) ; une PERSONNE peut « continuer sans ces dossiers » (`excludeBlockedFolders`,
   action `mapping-exclude-blocked` de `readiness`, audit `MAPPING_FOLDERS_EXCLUDED`), exclusion gardée aux scans suivants, affichée
   dans l'avertissement (`EXCLUDED_BY_PERSON`) et réversible (`mapping-include`). « À valider » distingue rien / filtré / erreur.
+- **Point 2 fait** (choix de Paul : la fonction sur la mission décide QUI revoit, le grade du compte décide si la personne est QUALIFIÉE
+  pour signer) : `lib/mission-function.js` (`reviewAuthority`, `programmeAuthority`, `SIGN_QUALIFIED`) ; une personne nommée Manager
+  sur la mission signe la revue Manager, un autre manager de grade non (`LEVEL_HELD_BY_OTHER`) ; une fonction sans le grade = `NOT_QUALIFIED_FOR_LEVEL` ;
+  personne nommée pour ce niveau = le grade, comme avant. Programme : modifié par la fonction manager / superviseur / associé, validé
+  par le manager ou l'associé nommé. Changer une fonction : carte Équipe de `mission.html`, action `function` de `mission-quick`
+  (`setMissionFunction` : associé ou manager / associé de la mission, jamais la sienne, audit `MISSION_FUNCTION_CHANGED`) ; les revues en
+  attente suivent tout de suite (calculées), les signatures données restent. « Superviseur » n'est plus lu comme « senior ».
+  Ordre manager ↔ superviseur NON décidé (aucune qualification croisée). Les anciennes routes (secrétariat, mails) restent sur le grade.
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.

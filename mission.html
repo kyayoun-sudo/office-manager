@@ -177,8 +177,10 @@
         <section class="card" id="sec-team" aria-labelledby="h-team">
           <h2 id="h-team">Équipe</h2>
           <h3 class="sub">Équipe retenue (affectations)</h3>
+          <p class="note">La fonction sur la mission décide qui revoit et valide ici (une personne peut être manager sur une mission, superviseur sur une autre). Signer une revue demande aussi le grade qualifié. Un associé ou le manager de la mission la change ; jamais la sienne. Chaque changement est tracé.</p>
+          <p class="note" id="fn-status" role="status" aria-live="polite"></p>
           <div class="table-box"><table>
-            <thead><tr><th scope="col">Personne</th><th scope="col">Rôle sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
+            <thead><tr><th scope="col">Personne</th><th scope="col">Fonction sur la mission</th><th scope="col">Période</th><th scope="col">Charge</th><th scope="col">État</th></tr></thead>
             <tbody id="team"></tbody>
           </table></div>
           <div id="reco-box" hidden>
@@ -453,7 +455,7 @@
     if (!(d.assignments || []).length) { var tr = el('tr'); var td = el('td', 'Aucune affectation enregistrée.', 'empty'); td.colSpan = 5; tr.appendChild(td); tbody.appendChild(tr); }
     (d.assignments || []).forEach(function (a) {
       var tr = el('tr');
-      tr.appendChild(el('td', a.full_name || 'Profil non trouvé')); tr.appendChild(el('td', a.mission_role || a.role_title || '–'));
+      tr.appendChild(el('td', a.full_name || 'Profil non trouvé')); tr.appendChild(functionCell(a));
       tr.appendChild(el('td', UI.dateRange(a.planned_start, a.planned_end))); tr.appendChild(el('td', a.allocation_pct != null ? a.allocation_pct + ' %' : '–'));
       var stc = el('td'); stc.appendChild(el('span', a.status || '–', 'tag neutral')); tr.appendChild(stc); tbody.appendChild(tr);
     });
@@ -938,6 +940,25 @@
       .catch(function () { drawPieces(current && current.mission && current.mission.drive_folder_id ? { folder_id: current.mission.drive_folder_id } : null); });
   }
 
+  // Function on the mission: shown to all, changeable by a partner / the mission's manager (the server decides).
+  var FUNCTIONS = [['partner', 'Associé'], ['manager', 'Manager'], ['supervisor', 'Superviseur'], ['senior', 'Senior'], ['auditor', 'Auditeur'],
+    ['quality_reviewer', 'Revue qualité'], ['specialist', 'Spécialiste'], ['secretary', 'Secrétariat'], ['finance', 'Finance']];
+  var FERR = { MISSION_MANAGER_OR_PARTNER_REQUIRED: 'Seuls un associé ou le manager de cette mission changent les fonctions.', NO_SELF_FUNCTION_CHANGE: 'Vous ne pouvez pas changer votre propre fonction : demandez à un associé.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.' };
+  function functionCell(a) {
+    var td = el('td'), label = a.mission_role || a.role_title || '–';
+    if (!a.id || ['owner', 'partner', 'manager', 'supervisor'].indexOf(OM.getRole()) < 0) { td.textContent = label; return td; }
+    var sel = el('select'); sel.setAttribute('aria-label', 'Fonction de ' + (a.full_name || 'cette personne') + ' sur la mission');
+    var cur = el('option', label); cur.value = ''; sel.appendChild(cur);
+    FUNCTIONS.forEach(function (f) { var o = el('option', f[1]); o.value = f[0]; sel.appendChild(o); });
+    sel.addEventListener('change', function () {
+      if (!sel.value) return;
+      var chosen = sel.options[sel.selectedIndex].textContent; sel.disabled = true; $('fn-status').textContent = 'Enregistrement…';
+      OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'function', mission_id: missionId, assignment_id: a.id, function: sel.value }) })
+        .then(function (r) { $('fn-status').textContent = r.changed ? (a.full_name || 'La personne') + ' : ' + (r.before || '—') + ' → ' + chosen + '. ' + (r.note || '') : 'Rien à changer.'; reload(); })
+        .catch(function (e) { $('fn-status').textContent = FERR[e.code || e.message] || ('Impossible : ' + e.message); sel.value = ''; sel.disabled = false; });
+    });
+    td.appendChild(sel); return td;
+  }
   function reload() {
     return OM.api('/api/app?route=mission-file&mission_id=' + encodeURIComponent(missionId)).then(showDossier)
       .catch(function () { return OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId)).then(showDossier); });

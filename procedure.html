@@ -345,7 +345,8 @@
   }
   var LV = { senior: 'Senior', manager: 'Manager', supervisor: 'Superviseur', partner: 'Associé' };
   var RERR = { NOT_THIS_REVIEW_LEVEL: 'Ce n’est pas à votre niveau de revoir maintenant.', NO_SELF_REVIEW: 'Vous avez préparé cette procédure : une autre personne la revoit.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.',
-    OPEN_REVIEW_POINTS: 'Des points de revue sont encore ouverts.', POINT_NOT_ANSWERED: 'Le préparateur n’a pas encore répondu à ce point.', REVIEW_POINT_REQUIRED: 'Écrivez au moins un point.', NOTHING_TO_REVIEW: 'Rien à revoir pour l’instant.', ALREADY_REVIEWED: 'Toutes les revues requises sont faites.' };
+    OPEN_REVIEW_POINTS: 'Des points de revue sont encore ouverts.', POINT_NOT_ANSWERED: 'Le préparateur n’a pas encore répondu à ce point.', REVIEW_POINT_REQUIRED: 'Écrivez au moins un point.', NOTHING_TO_REVIEW: 'Rien à revoir pour l’instant.', ALREADY_REVIEWED: 'Toutes les revues requises sont faites.',
+    LEVEL_HELD_BY_OTHER: 'Une autre personne tient cette fonction sur la mission : c’est elle qui revoit à ce niveau.', NOT_QUALIFIED_FOR_LEVEL: 'Vous tenez cette fonction sur la mission, mais votre grade ne permet pas de signer ce niveau : une personne qualifiée signe.' };
   var rmsg = function (e) { var c = e && (e.code || e.message); return RERR[c] || msg(e); };
   function postR(b, sayEl, done) { return post(b).then(function (r) { if (r && r.work) { data.work = r.work; window.dispatchEvent(new CustomEvent('procedure-updated', { detail: data })); } if (done) done(r); else { paint(); loadReview(); } }).catch(function (e) { sayEl.className = 'status error'; sayEl.textContent = rmsg(e); }); }
   function loadReview() {
@@ -366,7 +367,7 @@
         c.appendChild(say); box.appendChild(c);
       });
       $('rev-tools').hidden = !v.me.may_review;
-      if (v.next && !v.me.may_review && !v.me.is_preparer) $('rev-levels').appendChild(el('span', ' — ' + (RERR[v.me.why_not] || ''), 'meta'));
+      if (v.next && !v.me.may_review && !v.me.is_preparer) $('rev-levels').appendChild(el('span', ' — ' + (RERR[v.me.why_not] || '') + ((v.next_reviewers || []).length ? ' Revue attendue de : ' + v.next_reviewers.join(', ') + '.' : ''), 'meta'));
     }).catch(function () {});
   }
   $('rev-ai').addEventListener('click', function () {
