@@ -87,6 +87,7 @@
     <section class="card" aria-labelledby="h-imp" id="import-card">
       <h2 id="h-imp">Importer votre programme</h2>
       <p class="meta">Collez le lien de vos écrits Word, du plan ou de la revue analytique. Mission Controller, avec l’aide d’Enhanced Auditor, propose les procédures de la méthodologie du cabinet : chaque rapprochement reste à examiner. Les documents doivent être dans le dossier de la mission pour les responsables de mission.</p>
+      <div id="found-progs"></div>
       <div class="row"><input id="imp-file" type="text" placeholder="https://drive.google.com/file/d/…" aria-label="Lien du programme"><button class="btn ghost" id="imp" type="button">Importer les codes existants</button></div>
       <div class="field"><label for="planning-sources">Autres sources (revue analytique, compte rendu — un lien par ligne, deux maximum)</label><textarea id="planning-sources" rows="2"></textarea></div>
       <div class="field"><label for="planning-discussion">Discussion avec Mission Controller : décisions, demandes de modification ou questions</label><textarea id="planning-discussion" rows="4" maxlength="6000" placeholder="Ex. Après notre réunion, ajouter une recherche de dettes non enregistrées ; conserver les tests déjà retenus."></textarea></div>
@@ -309,7 +310,10 @@
       r.cycles.forEach(function (c) { var i = cycles.findIndex(function (x) { return x.sop_file_id === c.sop_file_id; }); if (i >= 0) cycles[i] = c; else cycles.push(c); });
       importedFrom = r.file_id; paintCycles(); paintAdd();
       $('imp-say').textContent = r.matched.length + ' procédure(s) reconnue(s)' + (r.unknown.length ? ' ; codes inconnus de la bibliothèque : ' + r.unknown.join(', ') : '') + (r.truncated ? ' ; fichier lu en partie.' : '.') + ' Vérifiez puis enregistrez.';
-    }).catch(function (e) { $('imp-say').textContent = msg(e) + (e.data && e.data.unknown && e.data.unknown.length ? ' Codes trouvés : ' + e.data.unknown.join(', ') : ''); }).then(function () { b.disabled = false; });
+    }).catch(function (e) {
+      // No SOP code in the file (a programme written in words): Mission Controller reads it and proposes the matching procedures.
+      if (e.code === 'NO_PROCEDURE_CODE_IN_FILE') { $('imp-say').textContent = 'Aucun code de la méthodologie dans ce fichier : Mission Controller le lit et rapproche ses contrôles des procédures du cabinet…'; $('planning-analyse').click(); return; }
+      $('imp-say').textContent = msg(e) + (e.data && e.data.unknown && e.data.unknown.length ? ' Codes trouvés : ' + e.data.unknown.join(', ') : ''); }).then(function () { b.disabled = false; });
   });
 
   function paint() {
@@ -329,6 +333,16 @@
     cycles = JSON.parse(JSON.stringify((p && p.cycles) || []));
     $('savebar').hidden = true; paintCycles(); paintAdd();
     $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
+    var fp = $('found-progs'); fp.textContent = '';
+    if ((data.found_programmes || []).length) {
+      fp.appendChild(el('p', 'Programme(s) de travail trouvé(s) parmi les documents de la mission :', 'meta'));
+      data.found_programmes.forEach(function (f) {
+        var row = el('div', null, 'row'); row.appendChild(f.url ? UI.safeLink(f.url, f.name) : el('span', f.name));
+        var use = el('button', 'Utiliser ce programme', 'btn ghost'); use.type = 'button';
+        use.addEventListener('click', function () { $('imp-file').value = 'https://drive.google.com/file/d/' + f.id; $('imp').click(); });
+        row.appendChild(use); fp.appendChild(row);
+      });
+    }
     document.querySelectorAll('#h-mat ~ .grid input, #reviews input').forEach(function (x) { x.disabled = !editable; });
     var val = data.validated;
     $('publish-programme').hidden = !val || !data.may_validate;

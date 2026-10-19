@@ -475,6 +475,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   sinon on coche les états financiers…) et ne tombe plus si la carte du Drive manque. Le fichier d'audit = les Working Papers par cycle,
   créés à la validation du programme. Test : `tests/pieces-rename-and-prep.test.js`.
 
+- **Programme de travail repéré (Paul, 2026-10-19 : « il n'arrive pas à repérer les programmes de travail »)** : `codesInText` cherche
+  chaque code de la bibliothèque avec un motif tolérant (« ach 01 », « ACH–1 », « C02_ACH-10 », « PRJ.5 » = le code ; toujours par code) ;
+  la page du programme montre les programmes trouvés parmi les documents de la mission (rôle `programme_de_travail` lu dans le contenu,
+  `foundProgrammes`) avec « Utiliser ce programme » ; un programme sans aucun code passe tout seul à la lecture par Mission Controller
+  (rapprochement proposé, à examiner). Test : `tests/programme-recognition.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.
