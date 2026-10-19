@@ -378,6 +378,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   test, carte retenue par version du modèle) — `writeWorkpaper` attend encore la forme du fichier de base ; 2) entrée par cycle
   dans la mission (ses tests d'abord) ; 3) remplir ce qui est sourcé et DEMANDER à l'auditeur le reste, partie par partie.
 
+## Veille open source de Shadow (Paul, 2026-10-19 : « Shadow part sur des forums où il peut avoir des codes pour agents d'audit et de comptabilité … pour améliorer les agents, et en s'auditant. Je tiens à cela. »)
+- `lib/shadow-code-watch.js` : un agent par jour (rotation `nextToWatch`, chacun au moins tous les 7 jours, Shadow compris), ou à la
+  demande (Entraînement → Objectifs et enquêtes → « Lancer la veille maintenant », action `code-watch` de la route `shadow`, associés).
+  1) recherche GitHub (API publique, lecture seule ; `SHADOW_GITHUB_TOKEN` seulement pour les limites) sur des sujets PUBLICS par agent
+  (`WATCH_TOPICS`, jamais un nom de cabinet ou de client) : récents (~18 mois), ni archivés ni forks, ≥ 15 étoiles ; 2) lecture du README
+  et de 3 petits fichiers « qui enseignent » (prompts, agent, eval…) à un commit figé, en TEXTE, jamais téléchargés pour être exécutés ;
+  3) forums et communautés via la recherche web de l'IA (lecture seule, sources) ; 4) comparaison à l'objectif et au code de notre agent
+  (`COMPARE` : contenu externe = donnée non fiable, injections signalées dans `suspicious`) ; 5) idées → leçons `hypothesis` EN ATTENTE
+  d'une personne (catégorie `veille_open_source`, source dans `evidence`), tests de référence, et au plus UNE PR en brouillon pour les
+  idées de code de confiance haute. La LICENCE décide par code (`reuseOf`) : MIT/Apache/BSD/ISC… = adaptation avec attribution, sinon
+  idée seulement, quoi que dise l'IA. Mémoire : `SHADOW_LAB.json` → `code_watch` (40 dernières), scores de l'agent gardés (`scores_before`).
+- Shadow s'audite : `watchSelfSignals` (idées refusées, idées adoptées suivies d'une baisse de score, contenu suspect) entre dans ses
+  propres enquêtes ; les enquêtes d'un agent voient les idées de veille des 30 derniers jours ; résultat `open_watch` dans ses objectifs.
+- Coût : 1 appel IA de Shadow par veille (compté dans `SHADOW_MAX_DAILY_RUNS` / `_COST`) + une recherche web. Test : `tests/shadow-code-watch.test.js`.
+
 ## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
 - Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).
 - `lib/ai-plus.js` : fournisseur `openrouter` (texte, images, PDF, recherche web `plugins: [{ id: 'web' }]`, sources) ;

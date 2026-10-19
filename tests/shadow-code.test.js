@@ -77,7 +77,7 @@ test('Shadow code: proposal → its own branch and a DRAFT pull request (never m
   const ai2 = async () => ({ provider: 'anthropic', text: JSON.stringify({ summary: 's', edits: [{ file: 'lib/shadow.js', find: "x = 0.9 ? 'file'", replace: "x = 0.95 ? 'file'" }] }) });
   const o2 = await codeStep('org', {}, { proposal_id: r2.id }, { ...d2, ai: ai2, readSource: async () => "export const lab = 1;\nconst x = 0.9 ? 'file' : 2;\n" });
   assert.equal(o2.status, 'ready_without_github');
-  assert.deepEqual(AGENT_FILES.shadow, ['lib/shadow.js', 'lib/shadow-investigate.js', 'lib/shadow-filing-exam.js'], 'Shadow improves itself (its lab, its investigations, its exam), never its guard rails');
+  assert.deepEqual(AGENT_FILES.shadow, ['lib/shadow.js', 'lib/shadow-investigate.js', 'lib/shadow-filing-exam.js', 'lib/shadow-code-watch.js'], 'Shadow improves itself (its lab, its investigations, its exam, its open-source watch), never its guard rails');
   assert.ok(AGENT_FILES.shadow.every(f => !isGuardedFile(f)) && isGuardedFile('lib/shadow-guard.js'));
 });
 

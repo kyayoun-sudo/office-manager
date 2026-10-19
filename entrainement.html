@@ -451,6 +451,32 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         b.appendChild(item('Enquête ' + NAME(inv.agent) + ' — ' + UI.dateTime(inv.at), (inv.gaps || []).length + ' écart(s) à l’objectif · ' + inv.evidence_count + ' observation(s) du vrai travail', box));
       });
       if (!(data.investigations || []).length) b.appendChild(el('p', 'Aucune enquête encore : Shadow en fait une par jour (l’agent le plus loin de son objectif, chacun au moins une fois par semaine, lui compris).', 'empty'));
+      // Open-source watch (2026-10-19): public projects and forums of agents doing the same work → ideas waiting for a person.
+      b.appendChild(el('h3', 'Veille open source : projets et forums d’agents d’audit et de comptabilité'));
+      b.appendChild(el('p', 'Chaque jour, Shadow étudie un agent (lui compris, pour s’auditer) : il cherche des projets publics qui font le même travail, lit leur documentation et quelques fichiers (jamais exécutés), écoute les retours des forums, puis compare à notre agent. Chaque idée cite sa source et sa licence ; elle devient une leçon en attente de votre décision, et une idée de code solide devient une proposition de code à relire. Rien n’est appliqué seul ; aucune donnée du cabinet ne sort.', 'small'));
+      var wr = el('div', null, 'btn-row'), wsel = document.createElement('select'); wsel.setAttribute('aria-label', 'Agent à comparer');
+      Object.keys(data.goals || {}).forEach(function (k) { wsel.appendChild(new Option(data.goals[k].label, k)); });
+      wr.appendChild(wsel); wr.appendChild(btn('Lancer la veille maintenant', null, function () { act({ action: 'code-watch', agent: wsel.value }, 'Veille lancée (quelques minutes) : rechargez cet onglet ensuite.'); }));
+      b.appendChild(wr);
+      var REUSE = { adapt_with_attribution: 'adaptation permise avec attribution', idea_only: 'idée seulement (licence non permissive ou absente)' };
+      (data.code_watch || []).forEach(function (w) {
+        var box = el('div', null, 'stack');
+        if (w.summary) box.appendChild(el('p', w.summary, 'small'));
+        if ((w.repos || []).length) { var rp = el('p', 'Projets lus : ', 'small'); w.repos.forEach(function (r, i) { if (i) rp.appendChild(document.createTextNode(' · ')); rp.appendChild(UI.safeLink(r.url, r.full_name)); rp.appendChild(document.createTextNode(' (' + (r.license || 'sans licence') + ', ' + r.stars + '★)')); }); box.appendChild(rp); }
+        (w.ideas || []).forEach(function (i) {
+          var p = el('p', null, 'small');
+          p.appendChild(el('strong', i.n + '. ' + i.title));
+          p.appendChild(document.createTextNode(' — ' + i.what_they_do + (i.our_gap ? ' Chez nous : ' + i.our_gap : '') + ' [' + (REUSE[i.reuse] || i.reuse) + ', confiance ' + i.confidence + (i.outcome ? ', résultat visé : ' + i.outcome : '') + ']' + (i.lesson_id ? ' → leçon ' + i.lesson_id + ' (onglet Leçons)' : '') + (i.test_id ? ' · test ' + i.test_id : '') + ' '));
+          if (i.source_url) p.appendChild(UI.safeLink(i.source_url, 'source'));
+          box.appendChild(p);
+        });
+        if ((w.self_audit || []).length) box.appendChild(el('p', 'Shadow s’audite : ' + w.self_audit.join(' ; '), 'small'));
+        if ((w.suspicious || []).length) box.appendChild(el('p', 'Contenu suspect ignoré : ' + w.suspicious.join(' ; '), 'status error'));
+        if ((w.forums && w.forums.sources || []).length) { var fs = el('p', 'Forums : ', 'small'); w.forums.sources.slice(0, 6).forEach(function (x, i) { if (i) fs.appendChild(document.createTextNode(' · ')); fs.appendChild(UI.safeLink(x.url, x.title || x.url)); }); box.appendChild(fs); }
+        if (w.code) box.appendChild(el('p', 'Proposition de code : ' + w.code + ' (voir l’onglet Code)', 'small'));
+        b.appendChild(item('Veille ' + NAME(w.agent) + ' — ' + UI.dateTime(w.at), (w.ideas || []).length + ' idée(s) · ' + (w.repos || []).length + ' projet(s) lu(s)', box));
+      });
+      if (!(data.code_watch || []).length) b.appendChild(el('p', 'Aucune veille encore : la première part au prochain passage quotidien de Shadow, ou maintenant avec le bouton ci-dessus.', 'empty'));
     }
     if (panel === 'perf') {
       Object.keys(data.agents).forEach(function (k) {
