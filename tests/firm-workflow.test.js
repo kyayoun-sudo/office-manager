@@ -146,7 +146,7 @@ function overviewWorld() {
     { id: 'M3', name: 'Ancienne mission', status: 'archived', created_at: '2025-01-01T00:00:00Z' }
   ];
   const fetchRows = async (path) => {
-    if (path.startsWith('office_missions')) return missions;
+    if (path.startsWith('office_missions')) { const ids = path.match(/[?&]id=in\.\(([^)]*)\)/)?.[1]; return ids ? missions.filter(m => ids.split(',').map(decodeURIComponent).includes(m.id)) : missions; }
     if (path.startsWith('office_mission_assignments')) return [
       { office_mission_id: 'M1', staff_profile_id: 's1', mission_function: 'manager', status: 'confirmed' },
       { office_mission_id: 'M2', staff_profile_id: 's2', mission_function: 'manager', status: 'confirmed' },
@@ -184,4 +184,13 @@ test('the bell: « une étape vous attend » for the person, « étape bloquée 
   assert.deepEqual(n.map(x => x.type).sort(), ['workflow_step', 'workflow_stuck']);
   assert.ok(n.every(x => x.action_required && x.href.startsWith('/dossiers.html?mission_id=')));
   assert.match(n.find(x => x.type === 'workflow_stuck').title, /bloquée depuis 11 j/);
+});
+
+// Security review (2026-10-19): a mission asked for never widens a person's access (the agents' tool passes the requester).
+test('overview: a mission outside the person\'s staffing is never returned, even when asked for by id', async () => {
+  const { d } = overviewWorld();
+  const awa = { role: 'auditor', email: 'awa@c.ci' };
+  const scoped = { ...d, accessibleMissionIds: async () => new Set(['M1']) };
+  assert.deepEqual((await W.workflowOverview('org', awa, { ...scoped, missionIds: ['M2'] })).items, []);
+  assert.deepEqual((await W.workflowOverview('org', awa, { ...scoped, missionIds: ['M1', 'M2'] })).items.map(x => x.mission_id), ['M1']);
 });
