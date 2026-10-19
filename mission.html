@@ -1023,6 +1023,16 @@
           at.addEventListener('click', function () { at.disabled = true; pbcPost({ action: 'assign', file_id: fid, id: r.id }, function () { return 'Pièce rattachée à votre nom : elle sera contrôlée.'; }); });
           t.appendChild(at);
         }); });
+        if (r.status === 'accepted') {
+          if (r.filed && r.filed.name) t.appendChild(el('span', 'Classée : ' + r.filed.name + (r.filed.verified ? ' ✓' : ' (non vérifiée)') + (r.workpaper && r.workpaper.verified ? ' · inscrite dans le working file (feuille PBC_RECUES) ✓' : ''), 'meta'));
+          var problem = (r.filed && r.filed.error) || (r.workpaper && r.workpaper.error);
+          if (problem || !(r.filed && r.filed.verified) || !(r.workpaper && r.workpaper.verified)) {
+            if (problem) t.appendChild(el('span', '⚠ ' + problem, 'meta'));
+            var bf = el('button', 'Classer et inscrire de nouveau', 'btn ghost'); bf.type = 'button';
+            bf.addEventListener('click', function () { bf.disabled = true; pbcPost({ action: 'file', id: r.id }, function (x) { return x.problems && x.problems.length ? x.problems.join(' ') : 'Pièce classée et inscrite dans le working file.'; }); });
+            t.appendChild(bf);
+          }
+        }
         if (last) t.appendChild(el('span', 'Réponse de ' + last.from + ' le ' + UI.dateTime(last.at) + (last.pieces && last.pieces.length ? ' — ' + last.pieces.length + ' pièce(s)' : ' — sans pièce') + (last.text ? ' : « ' + last.text.slice(0, 240) + ' »' : ''), 'meta'));
         it.appendChild(t);
         var acts = el('div', null, 'btn-row');

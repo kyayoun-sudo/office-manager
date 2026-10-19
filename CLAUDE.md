@@ -601,7 +601,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   quel document et quelle demande il satisfait, avec un passage vérifié mot pour mot (sinon avis écarté) ; verdict PROPOSÉ (`conforme`,
   `partiel`, `mauvaise_periode`, `autre_document`, `a_verifier`, `illisible`), confirmer contre le contrôle exige une raison ;
   `requestComplement` = texte précis dans la MÊME conversation (`reply_to` passé par `mission-write.submit`), validé par un manager.
-  RESTE : 4 (renommage, classement,
+  Sécurité : `senderCheck` refuse par défaut (un seul expéditeur, `Sender` identique, en-tête `Authentication-Results` du HAUT signé
+  mx.google.com et lu STRICTEMENT par `parseAuthResults` — sinon nul ; DMARC pass pour le domaine EXACT, DMARC en échec bloque, DKIM du
+  domaine exact seulement sans DMARC) ; le tri d'une pièce « à trier » par l'IA n'est qu'une SUGGESTION, une personne rattache
+  (`assignPiece`). ÉTAPE 4 FAITE : à la confirmation, `fileAccepted` déplace la pièce (même id) dans `<WP>/PIECES_<CYCLE>/PBC` sous
+  `CYCLE_PBC_document_période` (jamais par-dessus un autre fichier : suffixe), écrit sa ligne dans la feuille `PBC_RECUES` du working
+  paper du cycle (feuille de l'application, jamais une case d'une personne, conflit = relu et réécrit), relit les deux ; un échec est dit
+  et rejouable (« Classer et inscrire de nouveau »).
+  RESTE : 5 (recette d'ensemble : complète / partielle / absente sur une mission), 4bis (renommage, classement,
   working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon).
 
 ## Première connexion (Paul, 2026-10-17)

@@ -895,6 +895,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'control') { await m.pbcView(orgId, id, req.account); return m.controlPieces(orgId, id, {}); }
       if (b.action === 'complement') return m.requestComplement(orgId, id, b, req.account);
       if (b.action === 'assign') return m.assignPiece(orgId, id, b, req.account);
+      if (b.action === 'file') return m.fileAccepted(orgId, id, b, req.account);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'PBC_UNAVAILABLE'

@@ -24,7 +24,7 @@ function world() {
     if (path.startsWith('office_audit_events')) return [];
     return [];
   };
-  const d = { fetchRows, audit: async (o, e) => { t.audits.push(e); },
+  const d = { fetchRows, audit: async (o, e) => { t.audits.push(e); }, fileAccepted: async () => ({ problems: [] }),
     team: async () => [{ email: 'm@c.ci', mission_function: 'manager' }],
     methodology: async () => ({ sops: [
       { file_id: 'SOP1', file_name: 'SOP Achats.docx', cycle: { code: 'ACH', pbc: [{ document: 'Grand livre fournisseurs', purpose: 'Population des achats' }, { document: 'Factures fournisseurs', purpose: null }] } },
@@ -183,6 +183,13 @@ test('a reply from an unknown sender, or failing authentication, is kept « à v
   assert.equal(withAR('mx.google.com; dkim=pass header.i=@client.com; dmarc=fail header.from=client.com'), false);
   assert.equal(withAR('mx.google.com; dkim=pass header.d=client.com; spf=pass'), true, 'no DMARC for the domain: its own DKIM signature');
   assert.equal(withAR('mx.google.com; dkim=pass header.d=other.com; spf=pass'), false);
+  // Strict shape: quotes, nested parentheses, a repeated DMARC, a second « Gmail » header lower down: not verified.
+  assert.equal(withAR('mx.google.com; dmarc=fail header.from="client.com; dmarc=pass header.from=client.com"'), false);
+  assert.equal(withAR('mx.google.com; dmarc=fail ((x) dmarc=pass header.from=client.com) header.from=client.com'), false);
+  assert.equal(withAR('mx.google.com; dmarc=pass header.from=client.com; dmarc=fail header.from=client.com'), false);
+  assert.equal(withAR('mx.google.com; dmarc=pass (p=none sp=none dis=none) header.from=client.com'), true, 'Gmail\'s usual shape');
+  const twice = gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''); twice.payload.headers.push({ name: 'Authentication-Results', value: 'mx.google.com; dmarc=pass header.from=client.com' });
+  assert.equal(P.senderCheck(twice).ok, false);
   assert.equal((await P.syncReplies('org', M, w.d)).replies, 0, 'not read again by itself');
   await assert.rejects(P.trustReply('org', M, { gmail_id: 'x-1' }, outsider, w.d), /NOT_ON_THIS_MISSION/);
   await P.trustReply('org', M, { gmail_id: 'x-1' }, manager, w.d);
@@ -269,4 +276,38 @@ test('a piece to sort: the AI suggests a line, the piece stays « à trier » un
   assert.ok(w.t.rows.every(r => !(r.responses.at(-1).unassigned || []).length));
   await P.controlPieces('org', M, w.d);
   assert.equal(w.t.rows[0].status, 'to_confirm', 'then checked; a person still confirms');
+});
+
+// Step 4: confirmed by a person → renamed, filed with the cycle's working papers, written in the working file, both verified.
+test('a confirmed piece is renamed and filed (same file id, never over another file) and written in the cycle\'s working file', async () => {
+  const ExcelJS = (await import('exceljs')).default;
+  const wb = new ExcelJS.Workbook(); wb.addWorksheet('ACH-01').addRow(['Travail de l’auditeur']); const wpBuf = Buffer.from(await wb.xlsx.writeBuffer());
+  const { t, d } = world();
+  const files = { F1: { name: 'GL fournisseurs 2025.xlsx', parents: ['RECUES'] }, X: { name: 'ACH_PBC_Grand_livre_fournisseurs_Exercice_2025.xlsx', parents: ['PBC'] }, WP: { name: 'WP_ACH.xlsx', parents: ['WPF'], buf: wpBuf, mt: 'm0' } };
+  const drive = {
+    getMeta: async id => ({ id, name: files[id].name, parents: files[id].parents, modifiedTime: files[id].mt, webViewLink: 'https://drive/' + id }),
+    findFilesByExactName: async (name, parent) => Object.entries(files).filter(([, f]) => f.name === name && f.parents.includes(parent)).map(([id]) => ({ id })),
+    downloadBuffer: async id => files[id].buf,
+    updateBinary: async (id, { buffer, expectedModifiedTime }) => { if (expectedModifiedTime !== files[id].mt) throw new Error('MEMORY_CONFLICT'); files[id].buf = buffer; files[id].mt = 'm' + Math.random(); }
+  };
+  const deps = { ...d, fileAccepted: undefined, drive,
+    findWorkpapersFolder: async () => ({ id: 'WPF' }), findOrCreateFolder: async (parent, name) => ({ id: name === 'PBC' ? 'PBC' : 'PIECES' }),
+    move: async (id, from, to, name) => { files[id].parents = [to]; files[id].name = name; } };
+  const realFetch = deps.fetchRows;
+  deps.fetchRows = async (path, o) => path.startsWith('office_work_programmes') ? [{ id: 'p', version: 2, cycles: [], workpapers: [{ cycle_code: 'ACH', file_id: 'WP' }] }] : realFetch(path, o);
+  await P.planNeeds('org', M, manager, d);
+  await P.findExisting('org', M, manager, { ...d, missionDocuments: async () => [{ id: 'F1', name: 'GL fournisseurs 2025.xlsx', type: 'grand livre fournisseurs', period: '2025' }] });
+  const r = await P.decide('org', M, { id: 'r1', decision: 'accept', reason: 'Vérifié à l’écran' }, manager, deps);
+  assert.deepEqual(r.filing.problems, []);
+  assert.equal(files.F1.parents[0], 'PBC', 'same file id, moved');
+  assert.equal(files.F1.name, 'ACH_PBC_Grand_livre_fournisseurs_Exercice_2025_2.xlsx', 'a file of the same name was there: never over it');
+  assert.equal(t.rows[0].filed.verified, true); assert.equal(t.rows[0].workpaper.verified, true);
+  const check = new ExcelJS.Workbook(); await check.xlsx.load(files.WP.buf);
+  const sheet = check.getWorksheet('PBC_RECUES');
+  assert.equal(sheet.getRow(2).getCell(3).value, 'Grand livre fournisseurs');
+  assert.equal(check.getWorksheet('ACH-01').getRow(1).getCell(1).value, 'Travail de l’auditeur', 'the auditor\'s sheet untouched');
+  // Again: already filed and written — nothing moved twice, the line updated in place.
+  await P.fileAccepted('org', M, { id: 'r1' }, manager, deps);
+  const again = new ExcelJS.Workbook(); await again.xlsx.load(files.WP.buf);
+  assert.equal(again.getWorksheet('PBC_RECUES').rowCount, 2);
 });
