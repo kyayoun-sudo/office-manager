@@ -613,6 +613,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Recette en tests : GL 2024 puis 2025 (`tests/pbc-loop.test.js`). RESTE : 5 (recette d'ensemble sur une vraie mission : pièces
   complètes / partielle / absente), relances automatiques des pièces sans réponse (aujourd'hui : demande manuelle).
 
+- **« Ce que demande ce test » dans Ma procédure (Paul, 2026-10-19 : « pour le walkthrough il doit aller vers ce que ça demande,
+  préparer les mails pour les pièces manquantes ; sous l'Excel, des cases pour déposer les documents, par exemple le GL ; à côté,
+  envoyer le mail »)** : carte sous le fichier Excel de `procedure.html` ; `lib/procedure-needs.js` (CODE, sans IA) : le but (`aimOf` :
+  objectif, risque, assertion, explication de la méthode — walkthrough = une transaction réelle de bout en bout —, étapes du SOP) ; les
+  documents « Ce qu'il faut demander » de la fiche deviennent des lignes du registre unique `office_pbc_requests`
+  (`ensureProcedureNeeds`, même clé que les besoins du cycle, `procedure_codes` complété) ; un document déjà lu pour la mission est
+  proposé « à confirmer » (`findExisting`) ; chaque ligne a sa case de dépôt (`depositForNeed` → `PIECES_RECUES` de la mission,
+  `attachPiece` = « à confirmer », jamais « reçue » sans personne, puis lecture par les agents) et « Envoyer le mail » (`requestForNeeds` →
+  `draftRequest` : texte écrit par le code, destinataire = contact client de la mission, validé par un manager ; un manager peut l'envoyer
+  aussitôt). Actions `needs` / `need-piece` / `need-request` de la route `procedure`. Test : `tests/procedure-needs.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

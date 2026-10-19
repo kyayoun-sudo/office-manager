@@ -251,6 +251,11 @@ export const ROUTES = Object.freeze({
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
       if (b.action === 'workbook-view') return (await import('../lib/procedure-workspace.js')).workbookView(orgId, m, c, b, a);
       if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);
+      // What this test needs, the zones to deposit each document, and the e-mail for the missing ones (2026-10-19).
+      if (['needs', 'need-piece', 'need-request'].includes(b.action)) await requireMissionAccess(orgId, m, a);
+      if (b.action === 'needs') return (await import('../lib/procedure-needs.js')).procedureNeeds(orgId, m, c, a);
+      if (b.action === 'need-piece') return (await import('../lib/procedure-needs.js')).depositForNeed(orgId, m, c, b, a, req);
+      if (b.action === 'need-request') return (await import('../lib/procedure-needs.js')).requestForNeeds(orgId, m, c, b, a);
       if (b.action === 'population-preview') return w.populationPreview(orgId, m, c, b, a);
       if (b.action === 'population') return w.setPopulation(orgId, m, c, b, a);
       if (b.action === 'sample') return w.drawSample(orgId, m, c, b, a);

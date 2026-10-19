@@ -89,6 +89,18 @@
         <p class="meta">Vue consultable du fichier enregistré. Complétez les formulaires ci-dessous puis écrivez les travaux dans Excel. Jaune : champ d’entrée du modèle ; ƒ : formule.</p>
       </section>
     </section>
+    <section class="card" aria-labelledby="h-needs" id="needs-card">
+      <h2 id="h-needs">Ce que demande ce test</h2>
+      <div id="needs-aim"></div>
+      <h3 style="margin:14px 0 6px;font-size:15px">Documents nécessaires</h3>
+      <p class="meta">Déposez chaque document dans sa case (il va dans « Pièces reçues » de la mission, puis les agents le lisent). Pour ceux qui manquent, préparez la demande au client : elle part après validation par un manager.</p>
+      <div id="needs-list"></div>
+      <div class="row" id="needs-mail" hidden style="margin-top:10px;align-items:center">
+        <label for="needs-to" class="meta">Destinataire</label><select id="needs-to"></select>
+        <button class="btn" id="needs-ask-all" type="button">Demander tous les documents manquants</button>
+      </div>
+      <p class="status" id="needs-say" role="status" aria-live="polite"></p>
+    </section>
     <section class="card" aria-labelledby="h-card">
       <details id="card-box"><summary><h2 id="h-card" style="display:inline">Ce que dit le SOP</h2></summary><div id="card"></div></details>
     </section>
@@ -386,10 +398,65 @@
   $('rev-return').addEventListener('click', function () { postR({ action: 'return', points: $('rev-new').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean), severity: $('rev-sev').value, from_ai: fromAi }, $('rev-say'), function () { $('rev-new').value = ''; fromAi = false; $('rev-say').textContent = 'Renvoyée au préparateur.'; paint(); loadReview(); }); });
   $('rev-sign').addEventListener('click', function () { postR({ action: 'sign' }, $('rev-say'), function (r) { $('rev-say').textContent = r.all_signed ? 'Signé : toutes les revues requises sont faites.' : 'Signé. Revue suivante : ' + (LV[r.next] || '') + '.'; paint(); loadReview(); }); });
 
+  // ---- What this test needs (2026-10-19) ----
+  function readB64(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); }
+  var NERR = { RECIPIENTS_REQUIRED: 'Aucun contact client sur la mission : ajoutez-le dans la mission (contacts), puis revenez.', CLIENT_CONTACT_NOT_REGISTERED: 'Aucun contact client enregistré sur la mission.', NOTHING_TO_REQUEST: 'Rien à demander : ces documents sont déjà demandés ou reçus.', PBC_SQL_NOT_INSTALLED: 'À installer une fois : db/pbc-requests.sql dans Supabase.', FILE_TOO_LARGE: 'Fichier de plus de 3 Mo : déposez-le dans « Pièces reçues » de la mission.', MISSION_FOLDER_REQUIRED: 'Le dossier Drive de la mission n’existe pas encore (page de la mission).' };
+  var nmsg = function (e) { var c = e && (e.code || e.message); return NERR[c] || msg(e); };
+  var needs = null;
+  function askMail(ids, btn) {
+    var to = $('needs-to').value;
+    if (!to) { $('needs-say').textContent = NERR.RECIPIENTS_REQUIRED; return; }
+    if (btn) btn.disabled = true; $('needs-say').textContent = 'Préparation de la demande…';
+    post({ action: 'need-request', ids: ids, to: [to], send: !!(needs && needs.may_send) }).then(function (r) {
+      $('needs-say').textContent = r.status === 'sent' || r.sent ? 'Demande envoyée (' + r.items + ' document(s)).' : 'Demande préparée (' + r.items + ' document(s)) : elle part dès qu’un manager la valide dans « À valider ».';
+      loadNeeds();
+    }).catch(function (e) { $('needs-say').textContent = nmsg(e); }).then(function () { if (btn) btn.disabled = false; });
+  }
+  function paintNeeds() {
+    var a = needs.aim || {}, box = $('needs-aim'); box.textContent = '';
+    if (a.objective) box.appendChild(el('p', 'Le but : ' + a.objective));
+    if (a.risk || a.assertion) box.appendChild(el('p', [a.risk && 'Risque couvert : ' + a.risk, a.assertion && 'Assertion : ' + a.assertion].filter(Boolean).join(' · '), 'meta'));
+    if (a.how) box.appendChild(el('p', a.how, 'note'));
+    if ((a.steps || []).length) { var d = el('details'); d.appendChild(el('summary', 'Comment le faire (' + a.steps.length + ' étapes du SOP)')); var ol = document.createElement('ol'); a.steps.forEach(function (t) { ol.appendChild(el('li', t)); }); d.appendChild(ol); box.appendChild(d); }
+    var list = $('needs-list'); list.textContent = '';
+    if (!needs.sql_installed) { list.appendChild(el('p', NERR.PBC_SQL_NOT_INSTALLED, 'empty')); return; }
+    if (!needs.items.length) list.appendChild(el('p', needs.asked_in_sop ? 'Aucun document en attente pour ce test.' : 'Le SOP ne liste pas de document à demander pour ce test.', 'empty'));
+    var editable = data && data.editable !== false;
+    needs.items.forEach(function (it) {
+      var row = el('div', null, 'item'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)';
+      var t = el('div'); t.appendChild(el('strong', it.document)); t.appendChild(el('div', (it.label || it.status) + (it.period ? ' · ' + it.period : '') + ((it.pieces || []).length ? ' · ' + it.pieces.map(function (p) { return p.name; }).join(', ') : ''), 'meta')); row.appendChild(t);
+      var tools = el('div', null, 'row');
+      if (editable && ['accepted', 'not_applicable'].indexOf(it.status) < 0) {
+        var f = document.createElement('input'); f.type = 'file'; f.setAttribute('aria-label', 'Déposer : ' + it.document);
+        f.addEventListener('change', function () {
+          var file = f.files[0]; if (!file) return;
+          if (file.size > 3 * 1024 * 1024) { $('needs-say').textContent = NERR.FILE_TOO_LARGE; return; }
+          $('needs-say').textContent = 'Dépôt de « ' + file.name + ' »…';
+          readB64(file).then(function (b64) { return post({ action: 'need-piece', id: it.id, name: file.name, base64: b64, mime: file.type || 'application/octet-stream' }); })
+            .then(function () { $('needs-say').textContent = '« ' + file.name + ' » déposé : les agents le lisent ; à confirmer par une personne.'; loadNeeds(); })
+            .catch(function (e) { $('needs-say').textContent = nmsg(e); });
+        });
+        tools.appendChild(f);
+      }
+      if (editable && it.missing) { var b = el('button', 'Envoyer le mail', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { askMail([it.id], b); }); tools.appendChild(b); }
+      if (it.request) tools.appendChild(el('span', 'Demandé le ' + UI.dateTime(it.request.at), 'meta'));
+      row.appendChild(tools); list.appendChild(row);
+    });
+    var missing = needs.items.filter(function (x) { return x.missing; });
+    $('needs-mail').hidden = !editable || !missing.length;
+    var sel = $('needs-to'); sel.textContent = '';
+    if (!needs.contacts.length) sel.appendChild(new Option('— aucun contact client sur la mission —', ''));
+    needs.contacts.forEach(function (c) { sel.appendChild(new Option(c, c)); });
+    $('needs-ask-all').onclick = function () { askMail(missing.map(function (x) { return x.id; }), $('needs-ask-all')); };
+  }
+  function loadNeeds() {
+    post({ action: 'needs' }).then(function (r) { needs = r; paintNeeds(); }).catch(function (e) { $('needs-list').textContent = ''; $('needs-list').appendChild(el('p', nmsg(e), 'empty')); });
+  }
+
   function load() {
     if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
     OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
-      data = d; paintCard(); paint(); loadReview();
+      data = d; paintCard(); paint(); loadReview(); loadNeeds();
       window.dispatchEvent(new CustomEvent('procedure-ready', { detail: d }));
     }).catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
   }
