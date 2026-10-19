@@ -14,6 +14,7 @@
     review: "À examiner",
     done: "Étape terminée (décision enregistrée)",
     not_applicable: "Sans objet",
+    passed: "Passée sans enregistrement (mission lancée)",
   };
   // The firm's workflow (point 1, 2026-10-19): outcomes of the current step and why a person may not act.
   var OUTCOME_LABELS = { continue: "Poursuivre", complement: "Demander un complément", return: "Retourner pour correction", refuse: "Refuser" };

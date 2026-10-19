@@ -194,3 +194,37 @@ test('overview: a mission outside the person\'s staffing is never returned, even
   assert.deepEqual((await W.workflowOverview('org', awa, { ...scoped, missionIds: ['M2'] })).items, []);
   assert.deepEqual((await W.workflowOverview('org', awa, { ...scoped, missionIds: ['M1', 'M2'] })).items.map(x => x.mission_id), ['M1']);
 });
+
+// The link mission ← opportunity (2026-10-19, Paul: « règle cette limite »).
+test('a mission from an opportunity: its steps before the mission are over (passed or recorded), never the current one', () => {
+  const wf = { mission_type: 'default', version: 0, builtin: true, steps: W.DEFAULT_STEPS };
+  const st = W.workflowState(wf, { reception: 'recorded', decision: 'recorded', acceptance: 'recorded' }, {}, { hasOpportunity: true, missionStarted: true });
+  assert.equal(st.steps.find(s => s.id === 'decision').state, 'recorded');
+  assert.equal(st.steps.find(s => s.id === 'method').state, 'passed', 'not seen by the application: said so, not « done »');
+  assert.equal(st.current, 'risks');
+  // The acceptance is « both »: a mission whose opportunity has no accepted KYC stops there.
+  assert.equal(W.workflowState(wf, { decision: 'recorded' }, {}, { hasOpportunity: true, missionStarted: true }).current, 'acceptance');
+});
+
+test('overview: missions carry their opportunity; open opportunities show their own step, to whom it belongs', async () => {
+  const { d } = overviewWorld();
+  const won = { id: 'O1', mission_id: 'M2', title: 'AMI Banque', status: 'won', tdr_files: [{ id: 't' }], kyc_review: { status: 'accepted' } };
+  const open = { id: 'O2', title: 'TDR Ministère', client: 'Ministère', status: 'phase0', tdr_files: [{ id: 't' }], updated_at: '2026-10-01T00:00:00Z', team: { members: [{ email: 'awa@c.ci' }] } };
+  const deps = { ...d, opportunityLinks: async () => ({ byMission: new Map([['M2', won]]), open: [open] }),
+    settings: async () => ({ workflow_stuck_days: 7, business_partner: { name: 'Paul', email: 'paul@c.ci' } }) };
+  const paul = await W.workflowOverview('org', { role: 'partner', email: 'paul@c.ci' }, deps);
+  const m2 = paul.items.find(x => x.mission_id === 'M2');
+  assert.equal(m2.opportunity_id, 'O1'); assert.notEqual(m2.step.id, 'acceptance', 'the KYC accepted on the opportunity counts');
+  const o2 = paul.items.find(x => x.opportunity_id === 'O2' && !x.mission_id);
+  assert.equal(o2.step.id, 'decision'); assert.equal(o2.mine, true, 'the designated business-development partner decides');
+  assert.equal(o2.stuck, true); assert.equal(o2.href, '/opportunites.html?id=O2');
+  const other = await W.workflowOverview('org', { role: 'partner', email: 'p2@c.ci' }, deps);
+  assert.equal(other.items.find(x => x.opportunity_id === 'O2' && !x.mission_id).mine, false, 'another partner sees it, not his decision');
+  const zoe = await W.workflowOverview('org', { role: 'auditor', email: 'zoe@c.ci' }, { ...deps, accessibleMissionIds: async () => new Set() });
+  assert.equal(zoe.items.length, 0, 'not on its team: not shown');
+  const awa = await W.workflowOverview('org', { role: 'manager', email: 'awa@c.ci' }, deps);
+  assert.ok(awa.items.some(x => x.opportunity_id === 'O2'), 'on its team: shown');
+  const awaNoMission = await W.workflowOverview('org', { role: 'auditor', email: 'awa@c.ci' }, { ...deps, accessibleMissionIds: async () => new Set() });
+  assert.deepEqual(awaNoMission.items.map(x => x.opportunity_id), ['O2'], 'no mission yet: the opportunity of her team still shows');
+  assert.equal((await W.workflowOverview('org', { role: 'partner', email: 'paul@c.ci' }, { ...deps, missionIds: ['M1'] })).items.length, 1, 'one mission asked: only it');
+});

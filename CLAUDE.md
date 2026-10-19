@@ -573,7 +573,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `workflowOverview` (une lecture pour toutes les missions ouvertes : étape, qui attend, depuis quand, `stuck` après
   `settings.workflow_stuck_days`, défaut 7) → accueil « Mes étapes du workflow » (`isMyStep` = fonction sur la mission, sinon grade),
   cloche `workflow_step` / `workflow_stuck` (manager / associé de la mission et associés), page mission (étape sous le nom), outil
-  `get_mission_workflow` du Mission Controller et du Grand Contrôleur (lecture seule : une personne enregistre la suite). Les anciennes routes (secrétariat, mails) restent sur le grade.
+  `get_mission_workflow` du Mission Controller et du Grand Contrôleur (lecture seule : une personne enregistre la suite).
+  Lien mission ← opportunité (2026-10-19) : `opportunityLinks` (`lib/opportunities.js`, registre `OFFICE_MANAGER_OPPORTUNITIES.json`, une
+  opportunité par mission, deux = ambigu, jamais deviné) ; le dossier d'une mission retrouve son opportunité (états seulement, son contenu
+  reste derrière les droits de la page Opportunités) ; mission lancée = étapes d'opportunité terminées (`passed` si non vues, jamais
+  « en cours ») ; la vue d'ensemble montre aussi les opportunités sans mission (décision « poursuivre » = l'associé du développement
+  commercial désigné) ; la cloche ne reprend que les étapes des missions (les opportunités ont déjà leurs tâches). Outil des agents :
+  la personne qui demande est passée aux outils (`ctx.account`), une liste de missions demandée est croisée avec ses affectations. Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
   elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
