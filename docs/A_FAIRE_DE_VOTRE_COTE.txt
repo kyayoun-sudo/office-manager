@@ -182,6 +182,14 @@ Ensuite, pour une mission (programme de travail validé, période renseignée da
 [ ] Les demandes préparées par un auditeur attendent la validation d'un manager : menu « À valider ».
 
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)
+
+LECTURE DES SOP SYCEBNL — correction du 19/10/2026
+[ ] Après disponibilité de la Preview corrigée : menu Méthodologie → conserver le lien du dossier déjà renseigné
+    → « Lire les SOP » → attendre la fin de la lecture. Les anciennes fiches doivent être reconstruites.
+    Vérifier PRJ-01 : 5 documents à demander et 4 étapes spécifiques (plus 2 étapes communes).
+    Vérifier PRJ-02 : les étapes du walkthrough sont présentes. La méthode attendue du SOP est walkthrough.
+    Un programme déjà validé garde ses choix de sélection ; ne pas le revalider automatiquement.
+    Le classeur générique déjà associé à une mission n'est pas remplacé par cette correction du lecteur.
 -----------------------------------------------------------------------------------------------------------------
 [ ] Avant de redéployer la fonction Supabase taty-google-bridge : vérifier que les secrets OFFICE_MANAGER_DRIVE_ID
     (ou TATY_SHARED_DRIVE_ID) et DEFAULT_ORG_ID sont réglés (Supabase → Edge Functions → Secrets).

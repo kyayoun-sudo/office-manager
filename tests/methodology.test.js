@@ -36,6 +36,27 @@ const SOP = [
 
 async function readSop(blocks) { return extractStructuredOffice(await makeDocx(blocks), WORD, 400000); }
 
+test('SYCEBNL technical references before the execution sections do not truncate the procedure', async () => {
+  const blocks = procedure('PRJ-01', 'Compréhension convention',
+    card('Comprendre la convention.', 'Clauses omises', 'N/A', 'N/A | N/A | CORE | Niveau : Senior'),
+    ['Pas d’échantillon : examiner les informations nécessaires.'],
+    ['Identifier le bailleur et la période.', 'Construire la matrice des clauses.'],
+    ['convention complète', 'amendements', 'budget', 'manuel projet', 'organigramme']);
+  blocks.splice(3, 0, 'Références techniques : OHADA, Guide SYCEBNL ; ISA 315.');
+  blocks.push('Références techniques', 'Bibliographie finale du cycle.');
+  const parsed = parseSop(await readSop(blocks));
+  const p = parsed.procedures[0];
+  assert.deepEqual(p.ask, ['convention complète', 'amendements', 'budget', 'manuel projet', 'organigramme']);
+  assert.equal(p.population_steps.length, 2);
+  assert.equal(p.sampling_mode, 'none');
+  assert.deepEqual(p.steps.filter(s => !s.common).map(s => s.text),
+    ['Identifier le bailleur et la période.', 'Construire la matrice des clauses.']);
+  assert.equal(p.exceptions.length, 1);
+  assert.equal(p.wp_columns.length, 4);
+  assert.equal(p.conclusion_template, 'Travaux exécutés conformément à ZZZ. Population : [X éléments].');
+  assert.ok(!parsed.issues.some(i => i.issue === 'PROCEDURE_INCOMPLETE'));
+});
+
 test('a SOP is read procedure by procedure, by code (no AI): card, PBC, steps, sampling, conclusion', async () => {
   const r = parseSop(await readSop(SOP), { name: 'SOP_DEP.docx' });
   assert.deepEqual(r.procedures.map(p => p.code), ['DEP-01', 'DEP-02', 'DEP-03'], 'the summary lines are not procedures');

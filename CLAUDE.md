@@ -1,5 +1,7 @@
 # Office Manager AI — à lire avant toute modification
 
+Correction du lecteur SOP SYCEBNL (2026-10-19) : les « Références techniques » en tête d'une fiche ne terminent plus la lecture lorsque des sections d'exécution suivent. Une bibliographie terminale et la conclusion du cycle restent exclues. Vérifié sur les 8 SOP SYCEBNL : 101/101 procédures retrouvent leurs étapes et demandes ; les 20 SOP d'audit général donnent exactement le même résultat qu'avant. Relire la bibliothèque depuis Méthodologie après déploiement pour reconstruire les fiches déjà enregistrées. Cela ne change pas le modèle Excel associé à une mission ni les choix déjà validés dans son programme.
+
 **Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.
 
 **Corrections Codex du 12 octobre 2026** : lire [le message pour Claude](docs/NOTE_POUR_CLAUDE_CORRECTIONS_2026-10-12.md) avant de poursuivre. Les corrections sont sur des branches dédiées ; les parcours métier sont conservés.
