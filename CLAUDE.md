@@ -353,6 +353,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Premier scan : `startTidyPlan` appelle `ensureMemoryHome(orgId, { verify: true })` avant de démarrer (trace `MEMORY_HOME_CREATED`).
 - Test : `tests/memory-home-one-drive.test.js`.
 
+## Le Working Paper sait toujours où il est (Paul, 2026-10-19 : « la fiche de travail d'un Enhanced Auditor ne sait pas où elle se trouve »)
+- Avant : le WP d'un cycle n'existait que si quelqu'un cliquait « Créer les Working Papers », et seulement si un dossier dont le NOM
+  ressemblait à « Working Papers » existait sous la mission (ou un lien collé) → `NO_WORKPAPER_FOR_CYCLE` / `WORKPAPERS_FOLDER_NOT_FOUND`.
+- Désormais : `findWorkpapersFolder` crée `05_WORKING_PAPERS` sous le dossier de la mission s'il n'en trouve pas (lien collé > trouvé >
+  créé) ; `ensureCycleWorkpaper` (`lib/cycle-workpapers.js`) prépare le WP manquant du cycle à l'ouverture de la procédure
+  (`procedureView`, même code que le bouton, jamais d'écrasement, vérifié dans le Drive) ; seule une mission sans dossier Drive
+  connu s'arrête (`MISSION_FOLDER_NOT_KNOWN`, dit à l'écran). Test : `tests/workpaper-location.test.js`.
+
 ## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
 - Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).
 - `lib/ai-plus.js` : fournisseur `openrouter` (texte, images, PDF, recherche web `plugins: [{ id: 'web' }]`, sources) ;

@@ -325,7 +325,7 @@
     var b = this;
     act(b, { action: 'conclusion', conclusion: $('conc').value, walkthrough: walkthroughAnswers() }, $('say'), function () {
       var go = function () { act(b, { action: 'submit' }, $('say'), function () { $('say').textContent = 'Soumise pour revue.'; showGaps([]); paint(); loadReview(); }); };
-      if (data.workpaper) act(b, { action: 'write-wp' }, $('say'), go); else go();
+      if (data.workpaper && data.workpaper.file_id) act(b, { action: 'write-wp' }, $('say'), go); else go();
     });
   });
 
@@ -333,7 +333,7 @@
     var w = data.work;
     $('title').textContent = data.line.code + ' — ' + data.line.title;
     $('sub').textContent = data.cycle.code + ' · ' + data.cycle.title + ' · préparée par ' + (data.preparer || '?') + ' · programme v' + data.programme.version;
-    $('state').textContent = 'État : ' + (STATUS[w.status] || w.status) + (data.workpaper ? '' : ' · Working Paper du cycle pas encore créé');
+    $('state').textContent = 'État : ' + (STATUS[w.status] || w.status) + (data.workpaper && data.workpaper.file_id ? '' : ' · Working Paper du cycle introuvable' + (data.workpaper_problem === 'MISSION_FOLDER_NOT_KNOWN' ? ' : le dossier Drive de la mission n’est pas connu (à indiquer dans la mission)' : data.workpaper_problem ? ' (' + data.workpaper_problem + ')' : ''));
     $('back').href = '/programme.html?mission_id=' + encodeURIComponent(missionId);
     var model = (data.card || {}).conclusion_template;
     $('conc-model').textContent = model ? 'Modèle du SOP : « ' + model + ' »' : '';
