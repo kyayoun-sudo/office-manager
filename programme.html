@@ -122,7 +122,7 @@
     CYCLE_NA_NEEDS_REASON: 'Cycle non applicable : donnez la raison.', CYCLE_PREPARER_REQUIRED: 'Choisissez qui prépare le cycle.', CYCLE_WITHOUT_PROCEDURE: 'Aucune procédure cochée dans ce cycle.',
     MANDATORY_OFF_NEEDS_REASON: 'Procédure obligatoire décochée : donnez la raison.', RISK_DEPENDENT_NEEDS_REASON: 'Procédure selon le risque activée : donnez la raison.', SAMPLE_SIZE_REQUIRED: 'Fixez la taille de l’échantillon.' };
   var ERR = { PROGRAMME_EXPORT_BUSY:'Un export est en cours. Réessayez dans quelques instants.', PROGRAMME_EXPORT_LOCK_UNAVAILABLE:'Le verrou documentaire est indisponible. Vérifiez l’installation existante des verrous de lecture ; le programme reste validé dans l’application.', PLANNING_AI_RESPONSE_INVALID:'La réponse de l’IA est illisible. Aucun programme n’a été remplacé ; réessayez ou continuez manuellement.', PROGRAMME_CHANGED_RELOAD:'Le programme a changé depuis son ouverture. Rechargez-le avant d’enregistrer pour préserver les modifications de votre collègue.', PLANNING_LIBRARY_REQUIRED:'Chargez d’abord les procédures du cabinet dans Méthodologie.', PLANNING_MAX_THREE_SOURCES:'Analysez au maximum trois documents à la fois.', PLANNING_REVIEW_NOTE_REQUIRED:'Ajoutez votre décision de revue avant d’enregistrer le rapprochement comme examiné.', AGENTS_NOT_AUTHORIZED:'Le cabinet doit autoriser la lecture et les appels IA dans Paramètres.', NO_AI_PROVIDER_CONFIGURED:'Aucune IA disponible : vous pouvez continuer manuellement.', PLANNING_SOURCE_CHANGED:'Une source a changé : relancez l’analyse et la revue.', PLANNING_SOURCE_OUTSIDE_MISSION:'Placez ce document dans le dossier de cette mission avant de l’analyser.', PLANNING_SOURCE_UNREADABLE:'Le document ne peut pas être lu. Vérifiez son format et ses droits.', PLANNING_SOURCE_OR_DISCUSSION_REQUIRED:'Ajoutez un lien documentaire ou une discussion.', ROLE_NOT_ALLOWED: 'Votre rôle ne permet pas de modifier le programme.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.', NO_DRAFT_TO_VALIDATE: 'Rien à valider : enregistrez d’abord le brouillon.',
-    PROGRAMME_INCOMPLETE: 'Le programme n’est pas complet :', NO_PROCEDURE_CODE_IN_FILE: 'Aucun code de procédure connu dans ce fichier.', PROGRAMME_FILE_REQUIRED: 'Collez le lien du fichier.', SOP_NOT_IN_LIBRARY: 'Un cycle ne vient plus de la bibliothèque : relisez les SOP.' };
+    PROGRAMME_INCOMPLETE: 'Le programme n’est pas complet :', NO_PROCEDURE_CODE_IN_FILE: 'Aucun code de procédure connu dans ce fichier.', PROGRAMME_FILE_REQUIRED: 'Collez le lien du fichier.', SOP_NOT_IN_LIBRARY: 'Ce cycle n’a jamais été enregistré et son SOP n’est pas dans la bibliothèque : faites relire les SOP dans Méthodologie.' };
   var msg = function (e) { var m = e && (e.code || e.message) || String(e); return ERR[m] || (e && e.message) || m; };
   var data = null, cycles = [], editable = false;
 
@@ -174,7 +174,16 @@
           }
           tr.appendChild(titleCell);
           var tt = el('td'); tt.appendChild(el('span', (TYPE[p.type] || '?') + (p.condition ? ' ' + p.condition : ''), 'tag' + (p.type === 'RISK_DEPENDENT' ? ' risk' : ''))); tr.appendChild(tt);
-          tr.appendChild(el('td', p.level || '')); tr.appendChild(el('td', MODE[p.sampling_mode] || ''));
+          tr.appendChild(el('td', p.level || ''));
+          // The selection method can be changed for this mission (2026-10-19); the SOP's method is shown when it differs.
+          var tm = el('td'), ms = document.createElement('select'); ms.setAttribute('aria-label', 'Sélection ' + p.code);
+          Object.keys(MODE).forEach(function (k) { ms.appendChild(new Option(MODE[k], k)); });
+          ms.value = p.sampling_mode || 'other';
+          ms.addEventListener('change', function () { p.sampling_mode = ms.value; paintCycles(); });
+          tm.appendChild(ms);
+          var sopMode = p.sop_sampling_mode || null;
+          if (sopMode && sopMode !== p.sampling_mode) tm.appendChild(el('div', 'SOP : ' + (MODE[sopMode] || sopMode), 'meta'));
+          tr.appendChild(tm);
           var ts = el('td');
           if (p.active && (p.sampling_mode === 'programme_sample' || p.sampling_mode === 'random' || p.sampling_mode === 'risk_targeted')) {
             var n = el('input'); n.type = 'number'; n.min = '1'; n.value = p.sample_size || ''; n.setAttribute('aria-label', 'Taille de l’échantillon ' + p.code);

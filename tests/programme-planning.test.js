@@ -378,3 +378,26 @@ test("stale browser refuses to replace another saved draft", async () => {
   );
   assert.equal(f.rows.length, 1);
 });
+
+test("a saved programme stays editable when the SOP library has vanished; the Manager can change a test's selection method", async () => {
+  const f = fixture();
+  const body = {
+    materiality: { overall: 1 }, reviews: { partner: true },
+    cycles: [{ ...proposeCycle(lib.sops[0]), preparer: a.email }],
+  };
+  await saveProgramme("org", M, body, a, f.d);
+  // The library is gone (« Aucun SOP lu ») : the same cycle can still be changed and saved.
+  const empty = { ...f.d, methodology: async () => ({ status: "none", sops: [] }) };
+  const edit = JSON.parse(JSON.stringify(body));
+  edit.cycles[0].procedures[0].sampling_mode = "programme_sample";
+  edit.cycles[0].procedures[0].sample_size = 25;
+  const r = await saveProgramme("org", M, edit, a, empty);
+  const line = r.programme.cycles[0].procedures[0];
+  assert.deepEqual([line.sampling_mode, line.sop_sampling_mode, line.sample_size], ["programme_sample", "none", 25]);
+  // A cycle never saved and absent from the library is still refused.
+  const unknown = { ...edit, cycles: [...edit.cycles, { sop_file_id: "other", procedures: [] }] };
+  await assert.rejects(saveProgramme("org", M, unknown, a, empty), /SOP_NOT_IN_LIBRARY/);
+  // An unknown selection method is ignored.
+  edit.cycles[0].procedures[0].sampling_mode = "magic";
+  assert.equal((await saveProgramme("org", M, edit, a, f.d)).programme.cycles[0].procedures[0].sampling_mode, "none");
+});

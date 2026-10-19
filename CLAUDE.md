@@ -387,6 +387,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   3) sinon dossier des SOP connu → `reload` : la page relit seule (associé / manager), rien à recoller. Tous les lecteurs reçoivent
   `orgId`. Test : `tests/methodology-persistence.test.js`.
 
+## Programme modifiable même sans bibliothèque (Paul, 2026-10-19 : « ici je n'arrive pas à modifier ça »)
+- Cause : `cleanProgramme` reconstruisait chaque cycle depuis la bibliothèque des SOP ; bibliothèque absente (« Aucun SOP lu ») →
+  `SOP_NOT_IN_LIBRARY` à chaque enregistrement. Désormais un cycle déjà enregistré dans une version sert de base (seul un cycle jamais
+  enregistré ET absent de la bibliothèque est refusé). Le Manager peut changer la méthode de sélection d'un test pour la mission
+  (`SAMPLING_MODES`, liste dans `programme.html`) ; la méthode du SOP reste gardée (`sop_sampling_mode`, affichée si différente).
+  Test dans `tests/programme-planning.test.js`.
+
 ## Veille open source de Shadow (Paul, 2026-10-19 : « Shadow part sur des forums où il peut avoir des codes pour agents d'audit et de comptabilité … pour améliorer les agents, et en s'auditant. Je tiens à cela. »)
 - `lib/shadow-code-watch.js` : un agent par jour (rotation `nextToWatch`, chacun au moins tous les 7 jours, Shadow compris), ou à la
   demande (Entraînement → Objectifs et enquêtes → « Lancer la veille maintenant », action `code-watch` de la route `shadow`, associés).
