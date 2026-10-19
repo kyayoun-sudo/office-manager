@@ -72,3 +72,21 @@ test('explanation stays read-only and action failures stop subsequent writes', a
   const forbidden = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'sign' }], 'Continue', {}, f.d);
   assert.equal(forbidden[0].reason, 'UNSUPPORTED_ASSISTANT_ACTION');
 });
+
+// Point 6 (Paul, 2026-10-19): one rule for the Enhanced Auditor. The general instructions forbade any change to a working
+// file while the procedure assistant writes one; now both say the same thing: one controlled write, asked by the auditor.
+test('the Enhanced Auditor has one rule for working files, the same in its instructions and in the procedure assistant', async () => {
+  const { AGENTS } = await import('../agents/index.js');
+  const { readFileSync } = await import('node:fs');
+  const general = AGENTS['enhanced-auditor'].instructions;
+  assert.equal(/never delete or modify a working file/i.test(general), false, 'the old contradictory prohibition is gone');
+  assert.match(general, /ONE CONTROLLED WRITE/); assert.match(general, /write-workpaper/);
+  assert.match(general, /never overwrite what a person wrote or a formula/);
+  // The general conversation really has no tool that writes a working file.
+  assert.equal(/writeWorkpaper|write_workpaper/.test(readFileSync(new URL('../lib/agent-tools.js', import.meta.url), 'utf8')), false);
+  const f = await fixture(); let instructions = '';
+  await askProcedure('org', 'mission', 'CASH-01', { message: 'Explique' }, {}, { ...f.d,
+    ai: async (order, o) => { instructions = o.instructions; return { text: JSON.stringify({ answer: 'ok', actions: [] }) }; } });
+  assert.match(instructions, /seule écriture d'un working file permise/);
+  assert.match(instructions, /jamais une case remplie par une personne ni une formule/);
+});
