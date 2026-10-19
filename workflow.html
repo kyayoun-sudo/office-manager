@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workflow du cabinet</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .wf-step{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--surface)}
+  .wf-step summary{cursor:pointer;font-size:14.5px;line-height:1.5}
+  .wf-step .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:10px}
+  .wf-step label{display:block;font-size:13px;color:var(--muted);margin-bottom:2px}
+  .wf-step input[type=text],.wf-step textarea,.wf-step select{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+  .wf-step textarea{min-height:56px}
+  .checks{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13.5px}
+  .checks label{display:inline-flex;gap:4px;align-items:center;color:var(--ink);margin:0}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--soft);margin-left:4px}
+  .tag.gate{background:#fde7e7;color:#8a1f1f}
+  .src{font-size:13px;color:var(--muted);margin:8px 0 0}
+  .src.bad{color:#8a3b00}
+  @media (prefers-color-scheme: dark){ .tag.gate{background:#4a1d1d;color:#ffb3b3} .src.bad{color:#ffb98a} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/dossiers.html">Mes dossiers</a>
+    <a href="/mission.html">Missions</a>
+    <a href="/validations.html">À valider</a>
+    <a href="/methodologie.html">Méthodologie</a>
+    <a href="/workflow.html" aria-current="page">Workflow</a>
+    <a href="/parametres.html">Paramètres</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <header class="page-head">
+      <h1>Workflow du cabinet</h1>
+      <p class="lead">Les étapes que suit une mission, de la réception d’un TDR ou d’une demande jusqu’à la clôture : ce qui les déclenche, ce qu’il faut, qui agit, la décision, et les suites possibles. Un workflow par type de mission ; le workflow commun sert aux types qui n’en ont pas. Les étapes « porte » bloquent la suite tant que l’application n’a pas vu la décision ; une personne peut passer outre avec une raison, tracée.</p>
+    </header>
+
+    <section class="card" aria-labelledby="h-type">
+      <h2 id="h-type">Type de mission</h2>
+      <div class="row"><select id="type" aria-label="Type de mission"></select></div>
+      <p class="meta" id="state"></p>
+      <p class="status" id="say" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-edit" id="edit-card" hidden>
+      <h2 id="h-edit">Modifier (associés)</h2>
+      <p class="meta">Chaque enregistrement met à jour le brouillon ; « Confirmer » le fige et remplace la version précédente. Les missions suivent la version confirmée tout de suite.</p>
+      <div class="row">
+        <button class="btn ghost" id="from-builtin" type="button">Partir du parcours intégré</button>
+        <button class="btn ghost" id="from-confirmed" type="button">Partir de la version confirmée</button>
+        <button class="btn ghost" id="propose" type="button">Proposer depuis le document du cabinet</button>
+      </div>
+      <p class="meta">Le document est celui enregistré dans Paramètres → « Workflow et documents de gestion ». L’IA propose ; chaque étape garde la phrase du document d’où elle vient ; rien n’est confirmé sans vous.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-steps">
+      <h2 id="h-steps">Étapes <span class="meta" id="steps-what"></span></h2>
+      <div id="steps" class="stack" style="gap:8px"><p class="empty">Chargement…</p></div>
+      <div class="row" id="edit-actions" hidden style="margin-top:10px">
+        <button class="btn ghost" id="add" type="button">Ajouter une étape</button>
+        <button class="btn" id="save" type="button">Enregistrer le brouillon</button>
+        <button class="btn" id="confirm" type="button">Confirmer cette version</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-history">
+      <h2 id="h-history">Versions</h2>
+      <div id="history"><p class="empty">—</p></div>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function () {
+  var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
+  var ERR = { PARTNER_EDITS_WORKFLOW: 'Seuls les associés modifient le workflow.', PARTNER_CONFIRMS_WORKFLOW: 'Seul un associé confirme le workflow.',
+    WORKFLOW_SQL_NOT_INSTALLED: 'La base n’a pas encore la table du workflow (db/firm-workflow.sql) : voir docs/A_FAIRE_DE_VOTRE_COTE.txt.',
+    WORKFLOW_STEP_LABEL_REQUIRED: 'Chaque étape doit avoir un nom.', WORKFLOW_STEP_RESPONSIBLE_REQUIRED: 'Chaque étape doit avoir au moins une personne responsable.',
+    WORKFLOW_STEPS_REQUIRED: 'Ajoutez au moins une étape.', NO_WORKFLOW_DRAFT: 'Enregistrez d’abord le brouillon.', WORKFLOW_CHANGED_RELOAD: 'Un autre associé a modifié ce brouillon : rechargez la page.',
+    WORKFLOW_DOCUMENT_NOT_CONFIGURED: 'Aucun document « Workflow du cabinet » enregistré : Paramètres → Workflow et documents de gestion.',
+    WORKFLOW_DOCUMENT_FORMAT: 'Ce document ne peut pas être lu (Word, Excel, PowerPoint ou PDF).', WORKFLOW_DOCUMENT_EMPTY: 'Le document ne contient pas de texte lisible.',
+    AGENTS_NOT_AUTHORIZED: 'Le cabinet n’a pas autorisé les agents à utiliser l’IA (Paramètres) : modifiez les étapes à la main.', AI_UNAVAILABLE: 'IA indisponible : modifiez les étapes à la main.',
+    WORKFLOW_PROPOSAL_UNREADABLE: 'La réponse de l’IA est illisible : rien n’a été enregistré. Réessayez.' };
+  var msg = function (e) { var m = e && (e.code || e.message) || String(e); return ERR[m] || m; };
+  var AGENTS = { '': '—', auto: 'Firm Manager', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', orpailleur: 'Orpailleur', sika: 'SIKA' };
+  var PHASE = { opportunity: 'Avant la mission (opportunité)', mission: 'Pendant la mission', both: 'Les deux' };
+  var data = null, type = 'default', steps = [], editing = false, draftAt = null;
+
+  function current() { return data.types.filter(function (t) { return t.mission_type === type; })[0]; }
+  function copy(list) { return JSON.parse(JSON.stringify(list || [])); }
+  function lines(v) { return (v || []).join('\n'); }
+  function unlines(v) { return String(v || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean); }
+
+  function field(box, label, input) { var w = el('div'); var l = el('label', label); input.id = input.id || ('f' + Math.random().toString(36).slice(2)); l.htmlFor = input.id; w.appendChild(l); w.appendChild(input); box.appendChild(w); return input; }
+  function text(value, multi, onchange) { var i = el(multi ? 'textarea' : 'input'); if (!multi) i.type = 'text'; i.value = value || ''; i.disabled = !editing; i.addEventListener('input', function () { onchange(i.value); }); return i; }
+  function checks(box, label, options, chosen, onchange) {
+    var w = el('div'); w.appendChild(el('label', label)); var c = el('div', null, 'checks');
+    Object.keys(options).forEach(function (k) { var l = el('label'); var i = el('input'); i.type = 'checkbox'; i.checked = chosen.indexOf(k) >= 0; i.disabled = !editing;
+      i.addEventListener('change', function () { var set = chosen.filter(function (x) { return x !== k; }); if (i.checked) set.push(k); onchange(set); chosen = set; });
+      l.appendChild(i); l.appendChild(document.createTextNode(options[k])); c.appendChild(l); });
+    w.appendChild(c); box.appendChild(w);
+  }
+  function select(options, value, onchange) { var s = el('select'); Object.keys(options).forEach(function (k) { var o = el('option', options[k]); o.value = k; s.appendChild(o); }); s.value = value || ''; s.disabled = !editing; s.addEventListener('change', function () { onchange(s.value); }); return s; }
+
+  function renderSteps() {
+    var box = $('steps'); box.textContent = '';
+    if (!steps.length) { box.appendChild(el('p', 'Aucune étape.', 'empty')); return; }
+    steps.forEach(function (s, i) {
+      var d = el('details', null, 'wf-step'); if (editing && i === steps.length - 1 && !s.label) d.open = true;
+      var sum = el('summary'); sum.appendChild(el('strong', (i + 1) + '. ' + (s.label || 'Nouvelle étape')));
+      if (s.gate) sum.appendChild(el('span', 'porte', 'tag gate'));
+      sum.appendChild(el('span', (s.responsible || []).map(function (r) { return data.responsibles[r] || r; }).join(' / ') || 'responsable à choisir', 'tag'));
+      d.appendChild(sum);
+      var g = el('div', null, 'grid');
+      field(g, 'Nom de l’étape', text(s.label, false, function (v) { s.label = v; sum.firstChild.textContent = (i + 1) + '. ' + (v || 'Nouvelle étape'); }));
+      field(g, 'Déclencheur', text(s.trigger, true, function (v) { s.trigger = v; }));
+      field(g, 'Informations nécessaires (une par ligne)', text(lines(s.inputs), true, function (v) { s.inputs = unlines(v); }));
+      field(g, 'Actions', text(s.action, true, function (v) { s.action = v; }));
+      field(g, 'Documents attendus (un par ligne)', text(lines(s.documents), true, function (v) { s.documents = unlines(v); }));
+      field(g, 'Décision ou validation', text(s.decision, false, function (v) { s.decision = v; }));
+      checks(g, 'Qui agit (fonction sur la mission)', data.responsibles, s.responsible || [], function (v) { s.responsible = v; });
+      checks(g, 'Suites possibles', data.outcomes, s.outcomes || ['continue'], function (v) { s.outcomes = v; });
+      field(g, 'Agent qui aide', select(AGENTS, s.agent || '', function (v) { s.agent = v || null; }));
+      field(g, 'Quand', select(PHASE, s.phase || 'mission', function (v) { s.phase = v; }));
+      var det = { '': 'Aucune (une personne enregistre la suite)' }; data.detectors.forEach(function (k) { var b = data.builtin.filter(function (x) { return x.id === k; })[0]; det[k] = b ? b.label : k; });
+      field(g, 'Ce que l’application vérifie elle-même', select(det, s.detector || '', function (v) { s.detector = v || null; }));
+      var gl = el('label'); var gi = el('input'); gi.type = 'checkbox'; gi.checked = Boolean(s.gate); gi.disabled = !editing;
+      gi.addEventListener('change', function () { s.gate = gi.checked; renderSteps(); }); gl.appendChild(gi); gl.appendChild(document.createTextNode(' Porte : bloque la suite tant que la décision n’est pas vue'));
+      var gw = el('div', null, 'checks'); gw.appendChild(gl); g.appendChild(gw);
+      d.appendChild(g);
+      if (s.source && s.source.excerpt) d.appendChild(el('p', (s.source.verified ? 'Source dans le document : « ' : '⚠ Phrase non retrouvée telle quelle dans le document, à vérifier : « ') + s.source.excerpt + ' »', 'src' + (s.source.verified ? '' : ' bad')));
+      if (editing) {
+        var r = el('div', null, 'row'); r.style.marginTop = '8px';
+        [['↑ Monter', -1], ['↓ Descendre', 1]].forEach(function (m) { var b = el('button', m[0], 'btn ghost'); b.type = 'button'; b.disabled = (m[1] < 0 && i === 0) || (m[1] > 0 && i === steps.length - 1);
+          b.addEventListener('click', function () { var t = steps[i]; steps[i] = steps[i + m[1]]; steps[i + m[1]] = t; renderSteps(); }); r.appendChild(b); });
+        var del = el('button', 'Retirer', 'btn ghost'); del.type = 'button'; del.addEventListener('click', function () { if (confirm('Retirer l’étape « ' + (s.label || '') + ' » du brouillon ?')) { steps.splice(i, 1); renderSteps(); } });
+        r.appendChild(del); d.appendChild(r);
+      }
+      box.appendChild(d);
+    });
+  }
+
+  function paint() {
+    var t = current(); editing = Boolean(data.may_edit && data.sql_installed);
+    $('edit-card').hidden = !editing; $('edit-actions').hidden = !editing;
+    var st = t.confirmed ? 'Version confirmée ' + t.confirmed.version + ' — par ' + (t.confirmed.confirmed_by || '?') + ' le ' + UI.dateTime(t.confirmed.confirmed_at) + '.'
+      : type === 'default' ? 'Aucune version confirmée : les missions suivent le parcours intégré de l’application.' : 'Aucune version propre : les missions de ce type suivent le workflow commun.';
+    if (t.draft) st += ' Un brouillon (version ' + t.draft.version + ') attend une confirmation.';
+    if (!data.sql_installed) st += ' La table du workflow n’est pas encore installée : lecture seule.';
+    $('state').textContent = st;
+    if (t.draft && editing) { steps = copy(t.draft.steps); draftAt = t.draft.updated_at; $('steps-what').textContent = '· brouillon version ' + t.draft.version; }
+    else if (t.confirmed) { steps = copy(t.confirmed.steps); draftAt = null; $('steps-what').textContent = '· version confirmée ' + t.confirmed.version; }
+    else { steps = copy(data.builtin); draftAt = null; $('steps-what').textContent = '· parcours intégré'; }
+    renderSteps();
+    var h = $('history'); h.textContent = '';
+    if (!t.history.length) h.appendChild(el('p', 'Aucune version enregistrée.', 'empty'));
+    t.history.forEach(function (v) { h.appendChild(el('p', 'Version ' + v.version + ' · ' + ({ draft: 'brouillon', confirmed: 'confirmée', superseded: 'remplacée' }[v.status] || v.status) + (v.confirmed_by ? ' · ' + v.confirmed_by + ' le ' + UI.dateTime(v.confirmed_at) : '') + (v.source ? ' · d’après « ' + v.source + ' »' : ''), 'meta')); });
+  }
+  function post(body) { return OM.api('/api/app?route=workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  function load(keepType) {
+    return OM.api('/api/app?route=workflow').then(function (d) {
+      data = d; var sel = $('type');
+      if (!keepType) { sel.textContent = ''; d.types.forEach(function (t) { var o = el('option', t.label + (t.confirmed ? ' — v' + t.confirmed.version : '')); o.value = t.mission_type; sel.appendChild(o); }); }
+      sel.value = type; paint();
+    }).catch(function (e) { UI.fail($('steps'), { message: msg(e) }); });
+  }
+  $('type').addEventListener('change', function () { type = this.value; paint(); $('say').textContent = ''; });
+  $('from-builtin').addEventListener('click', function () { steps = copy(data.builtin); $('steps-what').textContent = '· à partir du parcours intégré (non enregistré)'; renderSteps(); });
+  $('from-confirmed').addEventListener('click', function () { var t = current(); if (!t.confirmed) { $('say').textContent = 'Aucune version confirmée pour ce type.'; return; } steps = copy(t.confirmed.steps); $('steps-what').textContent = '· à partir de la version ' + t.confirmed.version + ' (non enregistré)'; renderSteps(); });
+  $('add').addEventListener('click', function () { steps.push({ label: '', responsible: [], outcomes: ['continue', 'complement', 'return'], phase: 'mission', gate: false }); renderSteps(); });
+  $('save').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').textContent = 'Enregistrement…';
+    post({ action: 'save', mission_type: type, steps: steps, expected_updated_at: draftAt }).then(function () { $('say').textContent = 'Brouillon enregistré. Il n’est suivi par les missions qu’après « Confirmer ».'; return load(true); })
+      .catch(function (e) { $('say').textContent = 'Non enregistré : ' + msg(e) + (e.step ? ' (étape ' + e.step + ')' : ''); }).then(function () { b.disabled = false; });
+  });
+  $('confirm').addEventListener('click', function () {
+    if (!confirm('Confirmer ce brouillon ? Les missions de ce type le suivront tout de suite ; la version précédente reste dans l’historique.')) return;
+    var b = this; b.disabled = true;
+    post({ action: 'confirm', mission_type: type }).then(function () { $('say').textContent = 'Version confirmée et tracée dans le journal d’audit.'; return load(true); })
+      .catch(function (e) { $('say').textContent = 'Non confirmé : ' + msg(e); }).then(function () { b.disabled = false; });
+  });
+  $('propose').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('say').textContent = 'L’IA lit le document du cabinet…';
+    post({ action: 'propose', mission_type: type }).then(function (r) {
+      $('say').textContent = 'Proposition enregistrée comme brouillon : à relire avant de confirmer.' + ((r.unverified || []).length ? ' ' + r.unverified.length + ' étape(s) dont la phrase n’a pas été retrouvée dans le document (signalées).' : '') + ((r.unclear || []).length ? ' Points non tranchés par le document : ' + r.unclear.join(' ; ') + '.' : '');
+      return load(true);
+    }).catch(function (e) { $('say').textContent = msg(e); }).then(function () { b.disabled = false; });
+  });
+  UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(false); });
+})();
+</script>
+</body>
+</html>

@@ -12,7 +12,47 @@
     pending: "À compléter ou confirmer",
     recorded: "Information enregistrée",
     review: "À examiner",
+    done: "Étape terminée (décision enregistrée)",
+    not_applicable: "Sans objet",
   };
+  // The firm's workflow (point 1, 2026-10-19): outcomes of the current step and why a person may not act.
+  var OUTCOME_LABELS = { continue: "Poursuivre", complement: "Demander un complément", return: "Retourner pour correction", refuse: "Refuser" };
+  var WF_ERR = {
+    GATE_NOT_PASSED: "Porte : l’application n’a pas encore vu cette décision. Pour passer quand même, écrivez la raison.",
+    GATE_OVERRIDE_BY_MANAGER_OR_PARTNER: "Seuls le manager de la mission ou un associé passent une porte sans la décision.",
+    STEP_HELD_BY_OTHER: "Une autre personne tient cette fonction sur la mission : c’est elle qui agit sur cette étape.",
+    NOT_RESPONSIBLE_FOR_STEP: "Cette étape revient à une autre fonction.", REASON_REQUIRED: "Écrivez la raison (obligatoire sauf pour « Poursuivre »).",
+    PARTNER_REFUSES: "Seul un associé refuse.", WORKFLOW_STEP_CHANGED_RELOAD: "L’étape a changé entre-temps : la page est rechargée.",
+    WORKFLOW_SQL_NOT_INSTALLED: "La base n’a pas encore la colonne du workflow (db/firm-workflow.sql).", NO_EARLIER_STEP: "Il n’y a pas d’étape avant celle-ci."
+  };
+  function currentStep(host) {
+    var wf = current.workflow;
+    if (!wf || !current.mission_id) return;
+    var c = card(host, "Étape en cours" + (wf.builtin ? " (parcours intégré)" : " (workflow du cabinet, version " + wf.version + ")"));
+    if (wf.status === "refused") { append(c, "p", "Mission refusée."); return; }
+    var step = (wf.steps || []).filter(function (x) { return x.id === wf.current; })[0];
+    if (!step) { append(c, "p", "Toutes les étapes sont faites."); return; }
+    append(c, "h3", step.label);
+    var RESP = { partner: "Associé", manager: "Manager", supervisor: "Superviseur", senior: "Senior", auditor: "Auditeur", quality_reviewer: "Revue qualité", specialist: "Spécialiste", secretary: "Secrétariat", finance: "Finance", bdm: "BDM" };
+    append(c, "p", "Qui agit : " + (step.responsible || []).map(function (r) { return RESP[r] || r; }).join(" / ") + (step.decision ? " · Décision : " + step.decision : ""));
+    if (step.trigger) append(c, "p", "Déclencheur : " + step.trigger, "dossier-muted");
+    if ((step.inputs || []).length) append(c, "p", "Il faut : " + step.inputs.join(" ; "), "dossier-muted");
+    if ((step.documents || []).length) append(c, "p", "Documents attendus : " + step.documents.join(" ; "), "dossier-muted");
+    if (step.gate) append(c, "p", step.state === "recorded" || !step.detector ? "Porte : la décision est requise avant la suite." : "Porte : l’application n’a pas encore vu la décision (" + (labels[step.state] || step.state) + ").", "dossier-handoff");
+    var reason = append(c, "textarea"); reason.setAttribute("aria-label", "Raison ou complément demandé"); reason.placeholder = "Raison (obligatoire sauf pour « Poursuivre »)";
+    var status = append(c, "p", "", "status"); status.setAttribute("role", "status");
+    var row = append(c, "div", null, "btn-row");
+    (step.outcomes || ["continue"]).forEach(function (o) {
+      var b = append(row, "button", OUTCOME_LABELS[o] || o, o === "continue" ? "btn" : "btn ghost"); b.type = "button";
+      b.addEventListener("click", function () {
+        if (o === "refuse" && !confirm("Refuser la mission à l’étape « " + step.label + " » ?")) return;
+        b.disabled = true; status.textContent = "Enregistrement…";
+        OM.api("/api/app?route=workflow", { method: "POST", body: JSON.stringify({ action: "advance", mission_id: current.mission_id, step: step.id, outcome: o, reason: reason.value.trim() }) })
+          .then(function (r) { status.textContent = r.gate_override ? "Porte passée avec votre raison (tracé)." : "Enregistré."; load(); })
+          .catch(function (e) { status.textContent = WF_ERR[e.code || e.message] || e.message; b.disabled = false; if ((e.code || e.message) === "WORKFLOW_STEP_CHANGED_RELOAD") load(); });
+      });
+    });
+  }
   var stages = {
     identified: "Identifié",
     contacted: "Contact déclaré",
@@ -116,14 +156,16 @@
     });
   }
   function workflow(host) {
+    currentStep(host);
     var c = card(host, "Le parcours et les relais");
     if (!current.steps.length)
       empty(c, "Aucune étape disponible avec vos droits actuels.");
     current.steps.forEach(function (s) {
       var row = append(c, "article", null, "dossier-step"),
         head = append(row, "div");
-      append(head, "h3", s.label);
-      append(head, "span", labels[s.state], "tag");
+      append(head, "h3", (s.current ? "▶ " : "") + s.label);
+      append(head, "span", labels[s.state] || s.state, "tag");
+      if (s.gate) append(head, "span", "porte", "tag");
       var info = append(row, "div");
       append(info, "p", s.person + " → " + agentName(s.agent));
       append(info, "p", s.action);

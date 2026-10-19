@@ -819,6 +819,30 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'MISSION_UNAVAILABLE'
   },
+  // The firm's workflow (point 1, 2026-10-19): one per mission type, versioned; a partner confirms; missions follow it.
+  //   GET  workflow                         every type: confirmed version, draft, history (everyone in the firm reads it)
+  //   GET  workflow&mission_id=…            the mission's workflow, its current step and who acts
+  //   POST workflow {action: save | confirm | propose}   a partner: draft, confirmation, proposal read from the firm's document
+  //   POST workflow {action: advance, mission_id, outcome, reason?}   the outcome of the current step (gates: reason, traced)
+  workflow: {
+    GET: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/firm-workflow.js'), id = String(req.query?.mission_id || '');
+      if (!id) return m.listWorkflows(orgId, req.account);
+      await requireMissionAccess(orgId, id, req.account);
+      const v = await m.missionWorkflow(orgId, id, req.account);
+      const step = v.workflow?.steps.find(s => s.id === v.workflow.current);
+      return { workflow: v.workflow, me: step ? { may_act: !m.mayActOnStep(req.account, step, v.team), why_not: m.mayActOnStep(req.account, step, v.team) } : null };
+    }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const b = req.body || {}, m = await import('../lib/firm-workflow.js');
+      if (b.action === 'save') return m.saveWorkflowDraft(orgId, b, req.account);
+      if (b.action === 'confirm') return m.confirmWorkflow(orgId, b, req.account);
+      if (b.action === 'propose') return m.proposeFromDocument(orgId, b, req.account);
+      if (b.action === 'advance') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.advanceMission(orgId, b, req.account); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'WORKFLOW_UNAVAILABLE'
+  },
   // Background step of the Mission Controller: the structure of a directly created mission from the firm's model.
   'mission-quick-step': { POST: async (orgId, req) => (await import('../lib/mission-quick.js')).directWorkspaceStep(orgId, req.body || {}), unavailable: 'MISSION_UNAVAILABLE' },
   // Client contacts of a mission: found by the agents (proposed), validated by a manager.

@@ -113,6 +113,46 @@ Comment faire (le propriétaire ou un associé, après le point 2) :
      « Revues » affiche les niveaux dans le nouvel ordre. Les signatures déjà données restent.
 
 -----------------------------------------------------------------------------------------------------------------
+6. [ ] INSTALLER LE WORKFLOW DU CABINET DANS SUPABASE                            (point 1, workflow)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le workflow du cabinet (un par type de mission, avec ses versions) et l'étape où en est chaque mission sont
+rangés dans une nouvelle table et une nouvelle colonne. Sans elles, les missions suivent le parcours intégré de
+l'application, mais on ne peut ni enregistrer un workflow ni faire avancer une mission d'étape en étape.
+
+Comment faire : comme au point 1, avec le fichier  db/firm-workflow.sql  (Supabase → SQL Editor → New query → coller
+→ Run). Ou relancer  db/INSTALL_TOUT.sql  en entier (il le contient).
+Vérification :
+    select count(*) from information_schema.tables where table_name = 'office_firm_workflows';      → 1
+    select count(*) from information_schema.columns where table_name = 'office_missions' and column_name = 'workflow';  → 1
+
+
+-----------------------------------------------------------------------------------------------------------------
+7. [ ] DONNER SON WORKFLOW AU CABINET                                             (après le 6, un associé)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : tant qu'aucun workflow n'est confirmé, les missions suivent le parcours intégré (réception → décision →
+équipe → acceptation → … → programme → working papers → tests → revues → rapport → clôture). Le cabinet peut le
+remplacer par le sien, type de mission par type de mission.
+
+Comment faire :
+  1. Paramètres → carte « Workflow et documents de gestion » : choisir « Workflow du cabinet », coller le lien Drive du
+     document qui décrit votre workflow (Word, Excel, PowerPoint ou PDF), « Enregistrer ».
+  2. Cliquer le lien « Workflow du cabinet » de la même carte (ou aller sur /workflow.html).
+  3. Choisir le type de mission (commencer par « Workflow commun »), puis « Proposer depuis le document du cabinet ».
+     Il faut que « Autoriser les agents » soit accordé dans Paramètres (sinon : modifier à la main).
+  4. Relire chaque étape : nom, déclencheur, ce qu'il faut, documents, qui agit, décision, suites possibles, « porte ».
+     Une étape marquée « ⚠ Phrase non retrouvée telle quelle » est à vérifier dans votre document.
+     On peut aussi « Partir du parcours intégré » et le modifier.
+  5. « Enregistrer le brouillon », puis « Confirmer cette version ». Les missions de ce type la suivent tout de suite ;
+     la version précédente reste dans « Versions ». Chaque confirmation est dans le journal d'audit (WORKFLOW_CONFIRMED).
+  6. Recommencer pour chaque type de mission qui a son propre workflow (audit de projet, due diligence…).
+
+Vérification : ouvrir une mission → « Étape du workflow » (ou Mes dossiers → la mission → « Parcours et relais ») :
+l'étape en cours est marquée ▶ ; les boutons « Poursuivre / Demander un complément / Retourner pour correction /
+Refuser » enregistrent la suite (raison obligatoire sauf pour Poursuivre ; une porte non vue demande une raison et le
+manager de la mission ou un associé).
+
+
+-----------------------------------------------------------------------------------------------------------------
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)
 -----------------------------------------------------------------------------------------------------------------
 [ ] Avant de redéployer la fonction Supabase taty-google-bridge : vérifier que les secrets OFFICE_MANAGER_DRIVE_ID

@@ -562,7 +562,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - **Point 6 fait (règle)** : l'Enhanced Auditor a UNE règle des working files, la même dans `agents/index.js` et dans l'assistant de
   procédure (`lib/procedure-workspace.js`) : une seule écriture permise, `write-workpaper` de « Ma procédure » demandée par l'auditeur (feuille
   de la procédure, cases vides ou écrites par l'application, formules gardées, relu et vérifié, conflit signalé jamais forcé) ; aucun outil
-  de la conversation générale n'écrit un working file (test). RESTE du point 6 : parcours Word, modèles Excel quelconques, 3 actions max. Les anciennes routes (secrétariat, mails) restent sur le grade.
+  de la conversation générale n'écrit un working file (test). RESTE du point 6 : parcours Word, modèles Excel quelconques, 3 actions max.
+- **Point 1 fait (workflow du cabinet)** — choix de Paul : un workflow PAR TYPE de mission (`default` = commun), seules les PORTES
+  bloquent (passer outre = raison + manager de la mission ou associé, tracé). `lib/firm-workflow.js`, `db/firm-workflow.sql`
+  (`office_firm_workflows` versions brouillon → confirmée → superseded ; `office_missions.workflow` = étape en cours + historique),
+  page `workflow.html`, route `workflow`. Parcours intégré `DEFAULT_STEPS` = les `STEPS` de `dossier-model.js` (sans Shadow) + rapport +
+  clôture ; chaque étape garde son « détecteur » = `dossierStates` (même calcul qu'avant). L'IA lit le document `firm_workflow` → BROUILLON
+  (extrait de chaque étape vérifié mot pour mot, `unverified` sinon), jamais confirmé seul. Mes dossiers → « Parcours et relais » :
+  étape en cours ▶, boutons des suites (`advanceMission`, `mayActOnStep` = fonction sur la mission, sinon grade). RESTE : faire suivre le
+  workflow par les AUTRES écrans (mission.html, accueil) et les agents (prochaine étape annoncée), alertes d'étape bloquée. Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
   elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
