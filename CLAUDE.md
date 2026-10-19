@@ -551,14 +551,19 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - **Point 2 fait** (choix de Paul : la fonction sur la mission décide QUI revoit, le grade du compte décide si la personne est QUALIFIÉE
   pour signer) : `lib/mission-function.js` (`reviewAuthority`, `programmeAuthority`, `SIGN_QUALIFIED`) ; une personne nommée Manager
   sur la mission signe la revue Manager, un autre manager de grade non (`LEVEL_HELD_BY_OTHER`) ; une fonction sans le grade = `NOT_QUALIFIED_FOR_LEVEL` ;
-  personne nommée pour ce niveau = le grade, comme avant. Programme : modifié par la fonction manager / superviseur / associé, validé
+  personne nommée pour ce niveau = le grade, comme avant. Programme : modifié par le grade manager / superviseur (comme avant), validé
   par le manager ou l'associé nommé. Changer une fonction : carte Équipe de `mission.html`, action `function` de `mission-quick`
   (`setMissionFunction` : associé ou manager / associé de la mission, jamais la sienne, audit `MISSION_FUNCTION_CHANGED`) ; les revues en
   attente suivent tout de suite (calculées), les signatures données restent. « Superviseur » n'est plus lu comme « senior ».
   Ordre manager ↔ superviseur = RÉGLAGE DU CABINET (Paul, 2026-10-19 : la spécification §29 met le superviseur après le manager, le
   marché le met souvent en dessous) : `office_firm_settings.settings.supervisor_position` (`above_manager` par défaut / `below_manager`),
   Paramètres → Comptes, audit `REVIEW_ORDER_CHANGED` ; `reviewHierarchy` donne l'ordre des revues et les grades qualifiés (son niveau et
-  ceux en dessous).
+  ceux en dessous). Les anciennes routes (secrétariat, mails) restent sur le grade.
+  **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
+  fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
+  elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
+  manager / superviseur comme avant ; changer une fonction = associé du cabinet, ou grade manager tenant la fonction manager de la mission
+  (jamais Associé / Manager : `PARTNER_SETS_LEAD_FUNCTIONS`). Sans le SQL : grades seuls, `MISSION_FUNCTION_SQL_NOT_INSTALLED` au changement.
 - **Point 6 fait (règle)** : l'Enhanced Auditor a UNE règle des working files, la même dans `agents/index.js` et dans l'assistant de
   procédure (`lib/procedure-workspace.js`) : une seule écriture permise, `write-workpaper` de « Ma procédure » demandée par l'auditeur (feuille
   de la procédure, cases vides ou écrites par l'application, formules gardées, relu et vérifié, conflit signalé jamais forcé) ; aucun outil
@@ -585,17 +590,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   d'idempotence, historique), `lib/pbc-loop.js` : besoins = « PBC principale » des SOP des cycles du programme VALIDÉ (`planNeeds`, période
   lue dans `period_label`), pièces déjà lues pour la mission = candidates « à confirmer » (`findExisting`, par contenu : type, période),
   demande des SEULES manquantes par le code (`draftRequest` → `mission-write.submit`, validée par un manager), « demandée » seulement avec
-  l'id Gmail (`syncSending`), décisions d'une personne (`decide`). Route `pbc`, carte de `mission.html`. ÉTAPE 2 FAITE :  lit la
+  l'id Gmail (`syncSending`), décisions d'une personne (`decide`). Route `pbc`, carte de `mission.html`. ÉTAPE 2 FAITE : `syncReplies` lit la
   conversation Gmail de la demande (lien durable = le fil, jamais l'objet ni l'expéditeur), toute réponse gardée avec ou sans pièce
-  ( reste suivie), pièces déposées dans PIECES_RECUES sous un nom fixé par le message (, rejouable
-  sans doublon) puis lues par les agents (), rattachées par leur nom ou « à trier » ; passage planifié  ; le
-  scanner par libellé ignore ces fils (). RESTE : 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
-  working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon). Les anciennes routes (secrétariat, mails) restent sur le grade.
-  **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
-  fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
-  elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
-  manager / superviseur comme avant ; changer une fonction = associé du cabinet, ou grade manager tenant la fonction manager de la mission
-  (jamais Associé / Manager : `PARTNER_SETS_LEAD_FUNCTIONS`). Sans le SQL : grades seuls, `MISSION_FUNCTION_SQL_NOT_INSTALLED` au changement.
+  (`reply_without_piece` reste suivie), pièces déposées dans PIECES_RECUES sous un nom fixé par le message (`storeReceivedPiece`, rejouable
+  sans doublon) puis lues par les agents (`piecesReceived`), rattachées par leur nom ou « à trier » ; passage planifié `pbcPass` ; le
+  scanner par libellé ignore ces fils (`waitingThreads`). RESTE : 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
+  working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon).
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
