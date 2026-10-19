@@ -375,7 +375,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   « À ranger » ni « À valider » (`piece` ≤ 3 Mo, `piece-start` = envoi direct à Google), même nom = nom daté (jamais écrasé), vérifié
   dans le Drive ; `pieces-done` : seuls les fichiers réellement dans ce dossier, rôle `piece_recue` dans les documents de la mission,
   index partagé `placed_by: mission-controller, protected` (l'Orpailleur ne fait que renommer), puis lecture par les agents
-  (`startDepositAnalysis` purpose `understand` + `mission_id` → mission mise à jour).
+  (`startDepositAnalysis` purpose `pieces` + `mission_id` → mission mise à jour ; un TDR / contrat / lettre de mission reconnu par
+  son CONTENU part au Mission Controller = `startEngagementPrep` : briefing, risques du secteur, équipe, plan ; suivi en direct sur la carte).
+- Sans `db/mission-quick.sql` installé, la structure du modèle est quand même lancée (`no_record`, seulement si la colonne manque) et
+  l'étape lit les colonnes de base (cause probable de « le Mission Controller n'a rien fait », 2026-10-19).
+- **Aller directement aux tests (Paul, 2026-10-19)** : carte « Mes tests » de `mission.html` → `quickStartTests` / `testsView`
+  (`lib/mission-quick.js`, actions `tests-start` et GET `view=tests`) = raccourci sur le programme existant (`saveProgramme` +
+  `validateProgramme`, mêmes manques) : cycles choisis dans les SOP, CORE retenus, la personne prépare ; seuil, taille d'échantillon et
+  niveau de revue saisis par elle (jamais inventés) ; puis liens vers `procedure.html`. **Décision à confirmer par Paul** : le créateur
+  d'une mission directe, s'il est sur l'équipe, prépare ET valide son programme même auditeur (`isDirectMissionLead`,
+  `lib/work-programme.js`, lu dans la mission : `created_by` + `origin` + affectation).
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.

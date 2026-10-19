@@ -88,6 +88,23 @@
         <div class="kpi"><span>Temps prévu</span><strong id="k-time">–</strong></div>
       </div>
 
+      <section class="card" id="sec-tests" aria-labelledby="h-tests">
+        <div class="card-head"><h2 id="h-tests">Mes tests</h2><a id="tests-prog" href="/programme.html">Programme détaillé</a></div>
+        <p class="note" id="tests-status" role="status" aria-live="polite">Chargement…</p>
+        <div id="tests-list" class="stack"></div>
+        <div id="tests-start" hidden>
+          <p class="note">Choisissez les cycles à tester dans les SOP du cabinet : les procédures obligatoires sont retenues, vous êtes la personne qui les prépare. Le seuil et la taille d’échantillon sont les vôtres ; rien n’est inventé.</p>
+          <fieldset class="stack" style="border:0;padding:0;margin:0"><legend class="meta">Cycles</legend><div id="tests-cycles" class="chips"></div></fieldset>
+          <div class="form-grid">
+            <label>Seuil de signification *<input id="t-mat" type="number" min="1" step="any" placeholder="Ex. 5000000"></label>
+            <label>Devise<input id="t-cur" maxlength="10" value="FCFA"></label>
+            <label>Taille d’échantillon (tests par sondage)<input id="t-size" type="number" min="1" placeholder="Ex. 25"></label>
+            <label>Revue requise<select id="t-review"><option value="senior">Senior</option><option value="manager" selected>Manager</option><option value="supervisor">Superviseur</option><option value="partner">Associé</option></select></label>
+          </div>
+          <div class="btn-row"><button class="btn" id="t-go" type="button">Commencer les tests</button></div>
+        </div>
+      </section>
+
       <section class="card" id="sec-followups" aria-labelledby="h-followups" hidden>
         <h2 id="h-followups">À compléter plus tard</h2>
         <p class="meta" id="fu-origin"></p>
@@ -755,6 +772,12 @@
       var a = el('a', 'Ouvrir le dossier de la mission dans le Drive'); a.href = 'https://drive.google.com/drive/folders/' + encodeURIComponent(f.folder_id); a.target = '_blank'; a.rel = 'noopener noreferrer';
       $('pc-folder').appendChild(a);
       if (f.workspace && WS[f.workspace.status]) $('pc-folder').appendChild(el('span', ' · ' + (f.workspace.error || WS[f.workspace.status])));
+      if (f.workspace && f.workspace.summary) { var det = el('details'); det.appendChild(el('summary', 'Compte rendu du Mission Controller')); det.appendChild(el('p', f.workspace.summary, 'note')); $('pc-folder').appendChild(det); }
+      if (!f.workspace || ['failed', 'agents_not_authorized', 'reported'].indexOf(f.workspace.status) >= 0) {
+        var again = el('button', f.workspace && f.workspace.status === 'reported' ? 'Refaire la structure du modèle' : 'Lancer la structure du modèle', 'btn ghost'); again.type = 'button';
+        again.addEventListener('click', function () { $('pc-prepare').click(); }); $('pc-folder').appendChild(document.createTextNode(' ')); $('pc-folder').appendChild(again);
+      }
+      if (f.migration === false) $('pc-folder').appendChild(el('p', 'À installer une fois : db/mission-quick.sql dans Supabase (sinon l’avancement du Mission Controller ne peut pas être affiché ici).', 'note'));
     } else {
       var mf = (f && f.mission_folder) || {};
       $('pc-nofolder-why').textContent = mf.reason || 'Le dossier de la mission n’existe pas encore dans le Drive.';
@@ -765,7 +788,9 @@
     var b = this; b.disabled = true; $('pc-status').textContent = 'Le Mission Controller crée le dossier…';
     OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'prepare', mission_id: missionId }) }).then(function (r) {
       var st = r.folder || {};
-      $('pc-status').textContent = st.status === 'created' ? 'Dossier créé : « ' + st.name + ' ».' : st.status === 'ready' ? 'Le dossier existe déjà.' : (st.reason || 'Dossier non créé.');
+      var ws = r.workspace || {};
+      $('pc-status').textContent = (st.status === 'created' ? 'Dossier créé : « ' + st.name + ' ».' : st.status === 'ready' ? 'Dossier de la mission trouvé.' : (st.reason || 'Dossier non créé.')) +
+        (ws.status === 'queued' ? ' Le Mission Controller reprend maintenant la structure du modèle du cabinet.' : ws.status === 'already_running' ? ' Le Mission Controller y travaille déjà.' : ws.status === 'failed' ? ' La structure n’a pas pu être lancée.' : '');
       loadFollowups();
     }).catch(function (e) { $('pc-status').textContent = 'Impossible : ' + e.message; }).then(function () { b.disabled = false; });
   });
@@ -793,7 +818,11 @@
         if (!done.length) { $('pc-status').textContent = 'Aucune pièce déposée.'; b.disabled = false; return; }
         $('pc-status').textContent = done.length + ' pièce(s) dans le dossier de la mission. Les agents les lisent…';
         OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'pieces-done', mission_id: missionId, note: $('pc-note').value.trim(), files: done.map(function (x) { return { id: x.file_id }; }) }) })
-          .then(function (r) { $('pc-status').textContent = r.received + ' pièce(s) déposée(s) dans la mission. ' + (r.analysis && r.analysis.started ? 'Les agents les lisent et mettront la mission à jour.' : 'La lecture par les agents n’a pas pu partir ; les pièces sont bien dans le dossier.'); $('pc-note').value = ''; })
+          .then(function (r) {
+            $('pc-status').textContent = r.received + ' pièce(s) déposée(s) dans la mission. ' + (r.analysis && r.analysis.started ? 'Les agents les lisent…' : 'La lecture par les agents n’a pas pu partir ; les pièces sont bien dans le dossier.');
+            $('pc-note').value = '';
+            if (r.analysis && r.analysis.id) followPieces(r.analysis.id);
+          })
           .catch(function (e) { $('pc-status').textContent = 'Pièces déposées, mais l’enregistrement a échoué : ' + e.message; })
           .then(function () { b.disabled = false; });
         return;
@@ -804,6 +833,67 @@
         .then(function () { next(i + 1); });
     };
     next(0);
+  });
+
+  // What the agents do with the pieces, live: read, TDR recognised, Mission Controller preparing the mission.
+  function followPieces(id) {
+    var box = $('pc-results'), seen = 0, tries = 0;
+    var tick = function () {
+      OM.api('/api/app?route=deposit&id=' + encodeURIComponent(id)).then(function (st) {
+        (st.log || []).slice(seen).forEach(function (l) { box.appendChild(el('div', l.m, 'item')); }); seen = (st.log || []).length;
+        if (st.status === 'running' && ++tries < 90) { setTimeout(tick, 4000); return; }
+        if (st.status === 'failed') { $('pc-status').textContent = 'La lecture s’est arrêtée : ' + (st.error || 'erreur'); return; }
+        $('pc-status').textContent = st.status === 'done' ? 'Pièces lues et rattachées à la mission.' : 'Lecture toujours en cours : revenez plus tard.';
+        if (st.handed_to) { var go = el('a', 'Suivre la préparation de la mission par le ' + st.handed_to.agent, 'btn'); go.href = st.handed_to.page; box.appendChild(go); }
+        reload();
+      }).catch(function () { if (++tries < 90) setTimeout(tick, 6000); });
+    };
+    setTimeout(tick, 3000);
+  }
+
+  // ---- Straight to the tests (2026-10-19) ----
+  var GAPS = { MATERIALITY_REQUIRED: 'le seuil de signification', NO_CYCLE: 'au moins un cycle', REVIEW_LEVEL_REQUIRED: 'le niveau de revue', CYCLE_PREPARER_REQUIRED: 'qui prépare le cycle',
+    CYCLE_WITHOUT_PROCEDURE: 'un cycle sans procédure obligatoire (à compléter dans le programme détaillé)', SAMPLE_SIZE_REQUIRED: 'la taille d’échantillon', RISK_DEPENDENT_NEEDS_REASON: 'une justification', PLANNING_QUESTION_OPEN: 'une question de planification ouverte', PLANNING_REVIEW_REQUIRED: 'une revue de planification' };
+  function drawTests(t) {
+    var list = $('tests-list'); list.textContent = '';
+    $('tests-prog').href = '/programme.html?mission_id=' + encodeURIComponent(missionId);
+    $('tests-start').hidden = true;
+    if (t.validated) {
+      var mine = t.procedures.filter(function (p) { return p.mine; }), others = t.procedures.filter(function (p) { return !p.mine; });
+      $('tests-status').textContent = (mine.length ? mine.length + ' test(s) à faire par vous' : 'Aucun test ne vous est attribué') + ' — programme validé (version ' + t.version + ').';
+      mine.concat(others).forEach(function (p) {
+        var a = el('a', null, 'item link-item'); a.href = p.url;
+        var tt = el('div', null, 't'); tt.appendChild(el('span', p.code + ' — ' + (p.title || ''))); tt.appendChild(el('span', [p.cycle, p.preparer && 'préparé par ' + p.preparer].filter(Boolean).join(' · '), 'meta'));
+        a.appendChild(tt); a.appendChild(el('span', p.mine ? 'À moi' : 'Équipe', p.mine ? 'tag' : 'tag neutral')); list.appendChild(a);
+      });
+      return;
+    }
+    if (!t.library.length) { $('tests-status').textContent = 'La bibliothèque des SOP du cabinet est vide : chargez vos SOP pour proposer les tests.'; var ml = el('a', 'Charger les SOP (Méthodologie)', 'btn ghost'); ml.href = '/methodologie.html'; list.appendChild(ml); return; }
+    if (!t.may_start) { $('tests-status').textContent = t.draft ? 'Le programme de travail est en préparation : il attend sa validation par le manager ou l’associé.' : 'Le programme de travail n’est pas encore fait : le manager ou l’associé de la mission le prépare.'; return; }
+    $('tests-status').textContent = t.draft ? 'Un programme est en préparation : vous pouvez le compléter ici ou dans le programme détaillé.' : 'Pas encore de programme : commencez ici.';
+    var box = $('tests-cycles'); box.textContent = '';
+    t.library.forEach(function (sop) {
+      var lab = el('label', null, 'chip'), cb = el('input'); cb.type = 'checkbox'; cb.value = sop.file_id; cb.style.marginRight = '6px';
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(((sop.cycle && (sop.cycle.title || sop.cycle.code)) || sop.file_name) + ' (' + sop.procedures + ')'));
+      box.appendChild(lab);
+    });
+    $('tests-start').hidden = false;
+  }
+  function loadTests() {
+    OM.api('/api/app?route=mission-quick&view=tests&mission_id=' + encodeURIComponent(missionId)).then(drawTests)
+      .catch(function (e) { $('tests-status').textContent = e.code === 'NOT_ON_THIS_MISSION' ? 'Vous n’êtes pas sur cette mission.' : 'Tests indisponibles : ' + e.message; });
+  }
+  $('t-go').addEventListener('click', function () {
+    var ids = Array.prototype.filter.call(document.querySelectorAll('#tests-cycles input'), function (x) { return x.checked; }).map(function (x) { return x.value; });
+    if (!ids.length) { $('tests-status').textContent = 'Choisissez au moins un cycle.'; return; }
+    if (!$('t-mat').value) { $('tests-status').textContent = 'Indiquez le seuil de signification.'; return; }
+    var b = this; b.disabled = true; $('tests-status').textContent = 'Préparation de vos tests…';
+    OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'tests-start', mission_id: missionId, sop_file_ids: ids, materiality: $('t-mat').value, currency: $('t-cur').value, sample_size: $('t-size').value, review_level: $('t-review').value }) })
+      .then(drawTests)
+      .catch(function (e) {
+        var gaps = (e.data && e.data.gaps) || [];
+        $('tests-status').textContent = gaps.length ? 'Il manque : ' + Array.from(new Set(gaps.map(function (g) { return GAPS[g.gap] || g.gap; }))).join(', ') + '.' : 'Impossible : ' + e.message;
+      }).then(function () { b.disabled = false; });
   });
 
   function loadFollowups() {
@@ -830,7 +920,7 @@
       }).catch(function () { /* the existing mission remains usable if no opportunity is linked */ });
     }
     if (!missionId) { showList(); if (params.get('new') === '1') openNew(true); return; }
-    loadFollowups();
+    loadFollowups(); loadTests();
     // Remarks written in the work files by the Excel panel (branch « amelioration »).
     OM.api('/api/app?route=workfile&mission_id=' + encodeURIComponent(missionId)).then(function (d) {
       var list = d.remarks || []; if (!list.length) return;

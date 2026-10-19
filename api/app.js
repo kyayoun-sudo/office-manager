@@ -784,16 +784,19 @@ export const ROUTES = Object.freeze({
   // Direct mission creation (2026-10-19): a name and a client, the mission exists « En cours » with its creator on the
   // team; acceptance, independence and the engagement letter stay open items to complete later (never blocking).
   'mission-quick': {
-    GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account); return (await import('../lib/mission-quick.js')).missionFollowups(orgId, id); }),
+    GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account);
+      const m = await import('../lib/mission-quick.js');
+      return req.query?.view === 'tests' ? m.testsView(orgId, id, req.account) : m.missionFollowups(orgId, id); }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const b = req.body || {}, m = await import('../lib/mission-quick.js');
       if (b.action === 'create') return m.createMissionQuick(orgId, b, req.account, { req });
       // Everything below acts on one mission: the person must be on it (owner / partner: all).
-      if (['prepare', 'piece', 'piece-start', 'pieces-done'].includes(b.action)) await requireMissionAccess(orgId, String(b.mission_id || ''), req.account);
+      if (['prepare', 'piece', 'piece-start', 'pieces-done', 'tests-start'].includes(b.action)) await requireMissionAccess(orgId, String(b.mission_id || ''), req.account);
       if (b.action === 'prepare') return m.prepareDirectMission(orgId, req, String(b.mission_id || ''), req.account);
       if (b.action === 'piece') return m.uploadPiece(orgId, b, req.account);
       if (b.action === 'piece-start') return m.startPieceUpload(orgId, b, req.account, req);
       if (b.action === 'pieces-done') return m.piecesReceived(orgId, req, b, req.account);
+      if (b.action === 'tests-start') return m.quickStartTests(orgId, String(b.mission_id || ''), b, req.account);
       if (b.action === 'followup') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setFollowup(orgId, b, req.account); }
       if (b.action === 'folder') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); const r = await m.setMissionFolder(orgId, b, req.account);
         return { ...r, workspace: await m.requestDirectWorkspace(orgId, req, String(b.mission_id), req.account).catch(e => ({ status: 'failed', error: String(e.message || e).slice(0, 120) })) }; }

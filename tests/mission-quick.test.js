@@ -243,3 +243,84 @@ test('no mission folder yet: the deposit says so instead of putting the pieces e
   assert.equal(p.folder.status, 'configuration_required');
   assert.equal(followupView(db.missions[0]).items.find(i => i.key === 'folder').href.includes('mission_root'), true);
 });
+
+test('a TDR among the pieces received goes to the Mission Controller, read from its content', async () => {
+  const { startDepositAnalysis, depositStep } = await import('../lib/deposit-analysis.js');
+  const mem = { state: null }; let prep = null;
+  const d = {
+    drive: {}, folder: 'mem', fire: async () => true, budgetMs: 5000,
+    loadJsonFile: async () => ({ state: mem.state && JSON.parse(JSON.stringify(mem.state)), fileId: 'x' }),
+    saveJsonFile: async (n, dr, f, id, st) => { mem.state = JSON.parse(JSON.stringify(st)); },
+    // The name says « balance » for the TDR: only the content decides.
+    fileForAI: async id => ({ text: id === 'F1' ? 'TERMES DE REFERENCE — audit des comptes 2025' : 'Balance générale' }),
+    ai: async () => ({ provider: 'test', text: JSON.stringify({ documents: [{ file_id: 'F1', role: 'tdr', type: 'TDR' }, { file_id: 'F2', role: 'etat_financier', type: 'Balance' }] }) }),
+    engagementMissions: async () => [{ id: RID, name: 'Audit 2025', phase: 'active' }],
+    linkToMissions: async (o, docs) => ({ linked: docs.map(doc => ({ doc, mission: { id: RID, name: 'Audit 2025' }, dates: {} })), to_attach: [] }),
+    applyMissionUpdates: async () => ({ attached: 2, proposals: [] }),
+    startEngagementPrep: async (o, req, body) => { prep = body; return { started: true }; }
+  };
+  const r = await startDepositAnalysis(ORG, {}, { purpose: 'pieces', mission_id: RID, files: [{ id: 'F1', name: 'balance_scan.pdf' }, { id: 'F2', name: 'tdr.xlsx' }], by: 'Awa' }, d);
+  let st = await depositStep(ORG, {}, { id: r.id }, d);
+  for (let i = 0; i < 4 && st.status === 'running'; i++) st = await depositStep(ORG, {}, { id: r.id }, d);
+  assert.equal(st.status, 'done');
+  assert.deepEqual(prep.tdr_file_ids, ['F1']);
+  assert.equal(prep.mission_id, RID);
+  assert.equal(st.handed_to.agent, 'Mission Controller');
+  // Without a TDR / contract / letter: the pieces are only attached, nobody pretends the mission was prepared.
+  prep = null; mem.state = null;
+  d.ai = async () => ({ provider: 'test', text: JSON.stringify({ documents: [{ file_id: 'F2', role: 'etat_financier' }] }) });
+  const r2 = await startDepositAnalysis(ORG, {}, { purpose: 'pieces', mission_id: RID, files: [{ id: 'F2', name: 'b.xlsx' }] }, d);
+  let st2 = await depositStep(ORG, {}, { id: r2.id }, d);
+  for (let i = 0; i < 4 && st2.status === 'running'; i++) st2 = await depositStep(ORG, {}, { id: r2.id }, d);
+  assert.equal(st2.status, 'done'); assert.equal(prep, null); assert.equal(st2.handed_to, undefined);
+});
+
+test('without db/mission-quick.sql the model structure is still launched (never silently dropped)', async () => {
+  const { requestDirectWorkspace, directWorkspaceStep } = await import('../lib/mission-quick.js');
+  const db = fakeDb({ noMigration: true }); const fired = [];
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Xi' }, auditor, deps(db));
+  db.missions[0].drive_folder_id = 'FolderAlready0001';
+  const r = await requestDirectWorkspace(ORG, { headers: { host: 'x' } }, RID, auditor, { fetchRows: db.fetchRows, fire: async (req, path, body) => { fired.push(body); return true; } });
+  assert.equal(r.status, 'queued');
+  assert.equal(fired[0].no_record, true);
+  let ran = false;
+  const out = await directWorkspaceStep(ORG, fired[0], { fetchRows: db.fetchRows, permissions: async () => ({ granted: true }), run: async () => { ran = true; return { text: 'ok' }; } });
+  assert.equal(ran, true); assert.equal(out.status, 'reported');
+  // With the column present, « no_record » never bypasses the claim.
+  const db2 = fakeDb();
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Xi' }, auditor, deps(db2));
+  assert.equal((await directWorkspaceStep(ORG, { mission_id: RID, no_record: true }, { fetchRows: db2.fetchRows, run: async () => { throw new Error('must not run'); } })).status, 'not_queued');
+});
+
+test('go straight to the tests: cycles from the SOP library, CORE on, the person types materiality and sample size', async () => {
+  const { quickStartTests } = await import('../lib/mission-quick.js');
+  const w = await import('../lib/work-programme.js');
+  const db = fakeDb();
+  await createMissionQuick(ORG, { request_id: RID, name: 'Audit 2025', client: 'Omicron', origin: 'direct' }, auditor, deps(db));
+  db.missions[0].drive_folder_id = null;
+  const lib = { sops: [{ file_id: 'SOP_ACH', file_name: 'C02_ACH.docx', cycle: { code: 'ACH', title: 'Achats' }, procedures: [
+    { code: 'ACH-01', title: 'Rapprochement', type: 'CORE', sampling_mode: 'programme_sample' }, { code: 'ACH-02', title: 'Option', type: 'OPTIONAL' }] }] };
+  const programmes = [];
+  const base = db.fetchRows;
+  db.fetchRows = async (url, o = {}) => {
+    if (url.startsWith('office_work_programmes')) {
+      if (o.method === 'POST') { const r = { id: 'P1', updated_at: 't1', ...JSON.parse(o.body)[0] }; programmes.push(r); return [r]; }
+      if (o.method === 'PATCH') { const r = programmes.find(x => url.includes('id=eq.' + x.id)); if (!r) return []; Object.assign(r, JSON.parse(o.body)); return [r]; }
+      return url.includes('status=eq.validated') ? programmes.filter(x => x.status === 'validated') : [...programmes].reverse();
+    }
+    if (url.startsWith('office_staff_profiles?') && url.includes('id=in.')) return db.profiles;
+    if (url.startsWith('office_mission_assignments?') && !o.method) return db.assignments.map(a => ({ staff_profile_id: a.staff_profile_id, mission_role: a.mission_role, status: a.status }));
+    return base(url, o);
+  };
+  const dd = { fetchRows: db.fetchRows, methodology: async () => lib, audit: async () => ({}), emit: async () => ({}), drive: {} };
+  await assert.rejects(quickStartTests(ORG, RID, { sop_file_ids: ['SOP_ACH'], review_level: 'manager' }, auditor, dd), /MATERIALITY_REQUIRED/);
+  await assert.rejects(quickStartTests(ORG, RID, { sop_file_ids: ['SOP_ACH'], materiality: 5000000, review_level: 'manager' }, auditor, dd), e => e.message === 'PROGRAMME_INCOMPLETE' && e.gaps.some(g => g.gap === 'SAMPLE_SIZE_REQUIRED'));
+  // The auditor who created this direct mission leads it: prepares and validates its programme, then works the tests.
+  const r = await quickStartTests(ORG, RID, { sop_file_ids: ['SOP_ACH'], materiality: 5000000, sample_size: 25, review_level: 'manager' }, auditor, dd);
+  assert.equal(r.validated, true);
+  assert.deepEqual(r.procedures.map(p => [p.code, p.mine]), [['ACH-01', true]]);
+  assert.match(r.procedures[0].url, /procedure\.html\?mission_id=/);
+  // Anyone else's mission: an auditor is not its lead.
+  const other = { email: 'kofi@cabinet.test', display_name: 'Kofi', role: 'auditor' };
+  assert.equal(await w.isDirectMissionLead(ORG, RID, other, db.fetchRows), false);
+});
