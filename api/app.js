@@ -33,7 +33,7 @@ import { assertIsolatedOrg } from '../lib/test-mode.js';
 import { signinUrl, completeGoogleReturn } from '../lib/google-signin.js';
 import { googleClientConfigured } from '../lib/google-connection.js';
 import { agentPermissions, grantAgentPermissions } from '../lib/agent-permissions.js';
-import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
+import { startScan, scanStep, scanStatus, excludeBlockedFolders, includeFolder } from '../lib/mapping-scan.js';
 import { learnFirm, firmKnowledge } from '../lib/firm-learning.js';
 import { startTidyPlan, tidyPlanStep, tidyStatus, answerQuestion, stopTidy } from '../lib/tidy-plan.js';
 import { loadPeoplePolicy, savePeoplePolicy } from '../lib/people-policy.js';
@@ -95,7 +95,8 @@ import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from
 //   GET  /api/app?route=tenders                    tender watch: tenders, indicators, workload (BDM, partners)
 //   POST /api/app?route=tenders {action}           run | decide | tdr | submitted | result | review-decide | review-run | settings
 //   GET  /api/app?route=readiness                  "Mise en service": every link of the chain checked — OWNER ONLY
-//   POST /api/app?route=readiness {action}         mapping-pass (full Drive mapping by the Orpailleur) — OWNER ONLY
+//   POST /api/app?route=readiness {action}         mapping-pass (full Drive mapping by the Orpailleur) | mapping-exclude-blocked
+//                                                  {folder_ids?} | mapping-include {folder_id} — OWNER ONLY
 // Every route needs the pilot token, except the public login routes. Owner routes
 // also need the owner token (x-office-manager-owner-token), as in api/owner.js.
 
@@ -437,6 +438,10 @@ export const ROUTES = Object.freeze({
     POST: owner((orgId, req) => {
       // Whole-Drive mapping in short resumable steps (a single agent call hit the 300 s limit).
       if (req.body?.action === 'mapping-pass') return startScan(orgId, req).then(r => ({ ...r, message: r.already_running ? 'Cartographie déjà en cours : elle continue.' : 'Cartographie lancée : l’Orpailleur parcourt votre Drive. Suivez l’avancement ici.' }));
+      // Folders the Drive refuses: a person decides to continue without them (or to walk them again).
+      const by = req.account?.email || (req.body?.approved_by ? 'propriétaire — ' + String(req.body.approved_by).slice(0, 80) : null);
+      if (req.body?.action === 'mapping-exclude-blocked') return excludeBlockedFolders(orgId, req, { folderIds: req.body.folder_ids, by });
+      if (req.body?.action === 'mapping-include') return includeFolder(orgId, { folderId: req.body.folder_id, by });
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'READINESS_UNAVAILABLE'

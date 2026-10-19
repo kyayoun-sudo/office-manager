@@ -86,6 +86,7 @@
           <button class="btn" id="map-review" type="button" hidden>Valider la cartographie</button>
         </div>
         <p id="map-live" role="status" aria-live="polite" style="margin:0;font-size:15px;font-weight:600;color:var(--brand-ink)"></p>
+        <div id="map-why" class="stack" style="gap:6px" hidden></div>
         <h3 style="margin:8px 0 0;font-size:15px">Questions de l'Orpailleur</h3>
         <div id="questions" class="stack" style="gap:8px"></div>
       </section>
@@ -117,7 +118,9 @@
   var ICO = { ok: '✓', todo: '○', warn: '!' };
   var ERR = { OWNER_ONLY: 'Réservé au propriétaire.', OWNER_UNAUTHORIZED: 'Code propriétaire refusé : reconnectez-vous.',
     OFFICE_MANAGER_OWNER_TOKEN_MISSING: 'OFFICE_MANAGER_OWNER_TOKEN manque dans Vercel.', OWNER_APPROVAL_SECRET_MISSING: 'OWNER_APPROVAL_SECRET manque dans Vercel.',
-    FIRST_MAPPING_NOT_COMPLETE: 'La cartographie n’est pas encore complète.' };
+    FIRST_MAPPING_NOT_COMPLETE: 'La cartographie n’est pas encore complète.',
+    SCAN_NOT_BLOCKED: 'Le parcours n’est plus bloqué : rechargez la page.', NO_BLOCKED_FOLDER: 'Aucun dossier bloqué à écarter.',
+    PERSON_REQUIRED: 'Reconnectez-vous : ce choix doit être enregistré à votre nom.', FOLDER_NOT_EXCLUDED: 'Ce dossier n’est plus écarté.' };
   var msg = function (e) { var m = String(e && e.message || e); return ERR[m] || m; };
   function say(t) { $('status').textContent = t || ''; }
   function ownerHeaders() { return { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }; }
@@ -173,6 +176,7 @@
     $('map-warning').hidden = !m.warning && !m.error; $('map-warning').textContent = m.warning || m.error || '';
     if (m.mapping_state === 'NO_DRIVE') $('map-pass').disabled = true;
     $('map-review').hidden = m.mapping_state !== 'MAPPING_PENDING_REVIEW';
+    lastMapping = m; explainMapping();
 
     var qs = $('questions'); qs.textContent = '';
     var questions = m.owner_questions || [];
@@ -203,12 +207,64 @@
     OM.api('/api/app?route=readiness', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify({ action: 'mapping-pass' }) })
       .then(function (r) { live(r.message); watchScan(); }).catch(function (e) { live('La cartographie n’a pas démarré : ' + msg(e)); }).then(function () { $('map-pass').disabled = false; });
   }
+  // Why « Valider la cartographie » is not offered (Paul, 2026-10-19): the screen says it, with the folders at stake.
+  var lastMapping = null, lastScan = null;
+  function mk(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+  function scanAction(body, okText) {
+    return OM.api('/api/app?route=readiness', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify(body) })
+      .then(function () { live(okText); watchScan(); }).catch(function (e) { live(msg(e)); });
+  }
+  function explainMapping() {
+    var box = $('map-why'), m = lastMapping || {}, s = lastScan || {}, st = m.mapping_state, lines = [];
+    box.textContent = '';
+    if (!st || st === 'MAPPING_PENDING_REVIEW' || st === 'MAPPING_REVIEWED') { box.hidden = st !== 'MAPPING_REVIEWED' || !(s.excluded || []).length; }
+    else box.hidden = false;
+    if (st === 'NO_DRIVE') lines.push('Aucun Drive n’est choisi pour le cabinet : choisissez-le dans Paramètres, puis lancez le premier scan.');
+    else if (st === 'UNREADABLE') lines.push('La mémoire de la cartographie n’a pas pu être lue (' + (m.error || 'cause inconnue') + ') : rien n’est validable tant qu’elle n’est pas relue.');
+    else if (st === 'NO_MAP' || st === 'FIRST_MAPPING') {
+      var why = 'Le bouton « Valider la cartographie » n’apparaît que lorsque tout le Drive a été parcouru et lu par l’Orpailleur. ';
+      if (s.status === 'walking' || s.status === 'mapping') why += s.stalled ? 'Le parcours est interrompu : reprenez-le.' : 'Le parcours est en cours ; le bouton apparaîtra à la fin.';
+      else if (s.status === 'incomplete' && s.reason === 'ITEM_LIMIT') why += 'Le Drive choisi dépasse la taille qu’un parcours peut couvrir (50 000 éléments) : choisissez dans Paramètres un Drive ou un dossier plus restreint.';
+      else if (s.status === 'incomplete' && (s.blocked || []).length) why += (s.blocked.length > 1 ? s.blocked.length + ' dossiers refusent' : 'Un dossier refuse') + ' l’accès au compte Google connecté ; tant qu’ils ne sont pas lus ou écartés par vous, la cartographie reste incomplète.';
+      else if (s.status === 'incomplete') why += 'Certains dossiers ont eu une erreur passagère : relancez le scan (seuls ces dossiers sont repris).';
+      else if (s.status === 'failed') why += 'Le dernier parcours a échoué : ' + ((s.errors || []).map(function (e) { return e.path + ' — ' + e.error; }).pop() || 'cause inconnue') + '.';
+      else if (s.status === 'done') why += 'Le parcours est fini, mais la cartographie n’est pas enregistrée comme complète' + (m.warning ? ' (' + m.warning + ')' : '') + ' : relancez le scan.';
+      else why += 'Le premier scan n’a pas encore été lancé.';
+      lines.push(why);
+    }
+    lines.forEach(function (t) { box.appendChild(mk('p', t, 'small')); });
+    if (s.status === 'incomplete' && (s.blocked || []).length) {
+      var ul = mk('ul', null, 'small');
+      s.blocked.forEach(function (b) { ul.appendChild(mk('li', (b.path || '/') + ' — ' + (b.error || 'accès refusé') + ' (' + b.attempts + ' essai' + (b.attempts > 1 ? 's' : '') + ')')); });
+      box.appendChild(ul);
+      box.appendChild(mk('p', 'Vous pouvez donner l’accès à ces dossiers au compte Google connecté puis relancer le scan, ou continuer sans eux. Ce choix est enregistré à votre nom, les dossiers écartés restent affichés, et vous pourrez les faire parcourir de nouveau.', 'small'));
+      var go = mk('button', 'Continuer sans ces dossiers', 'btn ghost'); go.type = 'button';
+      go.addEventListener('click', function () {
+        if (!confirm('Continuer la cartographie sans ces ' + s.blocked.length + ' dossier(s) ? Leur contenu ne sera ni lu ni rangé tant que vous ne les réintégrez pas.')) return;
+        go.disabled = true;
+        scanAction({ action: 'mapping-exclude-blocked', folder_ids: s.blocked.map(function (b) { return b.id; }), approved_by: OM.getUserName() },
+          'Dossiers écartés à votre demande : l’Orpailleur termine la cartographie.');
+      });
+      box.appendChild(go);
+    }
+    if ((s.excluded || []).length) {
+      box.appendChild(mk('p', 'Dossiers écartés de la cartographie :', 'small'));
+      s.excluded.forEach(function (x) {
+        var row = mk('div', null, 'btn-row'); row.appendChild(mk('span', (x.path || '/') + ' — écarté par ' + (x.by || '?') + (x.at ? ' le ' + UI.dateTime(x.at) : ''), 'small'));
+        var back = mk('button', 'Parcourir de nouveau', 'btn ghost'); back.type = 'button';
+        back.addEventListener('click', function () { back.disabled = true; scanAction({ action: 'mapping-include', folder_id: x.id, approved_by: OM.getUserName() }, 'Ce dossier sera parcouru au prochain scan.'); });
+        row.appendChild(back); box.appendChild(row);
+      });
+      box.hidden = false;
+    }
+  }
   // Live progress of the Drive walk, then of the Orpailleur's mapping pass.
   var scanTimer = null;
   function watchScan() {
     clearTimeout(scanTimer);
     OM.api('/api/app?route=mapping-scan', { headers: ownerHeaders() }).then(function (s) {
       if (!s) return;
+      lastScan = s; explainMapping();
       var t = s.stalled ? '⚠ Scan interrompu ou bloqué : aucune progression confirmée depuis ' + (s.last_progress_at ? UI.dateTime(s.last_progress_at) : 'une heure inconnue') + '. ' + s.files_seen + ' fichiers recensés ; ' + s.folders_left + ' dossiers restant à parcourir.' + (s.resumable ? ' Cliquez sur « Reprendre le scan » pour continuer depuis le dernier point enregistré.' : ' La finalisation doit être vérifiée avant de relancer.')
         : s.status === 'walking' ? 'L’Orpailleur parcourt votre Drive : ' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers vus, ' + s.folders_left + ' dossiers encore à ouvrir' + (s.current ? ' (en ce moment : ' + s.current + ')' : '') + '.'
         : s.status === 'mapping' ? 'Parcours terminé (' + s.folders_seen + ' dossiers, ' + s.files_seen + ' fichiers). L’Orpailleur écrit sa cartographie…'

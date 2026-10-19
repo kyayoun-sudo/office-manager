@@ -275,12 +275,33 @@
     });
   }
 
+  // An empty list always says why (Paul, 2026-10-19): nothing proposed, hidden by a filter, or not loaded.
+  function emptyReason() {
+    var box = el('div', null, 'empty');
+    if (!all.length) {
+      box.appendChild(el('p', 'Aucune proposition des agents n’est enregistrée pour le moment.'));
+      var hint = el('p', 'Les déplacements et renommages du Drive ne sont proposés qu’après la cartographie validée par le propriétaire : ');
+      var a = el('a', 'voir la cartographie dans Mise en service'); a.href = '/mise-en-service.html#map-card'; hint.appendChild(a); hint.appendChild(document.createTextNode('.'));
+      box.appendChild(hint); return box;
+    }
+    var byAgent = filter === 'all' ? all : all.filter(function (a) { return (a.agent_key || 'autre') === filter; });
+    var hiddenByAgent = all.length - byAgent.length, decided = byAgent.filter(function (a) { return !isOpen(a); }).length;
+    if (filter !== 'all' && hiddenByAgent) {
+      box.appendChild(el('p', hiddenByAgent + ' proposition(s) d’autres agents sont masquées par le filtre « ' + agentName(filter) + ' ».'));
+      var allBtn = el('button', 'Tout afficher', 'btn ghost'); allBtn.type = 'button';
+      allBtn.addEventListener('click', function () { filter = 'all'; renderFilters(); render(); }); box.appendChild(allBtn);
+    }
+    if (openOnly() && decided) box.appendChild(el('p', 'Rien n’attend de réponse ici : ' + decided + ' proposition(s) déjà décidée(s) sont masquées. Décochez le filtre pour les revoir.'));
+    if (!box.childNodes.length) box.appendChild(el('p', 'Rien à valider pour le moment.'));
+    return box;
+  }
+
   function render() {
     var list = $('list'); list.textContent = '';
     var rows = all.filter(function (a) { return (a.id === targetAction || filter === 'all' || (a.agent_key || 'autre') === filter) && (a.id === targetAction || !openOnly() || isOpen(a)); });
     var open = all.filter(function (a) { return a.retry_needed || !a.last_decision || a.last_decision.decision === 'defer'; }).length;
     $('nav-count').hidden = !open; $('nav-count').textContent = String(open);
-    if (!rows.length) { list.appendChild(el('p', openOnly() ? 'Rien n’attend de réponse. Décochez le filtre pour revoir ce qui a déjà été décidé.' : 'Rien à valider pour le moment.', 'empty')); return; }
+    if (!rows.length) { list.appendChild(emptyReason()); return; }
     rows.forEach(function (a) { list.appendChild(card(a)); });
   }
 
@@ -400,7 +421,11 @@
       all = (data && data.actions) || [];
       show(data && data.truncated ? 'Seules les 100 propositions les plus récentes sont affichées.' : '');
       renderFilters(); render();
-    }).catch(function (err) { show('Indisponible : ' + err.message, true); });
+    }).catch(function (err) {
+      show('Indisponible : ' + err.message, true);
+      var list = $('list'); list.textContent = '';
+      list.appendChild(el('p', 'La liste n’a pas pu être chargée (' + err.message + ') : cela ne veut pas dire qu’il n’y a rien à valider. Rechargez la page ; si l’erreur reste, reconnectez-vous.', 'empty'));
+    });
   }
   UI.requireLogin(function () {
     start();

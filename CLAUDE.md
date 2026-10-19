@@ -534,6 +534,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `office_firm_settings.settings.references` (`documentReferences` fusionne). Tests : `tests/mission-quick.test.js`,
   `tests/references-durable.test.js`.
 
+## Cahier des 11 points (Paul, 2026-10-19 : workflow, rôles par mission, Drive/serveur, pièces manquantes, recette)
+- Ordre validé par Paul : **10 → 2 → 6 → 1 → 7**, puis la recette du point 11. Workflow (point 1) : le cabinet dépose son document,
+  l'IA propose les étapes, un associé confirme, puis modifiable à l'écran et versionné. Recette avec un vrai serveur de fichiers.
+- Diagnostic prouvé dans le code : 1) workflow = seulement un LIEN dans Paramètres (`firm_workflow`), rien ne pilote les étapes ;
+  2) revues / programme / secrétariat décident sur le rôle DU COMPTE (`procedure-review.js` LEVEL_ROLES, `work-programme.js`
+  EDITORS / VALIDATORS), `mission_role` n'est qu'un texte affiché ; `mission-function.js` range « superviseur » en « senior » ;
+  3) cartographie et premier scan = Google Drive seulement (le connecteur local lit / écrit mais ne découvre pas) ;
+  6) `agents/index.js:225` interdit de modifier un working file alors que l'assistant de procédure en écrit un ; 3 actions max ;
+  7) scanner des mails = `has:attachment newer_than:30d`, aucun lien durable demande → fil → pièce → contrôle → WP.
+- **Point 10 fait** : un dossier refusé par Drive (403/404 = `BLOCKED`) gardait le parcours `incomplete` pour toujours → passe de
+  l'Orpailleur jamais lancée → état `FIRST_MAPPING` → jamais « Valider la cartographie ». Désormais Mise en service dit pourquoi
+  (dossiers nommés, `ITEM_LIMIT`, échec, en cours) ; une PERSONNE peut « continuer sans ces dossiers » (`excludeBlockedFolders`,
+  action `mapping-exclude-blocked` de `readiness`, audit `MAPPING_FOLDERS_EXCLUDED`), exclusion gardée aux scans suivants, affichée
+  dans l'avertissement (`EXCLUDED_BY_PERSON`) et réversible (`mapping-include`). « À valider » distingue rien / filtré / erreur.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

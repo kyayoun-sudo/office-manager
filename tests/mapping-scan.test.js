@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startScan, scanStep, scanStatus } from '../lib/mapping-scan.js';
+import { startScan, scanStep, scanStatus, excludeBlockedFolders, includeFolder } from '../lib/mapping-scan.js';
 
 function fakeDrive() {
   const files = new Map(); let n = 0;
@@ -156,4 +156,41 @@ test('an empty but fully traversed Drive completes; restarting the last saved wa
   const result = await scanStep('org', {}, d);
   assert.equal(result.status, 'done'); assert.equal(result.files_seen, 0);
   assert.equal(lists, 0); assert.equal(mapped, 1);
+});
+
+// Paul, 2026-10-19: « le bouton Valider la cartographie n'apparaît pas ». One folder the Drive refuses kept the
+// walk « incomplete » forever, so the Orpailleur's pass never ran. Now the screen names it and a person may continue without it.
+test('a refused folder blocks the cartography until a person excludes it; the exclusion is kept, traced and reversible', async () => {
+  const drive = fakeDrive(); const audits = []; let passed = null;
+  const forest = { R: [{ id: 'A', name: 'Clients', mimeType: 'application/vnd.google-apps.folder' }, { id: 'S', name: 'Privé RH', mimeType: 'application/vnd.google-apps.folder' }],
+    A: [{ id: 'y', name: 'lettre.docx', mimeType: 'x' }] };
+  const d = { drive, folder: 'MEM', root: { id: 'R', path: '' }, budgetMs: 10000, fire: async () => true, audit: async (org, e) => { audits.push(e); },
+    list: async (id) => { if (id === 'S') throw Object.assign(new Error('GOOGLE_API_403'), { statusCode: 403 }); return forest[id] || []; },
+    runPass: async (dr, o) => { passed = o; return { summary: { objects_seen: o.listing.items.length } }; } };
+  await startScan('org', {}, d);
+  const s1 = await scanStep('org', {}, d);
+  assert.equal(s1.status, 'incomplete'); assert.equal(s1.reason, 'UNRESOLVED_FOLDERS');
+  assert.equal(passed, null, 'no mapping pass on a partial listing');
+  assert.deepEqual(s1.blocked.map(b => b.path), ['/Privé RH']);
+  // Retrying does not help: the same folder fails again.
+  await startScan('org', {}, d); const s2 = await scanStep('org', {}, d);
+  assert.equal(s2.status, 'incomplete'); assert.equal(s2.blocked[0].attempts, 2);
+  // Never without a person.
+  await assert.rejects(excludeBlockedFolders('org', {}, {}, d), /PERSON_REQUIRED/);
+  const ex = await excludeBlockedFolders('org', {}, { by: 'owner@cabinet.test' }, d);
+  assert.equal(ex.excluded_now, 1); assert.equal(ex.finishing, true);
+  assert.equal(audits[0].action_type, 'MAPPING_FOLDERS_EXCLUDED'); assert.equal(audits[0].approved_by, 'owner@cabinet.test');
+  const s3 = await scanStep('org', {}, d);
+  assert.equal(s3.status, 'done');
+  assert.equal(passed.listing.complete, true);
+  assert.deepEqual(passed.listing.excluded.map(x => x.path), ['/Privé RH']);
+  assert.equal(s3.excluded[0].by, 'owner@cabinet.test');
+  // Next full scan: the excluded folder is not walked again (no new block), until a person includes it back.
+  passed = null; await startScan('org', {}, d); const s4 = await scanStep('org', {}, d);
+  assert.equal(s4.status, 'done'); assert.equal(s4.blocked.length, 0); assert.equal(s4.excluded.length, 1);
+  await assert.rejects(excludeBlockedFolders('org', {}, { by: 'owner@cabinet.test' }, d), /SCAN_NOT_BLOCKED/);
+  const s5 = await includeFolder('org', { folderId: 'S', by: 'owner@cabinet.test' }, d);
+  assert.equal(s5.excluded.length, 0); assert.equal(audits.at(-1).action_type, 'MAPPING_FOLDER_INCLUDED');
+  await startScan('org', {}, d); const s6 = await scanStep('org', {}, d);
+  assert.equal(s6.status, 'incomplete'); assert.deepEqual(s6.blocked.map(b => b.path), ['/Privé RH']);
 });
