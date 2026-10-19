@@ -467,6 +467,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   jamais d'écrasement) et note qui prépare quoi ; le bouton « Créer les Working Papers » accepte aussi le responsable d'une mission
   directe (`mayPrepareWorkpapers`). Test : `tests/mission-correct-and-programme-followup.test.js`.
 
+- **Pièces reçues renommées, « Préparer une mission » sans TDR (Paul, 2026-10-19 : « il a mis dans pièces reçues, il devrait renommer et
+  créer le fichier d'audit ; préparer une mission ne me met aucun TDR »)** : après lecture, chaque pièce est renommée d'après son CONTENU
+  (`renamePieces` / `pieceName`, `lib/deposit-analysis.js` : `TYPE_CLIENT_PÉRIODE.ext`, même id, jamais d'écrasement → `_2`, non lue = nom
+  gardé, `PIECES_RENAMED` dans l'audit log). Rôle `convention` (convention de financement d'un projet) ajouté ; `ENGAGEMENT_ROLES` =
+  TDR, contrat, lettre, convention → lance la préparation. `tdrCandidates` propose TOUTES les pièces de la mission (recommandées cochées,
+  sinon on coche les états financiers…) et ne tombe plus si la carte du Drive manque. Le fichier d'audit = les Working Papers par cycle,
+  créés à la validation du programme. Test : `tests/pieces-rename-and-prep.test.js`.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

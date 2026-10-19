@@ -41,7 +41,7 @@
     <section class="card" aria-labelledby="h-start" id="start-card">
       <h2 id="h-start">Lancer la préparation</h2>
       <div class="field"><label for="mission">Mission (actives et pas encore commencées)</label><select id="mission"><option value="">Chargement…</option></select></div>
-      <div class="field"><span class="label" id="l-tdr" style="font-size:13px;font-weight:600;color:var(--muted)">TDR, appel d'offres ou contrat trouvés dans le Drive</span>
+      <div class="field"><span class="label" id="l-tdr" style="font-size:13px;font-weight:600;color:var(--muted)">Documents de la mission : TDR, convention, contrat, appel d'offres ou pièces reçues</span>
         <div class="picks" id="tdr-list" aria-labelledby="l-tdr"><p class="empty">Choisissez d'abord une mission.</p></div></div>
       <div class="field"><label for="tdr-links">Ou collez les liens Drive des documents (un par ligne)</label><textarea id="tdr-links" style="min-height:70px" placeholder="https://drive.google.com/file/d/…"></textarea></div>
       <div class="field"><label for="notes">Précisions pour Mission Controller (facultatif)</label><textarea id="notes" style="min-height:70px" placeholder="Exemple : le client est une filiale d'un groupe minier ; la mission couvre aussi l'évaluation des actifs."></textarea></div>
@@ -115,9 +115,11 @@
     box.appendChild(el('p', 'Recherche des documents…', 'empty'));
     OM.api('/api/app?route=engagement&candidates=1&mission_id=' + encodeURIComponent(id)).then(function (d) {
       box.textContent = '';
-      if (!d.candidates.length) { box.appendChild(el('p', 'Aucun TDR reconnu dans la carte du Drive pour cette mission : collez le lien ci-dessous.', 'empty')); }
+      if (!d.candidates.length) { box.appendChild(el('p', 'Aucun document pour cette mission : déposez les pièces dans la mission (« Pièces reçues ») ou collez le lien ci-dessous.', 'empty')); }
+      var anyRec = d.candidates.some(function (c) { return c.recommended; });
+      if (d.candidates.length && !anyRec && d.candidates.some(function (c) { return c.role; })) box.appendChild(el('p', 'Aucun TDR ni convention parmi les pièces lues : cochez celles dont le Mission Controller doit partir (états financiers, balance…).', 'empty'));
       d.candidates.forEach(function (c, i) {
-        var lab = el('label'); var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c.id; cb.checked = i === 0;
+        var lab = el('label'); var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c.id; cb.checked = anyRec ? !!c.recommended : i === 0;
         var t = el('span', c.name); t.appendChild(el('small', c.path)); lab.appendChild(cb); lab.appendChild(t); box.appendChild(lab);
       });
     }).catch(function () { box.textContent = ''; box.appendChild(el('p', 'Carte du Drive indisponible : collez les liens.', 'empty')); });
