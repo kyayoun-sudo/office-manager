@@ -568,6 +568,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 ## Règles de travail
 
+- **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans
+  `docs/A_FAIRE_DE_VOTRE_COTE.txt`, avec le « comment faire » pas à pas (Paul, 2026-10-19) ; le tenir à jour à chaque modification.
+
 - Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
   toi »). `amelioration` a reçu le même travail le 2026-10-11 (rôles, droits, veille, Shadow) ; elle n'est plus la branche
   de construction. Ne pas toucher `main`, `fix/map-register-bridge-write` (environnement de test isolé) sans accord.

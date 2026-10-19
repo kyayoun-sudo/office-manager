@@ -1,0 +1,114 @@
+OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
+=====================================================
+
+Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
+ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
+
+Dernière mise à jour : 19 octobre 2026
+Branche concernée : feature/white-label-desktop
+
+
+-----------------------------------------------------------------------------------------------------------------
+1. [ ] INSTALLER LA COLONNE DES FONCTIONS SUR LA MISSION DANS SUPABASE          (urgent — point 2, rôles par mission)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : les revues et la validation du programme lisent maintenant la fonction de chaque personne sur la mission
+(Manager sur une mission, Senior sur une autre…). Cette fonction est rangée dans une nouvelle colonne de la base.
+Sans elle, l'application marche comme avant (seul le grade du compte compte), mais on ne peut pas changer une fonction
+(message « La base n'a pas encore la colonne des fonctions »).
+
+Comment faire :
+  1. Ouvrir https://supabase.com/dashboard et choisir le projet du cabinet.
+  2. Menu de gauche → « SQL Editor » → « New query ».
+  3. Ouvrir sur votre ordinateur le fichier  db/mission-functions.sql  (dans le dossier office-manager),
+     tout copier, coller dans l'éditeur.
+  4. Cliquer « Run ». Le message attendu est « Success. No rows returned ».
+     (Sans danger si on le relance : il n'ajoute que ce qui manque, ne supprime rien.)
+  5. Vérifier : coller puis exécuter cette requête :
+         select column_name from information_schema.columns
+         where table_name = 'office_mission_assignments' and column_name like 'mission_function%';
+     Il doit y avoir 3 lignes : mission_function, mission_function_set_by, mission_function_set_at.
+
+Autre possibilité : relancer en entier  db/INSTALL_TOUT.sql  (il contient maintenant ce fichier), de la même façon.
+
+À faire pour CHAQUE cabinet installé (un cabinet = un projet Supabase).
+
+
+-----------------------------------------------------------------------------------------------------------------
+2. [ ] METTRE EN LIGNE LA BRANCHE ET VÉRIFIER                                    (après le 1)
+-----------------------------------------------------------------------------------------------------------------
+Les modifications sont poussées sur GitHub, branche feature/white-label-desktop. Elles ne sont PAS en production.
+
+Comment faire :
+  1. Sur https://vercel.com, ouvrir le projet → « Deployments » : un aperçu (Preview) de la branche
+     feature/white-label-desktop se construit seul après chaque envoi. Attendre qu'il soit « Ready ».
+  2. Tester sur cet aperçu (points 3 et 4 ci-dessous).
+  3. Si tout va bien : promouvoir en production (c'est vous qui le faites ; Claude ne promeut jamais).
+
+
+-----------------------------------------------------------------------------------------------------------------
+3. [ ] DÉBLOQUER LA CARTOGRAPHIE DU DRIVE                                        (point 10, validations du Drive)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le bouton « Valider la cartographie » n'apparaît qu'une fois tout le Drive parcouru. Un seul dossier que
+Google refuse (accès refusé, introuvable) bloquait tout, sans explication. L'écran dit maintenant pourquoi.
+
+Comment faire :
+  1. Se connecter en propriétaire → lien « Mise en service » de l'accueil → carte « Cartographie du Drive ».
+  2. Lire le paragraphe sous les boutons. Selon ce qu'il dit :
+
+     a) « Un dossier refuse l'accès… » (ou « N dossiers… ») avec la liste des dossiers :
+          - Soit donner l'accès : dans Google Drive, partager ces dossiers avec le compte Google connecté à
+            Office Manager (Paramètres → « Accès Google du cabinet (Drive et Gmail) » ; le bouton « Tester l'accès »
+            le vérifie), puis cliquer « Lancer le premier scan ».
+          - Soit les écarter : cliquer « Continuer sans ces dossiers » et confirmer. Leur contenu ne sera ni lu
+            ni rangé. Le choix est enregistré à votre nom et reste affiché ; « Parcourir de nouveau » l'annule.
+
+     b) « Le Drive choisi dépasse la taille… (50 000 éléments) » :
+          Paramètres → « Accès Google du cabinet » → champ « Drive du cabinet » : coller le lien d'un Drive partagé
+          ou d'un dossier plus restreint → « Utiliser ce Drive », puis relancer le scan.
+
+     c) « Certains dossiers ont eu une erreur passagère » : cliquer « Lancer le premier scan » (seuls ces dossiers
+        sont repris).
+
+     d) « Le parcours est interrompu » : cliquer « Reprendre le scan ».
+
+  3. Quand l'état devient « complète, à valider » : répondre aux questions de l'Orpailleur sur la même carte,
+     puis cliquer « Valider la cartographie ».
+  4. Me dire ce que le paragraphe affichait (pour confirmer la cause chez vous).
+
+
+-----------------------------------------------------------------------------------------------------------------
+4. [ ] RÉGLER LES FONCTIONS DES PERSONNES SUR LES MISSIONS EN COURS              (après le 1 et le 2)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : les missions existantes n'ont encore aucune fonction « contrôlée ». Tant qu'elle n'est pas réglée, c'est le
+grade du compte qui décide des revues, comme avant. Le libellé tapé à la création est affiché « (libellé, sans droit) ».
+
+Comment faire (un associé du cabinet) :
+  1. Ouvrir la mission → carte « Équipe » → tableau « Équipe retenue ».
+  2. Dans la colonne « Fonction sur la mission », choisir pour chaque personne : Associé, Manager, Superviseur,
+     Senior, Auditeur, Revue qualité, Spécialiste, Secrétariat ou Finance.
+  3. Le changement est immédiat et tracé (journal d'audit : MISSION_FUNCTION_CHANGED, avant → après).
+
+Règles à connaître :
+  - Seul un associé du cabinet donne ou retire les fonctions Associé et Manager.
+  - Le manager de la mission (grade manager) peut régler les autres fonctions.
+  - Personne ne change sa propre fonction.
+  - Signer une revue demande aussi le bon grade : un auditeur nommé Manager ne signe pas la revue Manager.
+
+Vérification : sur une procédure soumise, la section « Revues » doit indiquer « Revue attendue de : <nom> ».
+
+
+-----------------------------------------------------------------------------------------------------------------
+5. [ ] DÉCISION À PRENDRE : MANAGER OU SUPERVISEUR, LEQUEL EST AU-DESSUS ?
+-----------------------------------------------------------------------------------------------------------------
+Le code des revues place le Superviseur APRÈS le Manager, mais la validation du programme est réservée au Manager.
+Aujourd'hui rien n'est supposé : un manager nommé Superviseur sur une mission ne peut pas signer la revue Superviseur.
+Comment faire : répondre à Claude « le superviseur est au-dessus du manager » ou l'inverse (ou « ce sont deux
+chemins différents »). Claude ajustera la règle et les tests.
+
+
+-----------------------------------------------------------------------------------------------------------------
+RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)
+-----------------------------------------------------------------------------------------------------------------
+[ ] Avant de redéployer la fonction Supabase taty-google-bridge : vérifier que les secrets OFFICE_MANAGER_DRIVE_ID
+    (ou TATY_SHARED_DRIVE_ID) et DEFAULT_ORG_ID sont réglés (Supabase → Edge Functions → Secrets).
+[ ] Ne jamais définir OFFICE_MANAGER_TEST_RUN en production (Vercel → Settings → Environment Variables).
