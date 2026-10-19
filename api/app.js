@@ -874,6 +874,23 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'MISSION_UNAVAILABLE'
   },
+  // The missing-documents loop of a mission (point 7, 2026-10-19): one register, need → request → reply → control → filed.
+  //   GET  pbc&mission_id=…                         the register (and the sending decided since)
+  //   POST pbc {action: plan | existing | request | decide, mission_id, …}
+  pbc: {
+    GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account);
+      return (await import('../lib/pbc-loop.js')).pbcView(orgId, id, req.account); }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const b = req.body || {}, id = String(b.mission_id || ''), m = await import('../lib/pbc-loop.js');
+      await requireMissionAccess(orgId, id, req.account);
+      if (b.action === 'plan') return m.planNeeds(orgId, id, req.account);
+      if (b.action === 'existing') return m.findExisting(orgId, id, req.account);
+      if (b.action === 'request') return m.draftRequest(orgId, id, b, req.account);
+      if (b.action === 'decide') return m.decide(orgId, id, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'PBC_UNAVAILABLE'
+  },
   // Important e-mails of the firm's authorised mailbox: list, refresh, AI reply, send / propose.
   'mail-triage': {
     GET: users(MANAGERS, () => importantMails()),

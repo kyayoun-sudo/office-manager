@@ -579,7 +579,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   reste derrière les droits de la page Opportunités) ; mission lancée = étapes d'opportunité terminées (`passed` si non vues, jamais
   « en cours ») ; la vue d'ensemble montre aussi les opportunités sans mission (décision « poursuivre » = l'associé du développement
   commercial désigné) ; la cloche ne reprend que les étapes des missions (les opportunités ont déjà leurs tâches). Outil des agents :
-  la personne qui demande est passée aux outils (`ctx.account`), une liste de missions demandée est croisée avec ses affectations. Les anciennes routes (secrétariat, mails) restent sur le grade.
+  la personne qui demande est passée aux outils (`ctx.account`), une liste de missions demandée est croisée avec ses affectations.
+- **Point 7 — étape 1 faite** (choix de Paul : réponse dans la conversation d'une demande validée = DÉPÔT DIRECT dans PIECES_RECUES ;
+  pièce conforme = une PERSONNE confirme) : registre `office_pbc_requests` (`db/pbc-requests.sql`, une ligne par pièce attendue, clé
+  d'idempotence, historique), `lib/pbc-loop.js` : besoins = « PBC principale » des SOP des cycles du programme VALIDÉ (`planNeeds`, période
+  lue dans `period_label`), pièces déjà lues pour la mission = candidates « à confirmer » (`findExisting`, par contenu : type, période),
+  demande des SEULES manquantes par le code (`draftRequest` → `mission-write.submit`, validée par un manager), « demandée » seulement avec
+  l'id Gmail (`syncSending`), décisions d'une personne (`decide`). Route `pbc`, carte de `mission.html`. RESTE : étape 2 (réponses lues
+  dans la conversation, avec ou sans pièce, dépôt direct), 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
+  working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon). Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
   elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade

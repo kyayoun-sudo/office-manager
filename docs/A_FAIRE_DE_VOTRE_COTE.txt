@@ -158,6 +158,22 @@ affiche l'étape en cours sous son nom.
 
 
 -----------------------------------------------------------------------------------------------------------------
+8. [ ] INSTALLER LE REGISTRE DES PIÈCES DEMANDÉES DANS SUPABASE                  (point 7, pièces manquantes)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : chaque pièce attendue d'une mission (et le lien demande → e-mail → réponse → pièce → contrôle → working file)
+est rangée dans une nouvelle table. Sans elle, la carte « Pièces demandées au client » de la mission le dit et ne fait rien.
+
+Comment faire : comme au point 1, avec le fichier  db/pbc-requests.sql  (ou relancer  db/INSTALL_TOUT.sql ).
+Vérification :
+    select count(*) from information_schema.tables where table_name = 'office_pbc_requests';   → 1
+
+Ensuite, pour une mission (programme de travail validé, période renseignée dans « Corriger la mission ») :
+  Mission → carte « Documents et PBC » → « 1. Préparer les besoins » → « 2. Chercher les pièces déjà reçues »
+  → vérifier le destinataire → « 3. Demander les pièces manquantes » → un manager valide l'e-mail dans « À valider ».
+  Les besoins viennent du tableau « PBC principale » de chaque SOP : un SOP sans ce tableau est signalé.
+
+
+-----------------------------------------------------------------------------------------------------------------
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)
 -----------------------------------------------------------------------------------------------------------------
 [ ] Avant de redéployer la fonction Supabase taty-google-bridge : vérifier que les secrets OFFICE_MANAGER_DRIVE_ID
