@@ -189,3 +189,23 @@ test('Shadow sees the Enhanced Auditor’s real work: proposals the auditor cont
   assert.match(s.find(x => x.outcome === 'speed').text, /10 min/);
   assert.match(s.find(x => x.outcome === 'agreement').text, /l’IA proposait PASS .* l’auditeur a retenu EXCEPTION — pas de visa/);
 });
+
+test('two people write their own tests in the same Working File at the same instant: the second write is redone, nobody loses work', async () => {
+  const { t, d } = world();
+  t.files.POPFILEXXXXXXXXXXXXXXXXX = { buf: await populationXlsx(), mt: 'p1' };
+  t.files.WP1 = { buf: await buildCycleWorkpaper({ firm: 'C', mission: { id: M, name: 'Projet' }, programme, cycle, procedures: [{ ...card, ...cycle.procedures[0] }] }), mt: 'w1' };
+  await P.setPopulation('org', M, 'ACH-03', { file: 'POPFILEXXXXXXXXXXXXXXXXX', columns: { ref: 0, date: 1, party: 2, amount: 4 }, gl_total: 7599500.5 }, ali, d);
+  const s = await P.drawSample('org', M, 'ACH-03', {}, ali, d);
+  for (const it of s.work.items) await P.recordItem('org', M, 'ACH-03', { sample_id: it.sample_id, result: 'PASS', evidence_ref: 'p.' + it.row }, ali, d);
+  // While Ali writes, a colleague saves the same file (another sheet): Ali's first write is refused, then redone.
+  const real = d.drive.updateBinary; let clashes = 0;
+  d.drive.updateBinary = async (id, args) => {
+    if (!clashes++) { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(t.files[id].buf); wb.addWorksheet('COLLEGUE').addRow(['travail du collègue']); t.files[id] = { ...t.files[id], buf: Buffer.from(await wb.xlsx.writeBuffer()), mt: 'colleague' }; }
+    return real(id, args);
+  };
+  const w = await P.writeWorkpaper('org', M, 'ACH-03', ali, { ...d, retryDelayMs: 1, retryJitterMs: 1 });
+  assert.equal(clashes, 2, 'one refused write, one redone'); assert.ok(w.wp_sync.verified);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(t.files.WP1.buf);
+  assert.equal(wb.getWorksheet('COLLEGUE').getRow(1).getCell(1).value, 'travail du collègue', 'the colleague’s work is kept');
+  assert.ok(wb.getWorksheet('ACH-03'), 'and Ali’s test is written');
+});

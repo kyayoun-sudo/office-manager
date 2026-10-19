@@ -361,6 +361,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (`procedureView`, même code que le bouton, jamais d'écrasement, vérifié dans le Drive) ; seule une mission sans dossier Drive
   connu s'arrête (`MISSION_FOLDER_NOT_KNOWN`, dit à l'écran). Test : `tests/workpaper-location.test.js`.
 
+## Plusieurs personnes sur le même Working File (Paul, 2026-10-19)
+- Chaque test = sa feuille + sa ligne `office_procedure_work` : le travail dans l'application est déjà séparé. Seule collision : deux
+  écritures du fichier au même instant → `MEMORY_CONFLICT` (rien d'écrit). `writeWorkpaper` refait alors l'écriture (jusqu'à 5 fois,
+  délai croissant) sur le fichier relu, qui contient déjà le travail de l'autre ; seule la feuille du test est touchée. Test ajouté
+  dans `tests/procedure-work.test.js`. Limite : deux personnes qui ouvrent le .xlsx dans Excel en même temps ne co-éditent pas (Drive).
+- **À construire demain sur les vrais fichiers (plan validé par Paul, 2026-10-19)** : 1) l'Enhanced Auditor demande une fois où sont
+  les Working Files modèles, les reconnaît par AUDIT_META (WF_ID, cycle) ; 2) le WF de la mission = copie du modèle du cycle dans
+  `05_WORKING_PAPERS` (générique seulement en dernier recours) ; 3) entrée par cycle dans la mission (ses tests d'abord) ; 4) il
+  remplit ce qu'il peut sourcer et DEMANDE à l'auditeur ce que seul l'auditeur sait, partie par partie.
+
 ## OpenRouter en soutien (Paul, 2026-10-19 : « j'ai mis une nouvelle IA en soutien dans Vercel mais je ne la vois pas »)
 - Variables Vercel : `OPENROUTER_API_KEY` (obligatoire), `OPENROUTER_MODEL` (facultatif, défaut `openrouter/auto`).
 - `lib/ai-plus.js` : fournisseur `openrouter` (texte, images, PDF, recherche web `plugins: [{ id: 'web' }]`, sources) ;
