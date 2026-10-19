@@ -333,6 +333,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   supprimé), puis l'écrivent dans la mémoire actuelle. Test : `tests/shadow-lab-recovery.test.js`. À faire : même filet pour les autres
   fichiers mémoire (pointeur ou recherche) — cause commune avec la méthodologie.
 
+- **La mémoire ne perd plus rien quand elle déménage (Paul, 2026-10-19 : « je pense qu'il y a un problème avec la mémoire »)** — causes
+  trouvées dans `lib/memory-home.js` : 1) deux copies d'un même fichier mémoire → la plus récente gardée, l'autre MISE À LA CORBEILLE :
+  une copie presque vide créée après une perte du pointeur battait la vraie (méthodologie, leçons de Shadow) ; 2) l'ancien dossier
+  mémoire n'était repris que s'il s'appelait `00_OFFICE_MANAGER` (un « Atelier mémoire » / « MEMORY » restait derrière, avec
+  `SHADOW_LAB.json`) ; 3) une erreur passagère de la base était retenue 1 min comme « aucun Drive choisi » (`loadFirmDrive`) → les
+  agents écrivaient ailleurs. Désormais : rien n'est mis à la corbeille (`keepBoth` : copie active = la plus récente, sauf si elle fait
+  < 30 % de l'autre ; l'autre est gardée, renommée `…_ANCIENNE_COPIE_<date>`), l'ancien dossier mémoire est fusionné quel que soit son
+  nom (jamais la racine du Drive), `SHADOW_LAB.json` suit la mémoire, et une erreur de la base garde le Drive connu. Tests :
+  `tests/memory-home-one-drive.test.js`, `tests/memory.test.js`.
+
 ## Liste PBC reconnue quel que soit son nom (Paul, 2026-10-18)
 - `lib/pbc-lists.js` (code, sans IA) : 1) signature des modèles du cabinet (feuille masquée AUDIT_META `Document_Type =
   PBC_MASTER_CHECKLIST`, ou mots-clés du fichier) → certitude 100 % ; avec `Mission_Code` = liste de la mission, sans = référentiel

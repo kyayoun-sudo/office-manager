@@ -501,7 +501,7 @@ test('agents home: « … AI MANAGER / Atelier mémoire » found, scattered agen
   assert.equal(at.id, 'at'); assert.equal(at.created, false);
   const r = await gatherInto(at.id, H, { kind: 'drive', driveId: 'D', oldMemory: 'old', fetchImpl });
   const byId = id => files.find(f => f.id === id);
-  assert.deepEqual(byId('s1').parents, ['at']); assert.equal(byId('s2').trashed, true);   // the most recent copy stays
+  assert.deepEqual(byId('s1').parents, ['at']); assert.ok(!byId('s2').trashed); assert.match(byId('s2').name, /_ANCIENNE_COPIE_2026-10-01\.json$/);   // the most recent copy is active; the other is KEPT, renamed (2026-10-19)
   assert.deepEqual(byId('r1').parents, ['at']);
   assert.equal(byId('old').trashed, true); assert.equal(byId('o2').trashed, true);
   const clients = files.find(f => f.name === 'CLIENTS');

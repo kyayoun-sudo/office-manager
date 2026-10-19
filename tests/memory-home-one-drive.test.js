@@ -60,3 +60,21 @@ test('a « … AI MANAGER » already in the chosen Drive is kept (nothing create
   const home = await findAtelier(H, { kind: 'folder', driveId: 'chosen', fetchImpl, create: true });
   assert.equal(home.manager.id, 'myHome'); assert.equal(home.id, 'mem'); assert.equal(created.length, 0);
 });
+
+test('two copies of a memory file: never binned; a nearly empty new copy does not beat the real one', async () => {
+  const { pickActive } = await import('../lib/memory-home.js');
+  const real = { id: 'R', modifiedTime: '2026-10-18', size: '90000' }, empty = { id: 'E', modifiedTime: '2026-10-19', size: '300' };
+  assert.equal(pickActive(empty, real).active.id, 'R');
+  assert.equal(pickActive({ id: 'N', modifiedTime: '2026-10-19', size: '80000' }, real).active.id, 'N');
+});
+
+test('a passing database error does not make the agents forget the firm’s Drive', async () => {
+  const g = await import('../lib/google-connection.js');
+  g.resetFirmDriveCache();
+  await g.loadFirmDrive('org', { fetchRows: async () => [{ drive_id: 'DRV|m:MEM', drive_name: 'Cabinet' }] });
+  assert.equal(g.firmMemoryId(), 'MEM');
+  g.resetFirmDriveCache(); await g.loadFirmDrive('org', { fetchRows: async () => [{ drive_id: 'DRV|m:MEM', drive_name: 'Cabinet' }] });
+  // cache older than a minute, then the database fails: the known Drive is kept
+  const r = await g.loadFirmDrive('org', { fetchRows: async () => { throw new Error('timeout'); } });
+  assert.equal(g.firmMemoryId(), 'MEM'); assert.ok(r);
+});

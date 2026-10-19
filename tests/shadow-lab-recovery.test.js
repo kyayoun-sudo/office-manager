@@ -7,7 +7,7 @@ function drive() {
   const files = new Map(); let n = 0;
   return { files,
     findFilesByExactName: async (name, parent) => [...files].filter(([, f]) => f.name === name && f.parent === parent && !f.trashed).map(([id, f]) => ({ id, modifiedTime: f.mt })),
-    searchFiles: async ({ query }) => [...files].filter(([, f]) => f.name === query && !f.trashed).map(([id, f]) => ({ id, name: f.name })),
+    searchFiles: async ({ query }) => [...files].filter(([, f]) => f.name.includes(query) && !f.trashed).map(([id, f]) => ({ id, name: f.name })),
     downloadBuffer: async id => Buffer.from(files.get(id).body),
     getMeta: async id => ({ id, modifiedTime: files.get(id).mt }),
     createBinary: async ({ name, parentId, buffer }) => { const id = 'F' + (++n); files.set(id, { name, parent: parentId, body: buffer.toString(), mt: 't' + n }); return { id }; },
