@@ -148,6 +148,12 @@
       paint(d);
       if (d.source_folder_id) $('folder').value = 'https://drive.google.com/drive/folders/' + d.source_folder_id;
       if (d.status === 'loading' && OM.isManager()) { $('say').textContent = 'Une lecture était en cours : elle reprend.'; step(d.sops.length + d.left).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); }); }
+      if (d.recovered) $('say').textContent = 'Méthodologie retrouvée et remise dans la mémoire des agents.';
+      // Known SOP folder but the library is gone: read again by itself, nothing to paste (2026-10-19).
+      if (d.reload && d.source_folder_id && OM.isManager()) {
+        $('say').textContent = 'La méthodologie n’était plus dans la mémoire des agents : je la relis depuis le dossier des SOP…';
+        post({ action: 'list', folder_id: d.source_folder_id }).then(function (r) { return step(r.files); }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); });
+      }
     }).catch(function (e) { UI.fail($('sops'), { message: msg(e) }); });
   }
   UI.requireLogin(function () { OM.loadBranding().catch(function () {}); load(); });

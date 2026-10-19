@@ -214,7 +214,7 @@ export const ROUTES = Object.freeze({
   // The firm's methodology library (2026-10-12): its SOP read procedure by procedure (code, no AI).
   methodology: {
     GET: users(ALL_ROLES, async (orgId, req) => {
-      const m = await import('../lib/methodology.js'); const state = await m.methodologyState();
+      const m = await import('../lib/methodology.js'); const state = await m.methodologyState({}, orgId);
       const file = String(req.query?.sop || '');
       if (file) { const s = (state.sops || []).find(x => x.file_id === file); if (!s) throw fail('SOP_NOT_FOUND', 404); return s; }
       return m.librarySummary(state);

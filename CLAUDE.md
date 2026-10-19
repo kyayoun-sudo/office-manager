@@ -378,6 +378,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   test, carte retenue par version du modèle) — `writeWorkpaper` attend encore la forme du fichier de base ; 2) entrée par cycle
   dans la mission (ses tests d'abord) ; 3) remplir ce qui est sourcé et DEMANDER à l'auditeur le reste, partie par partie.
 
+## La méthodologie ne disparaît plus (Paul, 2026-10-19 : « j'ai mis le lien, il a tout lu ; je reviens, elle a disparu » — 3 fois)
+- Causes possibles : la bibliothèque vit dans le dossier mémoire des agents, qui peut changer (déménagement de la mémoire, Drive
+  re-choisi, cache du Drive pas encore chargé) ; et `methodologyState` CACHAIT une bibliothèque trouvée si son `drive_id` différait.
+- Désormais (`lib/methodology.js`) : pointeur dans `office_firm_settings.settings.methodology` (`file_id`, `source_folder_id`, dates —
+  un ID, jamais le SOP) ; lecture : 1) fichier dans la mémoire actuelle → affiché (plus de contrôle `drive_id`) ; 2) sinon le fichier
+  pointé, où qu'il soit (pas à la corbeille) → affiché (`recovered`) et COPIÉ dans la mémoire actuelle (original jamais supprimé) ;
+  3) sinon dossier des SOP connu → `reload` : la page relit seule (associé / manager), rien à recoller. Tous les lecteurs reçoivent
+  `orgId`. Test : `tests/methodology-persistence.test.js`.
+
 ## Veille open source de Shadow (Paul, 2026-10-19 : « Shadow part sur des forums où il peut avoir des codes pour agents d'audit et de comptabilité … pour améliorer les agents, et en s'auditant. Je tiens à cela. »)
 - `lib/shadow-code-watch.js` : un agent par jour (rotation `nextToWatch`, chacun au moins tous les 7 jours, Shadow compris), ou à la
   demande (Entraînement → Objectifs et enquêtes → « Lancer la veille maintenant », action `code-watch` de la route `shadow`, associés).
