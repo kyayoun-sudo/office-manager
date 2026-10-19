@@ -352,6 +352,20 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (0-100, défaut 45) = part des demandes envoyées d'abord à OpenRouter (`openRouterFirst`, dans `firstAvailable` et `runAI` auto) ;
   les autres le soutiennent, et lui les soutient pour le reste. Les pastilles de Pilotage → Modèles d'IA montrent OpenRouter et sa part.
 
+## Deux chemins pour créer une mission (Paul, 2026-10-19 : « je veux créer une mission et y aller directement »)
+- Constat : une mission ne naissait que d'une opportunité (TDR / AMI → Phase 0 → … → `ownerWorkflowOverride`) ou de la détection
+  des agents. Un petit cabinet qui reçoit les états financiers et part demain, ou un auditeur avec sa propre mission, était bloqué.
+- **Source ≠ acceptation.** Chemin 1 : Opportunités (inchangé). Chemin 2 : « + Nouvelle mission » (`mission.html?new=1`, aussi dans
+  Mes dossiers et l'accueil de chaque rôle) → `lib/mission-quick.js`, route `mission-quick` (`create` / `followup` / `folder` / `dates`).
+  Nom + client suffisent ; statut `fieldwork` ; le créateur est affecté (sa fiche Équipe créée s'il n'en a pas, `needs_review`) ;
+  `MISSION_STARTED` à tous les agents ; audit `MISSION_CREATED_DIRECT`. Origine gardée (`origin` : client direct, existant,
+  récurrente, recommandation, nomination, appel d'offres, autre) — jamais de faux TDR ni de fausse opportunité.
+- Acceptation / KYC, indépendance, lettre de mission = **points ouverts non bloquants** (`office_missions.followups`, carte « À compléter
+  plus tard ») ; acceptation réglée par un associé, indépendance et lettre par manager / associé ; « sans objet » exige une raison ;
+  historique gardé. Dates et dossier Drive (vérifié comme dossier dans le Drive, sinon « à vérifier ») complétables après.
+- Doublon même client + même nom → `POSSIBLE_DUPLICATE` avec la liste ; créer quand même = choix explicite. Double clic = même id.
+- SQL : `db/mission-quick.sql` (dans `INSTALL_TOUT.sql`) ; sans lui, la mission est créée quand même (sans origine ni points ouverts).
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.

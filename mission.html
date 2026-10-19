@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
+<style>#fu-items .item{flex-wrap:wrap}#fu-items .fu-inline{flex-basis:100%;margin:8px 0 0;grid-template-columns:repeat(auto-fit,minmax(180px,max-content))}</style>
 </head>
 <body>
 <div class="shell">
@@ -39,7 +40,25 @@
       <header class="page-head" style="margin-bottom:16px">
         <h1>Missions</h1>
         <p class="lead">Une mission <strong>active</strong> est une proposition soumise dont on attend le résultat, ou une mission gagnée pas encore commencée. Une mission <strong>en cours</strong> est acceptée et ses travaux ont commencé. Mission Controller propose les changements de statut ; vous validez.</p>
+        <div class="btn-row"><button class="btn" id="new-open" type="button" aria-expanded="false" aria-controls="new-mission">+ Nouvelle mission</button></div>
       </header>
+      <section class="card" id="new-mission" aria-labelledby="h-new" hidden style="margin-bottom:16px">
+        <h2 id="h-new">Nouvelle mission</h2>
+        <p class="note">Pour commencer tout de suite : le nom et le client suffisent. Vous êtes mis sur la mission. L’acceptation, l’indépendance et la lettre de mission restent à compléter ensuite, sans rien bloquer. Une mission venue d’un appel d’offres avec TDR peut aussi passer par <a href="/opportunites.html">Opportunités</a>.</p>
+        <div class="form-grid">
+          <label>Nom de la mission *<input id="n-name" maxlength="160" placeholder="Ex. Audit des comptes 2025"></label>
+          <label>Client *<input id="n-client" maxlength="200" placeholder="Ex. BLE TRANSIT"></label>
+          <label>Exercice / période<input id="n-period" maxlength="80" placeholder="Ex. 2025"></label>
+          <label>Type de mission<select id="n-type"><option value="">— à préciser —</option><option value="statutory">Audit légal / commissariat aux comptes</option><option value="contractual">Audit contractuel</option><option value="project">Audit de projet / bailleur</option><option value="review">Examen limité / revue</option><option value="agreed">Procédures convenues</option><option value="due_diligence">Due diligence</option><option value="advisory">Conseil / autre</option></select></label>
+          <label>D’où vient la mission<select id="n-origin"><option value="direct">Demande directe du client</option><option value="existing_client">Client existant</option><option value="recurring">Mission récurrente</option><option value="referral">Recommandation</option><option value="appointment">Nomination (mandat)</option><option value="tender">Appel d’offres / TDR / AMI</option><option value="other">Autre</option></select></label>
+          <label>Début<input id="n-start" type="date"></label>
+          <label>Fin<input id="n-end" type="date"></label>
+          <label class="wide">Dossier des documents (lien Drive, facultatif)<input id="n-folder" maxlength="500" placeholder="https://drive.google.com/drive/folders/… — là où sont déjà les états financiers, par exemple"></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="n-create" type="button">Créer et ouvrir la mission</button><button class="btn ghost" id="n-cancel" type="button">Annuler</button></div>
+        <p class="note" id="n-status" role="status" aria-live="polite"></p>
+        <div id="n-dups" class="stack" hidden></div>
+      </section>
       <div class="chips" id="phase-filter" role="group" aria-label="Filtrer les missions">
         <button type="button" class="chip" data-phase="all" aria-pressed="true">Toutes</button>
         <button type="button" class="chip" data-phase="running" aria-pressed="false">En cours</button>
@@ -68,6 +87,14 @@
         <div class="kpi"><span>Actions ouvertes</span><strong id="k-act">–</strong></div>
         <div class="kpi"><span>Temps prévu</span><strong id="k-time">–</strong></div>
       </div>
+
+      <section class="card" id="sec-followups" aria-labelledby="h-followups" hidden>
+        <h2 id="h-followups">À compléter plus tard</h2>
+        <p class="meta" id="fu-origin"></p>
+        <p class="note" id="fu-note"></p>
+        <div id="fu-items" class="stack"></div>
+        <p class="note" id="fu-status" role="status" aria-live="polite"></p>
+      </section>
 
       <div class="mission-sections">
         <section class="card" id="sec-summary" aria-labelledby="h-summary">
@@ -597,6 +624,108 @@
       .catch(function (err) { $('w-status').textContent = 'Échec : ' + err.message; }).then(function () { b.disabled = false; });
   });
 
+  // ---- Direct creation (2026-10-19): a name, a client, and the mission opens ----
+  function newId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, function () { return (Math.random() * 16 | 0).toString(16); });
+  }
+  var pendingId = null;
+  function openNew(show) {
+    $('new-mission').hidden = !show; $('new-open').setAttribute('aria-expanded', String(show));
+    if (show) { pendingId = pendingId || newId(); $('n-name').focus(); }
+  }
+  function createMission(confirmDup) {
+    var body = { action: 'create', request_id: pendingId || (pendingId = newId()), name: $('n-name').value.trim(), client: $('n-client').value.trim(),
+      period: $('n-period').value.trim(), engagement_type: $('n-type').value, origin: $('n-origin').value,
+      planned_start: $('n-start').value || null, planned_end: $('n-end').value || null, folder: $('n-folder').value.trim(), confirm_duplicate: confirmDup === true };
+    if (!body.name || !body.client) { $('n-status').textContent = 'Indiquez au moins le nom de la mission et le client.'; return; }
+    var b = $('n-create'); b.disabled = true; $('n-status').textContent = 'Création…'; $('n-dups').hidden = true;
+    OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
+      var msg = 'Mission créée.';
+      if (r.folder && !r.folder.verified) msg += ' Le dossier Drive n’a pas pu être vérifié : il reste « à vérifier » dans la mission.';
+      $('n-status').textContent = msg + ' Ouverture…';
+      location.href = r.url || ('/mission.html?id=' + encodeURIComponent(r.mission.id));
+    }).catch(function (e) {
+      b.disabled = false;
+      var dups = e.data && e.data.duplicates;
+      if (e.code === 'POSSIBLE_DUPLICATE' && dups && dups.length) {
+        $('n-status').textContent = 'Une mission du même nom existe déjà pour ce client. Ouvrez-la, ou créez quand même une nouvelle mission.';
+        var box = $('n-dups'); box.textContent = ''; box.hidden = false;
+        dups.forEach(function (m) { var a = el('a', null, 'item link-item'); a.href = '/mission.html?id=' + encodeURIComponent(m.id); a.appendChild(el('span', m.name)); a.appendChild(el('span', LABELS[canon(m.status)] || m.status, 'tag neutral')); box.appendChild(a); });
+        var again = el('button', 'Créer quand même une nouvelle mission', 'btn ghost'); again.type = 'button';
+        again.addEventListener('click', function () { createMission(true); }); box.appendChild(again);
+        return;
+      }
+      $('n-status').textContent = 'Impossible : ' + e.message;
+    });
+  }
+  $('new-open').addEventListener('click', function () { openNew($('new-mission').hidden); });
+  $('n-cancel').addEventListener('click', function () { openNew(false); });
+  $('n-create').addEventListener('click', function () { createMission(false); });
+
+  // ---- Open items of the mission (never blocking) ----
+  var FU_STATE = { open: 'À faire', done: 'Fait', not_applicable: 'Sans objet' };
+  var FU_WHO = { acceptance: ['owner', 'partner'], independence: ['owner', 'partner', 'manager', 'supervisor'], engagement_letter: ['owner', 'partner', 'manager', 'supervisor'] };
+  function drawFollowups(f) {
+    if (!f || !f.items) return;
+    var shown = f.items.filter(function (i) { return i.status === 'open' || !i.derived; });
+    // A mission from an opportunity with nothing open stays as before.
+    if (!f.origin && !f.open) { $('sec-followups').hidden = true; return; }
+    $('sec-followups').hidden = false;
+    $('fu-origin').textContent = [f.origin_label && 'Origine : ' + f.origin_label, f.type_label, f.period && 'Période : ' + f.period, f.created_by && 'Créée par ' + f.created_by].filter(Boolean).join(' · ');
+    $('fu-note').textContent = f.note || '';
+    var box = $('fu-items'); box.textContent = '';
+    shown.forEach(function (i) {
+      var it = el('div', null, 'item'), t = el('div', null, 't');
+      t.appendChild(el('span', i.label));
+      if (i.by) t.appendChild(el('span', FU_STATE[i.status] + ' — ' + i.by + (i.at ? ', ' + UI.dateTime(i.at) : '') + (i.note ? ' : ' + i.note : ''), 'meta'));
+      it.appendChild(t);
+      if (i.key === 'dates') {
+        var dr = el('div', null, 'form-grid fu-inline'), ds = el('input'), de = el('input');
+        ds.type = 'date'; de.type = 'date'; ds.setAttribute('aria-label', 'Début de la mission'); de.setAttribute('aria-label', 'Fin de la mission');
+        var dok = el('button', 'Enregistrer les dates', 'btn ghost'); dok.type = 'button';
+        dok.addEventListener('click', function () {
+          OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'dates', mission_id: missionId, planned_start: ds.value || null, planned_end: de.value || null }) })
+            .then(function () { $('fu-status').textContent = 'Dates enregistrées.'; loadFollowups(); reload(); })
+            .catch(function (e) { $('fu-status').textContent = e.code === 'END_BEFORE_START' ? 'La fin est avant le début.' : 'Impossible : ' + e.message; });
+        });
+        dr.appendChild(ds); dr.appendChild(de); dr.appendChild(dok); it.appendChild(dr);
+      }
+      if (i.key === 'folder') {
+        var fr = el('div', null, 'form-grid fu-inline'), inp = el('input'); inp.placeholder = 'Lien du dossier Drive'; inp.maxLength = 500; inp.setAttribute('aria-label', 'Lien du dossier Drive');
+        var ok = el('button', 'Relier ce dossier', 'btn ghost'); ok.type = 'button';
+        ok.addEventListener('click', function () {
+          OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'folder', mission_id: missionId, folder: inp.value.trim() }) })
+            .then(function (r) { $('fu-status').textContent = 'Dossier relié et vérifié : ' + (r.folder.name || r.folder.id) + '.'; loadFollowups(); })
+            .catch(function (e) { $('fu-status').textContent = e.code === 'DRIVE_FOLDER_NOT_VERIFIED' ? 'Ce lien n’a pas pu être vérifié comme un dossier du Drive du cabinet.' : 'Impossible : ' + e.message; });
+        });
+        fr.appendChild(inp); fr.appendChild(ok); it.appendChild(fr);
+      }
+      it.appendChild(el('span', FU_STATE[i.status] || i.status, i.status === 'open' ? 'tag warn' : 'tag'));
+      if (!i.derived && (FU_WHO[i.key] || []).indexOf(OM.getRole()) >= 0) {
+        var row = el('div', null, 'btn-row');
+        var next = i.status === 'open' ? [['done', 'Marquer fait'], ['not_applicable', 'Sans objet']] : [['open', 'Rouvrir']];
+        next.forEach(function (n) {
+          var bt = el('button', n[1], 'btn ghost'); bt.type = 'button';
+          bt.addEventListener('click', function () {
+            var note = n[0] === 'not_applicable' ? window.prompt('Pourquoi sans objet ?') : (n[0] === 'done' ? window.prompt('Une précision ou un lien vers le document (facultatif)') : '');
+            if (note === null) return;
+            if (n[0] === 'not_applicable' && !note.trim()) { $('fu-status').textContent = 'Une raison est demandée.'; return; }
+            var link = /^https?:\/\//.test(note || '') ? note : null;
+            OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'followup', mission_id: missionId, key: i.key, status: n[0], note: link ? null : note, link: link }) })
+              .then(function (r) { $('fu-status').textContent = 'Enregistré.'; drawFollowups(r); }).catch(function (e) { $('fu-status').textContent = 'Impossible : ' + e.message; });
+          });
+          row.appendChild(bt);
+        });
+        it.appendChild(row);
+      }
+      box.appendChild(it);
+    });
+  }
+  function loadFollowups() {
+    OM.api('/api/app?route=mission-quick&mission_id=' + encodeURIComponent(missionId)).then(drawFollowups).catch(function () { /* older install: nothing shown */ });
+  }
+
   function reload() {
     return OM.api('/api/app?route=mission-file&mission_id=' + encodeURIComponent(missionId)).then(showDossier)
       .catch(function () { return OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(missionId)).then(showDossier); });
@@ -615,7 +744,8 @@
         var host = $('dossier-view'); host.insertBefore(box, host.firstChild);
       }).catch(function () { /* the existing mission remains usable if no opportunity is linked */ });
     }
-    if (!missionId) { showList(); return; }
+    if (!missionId) { showList(); if (params.get('new') === '1') openNew(true); return; }
+    loadFollowups();
     // Remarks written in the work files by the Excel panel (branch « amelioration »).
     OM.api('/api/app?route=workfile&mission_id=' + encodeURIComponent(missionId)).then(function (d) {
       var list = d.remarks || []; if (!list.length) return;

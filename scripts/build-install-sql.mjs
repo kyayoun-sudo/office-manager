@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // Supabase); then the parts that extend it. purge.sql last (it lists every table of the firm).
 export const INSTALL_PARTS = ['base.sql', 'org-branding.sql', 'action-decisions.sql', 'agent-persona.sql', 'app-users.sql',
   'tidy.sql', 'agent-schedule.sql', 'access-log.sql', 'training.sql', 'agent-messages.sql', 'agent-messages-client.sql', 'test-run.sql', 'google-connection.sql', 'roles.sql', 'personal-ai.sql',
-  'memory.sql', 'live-collaboration.sql', 'inspection-reader-leases.sql', 'mission-plans.sql', 'workfiles.sql', 'people-intelligence.sql', 'work-programme.sql', 'procedure-work.sql', 'purge.sql'];
+  'memory.sql', 'live-collaboration.sql', 'inspection-reader-leases.sql', 'mission-plans.sql', 'workfiles.sql', 'people-intelligence.sql', 'work-programme.sql', 'procedure-work.sql', 'mission-quick.sql', 'purge.sql'];
 
 export function buildInstallSql() {
   const head = '-- OFFICE MANAGER — INSTALLATION DE TOUTES LES TABLES DE L’APPLICATION\n' +

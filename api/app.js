@@ -781,6 +781,20 @@ export const ROUTES = Object.freeze({
   'assign-action': { POST: users(MANAGERS, (orgId, req) => assignAction(orgId, String(req.body?.id || ''), String(req.body?.staff_profile_id || ''), who(req))), unavailable: 'ACTIONS_UNAVAILABLE' },
   // The mission file (2026-10-08): everything the agents and the team know about one mission.
   'mission-file': { GET: users(ALL_ROLES, (orgId, req) => getMissionFull(orgId, String(req.query?.mission_id || ''))), unavailable: 'MISSION_UNAVAILABLE' },
+  // Direct mission creation (2026-10-19): a name and a client, the mission exists « En cours » with its creator on the
+  // team; acceptance, independence and the engagement letter stay open items to complete later (never blocking).
+  'mission-quick': {
+    GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account); return (await import('../lib/mission-quick.js')).missionFollowups(orgId, id); }),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const b = req.body || {}, m = await import('../lib/mission-quick.js');
+      if (b.action === 'create') return m.createMissionQuick(orgId, b, req.account);
+      if (b.action === 'followup') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setFollowup(orgId, b, req.account); }
+      if (b.action === 'folder') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionFolder(orgId, b, req.account); }
+      if (b.action === 'dates') { await requireMissionAccess(orgId, String(b.mission_id || ''), req.account); return m.setMissionDates(orgId, b, req.account); }
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MISSION_UNAVAILABLE'
+  },
   // Client contacts of a mission: found by the agents (proposed), validated by a manager.
   'mission-client-contacts': {
     POST: users(MANAGERS, (orgId, req) => {
@@ -1016,6 +1030,8 @@ export default async function handler(req, res) {
     // What blocks a validation, listed (work programme, 2026-10-12) — codes only, no data.
     if (status < 500 && Array.isArray(error.gaps)) body.gaps = error.gaps.slice(0, 200);
     if (status < 500 && Array.isArray(error.unknown)) body.unknown = error.unknown.slice(0, 100);
+    // A possible duplicate mission: which ones, so the person opens it or confirms (2026-10-19).
+    if (status < 500 && Array.isArray(error.duplicates)) body.duplicates = error.duplicates.slice(0, 5);
     return res.status(status).json(body);
   }
 }
