@@ -1,5 +1,7 @@
 # Passation — cahier des 11 points de Paul (session du 19 octobre 2026)
 
+Prompt prêt à coller pour démarrer la nouvelle session : [docs/PROMPT_REPRISE_SESSION.md](PROMPT_REPRISE_SESSION.md).
+
 À lire **en entier** par la prochaine session IA avant de toucher au code. Ce fichier complète `CLAUDE.md` (mémoire du projet,
 toujours à lire d'abord) et ne le remplace pas. Tout ce qui est écrit ici a été vérifié dans le code au moment de la passation.
 
