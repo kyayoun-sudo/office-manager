@@ -434,3 +434,16 @@ test("attached evidence reaches the existing mission registry without moving it 
   assert.equal(records[0][1][0].pbc_status, "RECEIVED_REVIEW_REQUIRED");
   assert.equal(patches[0].status, "handled");
 });
+// Security review (2026-10-19): a mission's linked opportunity never leaks to someone who may not open it.
+test("a mission dossier uses its linked opportunity for states, and shows it only to whoever may open it", async () => {
+  const linked = { ...opportunity, kyc_review: { status: "accepted" }, team: { members: [{ email: "other@example.test" }] } };
+  const base = { ...deps(), opportunityLinks: async () => ({ byMission: new Map([[mid, linked]]), open: [] }) };
+  const outsider = await dossierView("org", { mission_id: mid }, { email: "senior@example.test", role: "senior" }, base);
+  assert.equal(outsider.linked_opportunity_id, null);
+  assert.equal(JSON.stringify(outsider).includes(oid), false, "no opportunity id anywhere in the answer");
+  assert.equal(outsider.workflow.steps.some((s) => s.phase === "opportunity"), false);
+  assert.equal(outsider.workflow.steps.find((s) => s.id === "acceptance").state, "recorded", "its accepted KYC still counts");
+  const partner = await dossierView("org", { mission_id: mid }, { email: "p@example.test", role: "partner" }, base);
+  assert.equal(partner.linked_opportunity_id, oid);
+  assert.ok(partner.workflow.steps.some((s) => s.phase === "opportunity"));
+});
