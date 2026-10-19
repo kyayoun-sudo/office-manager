@@ -556,6 +556,11 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (`setMissionFunction` : associé ou manager / associé de la mission, jamais la sienne, audit `MISSION_FUNCTION_CHANGED`) ; les revues en
   attente suivent tout de suite (calculées), les signatures données restent. « Superviseur » n'est plus lu comme « senior ».
   Ordre manager ↔ superviseur NON décidé (aucune qualification croisée). Les anciennes routes (secrétariat, mails) restent sur le grade.
+  **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
+  fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
+  elle-même à la création d'une mission directe). La fonction ne donne aucun droit que le grade n'a pas : modifier le programme = grade
+  manager / superviseur comme avant ; changer une fonction = associé du cabinet, ou grade manager tenant la fonction manager de la mission
+  (jamais Associé / Manager : `PARTNER_SETS_LEAD_FUNCTIONS`). Sans le SQL : grades seuls, `MISSION_FUNCTION_SQL_NOT_INSTALLED` au changement.
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.

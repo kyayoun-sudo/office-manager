@@ -943,9 +943,10 @@
   // Function on the mission: shown to all, changeable by a partner / the mission's manager (the server decides).
   var FUNCTIONS = [['partner', 'Associé'], ['manager', 'Manager'], ['supervisor', 'Superviseur'], ['senior', 'Senior'], ['auditor', 'Auditeur'],
     ['quality_reviewer', 'Revue qualité'], ['specialist', 'Spécialiste'], ['secretary', 'Secrétariat'], ['finance', 'Finance']];
-  var FERR = { MISSION_MANAGER_OR_PARTNER_REQUIRED: 'Seuls un associé ou le manager de cette mission changent les fonctions.', NO_SELF_FUNCTION_CHANGE: 'Vous ne pouvez pas changer votre propre fonction : demandez à un associé.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.' };
+  var FERR = { MISSION_MANAGER_OR_PARTNER_REQUIRED: 'Seuls un associé ou le manager de cette mission changent les fonctions.', NO_SELF_FUNCTION_CHANGE: 'Vous ne pouvez pas changer votre propre fonction : demandez à un associé.', NOT_ON_THIS_MISSION: 'Vous n’êtes pas dans l’équipe de cette mission.',
+    PARTNER_SETS_LEAD_FUNCTIONS: 'Les fonctions Associé et Manager sont données ou retirées par un associé du cabinet.', MISSION_FUNCTION_SQL_NOT_INSTALLED: 'La base n’a pas encore la colonne des fonctions (db/mission-functions.sql) : rien n’a été changé.' };
   function functionCell(a) {
-    var td = el('td'), label = a.mission_role || a.role_title || '–';
+    var td = el('td'), label = (a.mission_function ? (FUNCTIONS.filter(function (f) { return f[0] === a.mission_function; })[0] || [0, a.mission_role])[1] : (a.mission_role ? a.mission_role + ' (libellé, sans droit)' : a.role_title || '–'));
     if (!a.id || ['owner', 'partner', 'manager', 'supervisor'].indexOf(OM.getRole()) < 0) { td.textContent = label; return td; }
     var sel = el('select'); sel.setAttribute('aria-label', 'Fonction de ' + (a.full_name || 'cette personne') + ' sur la mission');
     var cur = el('option', label); cur.value = ''; sel.appendChild(cur);
