@@ -608,8 +608,8 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `CYCLE_PBC_document_période` (jamais par-dessus un autre fichier : suffixe), écrit sa ligne dans la feuille `PBC_RECUES` du working
   paper du cycle (feuille de l'application, jamais une case d'une personne, conflit = relu et réécrit), relit les deux ; un échec est dit
   et rejouable (« Classer et inscrire de nouveau »).
-  RESTE : 5 (recette d'ensemble : complète / partielle / absente sur une mission), 4bis (renommage, classement,
-  working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon).
+  Recette en tests : GL 2024 puis 2025 (`tests/pbc-loop.test.js`). RESTE : 5 (recette d'ensemble sur une vraie mission : pièces
+  complètes / partielle / absente), relances automatiques des pièces sans réponse (aujourd'hui : demande manuelle).
 
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
