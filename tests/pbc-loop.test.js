@@ -96,3 +96,56 @@ test('a person decides: confirm needs a piece; « sans objet » needs a reason; 
   assert.deepEqual(v.summary, { total: 2, missing: 0, waiting: 0, to_confirm: 0, accepted: 1 });
   assert.ok(t.rows[1].history.some(h => h.what === 'NOT_APPLICABLE' && h.reason));
 });
+
+// Step 2: replies read in the request's own conversation, with or without a piece; direct deposit; never twice.
+function gmailMsg(id, from, at, text, attachments = []) {
+  return { id, threadId: 'T1', internalDate: String(Date.parse(at)), payload: { headers: [{ name: 'From', value: from }, { name: 'Subject', value: 'Re: Demande' }, { name: 'Message-ID', value: '<' + id + '>' }],
+    parts: [{ mimeType: 'text/plain', body: { data: Buffer.from(text).toString('base64') } },
+      ...attachments.map((a, i) => ({ filename: a, mimeType: 'application/pdf', body: { attachmentId: 'A' + i, size: 10 } }))] } };
+}
+async function requested(extra = {}) {
+  const w = world();
+  await P.planNeeds('org', M, manager, w.d);
+  await P.draftRequest('org', M, { to: ['cfo@client.com'] }, manager, w.d);
+  w.t.messages.msg1 = { id: 'msg1', status: 'sent', sent_at: '2026-10-19T10:00:00Z', provider_message_id: 'gm-1' };
+  await P.syncSending('org', M, w.d);
+  w.thread = [gmailMsg('gm-1', 'Agent <agent@cabinet.ci>', '2026-10-19T10:00:00Z', 'Demande')];
+  w.stored = []; w.received = [];
+  w.d = { ...w.d, ...extra, getPersona: async () => ({ sender_email: 'agent@cabinet.ci' }),
+    gmail: async path => path.startsWith('/messages/gm-1?') ? { threadId: 'T1' } : path.startsWith('/threads/') ? { messages: w.thread } : { data: Buffer.from('%PDF').toString('base64') },
+    storePiece: async (o, mid, f) => { const ex = w.stored.find(x => x.name === f.name); if (ex) return { ...ex, already: true }; const s = { file_id: 'D' + (w.stored.length + 1), name: f.name }; w.stored.push(s); return s; },
+    recordReceived: async (o, mid, files) => { w.received.push(...files); } };
+  return w;
+}
+
+test('a reply without a piece is kept and shown; a later reply with the pieces is matched to each line by its name', async () => {
+  const w = await requested();
+  w.thread.push(gmailMsg('c-1', 'CFO <cfo@client.com>', '2026-10-19T12:00:00Z', 'Je vous envoie cela demain.'));
+  let r = await P.syncReplies('org', M, w.d);
+  assert.equal(r.replies, 1);
+  assert.ok(w.t.rows.every(x => x.status === 'reply_without_piece'), 'a reply is never a closing');
+  assert.equal(w.t.rows[0].responses[0].text, 'Je vous envoie cela demain.');
+  assert.equal(w.t.rows[0].request.thread_id, 'T1');
+  // Nothing new: nothing done twice.
+  assert.equal((await P.syncReplies('org', M, w.d)).replies, 0);
+  w.thread.push(gmailMsg('c-2', 'CFO <cfo@client.com>', '2026-10-20T09:00:00Z', 'Voici les pièces.', ['Grand livre fournisseurs 2025.pdf', 'Factures fournisseurs.pdf']));
+  r = await P.syncReplies('org', M, w.d);
+  assert.equal(r.replies, 1);
+  const [gl, inv] = w.t.rows;
+  assert.equal(gl.status, 'reply_received'); assert.match(gl.pieces[0].name, /Grand livre/);
+  assert.equal(inv.status, 'reply_received'); assert.match(inv.pieces[0].name, /Factures/);
+  assert.equal(w.stored.length, 2); assert.equal(w.received.length, 2, 'the pieces join the mission\'s documents, to be read');
+  assert.ok(w.stored.every(s => s.name.startsWith('MAIL_2026-10-20_')), 'a name fixed by the message: a replay finds it');
+  // Our own messages in the conversation are never replies.
+  w.thread.push(gmailMsg('a-2', 'Agent <agent@cabinet.ci>', '2026-10-20T10:00:00Z', 'Merci'));
+  assert.equal((await P.syncReplies('org', M, w.d)).replies, 0);
+});
+
+test('a piece whose name says nothing goes to « à trier » on every line of the conversation; the label scanner leaves these conversations alone', async () => {
+  const w = await requested();
+  w.thread.push(gmailMsg('c-3', 'CFO <cfo@client.com>', '2026-10-20T09:00:00Z', 'Ci-joint.', ['scan001.pdf']));
+  await P.syncReplies('org', M, w.d);
+  assert.ok(w.t.rows.every(x => x.status === 'reply_received' && !x.pieces.length && x.responses.at(-1).unassigned.length === 1));
+  const followed = await P.waitingThreads('org', w.d.fetchRows);
+  assert.ok(followed.threads.has('T1'));
+});

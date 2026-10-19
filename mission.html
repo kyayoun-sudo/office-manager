@@ -207,6 +207,7 @@
           <div class="btn-row">
             <button class="btn ghost" id="pl-plan" type="button">1. Préparer les besoins</button>
             <button class="btn ghost" id="pl-existing" type="button">2. Chercher les pièces déjà reçues</button>
+            <button class="btn ghost" id="pl-replies" type="button">Lire les réponses maintenant</button>
           </div>
           <div class="btn-row" style="margin-top:6px">
             <label style="flex:1 1 320px">Destinataire(s) de la demande (contacts validés)<input id="pl-to" placeholder="adresse@client.com, …"></label>
@@ -1004,6 +1005,8 @@
         t.appendChild(el('span', (r.ref ? r.ref + ' — ' : '') + r.document + (r.period ? ' (' + r.period + ')' : '')));
         t.appendChild(el('span', [r.cycle, r.label, (r.pieces || []).map(function (p) { return p.name; }).join(', ')].filter(Boolean).join(' · '), 'meta'));
         ((r.control && r.control.reasons) || []).forEach(function (x) { t.appendChild(el('span', x, 'meta')); });
+        var last = (r.responses || []).slice(-1)[0];
+        if (last) t.appendChild(el('span', 'Réponse de ' + last.from + ' le ' + UI.dateTime(last.at) + (last.pieces && last.pieces.length ? ' — ' + last.pieces.length + ' pièce(s)' : ' — sans pièce') + (last.text ? ' : « ' + last.text.slice(0, 240) + ' »' : ''), 'meta'));
         it.appendChild(t);
         var acts = el('div', null, 'btn-row');
         function act(label, body, cls) { var b = el('button', label, cls || 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () {
@@ -1025,6 +1028,7 @@
       var to = $('pl-to').value.split(/[,;\s]+/).filter(Boolean);
       pbcPost({ action: 'request', to: to }, function (r) { return r.items + ' pièce(s) dans la demande · ' + (r.status === 'pending_approval' ? 'en attente de validation par un manager (À valider)' : r.status === 'sent' ? 'envoyée' : r.status) + '.'; });
     });
+    $('pl-replies').addEventListener('click', function () { pbcPost({ action: 'replies' }, function (r) { return r.reason === 'mail_not_configured' ? 'La boîte mail des agents n’est pas configurée.' : r.replies + ' réponse(s) lue(s) dans ' + r.conversations + ' conversation(s).'; }); });
     loadPbc(false);
   }
   function reload() {

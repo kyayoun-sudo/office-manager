@@ -887,6 +887,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'existing') return m.findExisting(orgId, id, req.account);
       if (b.action === 'request') return m.draftRequest(orgId, id, b, req.account);
       if (b.action === 'decide') return m.decide(orgId, id, b, req.account);
+      // « Lire les réponses maintenant » (the scheduler does it at each pass): the mission's team only.
+      if (b.action === 'replies') { await m.pbcView(orgId, id, req.account); return m.syncReplies(orgId, id, { req }); }
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'PBC_UNAVAILABLE'

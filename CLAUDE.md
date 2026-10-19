@@ -585,8 +585,11 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   d'idempotence, historique), `lib/pbc-loop.js` : besoins = « PBC principale » des SOP des cycles du programme VALIDÉ (`planNeeds`, période
   lue dans `period_label`), pièces déjà lues pour la mission = candidates « à confirmer » (`findExisting`, par contenu : type, période),
   demande des SEULES manquantes par le code (`draftRequest` → `mission-write.submit`, validée par un manager), « demandée » seulement avec
-  l'id Gmail (`syncSending`), décisions d'une personne (`decide`). Route `pbc`, carte de `mission.html`. RESTE : étape 2 (réponses lues
-  dans la conversation, avec ou sans pièce, dépôt direct), 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
+  l'id Gmail (`syncSending`), décisions d'une personne (`decide`). Route `pbc`, carte de `mission.html`. ÉTAPE 2 FAITE :  lit la
+  conversation Gmail de la demande (lien durable = le fil, jamais l'objet ni l'expéditeur), toute réponse gardée avec ou sans pièce
+  ( reste suivie), pièces déposées dans PIECES_RECUES sous un nom fixé par le message (, rejouable
+  sans doublon) puis lues par les agents (), rattachées par leur nom ou « à trier » ; passage planifié  ; le
+  scanner par libellé ignore ces fils (). RESTE : 3 (contrôle du contenu, période, complément), 4 (renommage, classement,
   working file, vérification), 5 (recette : complète / partielle / absente, GL du mauvais exercice puis le bon). Les anciennes routes (secrétariat, mails) restent sur le grade.
   **Sécurité (revue du 2026-10-19)** : les droits lisent SEULEMENT la colonne contrôlée `mission_function` (`db/mission-functions.sql`, liste
   fermée, écrite par `setMissionFunction` avec `mission_function_set_by/at`), jamais le libellé libre `mission_role` (tapé par la personne
