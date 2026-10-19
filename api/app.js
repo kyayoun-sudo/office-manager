@@ -889,6 +889,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'decide') return m.decide(orgId, id, b, req.account);
       // « Lire les réponses maintenant » (the scheduler does it at each pass): the mission's team only.
       if (b.action === 'replies') { await m.pbcView(orgId, id, req.account); return m.syncReplies(orgId, id, { req }); }
+      // A reply from a sender outside the request kept « à vérifier »: a person of the mission accepts it, then its pieces are deposited.
+      if (b.action === 'trust') return m.trustReply(orgId, id, b, req.account, { req });
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'PBC_UNAVAILABLE'

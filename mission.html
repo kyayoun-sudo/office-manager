@@ -1006,6 +1006,13 @@
         t.appendChild(el('span', [r.cycle, r.label, (r.pieces || []).map(function (p) { return p.name; }).join(', ')].filter(Boolean).join(' · '), 'meta'));
         ((r.control && r.control.reasons) || []).forEach(function (x) { t.appendChild(el('span', x, 'meta')); });
         var last = (r.responses || []).slice(-1)[0];
+        (r.responses || []).filter(function (x) { return x.quarantined && !x.trusted_by; }).forEach(function (x) {
+          var w = el('span', '⚠ Réponse à vérifier de ' + x.from + ' (' + x.quarantine_reason + ')' + (x.pieces.length ? ' — ' + x.pieces.length + ' pièce(s) non déposée(s)' : ''), 'meta'); t.appendChild(w);
+          var ok = el('button', 'Accepter cette réponse', 'btn ghost'); ok.type = 'button';
+          ok.addEventListener('click', function () { if (!confirm('Accepter la réponse de ' + x.from + ' et déposer ses pièces dans la mission ?')) return; ok.disabled = true;
+            pbcPost({ action: 'trust', gmail_id: x.gmail_id }, function () { return 'Réponse acceptée à votre nom : ses pièces sont déposées.'; }); });
+          t.appendChild(ok);
+        });
         if (last) t.appendChild(el('span', 'Réponse de ' + last.from + ' le ' + UI.dateTime(last.at) + (last.pieces && last.pieces.length ? ' — ' + last.pieces.length + ' pièce(s)' : ' — sans pièce') + (last.text ? ' : « ' + last.text.slice(0, 240) + ' »' : ''), 'meta'));
         it.appendChild(t);
         var acts = el('div', null, 'btn-row');

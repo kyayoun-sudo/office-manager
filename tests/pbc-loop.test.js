@@ -149,3 +149,26 @@ test('a piece whose name says nothing goes to « à trier » on every line of th
   const followed = await P.waitingThreads('org', w.d.fetchRows);
   assert.ok(followed.threads.has('T1'));
 });
+
+// Security review (2026-10-19): only the people the request was sent to (or the mission's client contacts), with a mail Gmail
+// did not flag, get a direct deposit; anyone else waits for a person of the mission.
+test('a reply from an unknown sender, or failing authentication, is kept « à vérifier »: nothing deposited until a person accepts it', async () => {
+  const w = await requested();
+  w.thread.push(gmailMsg('x-1', 'Inconnu <attacker@evil.test>', '2026-10-20T08:00:00Z', 'Voici le grand livre.', ['Grand livre fournisseurs 2025.pdf']));
+  const spoofed = gmailMsg('x-2', 'CFO <cfo@client.com>', '2026-10-20T08:30:00Z', 'Factures.', ['Factures fournisseurs.pdf']);
+  spoofed.payload.headers.push({ name: 'Authentication-Results', value: 'mx.google.com; dmarc=fail header.from=client.com' });
+  w.thread.push(spoofed);
+  await P.syncReplies('org', M, w.d);
+  assert.equal(w.stored.length, 0, 'nothing written to the Drive');
+  assert.equal(w.received.length, 0, 'nothing given to the agents');
+  const kept = w.t.rows[0].responses.filter(x => x.quarantined);
+  assert.deepEqual(kept.map(x => x.gmail_id), ['x-1', 'x-2']);
+  assert.match(kept[1].quarantine_reason, /Authentification/);
+  assert.equal((await P.syncReplies('org', M, w.d)).replies, 0, 'not read again by itself');
+  await assert.rejects(P.trustReply('org', M, { gmail_id: 'x-1' }, outsider, w.d), /NOT_ON_THIS_MISSION/);
+  await P.trustReply('org', M, { gmail_id: 'x-1' }, manager, w.d);
+  assert.equal(w.stored.length, 1, 'accepted by a person: deposited');
+  const resp = w.t.rows[0].responses.find(x => x.gmail_id === 'x-1');
+  assert.equal(resp.trusted_by, 'm@c.ci'); assert.ok(resp.processed);
+  assert.equal(w.t.rows[0].responses.filter(x => x.gmail_id === 'x-1').length, 1, 'one entry per message');
+});
