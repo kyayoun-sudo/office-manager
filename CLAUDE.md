@@ -393,6 +393,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   enregistré ET absent de la bibliothèque est refusé). Le Manager peut changer la méthode de sélection d'un test pour la mission
   (`SAMPLING_MODES`, liste dans `programme.html`) ; la méthode du SOP reste gardée (`sop_sampling_mode`, affichée si différente).
   Test dans `tests/programme-planning.test.js`.
+- **« Préparé par » modifiable et enregistrable (Paul, 2026-10-19)** : la liste propose l'équipe de la mission puis toutes les autres
+  personnes du cabinet (`firmPeople`, `office_staff_profiles`) ; changer le préparateur du cycle fait suivre les tests qui suivaient
+  l'ancien (vidés = « comme le cycle », un test confié à quelqu'un d'autre garde sa personne) ; toute modification affiche une barre
+  « Enregistrer » qui reste à l'écran (erreur d'enregistrement affichée dedans). Test : `tests/programme-preparer.test.js`.
 
 ## Veille open source de Shadow (Paul, 2026-10-19 : « Shadow part sur des forums où il peut avoir des codes pour agents d'audit et de comptabilité … pour améliorer les agents, et en s'auditant. Je tiens à cela. »)
 - `lib/shadow-code-watch.js` : un agent par jour (rotation `nextToWatch`, chacun au moins tous les 7 jours, Shadow compris), ou à la

@@ -26,6 +26,8 @@
   .gaps ul{margin:4px 0 0;padding-left:18px}
   .wrap{overflow-x:auto}
   @media (prefers-color-scheme: dark){ .tag.risk{background:#4a3a10;color:#ffd98a} }
+  .procs select.who,.cyc select.who{min-width:210px;max-width:100%}
+  .savebar{position:sticky;bottom:0;z-index:5;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 -4px 16px rgba(0,0,0,.08)}
 </style>
 </head>
 <body>
@@ -106,6 +108,7 @@
       <div class="row"><button class="btn ghost" id="make-wps" type="button">Créer les Working Papers manquants</button><span class="status" id="wp-say" role="status" aria-live="polite"></span></div>
       <div id="wps"></div>
     </section>
+    <div class="savebar" id="savebar" hidden role="region" aria-label="Modifications à enregistrer"><span id="savebar-msg" role="status" aria-live="polite">Modifications non enregistrées.</span><button class="btn" id="save-now" type="button">Enregistrer</button></div>
   </main>
 </div>
 <script src="/assets/brand-theme.js"></script>
@@ -127,11 +130,30 @@
   var data = null, cycles = [], editable = false;
 
   function sopById(id) { return (data.library || []).filter(function (s) { return s.file_id === id; })[0]; }
-  function teamSelect(value, allowEmpty, label) {
-    var s = el('select'); s.setAttribute('aria-label', label);
-    var o0 = el('option', allowEmpty ? '— comme le cycle —' : '— choisir —'); o0.value = ''; s.appendChild(o0);
-    (data.team || []).forEach(function (p) { var o = el('option', p.name + (p.mission_role ? ' (' + p.mission_role + ')' : '')); o.value = p.email || p.name; s.appendChild(o); });
-    s.value = value || ''; if (value && s.value !== value) { var o = el('option', value); o.value = value; s.appendChild(o); s.value = value; }
+  // The mission's team first, then everyone else in the firm (2026-10-19 : « je veux changer préparé par »).
+  function personLabel(v) {
+    var all = (data.team || []).concat(data.people || []), low = String(v || '').toLowerCase();
+    var p = all.filter(function (x) { return String(x.email || '').toLowerCase() === low || String(x.name || '').toLowerCase() === low; })[0];
+    return p ? p.name : v;
+  }
+  function teamSelect(value, allowEmpty, label, cyclePreparer) {
+    var s = el('select'); s.setAttribute('aria-label', label); s.className = 'who';
+    var o0 = el('option', allowEmpty ? '— comme le cycle' + (cyclePreparer ? ' : ' + personLabel(cyclePreparer) : '') + ' —' : '— choisir —'); o0.value = ''; s.appendChild(o0);
+    var seen = {};
+    function group(title, list, role) {
+      list = (list || []).filter(function (p) { var k = String(p.email || p.name).toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; });
+      if (!list.length) return;
+      var g = document.createElement('optgroup'); g.label = title;
+      list.forEach(function (p) { var o = el('option', p.name + (role(p) ? ' (' + role(p) + ')' : '')); o.value = p.email || p.name; g.appendChild(o); });
+      s.appendChild(g);
+    }
+    group('Équipe de la mission', data.team, function (p) { return p.mission_role; });
+    group('Autres personnes du cabinet', data.people, function (p) { return p.role; });
+    s.value = value || '';
+    if (value && s.value !== value) {
+      var low = String(value).toLowerCase(), hit = Array.prototype.filter.call(s.options, function (o) { return o.value.toLowerCase() === low || o.textContent.toLowerCase().indexOf(low) === 0; })[0];
+      if (hit) s.value = hit.value; else { var o = el('option', value); o.value = value; s.appendChild(o); s.value = value; }
+    }
     return s;
   }
 
@@ -145,7 +167,11 @@
       var st = el('select'); st.setAttribute('aria-label', 'Statut du cycle'); STATUS.forEach(function (x) { var o = el('option', x[1]); o.value = x[0]; st.appendChild(o); }); st.value = c.status || 'IN_SCOPE';
       st.addEventListener('change', function () { c.status = st.value; paintCycles(); });
       tools.appendChild(st);
-      var prep = teamSelect(c.preparer, false, 'Qui prépare le cycle'); prep.addEventListener('change', function () { c.preparer = prep.value; });
+      var prep = teamSelect(c.preparer, false, 'Qui prépare le cycle');
+      // Changing the cycle's preparer moves every test that followed the old one; a test given to someone else keeps its person.
+      prep.addEventListener('change', function () { var old = String(c.preparer || '').toLowerCase(); c.preparer = prep.value;
+        (c.procedures || []).forEach(function (p) { if (!p.preparer || String(p.preparer).toLowerCase() === old || personLabel(p.preparer).toLowerCase() === personLabel(old).toLowerCase()) p.preparer = ''; });
+        dirty(); paintCycles(); });
       tools.appendChild(el('span', 'Préparé par', 'meta')); tools.appendChild(prep);
       if (editable) { var rm = el('button', 'Retirer', 'btn ghost'); rm.type = 'button'; rm.addEventListener('click', function () { cycles.splice(ci, 1); paintCycles(); paintAdd(); }); tools.appendChild(rm); }
       head.appendChild(tools); card.appendChild(head);
@@ -193,7 +219,7 @@
           var tj = el('td'), needs = (p.type === 'CORE' && !p.active) || (p.type === 'RISK_DEPENDENT' && p.active) || p.justification;
           if (needs) { var r = el('input'); r.type = 'text'; r.value = p.justification || ''; r.placeholder = p.active ? 'Pourquoi l’activer' : 'Pourquoi ne pas la faire'; r.setAttribute('aria-label', 'Raison ' + p.code); r.addEventListener('input', function () { p.justification = r.value; }); tj.appendChild(r); }
           tr.appendChild(tj);
-          var tp = el('td'); if (p.active) { var ps = teamSelect(p.preparer, true, 'Qui prépare ' + p.code); ps.addEventListener('change', function () { p.preparer = ps.value; }); tp.appendChild(ps); } tr.appendChild(tp);
+          var tp = el('td'); if (p.active) { var ps = teamSelect(p.preparer, true, 'Qui prépare ' + p.code, c.preparer); ps.addEventListener('change', function () { p.preparer = ps.value; }); tp.appendChild(ps); } tr.appendChild(tp);
           tb.appendChild(tr);
         });
         t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap);
@@ -234,11 +260,15 @@
     if (!list || !list.length) return;
     var d = el('div', null, 'gaps'); d.appendChild(el('strong', 'Avant de valider :')); var ul = el('ul'); list.forEach(function (g) { ul.appendChild(el('li', gapText(g))); }); d.appendChild(ul); box.appendChild(d);
   }
+  // Any change in the cycles shows a save bar that stays on screen (the « Enregistrer » button was far below).
+  function dirty() { if (editable) { $('savebar').hidden = false; $('savebar-msg').textContent = 'Modifications non enregistrées.'; } }
+  ['change', 'input'].forEach(function (ev) { $('cycles').addEventListener(ev, dirty); });
+  $('save-now').addEventListener('click', function () { $('save').click(); });
   $('save').addEventListener('click', function () {
     var b = this; b.disabled = true; $('say').textContent = 'Enregistrement…';
     post(Object.assign(body(), { action: 'save', source: importedFrom ? 'import' : undefined, imported_file_id: importedFrom || undefined })).then(function (r) {
-      $('say').textContent = 'Brouillon enregistré (version ' + r.programme.version + ').'; showGaps(r.gaps); load(true);
-    }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); }).then(function () { b.disabled = false; });
+      $('say').textContent = 'Brouillon enregistré (version ' + r.programme.version + ').'; showGaps(r.gaps); $('savebar').hidden = true; load(true);
+    }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); $('savebar-msg').textContent = 'Non enregistré : ' + msg(e); }).then(function () { b.disabled = false; });
   });
   $('validate').addEventListener('click', function () {
     var b = this; b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
@@ -297,7 +327,7 @@
     var rv = $('reviews'); rv.textContent = '';
     REVIEWS.forEach(function (r) { var l = el('label'), c = el('input'); c.type = 'checkbox'; c.id = 'r-' + r[0]; c.checked = !!(p && p.reviews && p.reviews[r[0]]); l.appendChild(c); l.appendChild(document.createTextNode(r[1])); rv.appendChild(l); });
     cycles = JSON.parse(JSON.stringify((p && p.cycles) || []));
-    paintCycles(); paintAdd();
+    $('savebar').hidden = true; paintCycles(); paintAdd();
     $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
     document.querySelectorAll('#h-mat ~ .grid input, #reviews input').forEach(function (x) { x.disabled = !editable; });
     var val = data.validated;
