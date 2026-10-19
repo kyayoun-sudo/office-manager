@@ -175,6 +175,14 @@ test('a reply from an unknown sender, or failing authentication, is kept « à v
   const signedElsewhere = gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''); signedElsewhere.payload.headers = signedElsewhere.payload.headers.map(h => h.name === 'Authentication-Results' ? { ...h, value: 'mx.google.com; dkim=pass header.i=@evil.test; dmarc=fail header.from=client.com' } : h);
   assert.equal(P.senderCheck(signedElsewhere).ok, false, 'a DKIM pass for another domain proves nothing');
   assert.equal(P.senderCheck(gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', '')).ok, true);
+  // Read as RFC 8601: a « pass » hidden in a comment, another server, a sub-domain, a DMARC failure next to a DKIM pass: no.
+  const withAR = v => { const m = gmailMsg('y', 'CFO <cfo@client.com>', '2026-10-20T08:00:00Z', ''); m.payload.headers = m.payload.headers.map(h => h.name === 'Authentication-Results' ? { ...h, value: v } : h); return P.senderCheck(m).ok; };
+  assert.equal(withAR('mx.google.com; dmarc=fail (dmarc=pass header.from=client.com) header.from=client.com'), false);
+  assert.equal(withAR('evil.test; dmarc=pass header.from=client.com'), false);
+  assert.equal(withAR('mx.google.com; dmarc=pass header.from=mail.client.com'), false);
+  assert.equal(withAR('mx.google.com; dkim=pass header.i=@client.com; dmarc=fail header.from=client.com'), false);
+  assert.equal(withAR('mx.google.com; dkim=pass header.d=client.com; spf=pass'), true, 'no DMARC for the domain: its own DKIM signature');
+  assert.equal(withAR('mx.google.com; dkim=pass header.d=other.com; spf=pass'), false);
   assert.equal((await P.syncReplies('org', M, w.d)).replies, 0, 'not read again by itself');
   await assert.rejects(P.trustReply('org', M, { gmail_id: 'x-1' }, outsider, w.d), /NOT_ON_THIS_MISSION/);
   await P.trustReply('org', M, { gmail_id: 'x-1' }, manager, w.d);
