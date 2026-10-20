@@ -30,3 +30,12 @@ test('scanned pages are isolated, transcribed with original page numbers and mar
   assert.equal(verified.source_fingerprint,r.source_fingerprint);
   await readSopPdf(bytes,options);assert.equal(calls,1,'identical duplicate documents reuse this preparation’s OCR');
 });
+
+test('OCR service failures are retryable; a confirmed illegible page stays an explicit coverage gap',async()=>{
+  const pdf=await PDFDocument.create();pdf.addPage();const bytes=Buffer.from(await pdf.save());
+  const native=async()=>({text:'',sections:[],total_pages:1,selected_pages:[1],needs_ocr_pages:[1],pages_read:[]});
+  const failed=await readSopPdf(bytes,{startPage:1,pageCount:1,native,ai:async()=>{throw new Error('service unavailable');}});
+  assert.deepEqual(failed.retryable_pages,[1]);assert.deepEqual(failed.ocr_pages,[]);
+  const illegible=await readSopPdf(bytes,{startPage:1,pageCount:1,native,ai:async()=>({text:JSON.stringify({pages:[{page:1,text:'',illegible:true,complete:true}]})})});
+  assert.deepEqual(illegible.retryable_pages,[]);assert.deepEqual(illegible.pending_ocr_pages,[1]);
+});

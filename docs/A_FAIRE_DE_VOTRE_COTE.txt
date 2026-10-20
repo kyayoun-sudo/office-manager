@@ -222,3 +222,6 @@ La progression est conservée après chaque fenêtre et chaque analyse ; après 
 Contrôler le relevé de couverture : documents attendus/traités, pages analysées, pages blanches, passages illisibles. Une couverture incomplète ne vaut jamais lecture exhaustive. L'OCR reste à comparer à l'original pour les éléments critiques.
 Un aperçu de 50 faits n'est pas la totalité du relevé : « Afficher les faits suivants » donne la suite ; l'écriture de préparation utilise tous les faits conservés.
 Pas de SQL ni de réglage de période à refaire. Les limites de taille restent PDF 100 Mio / autres formats 8 Mo ; les documents non lisibles sont signalés, pas réputés lus.
+
+2026-10-20 — Reprise d’une lecture bloquée
+Actualiser PRJ-01 puis Reprendre la lecture conservée sur l’étape 1. La page en cours et le temps d’attente apparaissent. En cas d’échec de transcription ou de délai dépassé, Reprendre la lecture réessaie la même page ; ne pas cliquer plusieurs fois sur Préparer. Aucun nouveau dépôt nécessaire, aucune écriture Excel pendant Préparer.

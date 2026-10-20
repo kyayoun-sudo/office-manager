@@ -4,11 +4,12 @@
   var view, book, cell = null, history = [], sequence = 0, readingScope = null;
   function node(tag, value) { var n = document.createElement(tag); if (value != null) n.textContent = value; return n; }
   function post(body) {
-    return window.OfficeManager.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ mission_id: view.mission_id, code: view.line.code }, body)) });
+    function run(signal){return window.OfficeManager.api('/api/app?route=procedure', { method: 'POST', signal:signal, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ mission_id: view.mission_id, code: view.line.code }, body)) });}
+    return body.action==='step-plan'?window.OfficeManager.readingRequest(run,function(seconds){$('audit-message').textContent='Lecture en cours · '+seconds+' s pour ce passage. La progression précédente est conservée.';}):run();
   }
   function error(e) {
-    return ({ AGENTS_NOT_AUTHORIZED: 'L’utilisation des agents doit être autorisée dans les paramètres du cabinet.',
+    return ({ DOCUMENT_OCR_RETRY_REQUIRED:'La transcription de cette page n’a pas abouti. Reprenez pour réessayer cette page.', READING_REQUEST_TIMEOUT:'Ce passage dépasse le délai de réponse.', AGENTS_NOT_AUTHORIZED: 'L’utilisation des agents doit être autorisée dans les paramètres du cabinet.',
       NO_WORKPAPER_FOR_CYCLE: 'Le fichier de travail de ce cycle n’est pas encore préparé.',
       PROCEDURE_SHEET_NOT_FOUND: 'La feuille de cette procédure est introuvable dans le fichier.',
       WORKBOOK_TOO_LARGE: 'Ce classeur dépasse la taille prise en charge par cette vue.' })[e.message] || e.message || 'Service indisponible.';
@@ -86,7 +87,8 @@
     var plan=outcome.pending_sop;
     while(plan.pending){
       $('audit-message').textContent='Lecture des pièces : '+plan.read+' / '+plan.total+(plan.current_document?' · '+plan.current_document:'')+(plan.total_pages?' · '+(plan.pages_read||[]).length+' page(s) lue(s) sur '+plan.total_pages:'')+'…';
-      plan=await post({action:'step-plan',step:plan.step.n,operation:'document-review',incremental:true,read_job:plan.read_job});
+      try{plan=await post({action:'step-plan',step:plan.step.n,operation:'document-review',incremental:true,read_job:plan.read_job});}
+      catch(e){$('audit-message').textContent=error(e)+' La progression est conservée. ';var resume=node('button','Reprendre la lecture');resume.type='button';resume.onclick=function(){resume.disabled=true;completeSopReading(Object.assign({},outcome,{pending_sop:plan})).catch(function(err){$('audit-message').textContent=error(err);});};$('audit-message').appendChild(resume);return;}
     }
     var receipt=null;
     if(outcome.write_requested && plan.ready)receipt=await post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}});

@@ -16,8 +16,8 @@ function fixture({pages=1000,documents=8,badPage=null,blankPage=null}={}){
     drive:{getMeta:async id=>({name:id+'.pdf',mimeType:'application/pdf',modifiedTime:'v1',md5Checksum:'md5-'+id,size:100000}),
       readText:async(id,o)=>{
         if(o.verifyFingerprintOnly)return {source_fingerprint:'fp-'+id};
-        assert.ok(o.startPage>=1);assert.equal(o.pageCount,6);
-        const total=id==='DOC0'?pages:1,selected=Array.from({length:Math.min(6,total-o.startPage+1)},(_,i)=>o.startPage+i);
+        assert.ok(o.startPage>=1);assert.equal(o.pageCount,1);
+        const total=id==='DOC0'?pages:1,selected=Array.from({length:Math.min(o.pageCount,total-o.startPage+1)},(_,i)=>o.startPage+i);
         windows.push([id,...selected]);
         const sections=selected.filter(p=>p!==badPage&&p!==blankPage).map(p=>({text:`PAGE ${p} OF ${id} : clause de financement et obligation documentaire. `+'Données complètes. '.repeat(35)+(p===1000?'CLAUSE_FINALE_MILLE':'FIN_PAGE'),source:{kind:'page',page:p}}));
         return {supported:true,total_pages:total,selected_pages:selected,pages_read:sections.map(s=>s.source.page),sections,text:sections.map(s=>s.text).join('\n'),source_fingerprint:'fp-'+id,
@@ -96,4 +96,26 @@ test('a single dense page is analysed to its final character, without the old ch
   f.d.ai=async(order,o)=>{const input=JSON.parse(o.input);if(input.notes)return {text:JSON.stringify({analysis_complete:true,summary:'Synthèse',questions:[]})};for(const part of input.fragments){ranges.push([part.start,part.end]);if(part.text.includes('CLAUSE_TOUT_A_LA_FIN'))lastSeen=true;}return {text:JSON.stringify({analysis_complete:true,summary:'Passage examiné',questions:[],findings:[]})};};
   const r=await f.drain();assert.equal(r.exhaustive,true);assert.equal(lastSeen,true);assert.equal(ranges[0][0],0);assert.equal(ranges.at(-1)[1],text.length);
   for(let i=1;i<ranges.length;i++)assert.ok(ranges[i][0]<=ranges[i-1][1]);
+});
+
+test('an OCR service failure preserves the current page for retry instead of skipping it',async()=>{
+  const f=fixture({pages:2,documents:1}),first=await f.pass();
+  await f.pass({read_job:first.read_job});
+  const before=structuredClone(f.view.work.walkthrough[0]);
+  const read=f.h.drive.readText;
+  f.h.drive.readText=async()=>({source_fingerprint:'fp-DOC0',retryable_pages:[2]});
+  await assert.rejects(f.pass({read_job:first.read_job}),/DOCUMENT_OCR_RETRY_REQUIRED/);
+  assert.deepEqual(f.view.work.walkthrough[0],before);
+  f.h.drive.readText=read;
+  assert.equal((await f.drain(first)).exhaustive,true);
+});
+
+test('Prepare reuses the active job and repairs pages failed under the previous OCR policy',async()=>{
+  const f=fixture({pages:2,documents:1}),first=await f.pass();
+  await f.pass(); // another Prepare does not create a second reading
+  assert.equal(f.view.work.walkthrough.length,1);
+  const job=f.view.work.walkthrough[0],doc=job.docs[0];
+  delete doc.retry_policy;doc.coverage[1]='unreadable';doc.next_page=2;
+  const result=await f.drain(first);
+  assert.equal(result.exhaustive,true);assert.equal(result.docs[0].coverage[1],'read');
 });
