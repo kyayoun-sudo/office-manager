@@ -663,3 +663,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Fichiers en CRLF (agents/index.js, lib/orchestrator.js, lib/supabase.js, lib/mission-dossier.js,
   tests/architecture.test.js, index.html) : éditer en conservant les fins de ligne.
 - `npm test` doit passer avant chaque commit.
+
+## Préparation documentaire selon le SOP (2026-10-20)
+- `lib/sop-document-work.js` étend Préparer/Exécuter : faits avec passage source vérifié, questions, préparation conservée dans le même classeur, entrées jaunes vides seulement. Pas de conformité finale ni de signature.
+- Le SOP associé au cycle est relu s’il change ; les préparations antérieures sont conservées et signalées à revoir. Un brouillon obsolète est bloqué à l’écriture.
+- Limites : 6 pièces, 8 Mo/pièce, 12 000 caractères/pièce ; classeur 20 Mio maximum, macros refusées. La carte du classeur est bornée ; ce n’est pas un import intégral du GL. Si les étapes Excel et SOP diffèrent, aucune entrée du modèle n’est remplie : préparation sourcée seulement.
+- Tests : `tests/sop-document-work.test.js` ; aucune migration requise.

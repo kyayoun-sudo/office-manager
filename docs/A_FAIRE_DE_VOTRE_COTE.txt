@@ -200,3 +200,11 @@ LECTURE DES SOP SYCEBNL — correction du 19/10/2026
 [ ] Avant de redéployer la fonction Supabase taty-google-bridge : vérifier que les secrets OFFICE_MANAGER_DRIVE_ID
     (ou TATY_SHARED_DRIVE_ID) et DEFAULT_ORG_ID sont réglés (Supabase → Edge Functions → Secrets).
 [ ] Ne jamais définir OFFICE_MANAGER_TEST_RUN en production (Vercel → Settings → Environment Variables).
+
+
+2026-10-20 — Préparation documentaire SOP
+1. Actualiser la Preview, ouvrir PRJ-01 puis Préparer sur la première étape.
+2. Contrôler les faits, leurs passages exacts, les pièces non lues et les questions. Une précision peut être saisie pour compléter la préparation.
+3. Inscrire la préparation sourcée dans Excel seulement après relecture. Ouvrir le même working file : une feuille PRJ-01_D… contient les preuves ; seules les entrées jaunes vides autorisées sont renseignées. Les décisions restent à valider.
+4. Vérifier que le vrai modèle souhaité est associé au cycle : cette modification ne remplace pas le classeur générique existant. Aucun import intégral du GL ajouté.
+5. Si le SOP change, préparer à nouveau : les anciennes préparations restent visibles à revoir. Pas de SQL ni nouveau réglage requis.
