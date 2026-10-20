@@ -100,7 +100,7 @@
       <div id="needs-aim"></div>
       <h3 style="margin:14px 0 6px;font-size:15px">Documents nécessaires</h3>
       <p class="meta">Déposez chaque document dans sa case (il va dans « Pièces reçues » de la mission, puis les agents le lisent). Pour ceux qui manquent, préparez la demande au client : elle part après validation par un manager.</p>
-      <p class="meta" id="needs-limits">Dépôt : 100 Mo maximum par fichier. Lecture automatique intégrale : limite actuelle de 8 Mo.</p>
+      <p class="meta" id="needs-limits">Dépôt : 100 Mo maximum par fichier. Lecture PDF : jusqu’à 100 Mo, avec indication des pages réellement lues. Autres formats : 8 Mo.</p>
       <div id="needs-list"></div>
       <div class="row" id="needs-mail" hidden style="margin-top:10px;align-items:center">
         <label for="needs-to" class="meta">Destinataire</label><select id="needs-to"></select>
@@ -453,7 +453,7 @@
             return post({ action: 'need-piece', id: it.id, file_id: r.file_id });
           }).then(function (r) {
             $('needs-say').textContent = '« ' + file.name + ' » déposé ; à confirmer par une personne. ' +
-              (file.size > 8000000 ? 'La lecture automatique intégrale de ce fichier dépasse la limite actuelle de 8 Mo.' : r.reading && r.reading.error ? 'Lecture non démarrée : ' + r.reading.error : 'Lecture demandée aux agents.');
+              (file.size > 8000000 && !(/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)) ? 'La lecture de ce format reste limitée à 8 Mo.' : r.reading && r.reading.error ? 'Lecture non démarrée : ' + r.reading.error : 'Lecture demandée aux agents.');
             loadNeeds();
           }).catch(function (e) {
             $('needs-say').textContent = deposited ? 'Fichier envoyé dans « Pièces reçues », mais rattachement non confirmé : ' + nmsg(e) + '. Ne le renvoyez pas.' : 'Dépôt non confirmé : ' + nmsg(e);
@@ -510,6 +510,7 @@
     box.appendChild(go); box.appendChild(out); host.appendChild(box);
   }
   function documentPlanBox(step,plan,host) {
+    (plan.reading||[]).forEach(function(r){host.appendChild(el('p',r.name+' : '+(r.pages_read||[]).length+' page(s) lue(s)'+(r.total_pages?' sur '+r.total_pages:'')+(r.ocr?' · transcription visuelle automatique à vérifier':'')+(r.partial?' · lecture partielle':''),'meta'));});
     var box=el('div',null,'note');
     box.appendChild(el('strong','Préparation documentaire selon le SOP courant'));
     box.appendChild(el('p',plan.understood));
