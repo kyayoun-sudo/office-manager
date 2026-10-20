@@ -690,3 +690,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Tests : vrai PDF de 1000 pages (fenêtre finale), parcours de 1000 pages + sept documents avec analyse de chaque passage, absence de plafond 60000 caractères, reprise, erreurs d'analyse, page illisible/blanche, pagination et contexte de mission.
 
 Lecture bloquée (2026-10-20) : parcours PDF page par page, budget IA 150 s avec 65 s par fournisseur, délai navigateur 210 s et compteur d’attente. Les échecs OCR de service sont réessayables, pas classés illisibles ; ils n’avancent jamais la couverture. Reprise du checkpoint actif au lieu de créer une autre lecture. Les anciens échecs OCR sont relus une fois avec cette politique. JSON incomplet refusé pour établir une lecture complète.
+
+## Dialogue de remplissage (2026-10-20)
+- Chaque écriture documentaire vérifiée conserve un reçu de cellules et un état awaiting_confirmation. Le même composant workpaper-dialogue.js affiche le reçu dans le haut et les étapes.
+- review-workpaper exige un clic humain : confirmation, demande de correction, ou valeurs corrigées explicitement saisies par l’auditeur. Le modèle ne possède pas cet outil. Les cellules et citations enregistrées sont relues avant confirmation ; corrections limitées aux cellules du reçu et vérifiées après écriture. Aucune signature ni conclusion automatique.
+- La prochaine préparation documentaire attend la confirmation précédente. Une modification SOP/période invalide le reçu. Les mises à jour de procédure utilisent updated_at pour refuser une écriture concurrente.
+- Limite : ce moteur conserve la correspondance actuelle aux cellules jaunes ; il ne lie pas à lui seul le modèle NL-T01 original et ne réalise pas encore un import intégral du GL/budget.

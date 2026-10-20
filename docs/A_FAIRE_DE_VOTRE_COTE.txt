@@ -225,3 +225,6 @@ Pas de SQL ni de réglage de période à refaire. Les limites de taille restent 
 
 2026-10-20 — Reprise d’une lecture bloquée
 Actualiser PRJ-01 puis Reprendre la lecture conservée sur l’étape 1. La page en cours et le temps d’attente apparaissent. En cas d’échec de transcription ou de délai dépassé, Reprendre la lecture réessaie la même page ; ne pas cliquer plusieurs fois sur Préparer. Aucun nouveau dépôt nécessaire, aucune écriture Excel pendant Préparer.
+
+2026-10-20 — Confirmer le remplissage avec l’agent
+Après une préparation inscrite dans Excel, ouvrir le compte rendu « ce que j’ai rempli » en haut ou sous l’étape. Vérifier les cellules, valeurs et citations. Je confirme ce remplissage conserve votre identité et la date ; ce n’est ni une conclusion ni une signature. Pour corriger : modifier les valeurs du compte rendu puis Appliquer mes corrections dans Excel, relire et confirmer. Demander une correction à l’agent conserve votre précision sans prétendre avoir modifié Excel. La prochaine étape documentaire attend votre confirmation. Aucun SQL requis. Les anciennes écritures sans reçu ne sont pas déclarées confirmées rétroactivement.

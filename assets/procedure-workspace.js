@@ -26,6 +26,7 @@
       host.appendChild(node('h3', title));
       (lines.length ? Array.from(new Set(lines)) : ['Aucun élément documenté à ce stade.']).forEach(function (s) { host.appendChild(node('p', s)); });
     }
+    window.OfficeManager.renderWorkpaperDialogue(host,b.dialogue||[],post);
     if(b.mission && b.mission.period_label)section('Période de la mission',[b.mission.period_label]);
     section('Ce que j’ai reçu', (b.population ? ['Population : ' + b.population] : []).concat((b.received || []).map(function (e) { return (e.sample_id ? e.sample_id + ' : ' : '') + (e.name || e.file_id) + (e.reading ? ' · ' + e.reading : ''); })));
     if(b.coverage)section('Couverture de lecture',[(b.coverage.scope==='selected_document'?'Document sélectionné : ':'Documents rattachés à la mission : ')+b.coverage.documents+' document(s) · '+b.coverage.pages_analysed+' / '+b.coverage.pages+' page(s) analysée(s) · '+(b.coverage.exhaustive?'toutes les pages ont été traitées':'lecture incomplète : voir les passages signalés')]);
@@ -94,7 +95,7 @@
     if(outcome.write_requested && plan.ready)receipt=await post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}});
     bubble('assistant',(plan.coverage?((plan.coverage.scope==='selected_document'?'Document sélectionné':'Documents rattachés à la mission')+' : '+plan.coverage.documents+' document(s), '+plan.coverage.pages_analysed+' / '+plan.coverage.pages+' page(s) analysée(s). '+(plan.exhaustive?'Toutes les pages ont été traitées.':'Lecture incomplète : voir les passages signalés.')+'\n'):'')+(plan.understood||'Préparation terminée.')+'\n'+(plan.findings||[]).map(function(f){return f.fact+'\nSource : '+f.source+' — « '+f.quote+' »';}).join('\n\n')+'\n'+(receipt && receipt.verified?'Préparation inscrite et vérifiée dans Excel, feuille '+receipt.sheet+'.':'Préparation uniquement ; aucune écriture Excel.')+'\n'+(plan.questions||[]).join('\n'));
     brief(await post({action:'workspace-brief'}));
-    if(receipt)refresh(book && book.sheet,book && book.start_row);
+    if(receipt){refresh(receipt.sheet,1);window.dispatchEvent(new Event('workpaper-dialogue-updated'));}
     $('audit-message').textContent='';
   }
   $('audit-ask').addEventListener('submit', function (e) {
@@ -139,6 +140,7 @@
     post({action:'workspace-brief'}).then(brief).catch(function(e){ $('audit-message').textContent=error(e); });
     refresh();
   });
+  window.addEventListener('workpaper-dialogue-updated',function(){post({action:'workspace-brief'}).then(brief).catch(function(e){$('audit-message').textContent=error(e);});refresh(book&&book.sheet,book&&book.start_row);});
   window.addEventListener('procedure-written', function () { refresh(book && book.sheet, book && book.start_row); });
   window.addEventListener('procedure-updated', function (e) {
     view = e.detail;

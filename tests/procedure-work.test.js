@@ -218,3 +218,13 @@ test('saving walkthrough answers preserves server-side sourced preparations and 
   const r = await P.saveConclusion('org', M, 'ACH-03', {conclusion:'À revoir',walkthrough:[{q:'Question',a:'Réponse'},{kind:'sop-document-work',id:'forged'}]}, ali, d);
   assert.deepEqual(r.work.walkthrough,[{q:'Question',a:'Réponse'},{kind:'sop-document-work',id:'server-plan',status:'applied'}]);
 });
+
+
+test('a stale procedure save cannot overwrite a newer reading or human confirmation',async()=>{
+  const row={id:'W',updated_at:'2026-10-20T10:00:00.000Z',status:'to_do',walkthrough:[]};
+  let url;
+  await assert.rejects(P.patch('O',row,{walkthrough:[]},{email:'human@test'},async(path)=>{url=path;return [];}),/MEMORY_CONFLICT/);
+  assert.match(url,/updated_at=eq\./);
+  const saved=await P.patch('O',row,{walkthrough:[]},{email:'human@test'},async()=>[{...row,updated_by:'human@test'}]);
+  assert.equal(saved.updated_by,'human@test');
+});

@@ -180,6 +180,7 @@
 <script src="/assets/brand-theme.js"></script>
 <script src="/assets/screens.js"></script>
 <script src="/assets/procedure-reading.js"></script>
+<script src="/assets/workpaper-dialogue.js"></script>
 <script src="/assets/procedure-workspace.js"></script>
 <script src="/assets/procedure-upload.js"></script>
 <script>
@@ -250,7 +251,7 @@
   }
 
   function paintSample() {
-    var mode = data.line.sampling_mode, box = $('sample-actions'); box.textContent = ''; $('sample-cand').textContent = '';
+    var mode = data.card?.sampling_mode || data.line.sampling_mode, box = $('sample-actions'); box.textContent = ''; $('sample-cand').textContent = '';
     $('sample-rule').textContent = 'Méthode du programme : ' + (data.sampling_label || '?') + (data.line.sample_size ? ' — ' + data.line.sample_size + ' élément(s)' : '') + '. Un élément tiré n’est jamais remplacé par un plus facile.';
     var b = function (label, body, after) { var x = el('button', label, 'btn ghost'); x.type = 'button'; x.addEventListener('click', function () { act(x, body, $('sample-result'), after); }); box.appendChild(x); };
     if (mode === 'none') { $('sample-card').hidden = true; return; }
@@ -362,7 +363,8 @@
     var model = (data.card || {}).conclusion_template;
     $('conc-model').textContent = model ? 'Modèle du SOP : « ' + model + ' »' : '';
     if (!$('conc').value) $('conc').value = w.conclusion || data.proposed_conclusion || '';
-    $('pop-card').hidden = data.line.sampling_mode === 'none';
+    var currentMode=data.card?.sampling_mode || data.line.sampling_mode;
+    $('pop-card').hidden = currentMode === 'none';$('sample-card').hidden=currentMode==='none';$('items-card').hidden=currentMode==='none';
     var locked = ['submitted', 'reviewed'].indexOf(w.status) >= 0 || data.editable === false;
     ['conc-save', 'wp-write', 'submit', 'pop-read', 'pop-set'].forEach(function (id) { $(id).disabled = locked; });
     paintPopulation(); paintSample(); paintItems(); paintWalkthrough();
@@ -477,7 +479,7 @@
     $('needs-ask-all').onclick = function () { askMail(missing.map(function (x) { return x.id; }), $('needs-ask-all')); };
   }
   // ---- The living working file: steps → « J'ai compris » → Exécuter (2026-10-19) ----
-  var SERR = { DOCUMENT_OCR_RETRY_REQUIRED:'La transcription de cette page n’a pas abouti. Reprenez la lecture : cette page sera réessayée, sans être sautée.', READING_REQUEST_TIMEOUT:'Ce passage dépasse le délai de réponse. Reprenez la lecture : la progression est conservée.', DOCUMENT_BATCH_ANALYSIS_INCOMPLETE:'Ce passage n’a pas été entièrement analysé. Reprenez la lecture : sa progression est conservée.', DOCUMENT_COVERAGE_UNAVAILABLE:'Le lecteur ne peut pas établir la couverture des pages. Aucune lecture exhaustive n’est annoncée.', DOCUMENT_INVENTORY_UNAVAILABLE:'La liste complète des pièces n’a pas pu être chargée. Réessayez quand leur accès est rétabli.', READING_RESTART_REQUIRED:'Cette ancienne préparation utilisait une lecture partielle. Cliquez Préparer pour démarrer le nouveau parcours exhaustif.', SOP_CHANGED_PREPARE_AGAIN: 'Le SOP ou la période de mission a changé : préparez à nouveau cette étape.', WORK_CHANGED_PREPARE_AGAIN: 'Le travail ou le classeur a changé : préparez à nouveau cette étape.', DOCUMENT_SOURCE_CHANGED: 'Une pièce a changé : préparez à nouveau cette étape.', DOCUMENT_PLAN_NOT_FOUND: 'Préparation introuvable : préparez à nouveau cette étape.', DOCUMENT_PLAN_INVALID: 'La préparation reçue est illisible : réessayez.', SOP_SOURCE_UNAVAILABLE: 'Le SOP associé est inaccessible. Vérifiez son accès.', SOP_SOURCE_INCOMPLETE: 'Le SOP associé ne peut pas être lu complètement.', PROCEDURE_REMOVED_FROM_SOP: 'Cette procédure ne figure plus dans le SOP courant.', MACRO_WORKBOOK_WRITE_UNSUPPORTED: 'Ce classeur contient des macros : cette écriture ne peut pas les préserver.', WORKBOOK_TOO_LARGE: 'Ce classeur dépasse la limite de traitement de 20 Mo.', WORKPAPER_WRITE_NOT_VERIFIED: 'L’écriture n’a pas pu être vérifiée : contrôlez le classeur avant de réessayer.', PLAN_INCOMPLETE: 'Il manque des éléments : choisissez l’opération et le fichier source.', AMOUNT_COLUMN_NOT_FOUND: 'Colonne des montants introuvable dans le fichier source.', PERIOD_END_REQUIRED: 'Indiquez la date de clôture.', IN_REVIEW_OR_NOT_EDITABLE: 'Procédure en revue ou non modifiable.', NO_WORKPAPER_FOR_CYCLE: 'Le working file du cycle n’existe pas encore.', MEMORY_CONFLICT: 'Le working file a été modifié en même temps : réessayez.' };
+  var SERR = { HUMAN_CONFIRMATION_REQUIRED:'Confirmez ou corrigez le remplissage précédent dans le compte rendu de l’étape.', DOCUMENT_OCR_RETRY_REQUIRED:'La transcription de cette page n’a pas abouti. Reprenez la lecture : cette page sera réessayée, sans être sautée.', READING_REQUEST_TIMEOUT:'Ce passage dépasse le délai de réponse. Reprenez la lecture : la progression est conservée.', DOCUMENT_BATCH_ANALYSIS_INCOMPLETE:'Ce passage n’a pas été entièrement analysé. Reprenez la lecture : sa progression est conservée.', DOCUMENT_COVERAGE_UNAVAILABLE:'Le lecteur ne peut pas établir la couverture des pages. Aucune lecture exhaustive n’est annoncée.', DOCUMENT_INVENTORY_UNAVAILABLE:'La liste complète des pièces n’a pas pu être chargée. Réessayez quand leur accès est rétabli.', READING_RESTART_REQUIRED:'Cette ancienne préparation utilisait une lecture partielle. Cliquez Préparer pour démarrer le nouveau parcours exhaustif.', SOP_CHANGED_PREPARE_AGAIN: 'Le SOP ou la période de mission a changé : préparez à nouveau cette étape.', WORK_CHANGED_PREPARE_AGAIN: 'Le travail ou le classeur a changé : préparez à nouveau cette étape.', DOCUMENT_SOURCE_CHANGED: 'Une pièce a changé : préparez à nouveau cette étape.', DOCUMENT_PLAN_NOT_FOUND: 'Préparation introuvable : préparez à nouveau cette étape.', DOCUMENT_PLAN_INVALID: 'La préparation reçue est illisible : réessayez.', SOP_SOURCE_UNAVAILABLE: 'Le SOP associé est inaccessible. Vérifiez son accès.', SOP_SOURCE_INCOMPLETE: 'Le SOP associé ne peut pas être lu complètement.', PROCEDURE_REMOVED_FROM_SOP: 'Cette procédure ne figure plus dans le SOP courant.', MACRO_WORKBOOK_WRITE_UNSUPPORTED: 'Ce classeur contient des macros : cette écriture ne peut pas les préserver.', WORKBOOK_TOO_LARGE: 'Ce classeur dépasse la limite de traitement de 20 Mo.', WORKPAPER_WRITE_NOT_VERIFIED: 'L’écriture n’a pas pu être vérifiée : contrôlez le classeur avant de réessayer.', PLAN_INCOMPLETE: 'Il manque des éléments : choisissez l’opération et le fichier source.', AMOUNT_COLUMN_NOT_FOUND: 'Colonne des montants introuvable dans le fichier source.', PERIOD_END_REQUIRED: 'Indiquez la date de clôture.', IN_REVIEW_OR_NOT_EDITABLE: 'Procédure en revue ou non modifiable.', NO_WORKPAPER_FOR_CYCLE: 'Le working file du cycle n’existe pas encore.', MEMORY_CONFLICT: 'Le working file a été modifié en même temps : réessayez.' };
   var smsg = function (e) { var c = e && (e.code || e.message); return SERR[c] || msg(e); };
   var stepsData = null;
   function paramsLine(p) { var out = []; if (p.row_from || p.row_to) out.push('lignes ' + (p.row_from || '…') + ' à ' + (p.row_to || '…')); if ((p.accounts || []).length) out.push('comptes ' + p.accounts.join(', ')); if (p.date_from || p.date_to) out.push('du ' + (p.date_from || '…') + ' au ' + (p.date_to || '…')); if (p.period_end) out.push('clôture ' + p.period_end); if (p.min_amount != null) out.push('montant ≥ ' + p.min_amount); if ((p.label_contains || []).length) out.push('libellé : ' + p.label_contains.join(', ')); return out.join(' · '); }
@@ -542,7 +544,7 @@
     go.addEventListener('click',function(){go.disabled=true;$('steps-say').textContent='Écriture puis relecture du fichier…';
       post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}}).then(function(r){
         $('steps-say').textContent=r.count+' faits sourcés conservés dans « '+r.sheet+' » ; '+(r.cells||0)+' cellule(s) du modèle renseignée(s). Écriture vérifiée. '+((r.questions||[]).length?'Des questions restent ouvertes.':'Préparation à relire avant de conclure.');
-        window.dispatchEvent(new Event('procedure-written'));
+        window.dispatchEvent(new Event('procedure-written'));window.dispatchEvent(new Event('workpaper-dialogue-updated'));
       }).catch(function(e){$('steps-say').textContent=smsg(e);go.disabled=false;});});box.appendChild(go);host.appendChild(box);
   }
   function paintSteps() {
@@ -557,6 +559,7 @@
       var tools = el('div', null, 'row');
       if (done.length) tools.appendChild(el('span', (done[0].stale ? 'Contexte modifié — préparation à revoir' : done[0].operation==='document-review' ? 'Préparation enregistrée' : 'Fait')+' — feuille « '+done[0].sheet+' »','tag'));
       var host = el('div');
+      OM.renderWorkpaperDialogue(host,(stepsData.dialogue||[]).filter(function(r){return r.step===st.n;}),post);
       if (stepsData.editable) {
         var b = el('button', done.length ? 'Refaire' : '▶ Préparer', 'btn ghost'); b.type = 'button';
         b.addEventListener('click', function () {
@@ -572,6 +575,7 @@
       head.appendChild(tools); it.appendChild(head); it.appendChild(host); list.appendChild(it);
     });
   }
+  window.addEventListener('workpaper-dialogue-updated',function(){loadSteps(true);});
   function loadSteps(quiet) {
     post({ action: 'steps' }).then(function (r) { stepsData = r; paintSteps(); if(r.workbook_differs)$('steps-say').textContent='Les étapes du fichier diffèrent du SOP courant. Les étapes affichées viennent du SOP ; vérifiez le modèle avant de renseigner ses cellules.'; else if (r.problem && !quiet) $('steps-say').textContent = smsg({ code: r.problem }); })
       .catch(function (e) { $('steps-list').textContent = ''; $('steps-list').appendChild(el('p', smsg(e), 'empty')); });

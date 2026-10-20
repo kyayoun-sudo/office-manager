@@ -1,3 +1,4 @@
+import {reviewWorkpaper,pendingConfirmation} from '../lib/workpaper-dialogue.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
@@ -117,4 +118,34 @@ test('a focused document read accepts only a source in this mission',async()=>{
   await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{source_file_id:'OUTSIDE'},{},f.d),/DOCUMENT_SOURCE_CHANGED/);
   const r=await prepareDocumentWork('O','M','PRJ-01',f.step,{source_file_id:'DOC'},{},f.d);
   assert.equal(r.total,1);assert.equal(r.read,0);
+});
+
+
+test('verified writes expose actual cells; human confirms or corrects them without deciding the audit',async()=>{
+  const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
+  const written=await runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{},f.d);
+  assert.equal(written.confirmation.status,'awaiting_confirmation');
+  assert.equal(written.receipt.cells[0].cell,'B11');assert.equal(written.receipt.cells[0].value,'Banque Exemple');
+  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d),/HUMAN_CONFIRMATION_REQUIRED/);
+  await assert.rejects(reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'confirm'},{},f.d),/HUMAN_IDENTITY_REQUIRED/);
+  const a={email:'auditeur@example.test'};
+  await reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'request-correction',note:'Préciser le bailleur'},a,f.d);
+  assert.equal(pendingConfirmation(f.view).confirmation.status,'correction_requested');
+  await assert.rejects(reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'apply-correction',edits:[{sheet:'PRJ-01',cell:'D11',value:'123'}]},a,f.d),/CORRECTION_CELL_NOT_OWNED/);
+  const corrected=await reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'apply-correction',edits:[{sheet:'PRJ-01',cell:'B11',value:'Banque Exemple — bailleur principal'}]},a,f.d);
+  assert.equal(corrected.excel_written,true);assert.equal(corrected.confirmation.status,'awaiting_confirmation');
+  const back=new ExcelJS.Workbook();await back.xlsx.load(f.getBytes());assert.equal(back.getWorksheet('PRJ-01').getCell('D11').formula,'1+2');
+  const confirmed=await reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'confirm'},a,f.d);
+  assert.equal(confirmed.confirmation.by,a.email);assert.equal(confirmed.complete,false);assert.equal(pendingConfirmation(f.view),undefined);
+  assert.equal(f.view.work.walkthrough[0].confirmation_history.length,3);
+});
+
+test('human confirmation is refused after a workbook cell or the SOP changes',async()=>{
+  const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
+  await runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{},f.d);
+  const back=new ExcelJS.Workbook();await back.xlsx.load(f.getBytes());back.getWorksheet('PRJ-01').getCell('B11').value='Autre saisie humaine';
+  await f.d.drive.updateBinary('WP',{buffer:Buffer.from(await back.xlsx.writeBuffer()),expectedModifiedTime:'v1'});
+  await assert.rejects(reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'confirm'},{email:'auditeur@example.test'},f.d),/WORK_CHANGED_PREPARE_AGAIN/);
+  f.view.card.steps=[{text:'Nouvelle exigence'}];
+  await assert.rejects(reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'confirm'},{email:'auditeur@example.test'},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
 });
