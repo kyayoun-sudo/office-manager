@@ -78,7 +78,7 @@
   async function completeSopReading(outcome) {
     var plan=outcome.pending_sop;
     while(plan.pending){
-      $('audit-message').textContent='Lecture des pièces : '+plan.read+' / '+plan.total+'…';
+      $('audit-message').textContent='Lecture des pièces : '+plan.read+' / '+plan.total+(plan.current_document?' · '+plan.current_document:'')+(plan.total_pages?' · '+(plan.pages_read||[]).length+' page(s) lue(s) sur '+plan.total_pages:'')+'…';
       plan=await post({action:'step-plan',step:plan.step.n,operation:'document-review',incremental:true,read_job:plan.read_job});
     }
     var receipt=null;
