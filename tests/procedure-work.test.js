@@ -209,3 +209,12 @@ test('two people write their own tests in the same Working File at the same inst
   assert.equal(wb.getWorksheet('COLLEGUE').getRow(1).getCell(1).value, 'travail du collègue', 'the colleague’s work is kept');
   assert.ok(wb.getWorksheet('ACH-03'), 'and Ali’s test is written');
 });
+
+
+test('saving walkthrough answers preserves server-side sourced preparations and rejects browser replacements', async () => {
+  const {d} = world();
+  const v = await P.procedureView('org', M, 'ACH-03', ali, d);
+  await P.patch('org', v.work, {walkthrough:[{kind:'sop-document-work',id:'server-plan',status:'applied'}]}, ali, d.fetchRows);
+  const r = await P.saveConclusion('org', M, 'ACH-03', {conclusion:'À revoir',walkthrough:[{q:'Question',a:'Réponse'},{kind:'sop-document-work',id:'forged'}]}, ali, d);
+  assert.deepEqual(r.work.walkthrough,[{q:'Question',a:'Réponse'},{kind:'sop-document-work',id:'server-plan',status:'applied'}]);
+});
