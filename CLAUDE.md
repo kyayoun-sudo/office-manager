@@ -674,7 +674,7 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 
 ## PDF volumineux de procédure (2026-10-20)
 - Limite PDF 100 Mio, autres formats 8 Mo (`reader-limits.js`) ; contrôles metadata, streaming et pont Drive utilisent la même limite.
-- `sop-pdf-reading.js` : jusqu’à 64 pages natives et 24 pages scannées (groupes de 3, concurrence 2), 60 000 caractères par pièce SOP ; extrait et pages manquantes signalés. OCR non vérifié. Téléchargement direct Drive, jamais transit du PDF par le navigateur/API Vercel en upload.
+- `sop-pdf-reading.js` : jusqu’à 64 pages natives et 64 pages scannées (groupes de 3, concurrence 2), 60 000 caractères par pièce SOP ; extrait et pages manquantes signalés. OCR non vérifié. Téléchargement direct Drive, jamais transit du PDF par le navigateur/API Vercel en upload.
 - Les citations OCR sont des propositions à relire. Avant écriture, empreinte binaire de la source contrôlée sans relancer une transcription non déterministe. Cache OCR limité au passage courant.
 - Tests `sop-pdf-reading.test.js` : vrai PDF >8 Mo, clause page 7, provenance OCR et recontrôle des octets.
 
