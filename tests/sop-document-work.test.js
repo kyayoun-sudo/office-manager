@@ -24,14 +24,20 @@ async function fixture() {
       downloadBuffer:async()=>bytes,readText:async()=>({text:sourceText,truncated:false}),
       updateBinary:async(id,o)=>{assert.equal(o.expectedModifiedTime,'v1');bytes=o.buffer;updates++;}},
     save:async(o,row,changes)=>{Object.assign(view.work,changes);return view.work;},
-    ai:async(_,options)=>{aiCalls++;assert.match(options.input,/Identifier le bailleur/);return {text:JSON.stringify({summary:'Le bailleur est identifié dans l’article 4.',questions:['La convention est-elle complète ?'],findings:[
+    ai:async(_,options)=>{aiCalls++;assert.match(options.input,/Identifier le bailleur/);return {text:JSON.stringify({analysis_complete:true,summary:'Le bailleur est identifié dans l’article 4.',questions:['La convention est-elle complète ?'],findings:[
       {fact:'Banque Exemple',file_id:'DOC',quote:'Le bailleur du projet est la Banque Exemple.',reference:'Article 4',target:'PRJ-01!B11'},
       {fact:'PASS',file_id:'DOC',quote:'passage inventé absent du fichier',target:'PRJ-01!C11'}]})};}};
   return {view,step,d,getBytes:()=>bytes,updates:()=>updates,aiCalls:()=>aiCalls,setText:t=>{sourceText=t;}};
 }
 
+async function prepareReady(o,m,c,step,body,account,d){
+  let r=await prepareDocumentWork(o,m,c,step,body,account,d);
+  for(let n=0;r.pending&&n<100;n++)r=await prepareDocumentWork(o,m,c,step,{read_job:r.read_job},account,d);
+  assert.equal(r.pending,undefined);return r;
+}
+
 test('reads the current SOP and documents, checks quotes, writes permitted cells and preserves formulas and human values',async()=>{
-  const f=await fixture(),p=await prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d);
+  const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
   assert.equal(f.updates(),0);assert.equal(p.findings.length,1);assert.equal(p.findings[0].target,'PRJ-01!B11');
   assert.ok(p.questions.some(q=>/écartée/.test(q)));
   const r=await runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id,findings:[{target:'C11',fact:'PASS'}]}, {},f.d);
@@ -44,7 +50,7 @@ test('reads the current SOP and documents, checks quotes, writes permitted cells
 });
 
 test('a changed SOP invalidates an unexecuted plan and marks older work for review without deleting it',async()=>{
-  const f=await fixture(),p=await prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d);
+  const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
   f.view.card.steps=[{text:'Identifier aussi le cofinancement.'}];
   await assert.rejects(runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
   assert.equal(f.updates(),0);
@@ -55,7 +61,7 @@ test('a changed SOP invalidates an unexecuted plan and marks older work for revi
 });
 
 test('changed evidence, lost access, changed workbook and unknown plan ids stop all writing',async()=>{
-  const f=await fixture(),p=await prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d);
+  const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
   f.setText('Nouveau contenu de la convention, même métadonnée.');
   await assert.rejects(runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{},f.d),/DOCUMENT_SOURCE_CHANGED/);
   await assert.rejects(runDocumentWork('O','M','PRJ-01',{plan_id:'forged'},{},f.d),/DOCUMENT_PLAN_NOT_FOUND/);
@@ -68,7 +74,7 @@ test('no permission prevents document access and AI; unread documents are report
   const f=await fixture();f.d.permissions=async()=>({granted:false});
   await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d),/AGENTS_NOT_AUTHORIZED/);assert.equal(f.aiCalls(),0);
   f.d.permissions=async()=>({granted:true});f.d.drive.readText=async()=>({text:'',error_code:'TOO_LARGE'});
-  const p=await prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d);
+  const p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
   assert.equal(p.ready,false);assert.equal(p.unread.length,1);assert.equal(f.aiCalls(),0);
 });
 
@@ -88,33 +94,27 @@ test('a changed Word source is reread from the programme-selected SOP, not anoth
 });
 
 
-test('incremental reading checkpoints one document before analysis, resumes and removes temporary content',async()=>{
+test('incremental reading checkpoints before analysis and removes temporary text at completion',async()=>{
   const f=await fixture();
   const first=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true},{},f.d);
-  assert.equal(first.pending,true);assert.equal(first.read,1);assert.equal(f.aiCalls(),0);assert.equal(f.updates(),0);
-  assert.equal(f.view.work.walkthrough[0].kind,'sop-reading-job');
-  const final=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:first.read_job},{},f.d);
+  assert.equal(first.pending,true);assert.equal(first.read,0);assert.equal(f.aiCalls(),0);assert.equal(f.updates(),0);
+  assert.equal(f.view.work.walkthrough[0].version,4);
+  const final=await prepareReady('O','M','PRJ-01',f.step,{read_job:first.read_job},{},f.d);
   assert.equal(final.ready,true);assert.equal(f.aiCalls(),1);
   assert.equal(f.view.work.walkthrough.some(r=>r.kind==='sop-reading-job'),false);
   assert.equal('text' in f.view.work.walkthrough[0].sources[0],false);
 });
 
-test('incremental scan pages merge and a changed SOP blocks resuming old checkpoints',async()=>{
-  const f=await fixture();let offset=[];
-  f.d.drive.readText=async(id,o)=>{offset.push(o.ocrOffset);return {text:'Le bailleur du projet est la Banque Exemple.',sections:[{text:o.ocrOffset?'Annexe sur les obligations de reporting.':'Le bailleur du projet est la Banque Exemple.',source:{page:o.ocrOffset?7:1,method:'ocr'}}],total_pages:7,pages_read:[o.ocrOffset?7:1],ocr_pages:[1],ocr_remaining:!o.ocrOffset,truncated:true};};
-  let p=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true},{},f.d);
-  assert.equal(p.read,0);
-  p=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:p.read_job},{},f.d);
-  assert.equal(p.read,1);assert.deepEqual(offset,[0,6]);
-  assert.deepEqual(f.view.work.walkthrough[0].docs[0].pages_read,[1,7]);
+test('a changed SOP blocks resuming an analysed-page checkpoint',async()=>{
+  const f=await fixture();
+  const p=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true},{},f.d);
   f.view.card.objective='SOP modifié';
-  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:p.read_job},{},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
+  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{read_job:p.read_job},{},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
 });
-
 
 test('a focused document read accepts only a source in this mission',async()=>{
   const f=await fixture();
-  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,source_file_id:'OUTSIDE'},{},f.d),/DOCUMENT_SOURCE_CHANGED/);
-  const r=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,source_file_id:'DOC'},{},f.d);
-  assert.equal(r.total,1);assert.equal(r.read,1);
+  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{source_file_id:'OUTSIDE'},{},f.d),/DOCUMENT_SOURCE_CHANGED/);
+  const r=await prepareDocumentWork('O','M','PRJ-01',f.step,{source_file_id:'DOC'},{},f.d);
+  assert.equal(r.total,1);assert.equal(r.read,0);
 });

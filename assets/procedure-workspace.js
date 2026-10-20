@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var view, book, cell = null, history = [], sequence = 0;
+  var view, book, cell = null, history = [], sequence = 0, readingScope = null;
   function node(tag, value) { var n = document.createElement(tag); if (value != null) n.textContent = value; return n; }
   function post(body) {
     return window.OfficeManager.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -25,8 +25,15 @@
       host.appendChild(node('h3', title));
       (lines.length ? Array.from(new Set(lines)) : ['Aucun élément documenté à ce stade.']).forEach(function (s) { host.appendChild(node('p', s)); });
     }
+    if(b.mission && b.mission.period_label)section('Période de la mission',[b.mission.period_label]);
     section('Ce que j’ai reçu', (b.population ? ['Population : ' + b.population] : []).concat((b.received || []).map(function (e) { return (e.sample_id ? e.sample_id + ' : ' : '') + (e.name || e.file_id) + (e.reading ? ' · ' + e.reading : ''); })));
+    if(b.coverage)section('Couverture de lecture',[(b.coverage.scope==='selected_document'?'Document sélectionné : ':'Documents rattachés à la mission : ')+b.coverage.documents+' document(s) · '+b.coverage.pages_analysed+' / '+b.coverage.pages+' page(s) analysée(s) · '+(b.coverage.exhaustive?'toutes les pages ont été traitées':'lecture incomplète : voir les passages signalés')]);
+    if(b.observed_total>50)host.appendChild(node('p','50 faits affichés sur '+b.observed_total+'. Le relevé complet est conservé.'));
     section('Ce que j’ai vu', (b.observed || []).map(function (o) { return (o.sample_id ? o.sample_id + ' : ' : '') + o.observation + (o.source ? '\nSource : ' + o.source : '') + (o.quote ? '\n« ' + o.quote + ' »' : ''); }));
+    if(b.report_plan_id && b.observed_total>50){
+      var more=node('button','Afficher les faits suivants'),offset=50;
+      more.type='button';more.addEventListener('click',async function(){more.disabled=true;try{var page=await post({action:'reading-report',plan_id:b.report_plan_id,offset:offset});page.findings.forEach(function(f){host.insertBefore(node('p',f.fact+'\nSource : '+f.source+' — '+f.reference+'\n« '+f.quote+' »'),more);});offset+=page.findings.length;more.hidden=offset>=page.findings_total;}catch(e){$('audit-message').textContent=error(e);}more.disabled=false;});host.appendChild(more);
+    }
     if (r.assessment) section('Mon avis provisoire', [r.assessment]);
     var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon' };
     section('Ce que j’ai fait', (r.outcomes || []).map(function (o) {
@@ -83,7 +90,7 @@
     }
     var receipt=null;
     if(outcome.write_requested && plan.ready)receipt=await post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}});
-    bubble('assistant',(plan.understood||'Préparation terminée.')+'\n'+(plan.findings||[]).map(function(f){return f.fact+'\nSource : '+f.source+' — « '+f.quote+' »';}).join('\n\n')+'\n'+(receipt && receipt.verified?'Préparation inscrite et vérifiée dans Excel, feuille '+receipt.sheet+'.':'Préparation uniquement ; aucune écriture Excel.')+'\n'+(plan.questions||[]).join('\n'));
+    bubble('assistant',(plan.coverage?((plan.coverage.scope==='selected_document'?'Document sélectionné':'Documents rattachés à la mission')+' : '+plan.coverage.documents+' document(s), '+plan.coverage.pages_analysed+' / '+plan.coverage.pages+' page(s) analysée(s). '+(plan.exhaustive?'Toutes les pages ont été traitées.':'Lecture incomplète : voir les passages signalés.')+'\n'):'')+(plan.understood||'Préparation terminée.')+'\n'+(plan.findings||[]).map(function(f){return f.fact+'\nSource : '+f.source+' — « '+f.quote+' »';}).join('\n\n')+'\n'+(receipt && receipt.verified?'Préparation inscrite et vérifiée dans Excel, feuille '+receipt.sheet+'.':'Préparation uniquement ; aucune écriture Excel.')+'\n'+(plan.questions||[]).join('\n'));
     brief(await post({action:'workspace-brief'}));
     if(receipt)refresh(book && book.sheet,book && book.start_row);
     $('audit-message').textContent='';
@@ -92,7 +99,8 @@
     e.preventDefault(); if (!view || $('audit-send').disabled) return;
     var message = $('audit-question').value.trim(); if (!message) return;
     bubble('user', message); $('audit-send').disabled = true; $('audit-message').textContent = 'L’agent examine le contexte de la procédure…';
-    post({ action: 'ask-procedure', message: message, history: history, cell: cell, sheet: book && book.sheet })
+    var scope=readingScope;readingScope=null;
+    post({ action: 'ask-procedure', reading_scope:scope, message: message, history: history, cell: cell, sheet: book && book.sheet })
       .then(function (r) {
         bubble('assistant', r.answer); history.push({ role: 'user', text: message }, { role: 'assistant', text: r.answer }); history = history.slice(-8);
         if (r.brief) brief(r);
@@ -109,7 +117,8 @@
     $('audit-ask').requestSubmit();
   });
   $('audit-continue').addEventListener('click', function () {
-    $('audit-question').value = 'Continue : lis la prochaine pièce disponible, remplis les observations documentées dans la fiche et écris-les dans Excel. Conserve les saisies existantes. Dis-moi ensuite ce que tu as reçu, vu, fait et ce qui manque pour avancer.';
+    readingScope='mission';
+    $('audit-question').value = 'Continue selon le SOP : lis tous les documents rattachés à cette mission et toutes leurs pages, en utilisant la période déjà enregistrée. Prépare les observations sourcées, conserve les saisies existantes et écris la préparation dans Excel. Signale précisément les passages illisibles ; ne conclus pas le test.';
     $('audit-ask').requestSubmit();
   });
   $('audit-explain').addEventListener('click', function () {

@@ -245,10 +245,11 @@ export const ROUTES = Object.freeze({
       if (req.query?.mine) return w.myProcedures(orgId, req.account);
       if (req.query?.reviews) return (await import('../lib/procedure-review.js')).myReviews(orgId, req.account);
       if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
-      return w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
+      return (await import('../lib/procedure-reading-report.js')).publicView(await w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account));
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'reading-report') return (await import('../lib/procedure-reading-report.js')).readingReport(orgId,m,c,b,a);
       if (b.action === 'workspace-brief') return (await import('../lib/procedure-workspace.js')).workspaceBrief(orgId,m,c,a);
       if (b.action === 'workbook-view') return (await import('../lib/procedure-workspace.js')).workbookView(orgId, m, c, b, a);
       if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);

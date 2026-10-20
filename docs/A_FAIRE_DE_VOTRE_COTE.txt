@@ -214,3 +214,11 @@ Actualiser PRJ-01 puis demander « Fais le point sur les documents reçus et ce 
 
 2026-10-20 — Lecture des accords PDF dépassant 8 Mo
 Actualiser la Preview, ouvrir PRJ-01 et cliquer Préparer sur l’étape 1. Les accords déjà déposés sont réutilisés : aucun nouveau dépôt nécessaire. Contrôler les pages lues, les citations et les limites ; les scans sont transcrits automatiquement et restent à vérifier. Capacité : PDF 100 Mio, lecture bornée à 64 pages natives / 64 pages scannées par préparation ; aucune affirmation de lecture intégrale au-delà. Pas de SQL ni de promotion Production requis.
+
+2026-10-20 — Lecture exhaustive et période de mission
+Actualiser la Preview. Le haut affiche la période enregistrée à la création de la mission : aucun ressaisissement nécessaire.
+« Continue avec les pièces disponibles » parcourt tous les documents rattachés à la mission et toutes leurs pages, puis inscrit la préparation sourcée demandée dans Excel. Pour lire sans écrire, utiliser Préparer ou demander explicitement la lecture seule dans la conversation.
+La progression est conservée après chaque fenêtre et chaque analyse ; après interruption/rechargement, cliquer « Reprendre la lecture conservée ». Une ancienne préparation partielle doit être redémarrée avec Préparer.
+Contrôler le relevé de couverture : documents attendus/traités, pages analysées, pages blanches, passages illisibles. Une couverture incomplète ne vaut jamais lecture exhaustive. L'OCR reste à comparer à l'original pour les éléments critiques.
+Un aperçu de 50 faits n'est pas la totalité du relevé : « Afficher les faits suivants » donne la suite ; l'écriture de préparation utilise tous les faits conservés.
+Pas de SQL ni de réglage de période à refaire. Les limites de taille restent PDF 100 Mio / autres formats 8 Mo ; les documents non lisibles sont signalés, pas réputés lus.

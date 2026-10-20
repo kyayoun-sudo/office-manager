@@ -679,3 +679,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Tests `sop-pdf-reading.test.js` : vrai PDF >8 Mo, clause page 7, provenance OCR et recontrôle des octets.
 
 - Lecture SOP incrémentale : une pièce / 6 pages OCR par requête, reprise automatique du bouton Préparer et de la conversation. Checkpoint temporaire `sop-reading-job` dans la procédure autorisée, retiré à la fin ; révision SOP contrôlée à la reprise. Empreinte Drive identique réutilise la transcription des doublons.
+
+## Lecture exhaustive et période (2026-10-20)
+- `sop-exhaustive-reading.js` remplace la lecture cumulative limitée : fenêtres PDF de six pages, fragments bornés analysés avant validation de couverture, synthèse hiérarchique. Pas de plafond total de pages ni de six documents. Les fragments courants disparaissent après analyse ; tous les faits/citations et la couverture sont conservés.
+- Un document de 1000 pages se traite par reprises persistantes `sop-reading-job` version 4, sans expiration d'une heure. États par page : pending/read/blank/unreadable. `exhaustive=true` seulement si chaque page de chaque document sélectionné a été analysée ou identifiée blanche, sans extraction incomplète ni fichier absent. OCR traité ≠ transcription vérifiée par l'humain.
+- « Continue » demande tous les documents rattachés à la mission. Une lecture ciblée reste possible sur demande explicite. Les échecs d'inventaire ne sont plus ignorés. Formats non pris en charge, fichiers hors limite de taille et extraction tronquée rendent la couverture incomplète ; aucune promesse de lecture universelle.
+- La limite PDF de 100 Mio et celle des autres formats de 8 Mo restent explicites. Pour les formats non PDF, une extraction tronquée n'est jamais déclarée exhaustive.
+- `procedureView.mission.period_label` vient de la mission autorisée (pas des dates de planification). Période transmise à l'analyse, la synthèse et la conversation ; les anciennes questions génériques de période sont filtrées si elle est enregistrée. Changer la période invalide une préparation.
+- `procedure-reading-report.js` : affichage paginé des faits et de la couverture, sans perte des faits au-delà de l'aperçu. Les API publiques ne renvoient pas les fragments temporaires ni tous les faits en un seul gros message.
+- Tests : vrai PDF de 1000 pages (fenêtre finale), parcours de 1000 pages + sept documents avec analyse de chaque passage, absence de plafond 60000 caractères, reprise, erreurs d'analyse, page illisible/blanche, pagination et contexte de mission.
