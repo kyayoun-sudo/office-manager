@@ -23,7 +23,7 @@
     var b = r.brief || {};
     function section(title, lines) {
       host.appendChild(node('h3', title));
-      (lines.length ? lines : ['Aucun élément documenté à ce stade.']).forEach(function (s) { host.appendChild(node('p', s)); });
+      (lines.length ? Array.from(new Set(lines)) : ['Aucun élément documenté à ce stade.']).forEach(function (s) { host.appendChild(node('p', s)); });
     }
     section('Ce que j’ai reçu', (b.population ? ['Population : ' + b.population] : []).concat((b.received || []).map(function (e) { return (e.sample_id ? e.sample_id + ' : ' : '') + (e.name || e.file_id) + (e.reading ? ' · ' + e.reading : ''); })));
     section('Ce que j’ai vu', (b.observed || []).map(function (o) { return (o.sample_id ? o.sample_id + ' : ' : '') + o.observation + (o.source ? '\nSource : ' + o.source : '') + (o.quote ? '\n« ' + o.quote + ' »' : ''); }));

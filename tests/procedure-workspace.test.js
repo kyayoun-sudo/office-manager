@@ -94,12 +94,12 @@ test('the Enhanced Auditor has one rule for working files, the same in its instr
 
 
 test('the upper conversation sees mission documents and sourced SOP work without inventing a sample requirement', async () => {
-  const f=await fixture(); f.view.line.sampling_mode='none';
+  const f=await fixture(); f.view.line.sampling_mode='programme_sample';f.view.card.sampling_mode='none';
   f.view.work.walkthrough=[{kind:'sop-document-work',step:1,status:'draft',findings:[{fact:'Bailleur identifié',source:'Convention.pdf',quote:'Le bailleur est Banque Exemple.'}],questions:['Quelle période ?']}];
   const sources=[{file_id:'DOC',name:'Convention.pdf'}];
   await askProcedure('org','mission','CASH-01',{message:'Explique ce que nous faisons'}, {}, {...f.d,sources:async()=>sources});
   const input=f.stats().input;
-  assert.equal(input.available_documents[0].file_id,'DOC');assert.equal(input.preparations[0].findings[0].source,'Convention.pdf');
+  assert.equal(input.procedure.sampling_mode,'none');assert.equal(input.available_documents[0].file_id,'DOC');assert.equal(input.preparations[0].findings[0].source,'Convention.pdf');
   assert.ok(input.workbook.sheets.length);
   const b=workBrief(f.view,sources); assert.equal(b.received[0].name,'Convention.pdf');assert.equal(b.observed[0].quote,'Le bailleur est Banque Exemple.');
   assert.equal(b.missing.some(x=>/Population|Sélection/.test(x)),false);
