@@ -208,3 +208,6 @@ LECTURE DES SOP SYCEBNL — correction du 19/10/2026
 3. Inscrire la préparation sourcée dans Excel seulement après relecture. Ouvrir le même working file : une feuille PRJ-01_D… contient les preuves ; seules les entrées jaunes vides autorisées sont renseignées. Les décisions restent à valider.
 4. Vérifier que le vrai modèle souhaité est associé au cycle : cette modification ne remplace pas le classeur générique existant. Aucun import intégral du GL ajouté.
 5. Si le SOP change, préparer à nouveau : les anciennes préparations restent visibles à revoir. Pas de SQL ni nouveau réglage requis.
+
+2026-10-20 — Conversation du haut raccordée aux pièces SOP
+Actualiser PRJ-01 puis demander « Fais le point sur les documents reçus et ce qui a été lu, sans rien modifier ». Le haut doit citer les documents et les faits déjà préparés. « Continue avec les pièces disponibles » peut désormais préparer une étape SOP puis inscrire ses faits sourcés dans Excel. Les limites de lecture demeurent (8 Mo/pièce).

@@ -8,8 +8,8 @@ import { askProcedure, executeProcedureActions } from '../lib/procedure-workspac
 const M = '11111111-1111-1111-1111-111111111111';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const card = { code: 'ACH-03', title: 'Test de détail', objective: 'Dépenses réelles', steps: [{ text: 'Retrouver la facture' }], wp_columns: ['Sample ID / Référence', 'Date', 'Tiers', 'Montant', 'Pièce / source', 'Résultat PASS/EXCEPTION', 'Écart', 'Commentaire'], conclusion_template: 'Travaux exécutés conformément à ACH-03.' };
-const LIB = { sops: [{ file_id: 'sopA', procedures: [card, { code: 'ACH-08', title: 'Doublons' }, { code: 'ACH-02', title: 'Walkthrough' }] }] };
-const cycle = { cycle_code: 'ACH', cycle_title: 'Achats', status: 'IN_SCOPE', preparer: 'ali@c.ci', sop_file_id: 'sopA', procedures: [
+const LIB = { sops: [{ file_id: 'sopA', modified_time:'m1', procedures: [card, { code: 'ACH-08', title: 'Doublons' }, { code: 'ACH-02', title: 'Walkthrough' }] }] };
+const cycle = { cycle_code: 'ACH', cycle_title: 'Achats', status: 'IN_SCOPE', preparer: 'ali@c.ci', sop_file_id: 'sopA', modified_time:'m1', procedures: [
   { code: 'ACH-03', title: 'Test de détail', type: 'CORE', active: true, sampling_mode: 'programme_sample', sample_size: 3 },
   { code: 'ACH-08', title: 'Doublons', type: 'RISK_DEPENDENT', active: true, sampling_mode: 'risk_targeted' },
   { code: 'ACH-02', title: 'Walkthrough', type: 'CORE', active: true, sampling_mode: 'walkthrough', preparer: 'sam@c.ci' }] };
@@ -88,7 +88,7 @@ function world(extra = {}) {
     listChildren: async id => id === 'MF' ? [{ id: 'WPF', name: 'WORKING_PAPERS', mimeType: 'application/vnd.google-apps.folder' }] : [],
     readText: async () => ({ text: 'Facture F2 Beta 1 000 000 FCFA du 08/03/2025, visa DAF' })
   };
-  const d = { fetchRows, drive, methodology: async () => LIB, audit: async () => ({}), findOrCreateFolder: async (p, n) => ({ id: p + '/' + n }), permissions: async () => ({ granted: true }), ...extra };
+  const d = { fetchRows, drive, sources:async()=>[], methodology: async () => LIB, audit: async () => ({}), findOrCreateFolder: async (p, n) => ({ id: p + '/' + n }), permissions: async () => ({ granted: true }), ...extra };
   return { t, d };
 }
 

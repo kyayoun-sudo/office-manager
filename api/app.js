@@ -249,6 +249,7 @@ export const ROUTES = Object.freeze({
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'workspace-brief') return (await import('../lib/procedure-workspace.js')).workspaceBrief(orgId,m,c,a);
       if (b.action === 'workbook-view') return (await import('../lib/procedure-workspace.js')).workbookView(orgId, m, c, b, a);
       if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);
       // What this test needs, the zones to deposit each document, and the e-mail for the missing ones (2026-10-19).

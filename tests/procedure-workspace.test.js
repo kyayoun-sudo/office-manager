@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { workbookView, askProcedure, executeProcedureActions } from '../lib/procedure-workspace.js';
+import { workbookView, askProcedure, executeProcedureActions, workBrief, workspaceBrief } from '../lib/procedure-workspace.js';
 
 async function fixture() {
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('CASH-01');
@@ -16,6 +16,7 @@ async function fixture() {
     workpaper: { file_id: 'AUTHORIZED' }, work: { items: [], wp_sync: {} } };
   const d = {
     view: async () => view,
+    sources: async () => [],
     drive: { getMeta: async id => { assert.equal(id, 'AUTHORIZED'); return { name: 'Mission.xlsx', modifiedTime: '2026-10-18T08:00:00Z' }; },
       downloadBuffer: async id => { assert.equal(id, 'AUTHORIZED'); downloads++; return buffer; } },
     permissions: async () => ({ granted: true }),
@@ -64,7 +65,7 @@ test('explanation stays read-only and action failures stop subsequent writes', a
   const explained = await askProcedure('org', 'mission', 'CASH-01', { message: 'Explique, ne modifie rien.' }, {}, {
     ...f.d, ai: async () => ({ text: JSON.stringify({ answer: 'Voici pourquoi on fait ce test.', actions: [] }) })
   });
-  assert.deepEqual(explained.outcomes, []); assert.equal(f.stats().downloads, 0);
+  assert.deepEqual(explained.outcomes, []); assert.equal(f.stats().downloads, 1);
   const outcomes = await executeProcedureActions('org', 'mission', 'CASH-01', [
     { type: 'prepare-observations' }, { type: 'write-workpaper' }
   ], 'Continue', {}, { ...f.d, tools: { writeWorkpaper: async () => { writes++; } } });
@@ -87,6 +88,39 @@ test('the Enhanced Auditor has one rule for working files, the same in its instr
   const f = await fixture(); let instructions = '';
   await askProcedure('org', 'mission', 'CASH-01', { message: 'Explique' }, {}, { ...f.d,
     ai: async (order, o) => { instructions = o.instructions; return { text: JSON.stringify({ answer: 'ok', actions: [] }) }; } });
-  assert.match(instructions, /seule écriture d'un working file permise/);
+  assert.match(instructions, /write-sop-preparation/);
   assert.match(instructions, /jamais une case remplie par une personne ni une formule/);
+});
+
+
+test('the upper conversation sees mission documents and sourced SOP work without inventing a sample requirement', async () => {
+  const f=await fixture(); f.view.line.sampling_mode='none';
+  f.view.work.walkthrough=[{kind:'sop-document-work',step:1,status:'draft',findings:[{fact:'Bailleur identifié',source:'Convention.pdf',quote:'Le bailleur est Banque Exemple.'}],questions:['Quelle période ?']}];
+  const sources=[{file_id:'DOC',name:'Convention.pdf'}];
+  await askProcedure('org','mission','CASH-01',{message:'Explique ce que nous faisons'}, {}, {...f.d,sources:async()=>sources});
+  const input=f.stats().input;
+  assert.equal(input.available_documents[0].file_id,'DOC');assert.equal(input.preparations[0].findings[0].source,'Convention.pdf');
+  assert.ok(input.workbook.sheets.length);
+  const b=workBrief(f.view,sources); assert.equal(b.received[0].name,'Convention.pdf');assert.equal(b.observed[0].quote,'Le bailleur est Banque Exemple.');
+  assert.equal(b.missing.some(x=>/Population|Sélection/.test(x)),false);
+});
+
+test('chat SOP actions reuse verified preparation and writing, never a browser-supplied plan', async () => {
+  const f=await fixture();let writes=0;
+  const d={...f.d,stepsView:async()=>({steps:[{n:1,text:'Lire la convention'}],runs:[]}),
+    prepareDocumentWork:async(o,m,c,step,b)=>{assert.equal(step.n,1);assert.equal(b.answer,'Continue');return {plan_id:'SERVER',ready:true,findings:[{fact:'Fact'}],questions:['Question'],unread:[]};},
+    runDocumentWork:async(o,m,c,b)=>{assert.equal(b.plan_id,'SERVER');writes++;return {verified:true,sheet:'Preparation',cells:0};}};
+  const r=await executeProcedureActions('org','mission','CASH-01',[{type:'prepare-sop-step'},{type:'write-sop-preparation',plan_id:'FORGED'}],'Continue',{},d);
+  assert.equal(r[0].excel_written,false);assert.equal(r[1].verified,true);assert.equal(writes,1);
+  const blocked=await executeProcedureActions('org','mission','CASH-01',[{type:'write-sop-preparation',plan_id:'FORGED'}],'Continue',{},d);
+  assert.equal(blocked[0].status,'blocked');assert.equal(writes,1);
+});
+
+
+test('the initial workspace brief loads authorized mission documents without calling AI or writing', async () => {
+  const f=await fixture();f.view.line.sampling_mode='none';
+  const r=await workspaceBrief('org','mission','CASH-01',{}, {...f.d,sources:async()=>[{file_id:'DOC',name:'Convention.pdf'}]});
+  assert.equal(r.brief.received[0].name,'Convention.pdf');assert.match(r.brief.received[0].reading,/Déposé/);
+  assert.equal(f.stats().aiCalls,0);assert.equal(f.stats().downloads,0);
+  await assert.rejects(workspaceBrief('org','mission','CASH-01',{}, {...f.d,view:async()=>{throw new Error('DENIED');}}),/DENIED/);
 });

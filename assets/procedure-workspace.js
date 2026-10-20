@@ -25,18 +25,20 @@
       host.appendChild(node('h3', title));
       (lines.length ? lines : ['Aucun élément documenté à ce stade.']).forEach(function (s) { host.appendChild(node('p', s)); });
     }
-    section('Ce que j’ai reçu', (b.population ? ['Population : ' + b.population] : []).concat((b.received || []).map(function (e) { return e.sample_id + ' : ' + (e.name || e.file_id); })));
-    section('Ce que j’ai vu', (b.observed || []).map(function (o) { return o.sample_id + ' : ' + o.observation; }));
+    section('Ce que j’ai reçu', (b.population ? ['Population : ' + b.population] : []).concat((b.received || []).map(function (e) { return (e.sample_id ? e.sample_id + ' : ' : '') + (e.name || e.file_id) + (e.reading ? ' · ' + e.reading : ''); })));
+    section('Ce que j’ai vu', (b.observed || []).map(function (o) { return (o.sample_id ? o.sample_id + ' : ' : '') + o.observation + (o.source ? '\nSource : ' + o.source : '') + (o.quote ? '\n« ' + o.quote + ' »' : ''); }));
     if (r.assessment) section('Mon avis provisoire', [r.assessment]);
-    var names = { 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon' };
+    var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon' };
     section('Ce que j’ai fait', (r.outcomes || []).map(function (o) {
       var label = names[o.action] || o.action;
       return label + (o.sample_id ? ' · ' + o.sample_id : '') + ' : ' +
         ({ done: 'réalisé', unchanged: 'travail existant conservé', blocked: 'non réalisé — ' + o.reason, 'needs-review': 'écriture à vérifier' }[o.status] || o.status) +
+        (o.sheet ? ' · feuille « ' + o.sheet + ' »' : '') +
+        (o.excel_written === false ? ' · préparation seulement, Excel non modifié' : '') +
         (o.cells != null ? ' · ' + o.cells + ' cellule(s) traitée(s)' : '') +
         ((o.conflicts || []).length ? ' · conflits : ' + o.conflicts.join(', ') : '');
     }));
-    section('Pour avancer', (b.missing || []).concat((b.observed || []).flatMap(function (o) { return (o.missing || []).map(function (s) { return o.sample_id + ' : ' + s; }); })).concat(r.next ? [r.next] : []));
+    section('Pour avancer', (b.missing || []).concat((b.observed || []).flatMap(function (o) { return (o.missing || []).map(function (s) { return (o.sample_id ? o.sample_id + ' : ' : '') + s; }); })).concat(r.next ? [r.next] : []));
   }
   function column(n) { var s = ''; for (; n; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; }
   function render(data) {
@@ -101,7 +103,7 @@
     $('audit-ask').requestSubmit();
   });
   $('audit-write').addEventListener('click', function () { $('wp-write').click(); });
-  $('audit-refresh').addEventListener('click', function () { refresh(book && book.sheet, book && book.start_row); });
+  $('audit-refresh').addEventListener('click', function () { refresh(book && book.sheet, book && book.start_row); post({action:'workspace-brief'}).then(brief).catch(function(e){$('audit-message').textContent=error(e);}); });
   $('audit-sheet').addEventListener('change', function () { refresh(this.value, 1); });
   $('audit-prev').addEventListener('click', function () { if (book) refresh(book.sheet, Math.max(1, book.start_row - 100)); });
   $('audit-more').addEventListener('click', function () { if (book) refresh(book.sheet, book.end_row + 1); });
@@ -109,12 +111,7 @@
     view = e.detail; $('procedure-workspace').hidden = false;
     $('audit-context').textContent = view.line.code + ' — ' + view.line.title + ' · préparateur : ' + (view.preparer || 'à affecter');
     $('audit-write').disabled = view.editable === false || ['submitted', 'reviewed'].includes(view.work.status) || !view.workpaper;
-    var items = view.work.items || [];
-    brief({ brief: { population: (view.work.population || {}).file_name,
-      received: items.flatMap(function (i) { return (i.evidence || []).map(function (e) { return { sample_id: i.sample_id, name: e.name, file_id: e.file_id }; }); }),
-      observed: items.filter(function (i) { return i.comment || i.ai; }).map(function (i) { return { sample_id: i.sample_id, observation: i.comment || i.ai.reason, missing: (i.ai || {}).missing || [] }; }),
-      missing: items.filter(function (i) { return !(i.evidence || []).length; }).map(function (i) { return 'Pièce de ' + i.sample_id; }) },
-      next: 'Dites-moi ce que vous souhaitez poursuivre, ajouter ou comprendre sur cette procédure.' });
+    post({action:'workspace-brief'}).then(brief).catch(function(e){ $('audit-message').textContent=error(e); });
     refresh();
   });
   window.addEventListener('procedure-written', function () { refresh(book && book.sheet, book && book.start_row); });

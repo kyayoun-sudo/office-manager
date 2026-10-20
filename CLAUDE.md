@@ -669,3 +669,5 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - Le SOP associé au cycle est relu s’il change ; les préparations antérieures sont conservées et signalées à revoir. Un brouillon obsolète est bloqué à l’écriture.
 - Limites : 6 pièces, 8 Mo/pièce, 12 000 caractères/pièce ; classeur 20 Mio maximum, macros refusées. La carte du classeur est bornée ; ce n’est pas un import intégral du GL. Si les étapes Excel et SOP diffèrent, aucune entrée du modèle n’est remplie : préparation sourcée seulement.
 - Tests : `tests/sop-document-work.test.js` ; aucune migration requise.
+
+- Conversation de procédure (2026-10-20) : le haut reçoit désormais les pièces de mission, la carte du classeur et les préparations sourcées ; actions `prepare-sop-step` puis `write-sop-preparation` réutilisent le même moteur. Aucun échantillon/population exigé pour mode none. Les pièces déposées sont distinguées des passages effectivement lus.
