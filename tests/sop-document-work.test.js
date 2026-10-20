@@ -110,3 +110,11 @@ test('incremental scan pages merge and a changed SOP blocks resuming old checkpo
   f.view.card.objective='SOP modifié';
   await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:p.read_job},{},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
 });
+
+
+test('a focused document read accepts only a source in this mission',async()=>{
+  const f=await fixture();
+  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,source_file_id:'OUTSIDE'},{},f.d),/DOCUMENT_SOURCE_CHANGED/);
+  const r=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,source_file_id:'DOC'},{},f.d);
+  assert.equal(r.total,1);assert.equal(r.read,1);
+});
