@@ -43,3 +43,15 @@ test('a document dropped in its zone goes into the mission pieces, is attached Â
   assert.deepEqual(seen, ['upload:GL_2025.xlsx', 'attach:R1:F1', 'read:F1']);
   assert.equal(r.status, 'to_confirm');
 });
+
+test('direct Drive uploads are checked before attaching; failed verification never registers a foreign file', async () => {
+  const seen = [];
+  const quick = { verifyReceivedPiece: async () => ({file_id:'F1',name:'verified.pdf'}),
+    piecesReceived: async () => {seen.push('read');return {};}};
+  const loop = {attachPiece:async(o,m,b)=>{seen.push(b.name);return {status:'to_confirm'};}};
+  await depositForNeed('org','M','ACH-01',{id:'R1',file_id:'F1',name:'FORGED'},{email:'a@x'}, {}, {quick,loop});
+  assert.deepEqual(seen,['verified.pdf','read']);
+  quick.verifyReceivedPiece=async()=>{throw new Error('PIECE_NOT_VERIFIED');};
+  await assert.rejects(depositForNeed('org','M','ACH-01',{id:'R1',file_id:'FOREIGN'},{email:'a@x'}, {}, {quick,loop}),/PIECE_NOT_VERIFIED/);
+  assert.equal(seen.length,2);
+});

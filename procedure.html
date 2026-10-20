@@ -100,6 +100,7 @@
       <div id="needs-aim"></div>
       <h3 style="margin:14px 0 6px;font-size:15px">Documents nécessaires</h3>
       <p class="meta">Déposez chaque document dans sa case (il va dans « Pièces reçues » de la mission, puis les agents le lisent). Pour ceux qui manquent, préparez la demande au client : elle part après validation par un manager.</p>
+      <p class="meta" id="needs-limits">Dépôt : 100 Mo maximum par fichier. Lecture automatique intégrale : limite actuelle de 8 Mo.</p>
       <div id="needs-list"></div>
       <div class="row" id="needs-mail" hidden style="margin-top:10px;align-items:center">
         <label for="needs-to" class="meta">Destinataire</label><select id="needs-to"></select>
@@ -179,6 +180,7 @@
 <script src="/assets/brand-theme.js"></script>
 <script src="/assets/screens.js"></script>
 <script src="/assets/procedure-workspace.js"></script>
+<script src="/assets/procedure-upload.js"></script>
 <script>
 (function () {
   var OM = window.OfficeManager, UI = window.OMScreens, $ = function (id) { return document.getElementById(id); }, el = UI.el;
@@ -436,11 +438,26 @@
         var f = document.createElement('input'); f.type = 'file'; f.setAttribute('aria-label', 'Déposer : ' + it.document);
         f.addEventListener('change', function () {
           var file = f.files[0]; if (!file) return;
-          if (file.size > 3 * 1024 * 1024) { $('needs-say').textContent = NERR.FILE_TOO_LARGE; return; }
+          if (file.size > window.ProcedureUpload.maxBytes) { $('needs-say').textContent = 'Fichier trop volumineux : 100 Mo maximum par document.'; return; }
+          f.disabled = true;
           $('needs-say').textContent = 'Dépôt de « ' + file.name + ' »…';
-          readB64(file).then(function (b64) { return post({ action: 'need-piece', id: it.id, name: file.name, base64: b64, mime: file.type || 'application/octet-stream' }); })
-            .then(function () { $('needs-say').textContent = '« ' + file.name + ' » déposé : les agents le lisent ; à confirmer par une personne.'; loadNeeds(); })
-            .catch(function (e) { $('needs-say').textContent = nmsg(e); });
+          var deposited = null;
+          window.ProcedureUpload.upload(file, {
+            small: function () { return readB64(file).then(function (b64) { return post({ action: 'need-piece', id: it.id, name: file.name, base64: b64, mime: file.type || 'application/octet-stream' }); }); },
+            start: function (details) { return OM.api('/api/app?route=mission-quick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'piece-start', mission_id: missionId }, details)) }); },
+            progress: function (percent) { $('needs-say').textContent = 'Dépôt de « ' + file.name + ' » : ' + percent + ' %'; }
+          }).then(function (r) {
+            if (file.size <= 3 * 1024 * 1024) return r;
+            deposited = r;
+            $('needs-say').textContent = 'Fichier envoyé ; vérification du dépôt…';
+            return post({ action: 'need-piece', id: it.id, file_id: r.file_id });
+          }).then(function (r) {
+            $('needs-say').textContent = '« ' + file.name + ' » déposé ; à confirmer par une personne. ' +
+              (file.size > 8000000 ? 'La lecture automatique intégrale de ce fichier dépasse la limite actuelle de 8 Mo.' : r.reading && r.reading.error ? 'Lecture non démarrée : ' + r.reading.error : 'Lecture demandée aux agents.');
+            loadNeeds();
+          }).catch(function (e) {
+            $('needs-say').textContent = deposited ? 'Fichier envoyé dans « Pièces reçues », mais rattachement non confirmé : ' + nmsg(e) + '. Ne le renvoyez pas.' : 'Dépôt non confirmé : ' + nmsg(e);
+          }).then(function () { f.disabled = false; });
         });
         tools.appendChild(f);
       }

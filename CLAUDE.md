@@ -1,5 +1,7 @@
 # Office Manager AI — à lire avant toute modification
 
+Dépôt des pièces depuis Ma procédure (2026-10-20) : 100 Mio maximum par document. Jusqu'à 3 Mio, route existante en base64 ; au-delà, session Drive `mission-quick/piece-start`, envoi direct par blocs de 8 Mio (`assets/procedure-upload.js`), puis rattachement PBC après vérification serveur du parent PIECES_RECUES et de la taille. La CSP autorise uniquement www.googleapis.com en plus de self. Ce dépôt ne lève pas la limite de lecture documentaire (8 000 000 octets), annoncée séparément dans l'interface. Aucun jeton OAuth n'est envoyé au navigateur.
+
 Correction du lecteur SOP SYCEBNL (2026-10-19) : les « Références techniques » en tête d'une fiche ne terminent plus la lecture lorsque des sections d'exécution suivent. Une bibliographie terminale et la conclusion du cycle restent exclues. Vérifié sur les 8 SOP SYCEBNL : 101/101 procédures retrouvent leurs étapes et demandes ; les 20 SOP d'audit général donnent exactement le même résultat qu'avant. Relire la bibliothèque depuis Méthodologie après déploiement pour reconstruire les fiches déjà enregistrées. Cela ne change pas le modèle Excel associé à une mission ni les choix déjà validés dans son programme.
 
 **Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.

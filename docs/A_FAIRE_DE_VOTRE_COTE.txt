@@ -183,6 +183,12 @@ Ensuite, pour une mission (programme de travail validé, période renseignée da
 
 RAPPELS QUI EXISTAIENT DÉJÀ (avant cette session)
 
+DÉPÔT DE DOCUMENTS JUSQU'À 100 MO (2026-10-20)
+[ ] Dans Ma procédure → Documents nécessaires, sélectionner à nouveau le fichier de plus de 3 Mo.
+    Le transfert démarre directement vers Drive ; suivre le pourcentage puis la vérification du dépôt.
+    Le document doit passer à « Pièce à confirmer ». Ne pas utiliser « Envoyer le mail » pour le déposer.
+    Au-delà de 8 Mo, le dépôt est possible mais la lecture automatique intégrale reste limitée ; l'écran le précise.
+
 LECTURE DES SOP SYCEBNL — correction du 19/10/2026
 [ ] Après disponibilité de la Preview corrigée : menu Méthodologie → conserver le lien du dossier déjà renseigné
     → « Lire les SOP » → attendre la fin de la lecture. Les anciennes fiches doivent être reconstruites.
