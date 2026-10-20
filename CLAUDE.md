@@ -677,3 +677,5 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - `sop-pdf-reading.js` : jusqu’à 64 pages natives et 24 pages scannées (groupes de 3, concurrence 2), 60 000 caractères par pièce SOP ; extrait et pages manquantes signalés. OCR non vérifié. Téléchargement direct Drive, jamais transit du PDF par le navigateur/API Vercel en upload.
 - Les citations OCR sont des propositions à relire. Avant écriture, empreinte binaire de la source contrôlée sans relancer une transcription non déterministe. Cache OCR limité au passage courant.
 - Tests `sop-pdf-reading.test.js` : vrai PDF >8 Mo, clause page 7, provenance OCR et recontrôle des octets.
+
+- Lecture SOP incrémentale : une pièce / 6 pages OCR par requête, reprise automatique du bouton Préparer et de la conversation. Checkpoint temporaire `sop-reading-job` dans la procédure autorisée, retiré à la fin ; révision SOP contrôlée à la reprise. Empreinte Drive identique réutilise la transcription des doublons.

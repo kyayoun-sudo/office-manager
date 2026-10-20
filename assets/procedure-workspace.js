@@ -75,6 +75,19 @@
       .then(function (r) { if (request === sequence) render(r); })
       .catch(function (e) { if (request === sequence) { book = null; $('audit-file-status').textContent = error(e); } });
   }
+  async function completeSopReading(outcome) {
+    var plan=outcome.pending_sop;
+    while(plan.pending){
+      $('audit-message').textContent='Lecture des pièces : '+plan.read+' / '+plan.total+'…';
+      plan=await post({action:'step-plan',step:plan.step.n,operation:'document-review',incremental:true,read_job:plan.read_job});
+    }
+    var receipt=null;
+    if(outcome.write_requested && plan.ready)receipt=await post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}});
+    bubble('assistant',(plan.understood||'Préparation terminée.')+'\n'+(plan.findings||[]).map(function(f){return f.fact+'\nSource : '+f.source+' — « '+f.quote+' »';}).join('\n\n')+'\n'+(receipt && receipt.verified?'Préparation inscrite et vérifiée dans Excel, feuille '+receipt.sheet+'.':'Préparation uniquement ; aucune écriture Excel.')+'\n'+(plan.questions||[]).join('\n'));
+    brief(await post({action:'workspace-brief'}));
+    if(receipt)refresh(book && book.sheet,book && book.start_row);
+    $('audit-message').textContent='';
+  }
   $('audit-ask').addEventListener('submit', function (e) {
     e.preventDefault(); if (!view || $('audit-send').disabled) return;
     var message = $('audit-question').value.trim(); if (!message) return;
@@ -87,6 +100,7 @@
         if ((r.outcomes || []).length) refresh(book && book.sheet, book && book.start_row);
         if ($('audit-question').value.trim() === message) $('audit-question').value = '';
         $('audit-message').textContent = '';
+        var pending=(r.outcomes||[]).find(function(o){return o.pending_sop;});if(pending)return completeSopReading(pending);
       }).catch(function (err) { $('audit-message').textContent = error(err); })
       .then(function () { $('audit-send').disabled = false; });
   });

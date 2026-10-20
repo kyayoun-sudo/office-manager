@@ -510,6 +510,8 @@
     box.appendChild(go); box.appendChild(out); host.appendChild(box);
   }
   function documentPlanBox(step,plan,host) {
+    if(plan.pending){host.textContent='Lecture des pièces : '+plan.read+' / '+plan.total+'. La préparation reprend automatiquement.';post({action:'step-plan',step:step.n,operation:'document-review',incremental:true,read_job:plan.read_job}).then(function(r){host.textContent='';documentPlanBox(step,r,host);}).catch(function(e){$('steps-say').textContent=smsg(e);});return;}
+
     (plan.reading||[]).forEach(function(r){host.appendChild(el('p',r.name+' : '+(r.pages_read||[]).length+' page(s) lue(s)'+(r.total_pages?' sur '+r.total_pages:'')+(r.ocr?' · transcription visuelle automatique à vérifier':'')+(r.partial?' · lecture partielle':''),'meta'));});
     var box=el('div',null,'note');
     box.appendChild(el('strong','Préparation documentaire selon le SOP courant'));
@@ -527,7 +529,7 @@
     var answer=el('textarea');answer.setAttribute('aria-label','Votre précision pour cette étape');answer.placeholder='Votre précision ou votre question';box.appendChild(answer);
     var again=el('button','Compléter la préparation','btn ghost');again.type='button';
     again.addEventListener('click',function(){again.disabled=true;$('steps-say').textContent='Lecture du SOP et des pièces…';
-      post({action:'step-plan',step:step.n,operation:'document-review',answer:answer.value}).then(function(r){$('steps-say').textContent='';host.textContent='';documentPlanBox(step,r,host);})
+      post({action:'step-plan',incremental:true,step:step.n,operation:'document-review',answer:answer.value}).then(function(r){$('steps-say').textContent='';host.textContent='';documentPlanBox(step,r,host);})
         .catch(function(e){$('steps-say').textContent=smsg(e);}).then(function(){again.disabled=false;});});box.appendChild(again);
     var go=el('button','Inscrire la préparation sourcée dans Excel','btn');go.type='button';go.disabled=!plan.ready;
     go.addEventListener('click',function(){go.disabled=true;$('steps-say').textContent='Écriture puis relecture du fichier…';
@@ -552,7 +554,7 @@
         var b = el('button', done.length ? 'Refaire' : '▶ Préparer', 'btn ghost'); b.type = 'button';
         b.addEventListener('click', function () {
           b.disabled = true; $('steps-say').textContent = 'L’Enhanced Auditor lit l’étape ' + st.n + '…';
-          post({ action: 'step-plan', step: st.n, text: st.text }).then(function (plan) { $('steps-say').textContent = ''; planBox(st, plan, host); })
+          post({ action: 'step-plan', incremental:true, step: st.n, text: st.text }).then(function (plan) { $('steps-say').textContent = ''; planBox(st, plan, host); })
             .catch(function (e) { $('steps-say').textContent = smsg(e); }).then(function () { b.disabled = false; });
         });
         tools.appendChild(b);

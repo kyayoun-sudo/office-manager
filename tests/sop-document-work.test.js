@@ -86,3 +86,27 @@ test('a changed Word source is reread from the programme-selected SOP, not anoth
   const card=await currentProcedure(state,'PRJ-01','RIGHT',{drive:{getMeta:async()=>({modifiedTime:'v2'}),downloadBuffer:async id=>{assert.equal(id,'RIGHT');return buffer;}}});
   assert.equal(card.objective,'New');assert.equal(card.steps[0].text,'Lire la clause nouvelle.');
 });
+
+
+test('incremental reading checkpoints one document before analysis, resumes and removes temporary content',async()=>{
+  const f=await fixture();
+  const first=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true},{},f.d);
+  assert.equal(first.pending,true);assert.equal(first.read,1);assert.equal(f.aiCalls(),0);assert.equal(f.updates(),0);
+  assert.equal(f.view.work.walkthrough[0].kind,'sop-reading-job');
+  const final=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:first.read_job},{},f.d);
+  assert.equal(final.ready,true);assert.equal(f.aiCalls(),1);
+  assert.equal(f.view.work.walkthrough.some(r=>r.kind==='sop-reading-job'),false);
+  assert.equal('text' in f.view.work.walkthrough[0].sources[0],false);
+});
+
+test('incremental scan pages merge and a changed SOP blocks resuming old checkpoints',async()=>{
+  const f=await fixture();let offset=[];
+  f.d.drive.readText=async(id,o)=>{offset.push(o.ocrOffset);return {text:'Le bailleur du projet est la Banque Exemple.',sections:[{text:o.ocrOffset?'Annexe sur les obligations de reporting.':'Le bailleur du projet est la Banque Exemple.',source:{page:o.ocrOffset?7:1,method:'ocr'}}],total_pages:7,pages_read:[o.ocrOffset?7:1],ocr_pages:[1],ocr_remaining:!o.ocrOffset,truncated:true};};
+  let p=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true},{},f.d);
+  assert.equal(p.read,0);
+  p=await prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:p.read_job},{},f.d);
+  assert.equal(p.read,1);assert.deepEqual(offset,[0,6]);
+  assert.deepEqual(f.view.work.walkthrough[0].docs[0].pages_read,[1,7]);
+  f.view.card.objective='SOP modifié';
+  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{incremental:true,read_job:p.read_job},{},f.d),/SOP_CHANGED_PREPARE_AGAIN/);
+});
