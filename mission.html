@@ -346,6 +346,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var params = new URLSearchParams(location.search);
   var missionId = params.get('id');
+  var livePbcCount = null;
   if (missionId && document.getElementById('wf-link')) document.getElementById('wf-link').href = '/dossiers.html?mission_id=' + encodeURIComponent(missionId);
   // The current step of the firm's workflow (point 1): what, who, since when; the outcome is recorded on the dossier.
   if (missionId) OM.api('/api/app?route=workflow&mission_id=' + encodeURIComponent(missionId)).then(function (r) {
@@ -431,7 +432,7 @@
       st.moves.forEach(function (x) { var o = el('option', x.label); o.value = x.key; sel.appendChild(o); });
     }
     var s = d.summary || {};
-    $('k-docs').textContent = s.documents_total; $('k-pbc').textContent = (d.pbc || []).length;
+    $('k-docs').textContent = s.documents_total; $('k-pbc').textContent = livePbcCount === null ? (d.pbc || []).length : livePbcCount;
     $('k-team').textContent = s.team_size; $('k-act').textContent = s.open_actions;
     $('k-time').textContent = d.time_budget ? d.time_budget.planned_days + ' j' : '–';
 
@@ -1006,6 +1007,7 @@
     OM.api('/api/app?route=pbc&mission_id=' + encodeURIComponent(missionId)).then(function (v) {
       var box = $('pl-list'); box.textContent = '';
       if (!v.sql_installed) { $('pl-sum').textContent = PERR.PBC_SQL_NOT_INSTALLED; return; }
+      livePbcCount = v.summary.total; $('k-pbc').textContent = livePbcCount;
       if (!keepSay) $('pl-sum').textContent = v.items.length ? v.summary.total + ' pièce(s) : ' + v.summary.missing + ' à demander, ' + v.summary.waiting + ' en attente du client, ' + v.summary.to_confirm + ' à contrôler ou confirmer, ' + v.summary.accepted + ' reçue(s) et confirmée(s).' : 'Aucune pièce attendue enregistrée : commencez par « Préparer les besoins ».';
       v.items.forEach(function (r) {
         var it = el('div', null, 'item'), t = el('div', null, 't');

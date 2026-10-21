@@ -263,3 +263,6 @@ Le classement respecte les permissions de rangement existantes : il peut rester 
 Un rapprochement PBC reste à confirmer ; aucune conclusion d'audit ni sign-off automatique.
 Les documents partiellement lus restent explicitement partiels : cette correction ne prouve
 pas à elle seule une lecture exhaustive de tous les scans ou de tous les PDF volumineux.
+Le compteur PBC de la mission lit le registre PBC actuel, comme l'onglet Documents et PBC.
+Les anciennes confirmations humaines et leurs associations restent à revoir par une personne
+si elles sont erronées (exemple constaté : conditions générales associées au budget).

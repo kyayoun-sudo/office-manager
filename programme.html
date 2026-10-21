@@ -105,7 +105,7 @@
 
     <section class="card" aria-labelledby="h-wps" id="wps-card" hidden>
       <h2 id="h-wps">Working Papers des cycles</h2>
-      <p class="meta">Un fichier Excel par cycle, dans le dossier des Working Papers de la mission : page de garde, un onglet par procédure du programme (fiche du SOP, étapes, colonnes, lignes d’échantillon, conclusion). Un fichier qui existe déjà n’est jamais écrasé.</p>
+      <p class="meta">Les Working Files sont copiés depuis les modèles du cabinet et conservent leur structure. Les tests actifs doivent être identifiés dans le modèle. Sans modèle adapté, la préparation attend ; aucun classeur générique n’est créé. Les anciens fichiers sont conservés.</p>
       <div class="row"><button class="btn ghost" id="make-wps" type="button">Créer les Working Papers manquants</button><span class="status" id="wp-say" role="status" aria-live="polite"></span></div>
       <div id="wps"></div>
     </section>
@@ -284,7 +284,7 @@
     CABINET_MODEL_REQUIRED:'modèle du cabinet requis ; aucun classeur générique créé', MODEL_INCOMPLETE:'modèle incomplet pour les tests actifs', MODEL_COPY_REVIEW_REQUIRED:'copie existante à identifier', MODEL_REPLACEMENT_REQUIRES_REVIEW:'travaux soumis ou revus : rattachement à contrôler', NO_MODEL_FOR_CYCLE:'aucun modèle ne couvre ce cycle', AMBIGUOUS:'plusieurs modèles possibles', CREATED_FROM_MODEL: 'copié depuis le Working File modèle du cabinet', WAITING_MODELS_FOLDER: 'en attente : l’Enhanced Auditor a demandé où sont les Working Files modèles du cabinet' };
   var MODEL_NOTE = { NO_MODEL_FOR_CYCLE: 'aucun modèle du cabinet ne contient les tests de ce cycle', AMBIGUOUS: 'plusieurs modèles possibles : aucun choisi au hasard', NO_FIRM_MODELS: 'le cabinet n’a pas de modèles', MODEL_COPY_FAILED: 'la copie du modèle a échoué' };
   function makeWps() {
-    $('wp-say').textContent = 'Création des Working Papers…';
+    $('wp-say').textContent = 'Vérification des modèles et préparation des copies manquantes…';
     return post({ action: 'workpapers', mission_id: missionId }).then(function (r) {
       $('wp-say').textContent = 'Dossier : ' + (r.folder.name || 'collé dans le programme') + '.'; paintWps(r.workpapers); load(true);
     }).catch(function (e) { $('wp-say').textContent = WP_ERR[e.code] || ('Impossible : ' + msg(e)); });
