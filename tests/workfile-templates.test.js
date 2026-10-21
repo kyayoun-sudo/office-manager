@@ -63,6 +63,15 @@ function world() {
   return { files, copies, patches, d: { fetchRows, drive, methodology: async () => ({ sops: [] }), firmName: 'C', audit: async () => null } };
 }
 
+test('readable connector content can identify every active code when binary download is unavailable; read errors are not missing models', async () => {
+  const w=world();w.files.M1='ACH-01 ACH-03';w.d.drive.downloadBuffer=async()=>{throw new Error('BINARY_READ_UNAVAILABLE');};
+  const deps={...w.d,templatesFolder:async()=>({status:'KNOWN',folder_id:'MODELS'}),listTemplateFiles:async()=>[{id:'M1',name:'Modele.xlsx'}]};
+  const out=await prepareCycleWorkpapers('org','m1',null,deps);
+  assert.equal(out.workpapers[0].status,'CREATED_FROM_MODEL');assert.equal(w.copies.length,1);
+  const broken=await pickTemplate(cycle,[{id:'M1',name:'Modele.xlsx'}],async()=>{throw new Error('CONNECTOR_UNAVAILABLE');});
+  assert.equal(broken.status,'MODEL_READ_FAILED');assert.equal(broken.error,'CONNECTOR_UNAVAILABLE');
+});
+
 test('with the models folder known, the cycle gets a COPY of the firm’s model; while asked, it waits; with none, no invented file', async () => {
   const w = world(); w.files.M1 = 'ACH-01 ACH-03 achats';
   const r = await prepareCycleWorkpapers('org', 'm1', { email: 'a@x' }, { ...w.d, templatesFolder: async () => ({ status: 'KNOWN', folder_id: 'MODELS' }), listTemplateFiles: async () => [{ id: 'M1', name: 'Modele.xlsx' }] });
