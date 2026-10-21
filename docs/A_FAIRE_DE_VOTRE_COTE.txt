@@ -271,3 +271,5 @@ avec couverture de tous les codes actifs. Un échec de lecture est distinct d'un
 Cause reproduite sur le vrai NL-T01_PRJ : ExcelJS échoue sur .text d'une cellule fusionnée vide.
 Le lecteur de modèles ignore ces seules cellules sans valeur ; 30 feuilles et 14 codes PRJ
 ont été contrôlés sur la copie du cabinet, sans modification du classeur.
+Le contexte partagé utilise le programme validé en vigueur ; un brouillon plus récent
+ne remplace pas silencieusement le programme qui guide les travaux et les fichiers Excel.

@@ -28,6 +28,14 @@ function world() {
   const d={drive,tidyDrive:tidy,folder:'central',fetchRows,acquireLease:async(o,scope)=>acquireOfflineReaderLease({org:o,...scope})};
   return {store,add,drive,tidy,mission,events,d};
 }
+
+test('a newer draft never replaces the validated programme and its working-file links in shared context',async()=>{
+  const w=world(),base=w.d.fetchRows;
+  const versions=[{id:'draft',version:3,status:'draft',workpapers:[]},{id:'active',version:2,status:'validated',workpapers:[{file_id:'real-cabinet-copy'}]}];
+  w.d.fetchRows=async(path,o)=>path.startsWith('office_work_programmes')?versions.filter(p=>!path.includes('status=eq.validated')||p.status==='validated').slice(0,1):base(path,o);
+  const out=await syncMissionSharedMemory(O,M,w.d);
+  assert.equal(out.memory.snapshot.programme.id,'active');assert.equal(out.memory.snapshot.programme.workpapers[0].file_id,'real-cabinet-copy');
+});
 test('one shared cache and one log persist signed facts, full inventory, period and programme; no file per agent/pass',async()=>{
   const w=world();w.events.push({seq:1,actor:'enhanced-auditor',operation:'UPDATE'});
   const first=await syncMissionSharedMemory(O,M,w.d);assert.equal(first.status,'synced');
