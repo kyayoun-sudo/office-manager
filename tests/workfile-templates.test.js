@@ -63,7 +63,7 @@ function world() {
   return { files, copies, patches, d: { fetchRows, drive, methodology: async () => ({ sops: [] }), firmName: 'C', audit: async () => null } };
 }
 
-test('with the models folder known, the cycle gets a COPY of the firm’s model; while asked, it waits; with none, the base file', async () => {
+test('with the models folder known, the cycle gets a COPY of the firm’s model; while asked, it waits; with none, no invented file', async () => {
   const w = world(); w.files.M1 = 'ACH-01 ACH-03 achats';
   const r = await prepareCycleWorkpapers('org', 'm1', { email: 'a@x' }, { ...w.d, templatesFolder: async () => ({ status: 'KNOWN', folder_id: 'MODELS' }), listTemplateFiles: async () => [{ id: 'M1', name: 'Modele.xlsx' }] });
   assert.equal(r.workpapers[0].status, 'CREATED_FROM_MODEL'); assert.equal(w.copies[0].id, 'M1'); assert.equal(r.workpapers[0].model.id, 'M1');
@@ -72,5 +72,5 @@ test('with the models folder known, the cycle gets a COPY of the firm’s model;
   assert.equal(waiting.workpapers[0].status, 'WAITING_MODELS_FOLDER'); assert.equal(w2.copies.length, 0);
   const w3 = world();
   const none = await prepareCycleWorkpapers('org', 'm1', null, { ...w3.d, templatesFolder: async () => ({ status: 'NONE' }) });
-  assert.equal(none.workpapers[0].status, 'CREATED'); assert.equal(none.workpapers[0].model_note, 'NO_FIRM_MODELS');
+  assert.equal(none.workpapers[0].status, 'CABINET_MODEL_REQUIRED'); assert.equal(none.workpapers[0].file_id,undefined);
 });

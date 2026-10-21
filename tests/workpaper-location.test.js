@@ -17,13 +17,14 @@ test('no « Working Papers » folder under the mission: one is created there, in
   await assert.rejects(findWorkpapersFolder({}, { materiality: {} }, drive), /MISSION_FOLDER_NOT_KNOWN/);
 });
 
-test('a cycle with no working paper recorded gets one prepared, then the programme is read again', async () => {
-  let prepared = 0;
-  const programme = { id: 'p1', workpapers: [] };
-  const fetchRows = async () => [{ id: 'p1', workpapers: [{ cycle_code: 'C02_ACH', file_id: 'F1', status: 'CREATED' }] }];
-  const r = await ensureCycleWorkpaper('org', 'm1', programme, 'C02_ACH', { email: 'a@x' }, { fetchRows, prepare: async () => { prepared++; return { folder: { id: 'WP' } }; } });
-  assert.equal(prepared, 1); assert.equal(r.workpaper.file_id, 'F1');
-  // Already recorded: nothing is prepared again.
-  const again = await ensureCycleWorkpaper('org', 'm1', { id: 'p1', workpapers: [{ cycle_code: 'C02_ACH', file_id: 'F1' }] }, 'C02_ACH', null, { fetchRows, prepare: async () => { prepared++; } });
-  assert.equal(prepared, 1); assert.equal(again.workpaper.file_id, 'F1');
+test('a missing working paper is prepared only from a proven cabinet model; a legacy generic association does not count',async()=>{
+  let prepared=0;const cycle={cycle_code:'C02_ACH',procedures:[{code:'ACH-01',active:true}]};
+  const wp={cycle_code:'C02_ACH',file_id:'F1',status:'CREATED_FROM_MODEL',model:{id:'MODEL'},programme_version:1,active_codes:['ACH-01']};
+  const fresh={id:'p1',version:1,cycles:[cycle],workpapers:[wp]};
+  const fetchRows=async()=>[fresh];
+  const r=await ensureCycleWorkpaper('org','m1',{...fresh,workpapers:[]},'C02_ACH',null,{fetchRows,prepare:async()=>{prepared++;return {folder:{id:'WP'}};}});
+  assert.equal(prepared,1);assert.equal(r.workpaper.file_id,'F1');
+  await ensureCycleWorkpaper('org','m1',fresh,'C02_ACH',null,{fetchRows,prepare:async()=>{prepared++;}});assert.equal(prepared,1);
+  const legacy={...fresh,workpapers:[{cycle_code:'C02_ACH',file_id:'OLD',status:'CREATED'}]};
+  const blocked=await ensureCycleWorkpaper('org','m1',legacy,'C02_ACH',null,{fetchRows:async()=>[legacy],prepare:async()=>({workpapers:[{cycle_code:'C02_ACH',status:'CABINET_MODEL_REQUIRED'}]})});assert.equal(blocked.workpaper,null);assert.equal(blocked.error,'CABINET_MODEL_REQUIRED');
 });

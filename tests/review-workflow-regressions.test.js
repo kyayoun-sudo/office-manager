@@ -19,7 +19,7 @@ async function world(count = 15) {
   const files = new Map([['WP', { name: 'WP_ACH_Achats_Audit.xlsx', parent: 'WP_FOLDER_123456789012345', buf: await buildCycleWorkpaper({ mission: { id: M, name: 'Audit' }, programme, cycle, procedures: cycle.procedures }), mt: 'm0' }]]); let n = 0;
   const fetchRows = async (path, o = {}) => {
     if (path.startsWith('office_work_programmes')) { if (o.method === 'PATCH') Object.assign(programme, JSON.parse(o.body)); return [programme]; }
-    if (path.startsWith('office_procedure_work')) { if (o.method === 'PATCH') Object.assign(work, JSON.parse(o.body)); return [work]; }
+    if (path.startsWith('office_procedure_work')) { if(path.includes('status=in.(submitted,reviewed)'))return ['submitted','reviewed'].includes(work.status)?[work]:[]; if (o.method === 'PATCH') Object.assign(work, JSON.parse(o.body)); return [work]; }
     if (path.startsWith('office_missions')) return [{ id: M, name: 'Audit' }];
     if (path.startsWith('office_mission_assignments')) return [{ staff_profile_id: 'a', status: 'active' }, { staff_profile_id: 'm', status: 'active' }];
     if (path.startsWith('office_staff_profiles')) return [{ id: 'a', email: ali.email }, { id: 'm', email: mia.email }];
@@ -84,11 +84,17 @@ test('signoff rejects missing files, unsynced work and conflicting writes; curre
   assert.equal((await R.signOff('org',M,'ACH-01',mia,d)).all_signed,true);
 });
 
+async function useCabinetModel(w) {
+  const wb=new ExcelJS.Workbook();wb.addWorksheet('ACH-01').getCell('A1').value='MODELE CABINET';wb.addWorksheet('ACH-02').getCell('A1').value='ZONE DU MODELE';
+  w.files.set('MODEL',{name:'Cabinet_Achats.xlsx',parent:'MODELS',buf:Buffer.from(await wb.xlsx.writeBuffer()),mt:'model-v1'});
+  w.d.templatesFolder=async()=>({status:'KNOWN',folder_id:'MODELS'});w.d.listTemplateFiles=async()=>[{id:'MODEL',name:'Cabinet_Achats.xlsx'}];
+  w.d.drive.copyFile=async(id,name,parent)=>{const key='copied'+w.files.size;w.files.set(key,{name,parent,buf:Buffer.from(w.files.get(id).buf),mt:'copy'});return {id:key};};
+}
 test('new programme versions receive new workbooks without overwriting the previous version', async () => {
-  const { programme, files, d } = await world();programme.id='p2';programme.version=2;programme.workpapers=[];
+  const w=await world();await useCabinetModel(w);const {programme,files,d}=w;programme.id='p2';programme.version=2;programme.workpapers=[];
   programme.cycles[0].procedures.push({code:'ACH-02',active:true});
   const r=await prepareCycleWorkpapers('org',M,mia,d);
-  assert.equal(r.workpapers[0].status,'CREATED');assert.match(r.workpapers[0].name,/_v2\.xlsx$/);
+  assert.equal(r.workpapers[0].status,'CREATED_FROM_MODEL');assert.match(r.workpapers[0].name,/_v2\.xlsx$/);
   assert.ok(files.has('WP'));
   const wb=new ExcelJS.Workbook();await wb.xlsx.load(files.get(r.workpapers[0].file_id).buf);assert.ok(wb.getWorksheet('ACH-02'));
   assert.equal((await prepareCycleWorkpapers('org',M,mia,d)).workpapers[0].status,'ALREADY_EXISTS');
@@ -133,8 +139,8 @@ test('editing the Excel after completed review invalidates it and returns the pr
 });
 
 test('legacy workbook associations pointing to an older programme are replaced by a separate version', async () => {
-  const {programme,files,d}=await world();programme.version=2;programme.id='p2';programme.workpapers[0].name='WP_ACH_Achats_Audit.xlsx';
+  const w=await world();await useCabinetModel(w);const {programme,files,d}=w;programme.version=2;programme.id='p2';programme.workpapers[0].name='WP_ACH_Achats_Audit.xlsx';
   const old=Buffer.from(files.get('WP').buf);
   const result=await prepareCycleWorkpapers('org',M,mia,d);
-  assert.equal(result.workpapers[0].status,'CREATED');assert.match(result.workpapers[0].name,/_v2\.xlsx$/);assert.ok(files.get('WP').buf.equals(old));
+  assert.equal(result.workpapers[0].status,'CREATED_FROM_MODEL');assert.equal(result.workpapers[0].previous_file_id,'WP');assert.match(result.workpapers[0].name,/_v2\.xlsx$/);assert.ok(files.get('WP').buf.equals(old));
 });

@@ -151,6 +151,7 @@ function fakeDrive(files = {}) {
   return {
     store,
     getMeta: async id => store[id] || null,
+    listChildren: async id => Object.values(store).filter(f=>(f.parents || []).includes(id)),
     findFilesByExactName: async (name, parent) => Object.values(store).filter(f => f.name === name && (f.parents || []).includes(parent)),
     createBinary: async ({ name, parentId }) => { const id = 'FileCreated' + (++n).toString().padStart(10, '0'); store[id] = { id, name, parents: [parentId], mimeType: 'application/pdf', webViewLink: 'https://drive/' + id }; return store[id]; }
   };
@@ -171,7 +172,7 @@ test('the Mission Controller creates the mission folder under the firm’s missi
   await createMissionQuick(ORG, { request_id: RID, name: 'Audit des comptes', client: 'BLE TRANSIT', period: '2025' }, auditor, deps(db));
   const r = await createMissionFolder(ORG, db.missions[0], { fetchRows: db.fetchRows, drive, tidy: fakeTidy(drive), documentReferences: rootRef });
   assert.equal(r.status, 'created');
-  assert.equal(drive.store[r.id].parents[0], ROOT);
+  const parent=drive.store[drive.store[r.id].parents[0]];assert.match(parent.name,/^20\d{2}$/);assert.equal(drive.store[parent.parents[0]].name,'BLE TRANSIT');assert.equal(drive.store[parent.parents[0]].parents[0],ROOT);
   assert.equal(db.missions[0].drive_folder_id, r.id);
   // No root configured: the person is told where to set it, nothing invented.
   const none = await createMissionFolder(ORG, { id: RID, name: 'X' }, { fetchRows: db.fetchRows, drive, tidy: fakeTidy(drive), documentReferences: async () => [] });

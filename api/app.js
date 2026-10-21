@@ -1,3 +1,4 @@
+import { withOperationActor } from '../lib/operation-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
 import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
@@ -825,6 +826,14 @@ export const ROUTES = Object.freeze({
       if (b.action === 'create') return m.createMissionQuick(orgId, b, req.account, { req });
       // Everything below acts on one mission: the person must be on it (owner / partner: all).
       if (['prepare', 'piece', 'piece-start', 'pieces-done', 'tests-start'].includes(b.action)) await requireMissionAccess(orgId, String(b.mission_id || ''), req.account);
+      if (b.action === 'memory-sync') {
+        await requireMissionAccess(orgId,String(b.mission_id || ''),req.account);
+        return m.syncSharedMissionMemory(orgId,req,String(b.mission_id || ''));
+      }
+      if (b.action === 'reconcile-documents') {
+        await requireMissionAccess(orgId,String(b.mission_id || ''),req.account);
+        return m.reconcileMissionDocuments(orgId,req,String(b.mission_id || ''),req.account);
+      }
       if (b.action === 'prepare') return m.prepareDirectMission(orgId, req, String(b.mission_id || ''), req.account);
       if (b.action === 'piece') return m.uploadPiece(orgId, b, req.account);
       if (b.action === 'piece-start') return m.startPieceUpload(orgId, b, req.account, req);
@@ -871,7 +880,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'WORKFLOW_UNAVAILABLE'
   },
   // Background step of the Mission Controller: the structure of a directly created mission from the firm's model.
-  'mission-quick-step': { POST: async (orgId, req) => (await import('../lib/mission-quick.js')).directWorkspaceStep(orgId, req.body || {}), unavailable: 'MISSION_UNAVAILABLE' },
+  'mission-quick-step': { POST: async (orgId, req) => { const m=await import('../lib/mission-quick.js'); return req.body?.kind==='mission-memory-sync'?m.syncSharedMissionMemory(orgId,req,String(req.body.mission_id || '')):m.directWorkspaceStep(orgId,req.body || {}); }, unavailable: 'MISSION_UNAVAILABLE' },
   // Client contacts of a mission: found by the agents (proposed), validated by a manager.
   'mission-client-contacts': {
     POST: users(MANAGERS, (orgId, req) => {
@@ -884,7 +893,7 @@ export const ROUTES = Object.freeze({
     unavailable: 'MISSION_UNAVAILABLE'
   },
   // Information added to a mission by a person (agents use their tool).
-  'mission-fact': { POST: users(ALL_ROLES, (orgId, req) => addFact(String(req.body?.mission_id || ''), { ...(req.body || {}), agent: who(req) })), unavailable: 'MISSION_UNAVAILABLE' },
+  'mission-fact': { POST: users(ALL_ROLES, async (orgId, req) => { const mid=String(req.body?.mission_id || ''); await requireMissionAccess(orgId,mid,req.account); return addFact(mid,{...(req.body || {}),agent:who(req)},{orgId}); }), unavailable: 'MISSION_UNAVAILABLE' },
   // Writing to the client from a mission: purpose, suggested recipients, AI draft, validation.
   'mission-write': {
     POST: users(ALL_ROLES, (orgId, req) => {
@@ -1103,7 +1112,7 @@ export async function handleApp(req) {
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await loadGoogleConnection(orgId).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
-  const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => run(orgId, req)));
+  const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => withOperationActor({orgId,actor:req.account?.email || 'office-manager-system',kind:req.account?'human':'system'},()=>run(orgId, req))));
   if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, invoke);
   return invoke();
 }

@@ -240,3 +240,26 @@ Paramètres > Admin > AI & Specialists > Specialist Registry : créer Mock Speci
 Garder approbation obligatoire : Tester > approuver l’appel > exécuter le test approuvé. Vérifier le résultat simulé et le journal. Désactiver pour couper tout nouvel appel.
 La page nécessite une session propriétaire/associé/administrateur informatique. L’administrateur informatique ne peut pas approuver un appel métier.
 Les anciens problèmes de classement, création de classeurs et mémoire par mission sont distincts de cette couche additive ; le Registry ne les répare pas.
+
+MISSION : RANGEMENT, MODELES ET MEMOIRE PARTAGEE — 21 octobre 2026
+---------------------------------------------------------------
+Organisation : conserver 01_AUDIT et réutiliser client/année/mission ou année/client/mission.
+L'année vient du début prévu ou de la création de mission ; la période auditée reste distincte.
+Les anciens dossiers de mission sont déplacés entiers, avec conservation des identifiants.
+Aucun working file générique de remplacement n'est désormais fabriqué : un modèle cabinet
+identifié couvrant les procédures est requis. Les anciens travaux sont conservés.
+
+Migration backend : db/mission-shared-memory.sql (appliquée au projet du cabinet le 21 octobre).
+Pour un autre cabinet, appliquer cette migration avant déploiement du code.
+Un cache MISSION_MEMORY.json et un journal OFFICE_MANAGER_MISSION_AUDIT.json sont réutilisés
+dans le seul sous-dossier 00_OFFICE_MANAGER de la mission. Les mémoires centrales et d'agents
+restent en place. Le cache est une projection, les registres métier restent les sources.
+Le journal SQL conserve les changements des tables de mission instrumentées ; les événements
+historiques réels sont repris. Un auteur inconnu est indiqué comme technique, jamais inventé.
+
+Depuis la mission : préparer/reprendre le dossier, actualiser la mémoire, puis utiliser
+« Relire et rapprocher les pièces reçues » pour reprendre les dépôts existants sans renvoi.
+Le classement respecte les permissions de rangement existantes : il peut rester à valider.
+Un rapprochement PBC reste à confirmer ; aucune conclusion d'audit ni sign-off automatique.
+Les documents partiellement lus restent explicitement partiels : cette correction ne prouve
+pas à elle seule une lecture exhaustive de tous les scans ou de tous les PDF volumineux.

@@ -45,28 +45,10 @@ test('the working-papers folder: pasted in the programme, else found under the m
   await assert.rejects(findWorkpapersFolder(mission, programme, { listChildren: async () => [] }), /WORKPAPERS_FOLDER_NOT_FOUND/);
 });
 
-test('validated programme → one Excel per cycle in scope, verified in the Drive; an existing file is never overwritten', async () => {
-  const created = []; let patched = null, audited = null;
-  const F = 'application/vnd.google-apps.folder';
-  const drive = {
-    listChildren: async id => id === 'MISSIONFOLDER' ? [{ id: 'wpf', name: 'WORKING PAPERS', mimeType: F }] : [],
-    findFilesByExactName: async name => created.some(c => c.name === name) ? [{ id: 'old' }] : [],
-    createBinary: async ({ name, parentId, buffer }) => { created.push({ name, parentId, size: buffer.length }); return { id: 'f' + created.length }; },
-    getMeta: async id => ({ id, parents: ['wpf'], webViewLink: 'https://drive/' + id })
-  };
-  const fetchRows = async (path, o = {}) => {
-    if (path.startsWith('office_missions')) return [mission];
-    if (path.startsWith('office_work_programmes') && o.method === 'PATCH') { patched = JSON.parse(o.body); return []; }
-    if (path.startsWith('office_work_programmes')) return [programme];
-    return [];
-  };
-  const d = { fetchRows, drive, methodology: async () => LIB, firmName: 'Cabinet Exemple', audit: async (org, e) => { audited = e; } };
-  const r = await prepareCycleWorkpapers('org', M, { email: 'mia@c.ci' }, d);
-  assert.deepEqual(r.workpapers.map(w => [w.cycle_code, w.status]), [['ACH', 'CREATED']], 'the N/A cycle gets no working paper');
-  assert.equal(created[0].parentId, 'wpf');
-  assert.equal(patched.workpapers[0].file_id, 'f1');
-  assert.equal(audited.action_type, 'CYCLE_WORKPAPERS_PREPARED');
-  const again = await prepareCycleWorkpapers('org', M, { email: 'mia@c.ci' }, d);
-  assert.deepEqual(again.workpapers.map(w => w.status), ['ALREADY_EXISTS']);
-  assert.equal(created.length, 1);
+test('without a registered cabinet model, no generated workbook is created and the missing model is explicit', async () => {
+  let created=0,patched=null;
+  const drive={listChildren:async()=>[{id:'wpf',name:'WORKING PAPERS',mimeType:'application/vnd.google-apps.folder'}],findFilesByExactName:async()=>[],createBinary:async()=>{created++;throw new Error('FORBIDDEN');}};
+  const fetchRows=async(path,o={})=>{if(o.method==='PATCH'){patched=JSON.parse(o.body);return [];}return path.startsWith('office_missions')?[mission]:[programme];};
+  const out=await prepareCycleWorkpapers('org',M,{email:'a@x'},{drive,fetchRows,methodology:async()=>LIB,audit:async()=>null,templatesFolder:async()=>({status:'NONE'})});
+  assert.equal(created,0);assert.deepEqual(out.workpapers.map(x=>x.status),['CABINET_MODEL_REQUIRED']);assert.equal(patched.workpapers[0].file_id,undefined);
 });
