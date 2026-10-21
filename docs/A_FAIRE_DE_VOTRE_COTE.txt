@@ -268,3 +268,6 @@ Les anciennes confirmations humaines et leurs associations restent à revoir par
 si elles sont erronées (exemple constaté : conditions générales associées au budget).
 Un connecteur sans téléchargement binaire peut identifier les modèles par leur contenu lisible,
 avec couverture de tous les codes actifs. Un échec de lecture est distinct d'un modèle absent.
+Cause reproduite sur le vrai NL-T01_PRJ : ExcelJS échoue sur .text d'une cellule fusionnée vide.
+Le lecteur de modèles ignore ces seules cellules sans valeur ; 30 feuilles et 14 codes PRJ
+ont été contrôlés sur la copie du cabinet, sans modification du classeur.

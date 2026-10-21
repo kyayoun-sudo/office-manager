@@ -72,6 +72,14 @@ test('readable connector content can identify every active code when binary down
   assert.equal(broken.status,'MODEL_READ_FAILED');assert.equal(broken.error,'CONNECTOR_UNAVAILABLE');
 });
 
+test('empty merged cells in cabinet Excel models do not abort procedure-code discovery', async () => {
+  const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Guide');ws.mergeCells('A1:D2');ws.getCell('A4').value='ACH-01';ws.getCell('A5').value='ACH-03';
+  const bytes=Buffer.from(await wb.xlsx.writeBuffer());const w=world();w.d.drive.downloadBuffer=async()=>bytes;
+  w.d.drive.readText=async()=>{throw new Error('Fallback must not be needed for a valid workbook');};
+  const out=await prepareCycleWorkpapers('org','m1',null,{...w.d,templatesFolder:async()=>({status:'KNOWN',folder_id:'MODELS'}),listTemplateFiles:async()=>[{id:'M1',name:'Modele.xlsx'}]});
+  assert.equal(out.workpapers[0].status,'CREATED_FROM_MODEL');assert.equal(w.copies.length,1);
+});
+
 test('with the models folder known, the cycle gets a COPY of the firm’s model; while asked, it waits; with none, no invented file', async () => {
   const w = world(); w.files.M1 = 'ACH-01 ACH-03 achats';
   const r = await prepareCycleWorkpapers('org', 'm1', { email: 'a@x' }, { ...w.d, templatesFolder: async () => ({ status: 'KNOWN', folder_id: 'MODELS' }), listTemplateFiles: async () => [{ id: 'M1', name: 'Modele.xlsx' }] });
