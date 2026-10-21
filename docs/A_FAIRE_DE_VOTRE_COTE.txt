@@ -233,3 +233,10 @@ Après une préparation inscrite dans Excel, ouvrir le compte rendu « ce que j�
 Dans Mon fichier Excel : Choisir le modèle Excel du cabinet. Choisir le modèle dans le dossier enregistré, vérifier les feuilles affichées, puis Créer une copie de ce modèle et la rattacher au cycle. Réservé aux responsables autorisés ; le nouveau classeur sert à toutes les procédures du cycle. Ancien fichier conservé, aucune saisie ancienne transférée automatiquement. Vérifier les éventuels travaux antérieurs avant de poursuivre. Aucun SQL requis. Ce changement ne réalise pas encore à lui seul l’import GL/budget.
 
 Import GL/budget/fonds/avances : déposer le tableau XLSX/CSV dans les pièces de la mission, sélectionner la feuille de données du vrai modèle, cliquer Importer les données client dans cette feuille. Choisir le fichier et l’étape SOP, vérifier le nombre de lignes, les totaux source et les correspondances de colonnes, puis importer. Confirmer ensuite le reçu avec l’agent. Le système ne tronque pas : si les lignes dépassent les entrées vides du modèle, il bloque et demande un modèle adapté.
+
+2026-10-21 — Specialist Registry V1
+Migration db/specialists.sql appliquée au projet connecté. Aucun service externe connecté ; aucun outil des six agents remplacé.
+Paramètres > Admin > AI & Specialists > Specialist Registry : créer Mock Specialist (identifiant mock-specialist, compétence mock.echo), activer et autoriser Shadow pour le test.
+Garder approbation obligatoire : Tester > approuver l’appel > exécuter le test approuvé. Vérifier le résultat simulé et le journal. Désactiver pour couper tout nouvel appel.
+La page nécessite une session propriétaire/associé/administrateur informatique. L’administrateur informatique ne peut pas approuver un appel métier.
+Les anciens problèmes de classement, création de classeurs et mémoire par mission sont distincts de cette couche additive ; le Registry ne les répare pas.

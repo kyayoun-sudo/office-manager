@@ -116,6 +116,11 @@ const who = req => req.account?.display_name || req.account?.email || null;
 const light = st => { if (!st) return st; const { threads, extracted, workings, auditor_risks, gc_risks, ...rest } = st; return rest; };
 
 export const ROUTES = Object.freeze({
+  'specialist-registry': {
+    GET: users(ACCOUNT_ADMINS, async (orgId, req) => (await import('../lib/specialists/admin.js')).specialistsAdmin(orgId, {}, req.account)),
+    POST: users(ACCOUNT_ADMINS, async (orgId, req) => (await import('../lib/specialists/admin.js')).specialistsAdmin(orgId, req.body || {}, req.account)),
+    unavailable: 'SPECIALIST_REGISTRY_UNAVAILABLE'
+  },
   'sika-expenses': {
     GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/sika-expenses.js')).expenseView(orgId, req.query || {}, req.account)),
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/sika-expenses.js')).expenseAction(orgId, req.body || {}, req.account)),

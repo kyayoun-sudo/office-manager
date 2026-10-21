@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Specialist Registry — Admin</title><link rel="stylesheet" href="/assets/app.css"></head>
+<body><div class="shell"><nav class="nav" aria-label="Navigation principale"><div class="brand">Office Manager</div><a href="/accueil.html">Accueil</a><a href="/parametres.html">Admin</a><a href="/specialists.html" aria-current="page">AI &amp; Specialists</a></nav>
+<main class="main"><header><p>Admin › AI &amp; Specialists</p><h1>Specialist Registry</h1><p>Outils spécialisés sous la responsabilité des agents internes. Version de simulation : aucun service externe connecté.</p></header>
+<p id="specialist-status" role="status" aria-live="polite"></p>
+<section class="card"><h2>Configurer un spécialiste</h2><form id="specialist-form">
+<div class="field"><label for="specialist-key">Identifiant</label><input id="specialist-key" required value="mock-specialist" pattern="[a-z][a-z0-9-]{1,79}"></div>
+<div class="field"><label for="specialist-name">Nom</label><input id="specialist-name" required value="Mock Specialist" maxlength="160"></div>
+<div class="field"><label for="specialist-adapter">Adapter</label><select id="specialist-adapter"><option value="mock">Mock (simulation)</option value="mcp">MCP — non connecté</option><option value="rest">REST/API — non connecté</option><option value="huggingface">Hugging Face / local — non connecté</option><option value="internal">Internal — non connecté</option></select></div>
+<div class="field"><label for="specialist-capabilities">Compétences (séparées par une virgule)</label><input id="specialist-capabilities" value="mock.echo" required></div>
+<p><label><input id="specialist-enabled" type="checkbox"> Activé</label></p><p><label><input id="specialist-approval" type="checkbox" checked> Approbation humaine requise pour chaque appel</label></p>
+<button class="btn" type="submit">Enregistrer</button></form></section>
+<section class="card"><h2>Spécialistes et permissions</h2><p>Un agent doit être autorisé explicitement. Le test utilise Shadow et ne lit aucune pièce client.</p><div id="specialist-list"></div></section>
+<section class="card"><h2>Journal des appels</h2><p>100 derniers appels du cabinet. Les scores décrivent la fiabilité technique de cette fenêtre. Une réponse simulée n’est pas une preuve d’audit.</p><div id="specialist-calls"></div></section>
+<section class="card"><h2>Résultat du test</h2><pre id="specialist-result" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite">Aucun test exécuté.</pre></section>
+<section class="card"><h2>Autorité</h2><p>Le résultat reste un avis : aucune conclusion d’audit, validation ou signature automatique. Les agents existants conservent leurs tâches et leurs outils actuels.</p></section>
+</main></div><script src="/assets/brand-theme.js"></script><script src="/assets/specialists.js"></script></body></html>
