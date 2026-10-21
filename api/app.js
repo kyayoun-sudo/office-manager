@@ -249,6 +249,11 @@ export const ROUTES = Object.freeze({
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'preview-table-import') return (await import('../lib/workfile-table-import.js')).previewTableImport(orgId,m,c,b,a);
+      if (b.action === 'run-table-import') return (await import('../lib/workfile-table-import.js')).runTableImport(orgId,m,c,b,a);
+      if (b.action === 'template-options') return (await import('../lib/procedure-template.js')).templateOptions(orgId,m,c,a);
+      if (b.action === 'inspect-template') return (await import('../lib/procedure-template.js')).inspectTemplate(orgId,m,c,b,a);
+      if (b.action === 'adopt-template') return (await import('../lib/procedure-template.js')).adoptTemplate(orgId,m,c,b,a);
       if (b.action === 'review-workpaper') return (await import('../lib/workpaper-dialogue.js')).reviewWorkpaper(orgId,m,c,b,a);
       if (b.action === 'reading-report') return (await import('../lib/procedure-reading-report.js')).readingReport(orgId,m,c,b,a);
       if (b.action === 'workspace-brief') return (await import('../lib/procedure-workspace.js')).workspaceBrief(orgId,m,c,a);

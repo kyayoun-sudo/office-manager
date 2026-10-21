@@ -696,3 +696,10 @@ Lecture bloquée (2026-10-20) : parcours PDF page par page, budget IA 150 s avec
 - review-workpaper exige un clic humain : confirmation, demande de correction, ou valeurs corrigées explicitement saisies par l’auditeur. Le modèle ne possède pas cet outil. Les cellules et citations enregistrées sont relues avant confirmation ; corrections limitées aux cellules du reçu et vérifiées après écriture. Aucune signature ni conclusion automatique.
 - La prochaine préparation documentaire attend la confirmation précédente. Une modification SOP/période invalide le reçu. Les mises à jour de procédure utilisent updated_at pour refuser une écriture concurrente.
 - Limite : ce moteur conserve la correspondance actuelle aux cellules jaunes ; il ne lie pas à lui seul le modèle NL-T01 original et ne réalise pas encore un import intégral du GL/budget.
+
+## Raccordement au modèle complet (2026-10-21)
+- procedure-template.js : liste les fichiers du dossier de modèles enregistré ; inspecte uniquement le modèle choisi (XLSX 20 Mio maximum, macros refusées). Vérifie la feuille de procédure par contenu avant copie. Adoption réservée aux responsables autorisés à travailler sur la procédure.
+- Copie dans le même dossier de mission que le working file actuel, vérification des octets puis rattachement au cycle par mise à jour conditionnelle du programme. Ancien fichier conservé et référencé ; aucune migration automatique de ses saisies.
+- Les consignes communes supplémentaires placées après les étapes SOP ne déclenchent plus un faux conflit. Les destinations du remplissage sont limitées à la ligne de l’étape courante lorsqu’elle est identifiée dans le modèle.
+
+- workfile-table-import.js : import complet des lignes XLSX/CSV déposées à la mission, correspondance de colonnes explicite, contrôle de version source/classeur/SOP, entrées jaunes vides seulement, formules préservées. Dépassement de capacité ou source de 20000 lignes bloque sans tronquer. Reçu partagé et confirmation humaine après relecture. Les données client importées ne sont pas modifiables par le compte rendu. Pas encore d’extension automatique des tableaux/formules.
