@@ -7,6 +7,8 @@ import {
   convertOfficeToPdf,
   memoryStore,
   memorySearch,
+  semanticMemoryStore,
+  semanticMemorySearch,
   searchIndex,
   searchQuery,
   workflowRun
@@ -98,6 +100,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/memory/search") {
       return send(res, 200, await memorySearch(data));
+    }
+
+    if (req.url === "/memory/semantic-store") {
+      return send(res, 200, await semanticMemoryStore(data));
+    }
+
+    if (req.url === "/memory/semantic-search") {
+      return send(res, 200, await semanticMemorySearch(data));
     }
 
     if (req.url === "/search/index") {
