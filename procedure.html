@@ -532,7 +532,7 @@
       var item=el('div',null,'item');item.appendChild(el('p',f.fact));
       item.appendChild(el('p','Source : '+f.source+(f.reference?' — '+f.reference:''),'meta'));
       item.appendChild(el('blockquote',f.quote));
-      item.appendChild(el('p',f.target?'Entrée proposée : '+f.target:'Conservé dans une feuille de préparation ; aucune cellule du test modifiée.','meta'));box.appendChild(item);
+      item.appendChild(el('p',f.target?'Entrée proposée : '+f.target+(f.value?' = '+f.value:''):'Conservé dans une feuille de préparation ; aucune cellule du test modifiée.','meta'));box.appendChild(item);
     });
     if((plan.questions||[]).length){box.appendChild(el('strong','Pour avancer'));var ul=el('ul');plan.questions.forEach(function(q){ul.appendChild(el('li',q));});box.appendChild(ul);}
     var answer=el('textarea');answer.setAttribute('aria-label','Votre précision pour cette étape');answer.placeholder='Votre précision ou votre question';box.appendChild(answer);
@@ -540,9 +540,9 @@
     again.addEventListener('click',function(){again.disabled=true;$('steps-say').textContent='Lecture du SOP et des pièces…';
       post({action:'step-plan',incremental:true,step:step.n,operation:'document-review',answer:answer.value}).then(function(r){$('steps-say').textContent='';host.textContent='';documentPlanBox(step,r,host);})
         .catch(function(e){$('steps-say').textContent=smsg(e);}).then(function(){again.disabled=false;});});box.appendChild(again);
-    var go=el('button','Inscrire la préparation sourcée dans Excel','btn');go.type='button';go.disabled=!plan.ready;
+    var go=el('button','Je confirme les propositions : remplir Excel','btn');go.type='button';go.disabled=!plan.ready;
     go.addEventListener('click',function(){go.disabled=true;$('steps-say').textContent='Écriture puis relecture du fichier…';
-      post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id}}).then(function(r){
+      post({action:'step-run',plan:{operation:'document-review',plan_id:plan.plan_id,confirm_proposals:true}}).then(function(r){
         $('steps-say').textContent=r.count+' faits sourcés conservés dans « '+r.sheet+' » ; '+(r.cells||0)+' cellule(s) du modèle renseignée(s). Écriture vérifiée. '+((r.questions||[]).length?'Des questions restent ouvertes.':'Préparation à relire avant de conclure.');
         window.dispatchEvent(new Event('procedure-written'));window.dispatchEvent(new Event('workpaper-dialogue-updated'));
       }).catch(function(e){$('steps-say').textContent=smsg(e);go.disabled=false;});});box.appendChild(go);host.appendChild(box);

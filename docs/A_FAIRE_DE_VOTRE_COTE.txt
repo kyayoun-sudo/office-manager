@@ -273,3 +273,12 @@ Le lecteur de modèles ignore ces seules cellules sans valeur ; 30 feuilles et 1
 ont été contrôlés sur la copie du cabinet, sans modification du classeur.
 Le contexte partagé utilise le programme validé en vigueur ; un brouillon plus récent
 ne remplace pas silencieusement le programme qui guide les travaux et les fichiers Excel.
+
+CORRECTIONS METIER ET CONNEXIONS — 21 octobre 2026
+Les GL historiques .xls apparaissent maintenant dans les sources d import (SheetJS 0.20.3 officiel).
+Le budget n est plus choisi par defaut pour un GL ; colonnes proposees, confirmation humaine
+et totaux debit/credit avant import. Plafonds : source 20 Mio / 20000 lignes, modele limite
+aux cellules jaunes disponibles. Pas de remplacement silencieux des saisies.
+Le laboratoire EYNOWA utilise ses variables existantes URL/API_KEY, sans lecture des secrets.
+Diagnostic admin sur /diagnostic-ia.html : court message fictif, jamais de piece client.
+La conversation Firm Manager a un delai navigateur et n est pas rejouee automatiquement.

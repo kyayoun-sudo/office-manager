@@ -37,6 +37,16 @@ async function prepareReady(o,m,c,step,body,account,d){
   assert.equal(r.pending,undefined);return r;
 }
 
+test('literal donor proposal waits for a human click, then writes the name rather than its explanatory sentence',async()=>{
+  const f=await fixture(),original=f.d.ai;
+  f.d.ai=async(...args)=>{const r=await original(...args),data=JSON.parse(r.text);data.findings[0].value='Banque Exemple';data.findings[0].fact='Le bailleur identifié dans la convention est Banque Exemple.';return {text:JSON.stringify(data)};};
+  const p=await prepareReady('O','M','PRJ-01',f.step,{}, {email:'human@test'},f.d);
+  await assert.rejects(runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{email:'human@test'},f.d),/PROPOSAL_CONFIRMATION_REQUIRED/);
+  assert.equal(f.updates(),0);
+  const r=await runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id,confirm_proposals:true},{email:'human@test'},f.d);
+  assert.equal(r.verified,true);const wb=new ExcelJS.Workbook();await wb.xlsx.load(f.getBytes());assert.equal(wb.getWorksheet('PRJ-01').getCell('B11').value,'Banque Exemple');
+});
+
 test('reads the current SOP and documents, checks quotes, writes permitted cells and preserves formulas and human values',async()=>{
   const f=await fixture(),p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);
   assert.equal(f.updates(),0);assert.equal(p.findings.length,1);assert.equal(p.findings[0].target,'PRJ-01!B11');

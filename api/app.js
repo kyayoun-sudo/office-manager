@@ -255,6 +255,7 @@ export const ROUTES = Object.freeze({
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (b.action === 'table-import-options') return (await import('../lib/workfile-table-import.js')).tableImportOptions(orgId,m,c,b,a);
       if (b.action === 'preview-table-import') return (await import('../lib/workfile-table-import.js')).previewTableImport(orgId,m,c,b,a);
       if (b.action === 'run-table-import') return (await import('../lib/workfile-table-import.js')).runTableImport(orgId,m,c,b,a);
       if (b.action === 'template-options') return (await import('../lib/procedure-template.js')).templateOptions(orgId,m,c,a);
@@ -553,7 +554,7 @@ export const ROUTES = Object.freeze({
   translate: { POST: users([...EVERYONE], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
   // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----
   // Which AI providers are configured (keys in Vercel; nothing secret returned).
-  'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), unavailable: 'AI_UNAVAILABLE' },
+  'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), POST: users(ACCOUNT_ADMINS, async (orgId,req)=>(await import('../lib/provider-diagnostics.js')).checkProvider(req.body?.provider)), unavailable: 'AI_UNAVAILABLE' },
   // The firm's capability database (Grand Contrôleur): read from the HR / CV folders.
   capabilities: {
     GET: users(MANAGERS, async (orgId, req) => req.query?.people ? capabilityContext(orgId) : capabilityInsights(orgId)),

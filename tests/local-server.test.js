@@ -12,6 +12,14 @@ import { createConnector } from "../connectors/local-server/server.mjs";
 import { localAdapter } from "../lib/local-storage.js";
 import { missionPresentation } from "../lib/mission-function.js";
 const claims = { subject: "auditor@test.local", write: true, org: "org" };
+async function symlinkOrSkip(t, target, link) {
+  try { await fs.symlink(target, link); return true; }
+  catch (error) {
+    if (process.platform !== 'win32' || !['EPERM','EACCES'].includes(error.code)) throw error;
+    t.skip('Windows does not grant symbolic-link creation to this test process.');
+    return false;
+  }
+}
 async function fixture(t) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "om-local-"));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
@@ -108,7 +116,7 @@ test("local files preserve versions, refuse overwrites and keep identity when re
     1,
   );
 });
-test("local ACL, write scope, path traversal and symlinks fail closed", async (t) => {
+test("local ACL, write scope and path traversal fail closed", async (t) => {
   const { files, root, dir } = await fixture(t);
   await assert.rejects(
     files.execute(
@@ -143,8 +151,11 @@ test("local ACL, write scope, path traversal and symlinks fail closed", async (t
     ),
     /ROOT_READ_ONLY/,
   );
+});
+test("local directory listing does not follow symbolic links", async (t) => {
+  const {files,root,dir}=await fixture(t);
   await fs.writeFile(path.join(dir, "secret.txt"), "secret");
-  await fs.symlink(path.join(dir, "secret.txt"), path.join(root, "link.txt"));
+  if(!await symlinkOrSkip(t,path.join(dir,"secret.txt"),path.join(root,"link.txt")))return;
   assert.deepEqual(
     await files.execute({ action: "list", id: "local:root:audit" }, claims),
     [],
@@ -161,7 +172,7 @@ test("backup folder cannot redirect writes outside the root", async (t) => {
     },
     claims,
   );
-  await fs.symlink(dir, path.join(root, ".office-manager-versions"));
+  if(!await symlinkOrSkip(t,dir,path.join(root,".office-manager-versions")))return;
   await assert.rejects(
     files.execute(
       {

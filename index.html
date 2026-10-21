@@ -330,6 +330,7 @@ sendEl.addEventListener("click", async () => {
 
   try {
     const response = await fetch("/api/agent", {
+      signal: AbortSignal.timeout(310000),
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -358,7 +359,7 @@ sendEl.addEventListener("click", async () => {
       `${data.agentName} · ${data.provider}` +
       (data.reviewed ? " · reviewed" : "");
   } catch (error) {
-    answerEl.textContent = `Erreur : ${error.message}`;
+    answerEl.textContent = error.name === "TimeoutError" ? "Délai dépassé. La fin de la demande n’est pas confirmée. Vérifiez l’historique et les actions avant de relancer." : `Erreur : ${error.message}`;
   } finally {
     sendEl.disabled = false;
   }

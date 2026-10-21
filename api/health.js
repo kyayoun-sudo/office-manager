@@ -20,6 +20,9 @@ export default async function handler(req, res) {
         process.env.ANTHROPIC_MODEL
       ),
       openrouter: Boolean(process.env.OPENROUTER_API_KEY),
+      mistral: Boolean(process.env.MISTRAL_API_KEY),
+      huggingface: Boolean(process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN),
+      groq: Boolean(process.env.GROQ_API_KEY),
       orpailleur: Boolean(process.env.ORPAILLEUR_JOB_SECRET),
       googleDriveSheets: googleConnectionConfigured()
     }
