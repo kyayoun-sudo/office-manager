@@ -17,7 +17,7 @@
       for (const agent of state.agents) {
         const label=el('label',' '+agent+' '),check=document.createElement('input'); check.type='checkbox';check.checked=state.permissions.some(p=>p.specialist_id===s.id&&p.agent_key===agent&&p.allowed);check.onchange=()=>run(()=>api({action:'permission',specialist_key:s.specialist_key,agent_key:agent,allowed:check.checked}));label.prepend(check);host.append(label);
       }
-      button(host,'Tester avec Shadow',async()=>{const r=await api({action:'test',specialist_key:s.specialist_key}); $('specialist-result').textContent=r.status==='pending_approval'?'Appel enregistré : approbation humaine requise.':JSON.stringify(r,null,2);}); $('specialist-list').append(host);
+      button(host,'Simuler un appel de Shadow',async()=>{const r=await api({action:'test',specialist_key:s.specialist_key}); $('specialist-result').textContent=r.status==='pending_approval'?'Appel enregistré : approbation humaine requise.':JSON.stringify(r,null,2);}); $('specialist-list').append(host);
     }
     for (const c of state.calls) {
       const row=el('article','');row.append(el('p',c.created_at+' · '+c.agent_key+' · '+c.capability+' · '+c.status+(c.error_code?' · '+c.error_code:'')));

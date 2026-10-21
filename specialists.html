@@ -10,7 +10,7 @@
 <div class="field"><label for="specialist-capabilities">Compétences (séparées par une virgule)</label><input id="specialist-capabilities" value="mock.echo" required></div>
 <p><label><input id="specialist-enabled" type="checkbox"> Activé</label></p><p><label><input id="specialist-approval" type="checkbox" checked> Approbation humaine requise pour chaque appel</label></p>
 <button class="btn" type="submit">Enregistrer</button></form></section>
-<section class="card"><h2>Spécialistes et permissions</h2><p>Un agent doit être autorisé explicitement. Le test utilise Shadow et ne lit aucune pièce client.</p><div id="specialist-list"></div></section>
+<section class="card"><h2>Spécialistes et permissions</h2><p>Un agent doit être autorisé explicitement. Le test simule une demande de Shadow au routeur, sans lancer l’agent ni lire de pièce client.</p><div id="specialist-list"></div></section>
 <section class="card"><h2>Journal des appels</h2><p>100 derniers appels du cabinet. Les scores décrivent la fiabilité technique de cette fenêtre. Une réponse simulée n’est pas une preuve d’audit.</p><div id="specialist-calls"></div></section>
 <section class="card"><h2>Résultat du test</h2><pre id="specialist-result" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite">Aucun test exécuté.</pre></section>
 <section class="card"><h2>Autorité</h2><p>Le résultat reste un avis : aucune conclusion d’audit, validation ou signature automatique. Les agents existants conservent leurs tâches et leurs outils actuels.</p></section>

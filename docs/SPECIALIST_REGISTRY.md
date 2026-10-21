@@ -12,7 +12,7 @@ Les adapters MCP, REST, Hugging Face/local et internal sont des contrats fermés
 
 Paramètres → Admin → AI & Specialists → Specialist Registry (`/specialists.html`). Propriétaire, associé et administrateur informatique configurent les spécialistes et permissions. Seuls propriétaire/associé/manager peuvent approuver un appel côté service ; la page Admin reste réservée aux administrateurs.
 
-Créer `mock-specialist`, compétence `mock.echo`, adapter Mock ; activer, autoriser Shadow, garder l’approbation obligatoire. Tester : un appel attend. Approuver puis exécuter le test approuvé : résultat simulé et journal. Refaire sans permission ou avec le spécialiste désactivé : refus journalisé.
+Créer `mock-specialist`, compétence `mock.echo`, adapter Mock ; activer, autoriser Shadow, garder l’approbation obligatoire. Simuler un appel de Shadow (identité de test liée au serveur, sans lancer son IA) : un appel attend. Approuver puis exécuter le test approuvé : résultat simulé et journal. Refaire sans permission ou avec le spécialiste désactivé : refus journalisé.
 
 L’approbation est à usage unique, liée à l’organisation, l’agent, le demandeur, la mission éventuelle, la compétence, l’empreinte de l’entrée et la révision du registre. Les appels concurrents utilisent une prise conditionnelle en base. Une panne après prise laisse l’appel `running` : aucun rejeu automatique d’un effet potentiellement déjà exécuté.
 
