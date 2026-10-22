@@ -72,6 +72,22 @@ For a multi-domain Firm Manager request, Lab queries each relevant collection, c
 
 A model citation is accepted only when the cited source was actually retrieved from Chroma for the current request. Merely being present in the source registry is not enough.
 
+## Registered professional source families
+
+The registry currently includes source metadata for:
+
+- IFRS Accounting Standards / IAS / IFRIC / SIC / Conceptual Framework / IFRS for SMEs
+- IFRS Accounting Taxonomy
+- OHADA AUDCIF / SYSCOHADA
+- OHADA SYCEBNL
+- IAASB 2026 Handbook: ISA / ISQM / IAPN / ISA for LCE / ISSA 5000 / ISAE / ISRE / ISRS
+- IESBA 2026 Code / International Independence Standards
+- OHADA practical ISA implementation and quality-assurance tools
+- IFRS Sustainability / ISSB
+- IVSC / IVS valuation standards
+
+The registry is metadata only and is not evidence until an authorised passage has actually been ingested and retrieved.
+
 ## Knowledge ingestion
 
 Every ingested chunk must pass `knowledge-contract.js` and include:
