@@ -15,26 +15,20 @@ export function createProfessionalGatewayDispatcher(options = {}) {
     if (verb === 'POST' && pathname === '/v1/professional/query') {
       return { handled: true, status: 200, body: await handleQuery(body || {}) };
     }
-
     if (verb === 'POST' && pathname === '/v1/professional/memory/remember') {
       return { handled: true, status: 200, body: await handleProfessionalMemory(body || {}) };
     }
-
     if (verb === 'POST' && pathname === '/v1/professional/knowledge/import') {
       return { handled: true, status: 200, body: { imported: await handleProfessionalKnowledgeImport(body || {}) } };
     }
-
     if (verb === 'GET' && pathname === '/v1/professional/health') {
       return { handled: true, status: 200, body: await handleProfessionalHealth() };
     }
-
     return { handled: false };
   };
 }
 
-// These helpers intentionally do not implement authentication. The existing EYNOWA
-// Lab Gateway remains the security boundary and must authenticate/authorise requests
-// before delegating sensitive memory-write or knowledge-import routes here.
+// Authentication remains the responsibility of the existing EYNOWA Lab Gateway.
 export async function readJsonRequest(req, { maxBytes = 2_000_000 } = {}) {
   let total = 0;
   const chunks = [];
@@ -44,8 +38,7 @@ export async function readJsonRequest(req, { maxBytes = 2_000_000 } = {}) {
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
-  const text = Buffer.concat(chunks).toString('utf8');
-  return JSON.parse(text);
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 export function writeJsonResponse(res, status, body) {
