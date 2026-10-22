@@ -1,0 +1,48 @@
+{
+  "pack_id": "ohada-accounting-v0",
+  "name": "EYNOWA Lab OHADA Accounting Pack",
+  "version": "0.1.0",
+  "domain": "accounting",
+  "jurisdiction": "OHADA",
+  "languages": ["fr"],
+  "frameworks": ["AUDCIF", "SYSCOHADA", "SYCEBNL"],
+  "target_collection": "eynowa_accounting",
+  "source_ids": ["OHADA_AUDCIF_SYSCOHADA", "OHADA_SYCEBNL"],
+  "content_policy": {
+    "public_metadata_and_paraphrase": true,
+    "full_normative_text_bundled": false,
+    "normative_text_requires_documented_permission": true,
+    "professional_memory_is_normative_authority": false
+  },
+  "topic_groups": [
+    "framework_and_scope",
+    "accounting_plan",
+    "purchases_and_expenses",
+    "sales_and_revenue",
+    "property_plant_equipment",
+    "inventories",
+    "receivables",
+    "payables",
+    "cash_and_banking",
+    "payroll_and_employee_costs",
+    "taxes_and_levies",
+    "provisions_and_contingencies",
+    "borrowings_and_financing",
+    "equity",
+    "foreign_currency",
+    "period_end_close",
+    "financial_statements",
+    "consolidated_and_combined_accounts",
+    "not_for_profit_specifics"
+  ],
+  "official_sources": [
+    {
+      "source_id": "OHADA_AUDCIF_SYSCOHADA",
+      "url": "https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/"
+    },
+    {
+      "source_id": "OHADA_SYCEBNL",
+      "url": "https://www.ohada.org/acte-uniforme-relatif-au-systeme-comptable-des-entites-a-but-non-lucratif/"
+    }
+  ]
+}
