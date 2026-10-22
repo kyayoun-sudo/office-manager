@@ -36,9 +36,7 @@ async function embedTexts(texts) {
     body: JSON.stringify({ model, input }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(`OLLAMA_EMBED_${response.status}: ${data?.error || response.statusText}`);
-  }
+  if (!response.ok) throw new Error(`OLLAMA_EMBED_${response.status}: ${data?.error || response.statusText}`);
   if (!Array.isArray(data?.embeddings) || data.embeddings.length !== input.length) {
     throw new Error('OLLAMA_EMBED_INVALID_RESPONSE');
   }
@@ -46,6 +44,7 @@ async function embedTexts(texts) {
 }
 
 function primitiveMetadata(chunk) {
+  const meta = chunk.metadata || {};
   return {
     source_id: chunk.sourceId,
     domain: chunk.domain,
@@ -61,20 +60,18 @@ function primitiveMetadata(chunk) {
     language: chunk.language || '',
     source_url: chunk.sourceUrl || '',
     license_basis: chunk.licenceBasis || '',
-    extra_json: JSON.stringify(chunk.metadata || {}),
+    topic: String(meta.topic || ''),
+    subtopic: String(meta.subtopic || ''),
+    source_kind: String(meta.source_kind || ''),
+    normative_text: Boolean(meta.normative_text),
+    requires_normative_followup: Boolean(meta.requires_normative_followup),
+    extra_json: JSON.stringify(meta),
   };
 }
 
 function stableId(chunk) {
   if (chunk.id) return chunk.id;
-  const seed = [
-    chunk.sourceId,
-    chunk.domain,
-    chunk.framework,
-    chunk.reference,
-    chunk.version,
-    chunk.content.slice(0, 200),
-  ].join('|');
+  const seed = [chunk.sourceId, chunk.domain, chunk.framework, chunk.reference, chunk.version, chunk.content.slice(0, 200)].join('|');
   let hash = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {
     hash ^= seed.charCodeAt(i);
@@ -116,6 +113,11 @@ function resultRows(result, domain) {
       language: metadata.language || '',
       sourceUrl: metadata.source_url || '',
       licenseBasis: metadata.license_basis || '',
+      topic: metadata.topic || '',
+      subtopic: metadata.subtopic || '',
+      sourceKind: metadata.source_kind || '',
+      normativeText: Boolean(metadata.normative_text),
+      requiresNormativeFollowup: Boolean(metadata.requires_normative_followup),
     };
   });
 }
@@ -135,6 +137,13 @@ function countryMatches(row, country) {
   const jurisdiction = String(row.jurisdiction || '').trim().toUpperCase();
   const wanted = String(country).trim().toUpperCase();
   return !value || value === wanted || value === 'INTL' || value === 'INTERNATIONAL' || jurisdiction === 'INTERNATIONAL' || jurisdiction === 'OHADA';
+}
+
+function topicRank(row, topics) {
+  if (!Array.isArray(topics) || !topics.length) return 1;
+  const topic = String(row.topic || '').trim();
+  if (!topic) return 2;
+  return topics.includes(topic) ? 0 : 3;
 }
 
 export async function upsertKnowledgeChunks(inputs = []) {
@@ -167,35 +176,26 @@ export async function searchChromaKnowledge({
   domains,
   framework = '',
   frameworks = [],
+  topics = [],
   country = '',
   query = '',
   limit = 10,
 } = {}) {
   if (!String(query || '').trim()) return [];
-  const requestedDomains = Array.isArray(domains) && domains.length
-    ? domains
-    : (domain ? [domain] : ['accounting', 'audit', 'advisory']);
-  const requestedFrameworks = Array.isArray(frameworks) && frameworks.length
-    ? frameworks
-    : (framework ? [framework] : []);
+  const requestedDomains = Array.isArray(domains) && domains.length ? domains : (domain ? [domain] : ['accounting', 'audit', 'advisory']);
+  const requestedFrameworks = Array.isArray(frameworks) && frameworks.length ? frameworks : (framework ? [framework] : []);
 
-  // Avoid loading the embedding model for an empty professional knowledge base.
-  // This keeps first-run Firm Manager requests fast before any licensed content is ingested.
   const collectionStates = await Promise.all(requestedDomains.map(async (currentDomain) => {
     const collection = await getCollection(currentDomain);
     let count = 0;
-    try {
-      count = Number(await collection.count()) || 0;
-    } catch {
-      count = 0;
-    }
+    try { count = Number(await collection.count()) || 0; } catch { count = 0; }
     return { domain: currentDomain, collection, count };
   }));
   const searchable = collectionStates.filter((item) => item.count > 0);
   if (!searchable.length) return [];
 
   const queryEmbedding = (await embedTexts([String(query)]))[0];
-  const perDomainLimit = Math.max(4, Math.ceil((Number(limit) || 10) / searchable.length) * 4);
+  const perDomainLimit = Math.max(6, Math.ceil((Number(limit) || 10) / searchable.length) * 5);
   const rows = [];
 
   for (const item of searchable) {
@@ -210,7 +210,7 @@ export async function searchChromaKnowledge({
   return rows
     .filter((row) => frameworkMatches(row, requestedFrameworks))
     .filter((row) => countryMatches(row, country))
-    .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
+    .sort((a, b) => topicRank(a, topics) - topicRank(b, topics) || (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
     .slice(0, Math.max(1, Number(limit) || 10));
 }
 
