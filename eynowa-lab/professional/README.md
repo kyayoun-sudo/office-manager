@@ -16,31 +16,9 @@ The calling application does **not** define or restrict the professional domain.
 
 Firm Manager is the cabinet operating system, not an audit-only application. It can use all three professional brains and can combine them in one request.
 
-If Firm Manager sends no explicit domain scope, EYNOWA Lab defaults to:
+If Firm Manager sends no explicit domain scope, EYNOWA Lab defaults to all three brains.
 
-```json
-{
-  "application": "firm_manager",
-  "domains": ["accounting", "audit", "advisory"]
-}
-```
-
-It can also narrow a task when useful:
-
-```json
-{
-  "application": "firm_manager",
-  "domains": ["audit"],
-  "task": "risk_assessment",
-  "frameworks": ["ISA"],
-  "country": "CI",
-  "professional_id": "user-123",
-  "client": "ABC SARL",
-  "query": "Identify significant risks for this engagement."
-}
-```
-
-Or combine several disciplines:
+Example cross-disciplinary request:
 
 ```json
 {
@@ -55,60 +33,48 @@ Or combine several disciplines:
 }
 ```
 
-### Accounting AI
-
-Accounting AI will normally call the accounting brain explicitly:
-
-```json
-{
-  "application": "accounting_ai",
-  "domains": ["accounting"],
-  "task": "invoice_posting",
-  "country": "CI",
-  "frameworks": ["SYSCOHADA"],
-  "professional_id": "user-123",
-  "client": "ABC SARL",
-  "query": "How should this invoice be posted?"
-}
-```
+Accounting AI will normally use `domains: ["accounting"]`, but it calls the same shared Lab.
 
 Legacy `domain` remains accepted for compatibility. `domain=all` also activates all three brains.
 
-## Intended Gateway route
+## Local services
 
-The local `lab-gateway-server.js` should expose:
+Default integration targets:
 
-- `POST /v1/professional/query`
-- `POST /v1/professional/memory/remember`
+- EYNOWA Lab Gateway: existing local gateway
+- Ollama generation: `http://127.0.0.1:11434`
+- Chroma: `127.0.0.1:8000`
+- Ollama embeddings: `embeddinggemma`
 
-The existing local gateway is currently not versioned in this repository. Do not replace it blindly. Import this module into the real local gateway after inspecting that file.
+Environment overrides:
 
-Minimal integration shape:
-
-```js
-import { createProfessionalHandler, handleProfessionalMemory } from './eynowa-lab/professional/handler.js';
-
-const handleProfessional = createProfessionalHandler({
-  searchKnowledge: queryChromaKnowledge
-});
-
-// POST /v1/professional/query -> await handleProfessional(req.body)
-// POST /v1/professional/memory/remember -> await handleProfessionalMemory(req.body)
+```text
+OLLAMA_HOST=http://127.0.0.1:11434
+OLLAMA_MODEL=<your-generation-model>
+OLLAMA_EMBED_MODEL=embeddinggemma
+CHROMA_HOST=127.0.0.1
+CHROMA_PORT=8000
+CHROMA_SSL=false
+EYNOWA_LAB_HOME=<optional local memory folder>
 ```
 
-## Knowledge
+The Node client dependency is `chromadb` 3.5.0.
 
-Knowledge must remain separate from personal professional memory.
-
-Recommended Chroma collections:
+## Chroma knowledge collections
 
 - `eynowa_accounting`
 - `eynowa_audit`
 - `eynowa_advisory`
 
-For a multi-domain Firm Manager request, Lab queries all relevant collections and gives Ollama one combined, labelled professional context.
+EYNOWA Lab generates query and document embeddings with the local Ollama `/api/embed` endpoint and supplies those embeddings to Chroma. The same embedding model must be used for indexing and retrieval.
 
-Every ingested chunk must include at least:
+For a multi-domain Firm Manager request, Lab queries each relevant collection, combines the labelled evidence, then sends the evidence to the local generation model.
+
+A model citation is accepted only when the cited source was actually retrieved from Chroma for the current request. Merely being present in the source registry is not enough.
+
+## Knowledge ingestion
+
+Every ingested chunk must pass `knowledge-contract.js` and include:
 
 - `source_id`
 - `domain`
@@ -120,8 +86,16 @@ Every ingested chunk must include at least:
 - `jurisdiction`
 - `source_url`
 - `license_basis`
+- `content`
 
-Use `knowledge-contract.js` before adding anything to Chroma.
+Import authorised JSON or JSONL chunks with:
+
+```bash
+npm install
+npm run lab:import -- ./authorised-chunks.jsonl
+```
+
+Protected standards are not bundled in this repository. IFRS/IAASB/IESBA material must only be ingested when the applicable licence or permission basis has been documented. OHADA and IVSC content remains subject to rights verification before ingestion unless an authorised basis is documented.
 
 ## Professional memory
 
@@ -131,19 +105,52 @@ Personal memory is local to the professional computer by default:
 
 Only `HUMAN_VALIDATED` decisions can be written automatically.
 
-Memory is compartmentalised by professional + domain + client. Firm Manager can retrieve several domain compartments for a cross-disciplinary task, but memory is still contextual evidence, never normative authority.
+Memory is compartmentalised by professional + domain + client. Firm Manager can retrieve several domain compartments for a cross-disciplinary task, but memory remains contextual evidence, never normative authority.
+
+## Gateway routes
+
+The existing local `lab-gateway-server.js` should delegate these paths to `gateway-dispatcher.js`:
+
+- `POST /v1/professional/query`
+- `POST /v1/professional/memory/remember`
+- `POST /v1/professional/knowledge/import`
+- `GET /v1/professional/health`
+
+The gateway itself is currently local and not versioned in this repository. Do not replace it blindly. The dispatcher is framework-neutral so the existing Gateway only needs to pass `method`, `path` and parsed `body`.
+
+Example:
+
+```js
+import {
+  createProfessionalGatewayDispatcher,
+  readJsonRequest,
+  writeJsonResponse,
+} from './eynowa-lab/professional/gateway-dispatcher.js';
+
+const dispatchProfessional = createProfessionalGatewayDispatcher();
+
+// Inside the existing HTTP request handler, after its existing authentication:
+const body = req.method === 'POST' ? await readJsonRequest(req) : {};
+const result = await dispatchProfessional({ method: req.method, path: req.url, body });
+if (result.handled) {
+  writeJsonResponse(res, result.status, result.body);
+  return;
+}
+```
+
+Keep the Gateway's existing authentication around the knowledge-import and memory-write routes.
 
 ## Validation gate
 
-The final answer is blocked for professional validation when, among other things:
+The final answer requires professional validation when, among other things:
 
-- no verifiable professional source supports the conclusion;
+- no retrieved professional source supports the conclusion;
 - facts are missing;
 - sources/facts conflict;
 - model confidence is below the automatic threshold;
 - the subject requires significant professional judgment in accounting, audit or advisory.
 
-The API response includes:
+Response shape:
 
 ```json
 {
@@ -156,8 +163,12 @@ The API response includes:
 }
 ```
 
-## Source licensing
+## Tests
 
-The registry stores source metadata only. It does not bundle copyrighted standards.
+Pure routing/validation tests do not require Chroma or Ollama:
 
-IFRS Foundation materials require licensing for integration into products/services. IAASB/IESBA reproduction and AI ingestion must follow the applicable permission process. OHADA and IVSC materials remain flagged for rights verification before ingestion unless an authorised basis is documented.
+```bash
+npm run test:lab
+```
+
+End-to-end RAG testing additionally requires the real local Chroma and Ollama services plus an authorised test knowledge chunk.
