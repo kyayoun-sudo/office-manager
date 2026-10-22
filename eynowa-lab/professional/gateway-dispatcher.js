@@ -21,7 +21,7 @@ export function createProfessionalGatewayDispatcher(options = {}) {
     if (verb === 'POST' && pathname === '/v1/professional/knowledge/import') {
       return { handled: true, status: 200, body: { imported: await handleProfessionalKnowledgeImport(body || {}) } };
     }
-    if (verb === 'GET' && pathname === '/v1/professional/health') {
+    if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/health') {
       return { handled: true, status: 200, body: await handleProfessionalHealth() };
     }
     return { handled: false };
