@@ -16,16 +16,12 @@ export function validateKnowledgeChunk(input = {}) {
 
   const licenceBasis = text(input.license_basis || input.licence_basis || input.licenseBasis, 500);
   if (!licenceBasis) throw new Error('LICENSE_BASIS_REQUIRED');
-
   const authority = text(input.authority, 200);
   if (!authority) throw new Error('AUTHORITY_REQUIRED');
-
   const sourceUrl = text(input.source_url || input.sourceUrl, 1200);
   if (!sourceUrl) throw new Error('SOURCE_URL_REQUIRED');
-
   const reference = text(input.reference, 500);
   if (!reference) throw new Error('SOURCE_REFERENCE_REQUIRED');
-
   const content = text(input.content, 50000);
   if (!content) throw new Error('KNOWLEDGE_CONTENT_REQUIRED');
 
