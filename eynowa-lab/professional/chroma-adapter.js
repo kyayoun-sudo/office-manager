@@ -178,18 +178,33 @@ export async function searchChromaKnowledge({
   const requestedFrameworks = Array.isArray(frameworks) && frameworks.length
     ? frameworks
     : (framework ? [framework] : []);
+
+  // Avoid loading the embedding model for an empty professional knowledge base.
+  // This keeps first-run Firm Manager requests fast before any licensed content is ingested.
+  const collectionStates = await Promise.all(requestedDomains.map(async (currentDomain) => {
+    const collection = await getCollection(currentDomain);
+    let count = 0;
+    try {
+      count = Number(await collection.count()) || 0;
+    } catch {
+      count = 0;
+    }
+    return { domain: currentDomain, collection, count };
+  }));
+  const searchable = collectionStates.filter((item) => item.count > 0);
+  if (!searchable.length) return [];
+
   const queryEmbedding = (await embedTexts([String(query)]))[0];
-  const perDomainLimit = Math.max(4, Math.ceil((Number(limit) || 10) / requestedDomains.length) * 4);
+  const perDomainLimit = Math.max(4, Math.ceil((Number(limit) || 10) / searchable.length) * 4);
   const rows = [];
 
-  for (const currentDomain of requestedDomains) {
-    const collection = await getCollection(currentDomain);
-    const result = await collection.query({
+  for (const item of searchable) {
+    const result = await item.collection.query({
       queryEmbeddings: [queryEmbedding],
-      nResults: perDomainLimit,
+      nResults: Math.max(1, Math.min(perDomainLimit, item.count)),
       include: ['documents', 'metadatas', 'distances'],
     });
-    rows.push(...resultRows(result, currentDomain));
+    rows.push(...resultRows(result, item.domain));
   }
 
   return rows
