@@ -1,0 +1,110 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildProfessionalRequest, answerProfessional } from './router.js';
+
+const OHADA_HIT = {
+  sourceId: 'OHADA_AUDCIF_SYSCOHADA',
+  authority: 'OHADA',
+  domain: 'accounting',
+  framework: 'SYSCOHADA',
+  reference: 'Test reference',
+  sourceUrl: 'https://www.ohada.org/',
+  content: 'Authorised test passage about accounting treatment.',
+};
+
+const ISA_HIT = {
+  sourceId: 'IAASB_2026_HANDBOOK',
+  authority: 'IAASB',
+  domain: 'audit',
+  framework: 'ISA',
+  reference: 'ISA test reference',
+  sourceUrl: 'https://www.iaasb.org/',
+  content: 'Authorised test passage about audit risk.',
+};
+
+test('Firm Manager defaults to all professional domains', () => {
+  const request = buildProfessionalRequest({ application: 'firm_manager', query: 'Review this year-end situation' });
+  assert.deepEqual(request.domains, ['accounting', 'audit', 'advisory']);
+  assert.equal(request.domain, 'multi');
+});
+
+test('Firm Manager may explicitly narrow or combine domains', () => {
+  const request = buildProfessionalRequest({
+    application: 'firm_manager',
+    domains: ['accounting', 'audit'],
+    frameworks: ['SYSCOHADA', 'ISA'],
+    query: 'Analyse the accounting and audit implications',
+  });
+  assert.deepEqual(request.domains, ['accounting', 'audit']);
+  assert.deepEqual(request.frameworks, ['SYSCOHADA', 'ISA']);
+});
+
+test('a registered but unretrieved source cannot be cited as evidence', async () => {
+  const result = await answerProfessional(
+    { application: 'firm_manager', domain: 'accounting', framework: 'SYSCOHADA', query: 'Post this invoice' },
+    {
+      searchKnowledge: async () => [],
+      searchMemory: async () => [],
+      generateJson: async () => ({
+        answer: 'Use an account.',
+        sources: [{ sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Invented reference' }],
+        confidence: 0.95,
+        missing_facts: [],
+        contradictions: [],
+        requires_validation: false,
+      }),
+    }
+  );
+  assert.deepEqual(result.sources, []);
+  assert.equal(result.requires_validation, true);
+  assert.match(result.validation_reason, /source professionnelle vérifiable/i);
+});
+
+test('retrieved evidence is accepted and reference is anchored to retrieved chunk', async () => {
+  const result = await answerProfessional(
+    { application: 'firm_manager', domain: 'accounting', framework: 'SYSCOHADA', query: 'Post this invoice' },
+    {
+      searchKnowledge: async () => [OHADA_HIT],
+      searchMemory: async () => [],
+      generateJson: async () => ({
+        answer: 'Proposed accounting treatment.',
+        sources: [{ sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Made-up paragraph' }],
+        confidence: 0.95,
+        missing_facts: [],
+        contradictions: [],
+        requires_validation: false,
+      }),
+    }
+  );
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].reference, 'Test reference');
+  assert.equal(result.requires_validation, false);
+});
+
+test('Firm Manager can combine accounting and audit evidence', async () => {
+  const result = await answerProfessional(
+    {
+      application: 'firm_manager',
+      domains: ['accounting', 'audit'],
+      frameworks: ['SYSCOHADA', 'ISA'],
+      query: 'Assess year-end accounting and audit risk',
+    },
+    {
+      searchKnowledge: async ({ domain }) => domain === 'accounting' ? [OHADA_HIT] : [ISA_HIT],
+      searchMemory: async () => [],
+      generateJson: async () => ({
+        answer: 'Combined accounting and audit analysis.',
+        sources: [
+          { sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Test reference' },
+          { sourceId: 'IAASB_2026_HANDBOOK', reference: 'ISA test reference' },
+        ],
+        confidence: 0.92,
+        missing_facts: [],
+        contradictions: [],
+        requires_validation: false,
+      }),
+    }
+  );
+  assert.deepEqual(result.domains, ['accounting', 'audit']);
+  assert.equal(result.sources.length, 2);
+});
