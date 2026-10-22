@@ -109,6 +109,23 @@ function resultRows(result, domain) {
   });
 }
 
+function frameworkMatches(row, frameworks) {
+  if (!Array.isArray(frameworks) || !frameworks.length) return true;
+  const value = String(row.framework || '').toLowerCase();
+  return frameworks.some((framework) => {
+    const wanted = String(framework || '').toLowerCase();
+    return wanted && (value === wanted || value.includes(wanted) || wanted.includes(value));
+  });
+}
+
+function countryMatches(row, country) {
+  if (!country) return true;
+  const value = String(row.country || '').trim().toUpperCase();
+  const jurisdiction = String(row.jurisdiction || '').trim().toUpperCase();
+  const wanted = String(country).trim().toUpperCase();
+  return !value || value === wanted || value === 'INTL' || value === 'INTERNATIONAL' || jurisdiction === 'INTERNATIONAL' || jurisdiction === 'OHADA';
+}
+
 export async function upsertKnowledgeChunks(inputs = []) {
   const chunks = inputs.map(validateKnowledgeChunk);
   const groups = new Map();
@@ -138,6 +155,7 @@ export async function searchChromaKnowledge({
   domain,
   domains,
   framework = '',
+  frameworks = [],
   country = '',
   query = '',
   limit = 10,
@@ -146,26 +164,26 @@ export async function searchChromaKnowledge({
   const requestedDomains = Array.isArray(domains) && domains.length
     ? domains
     : (domain ? [domain] : ['accounting', 'audit', 'advisory']);
+  const requestedFrameworks = Array.isArray(frameworks) && frameworks.length
+    ? frameworks
+    : (framework ? [framework] : []);
   const queryEmbedding = (await embedTexts([String(query)]))[0];
-  const perDomainLimit = Math.max(2, Math.ceil((Number(limit) || 10) / requestedDomains.length));
+  const perDomainLimit = Math.max(4, Math.ceil((Number(limit) || 10) / requestedDomains.length) * 4);
   const rows = [];
 
   for (const currentDomain of requestedDomains) {
     const collection = await getCollection(currentDomain);
-    const whereParts = [];
-    if (framework) whereParts.push({ framework: { $eq: String(framework) } });
-    if (country) whereParts.push({ country: { $eq: String(country).toUpperCase() } });
-    const where = whereParts.length === 0 ? undefined : (whereParts.length === 1 ? whereParts[0] : { $and: whereParts });
     const result = await collection.query({
       queryEmbeddings: [queryEmbedding],
       nResults: perDomainLimit,
-      where,
       include: ['documents', 'metadatas', 'distances'],
     });
     rows.push(...resultRows(result, currentDomain));
   }
 
   return rows
+    .filter((row) => frameworkMatches(row, requestedFrameworks))
+    .filter((row) => countryMatches(row, country))
     .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
     .slice(0, Math.max(1, Number(limit) || 10));
 }
