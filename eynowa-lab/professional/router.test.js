@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildProfessionalRequest, answerProfessional } from './router.js';
+import { buildProfessionalRequest, answerProfessional, PROFESSIONAL_RESPONSE_SCHEMA } from './router.js';
 
 const OHADA_HIT = {
   sourceId: 'OHADA_AUDCIF_SYSCOHADA',
@@ -22,6 +22,20 @@ const ISA_HIT = {
   content: 'Authorised test passage about audit risk.',
 };
 
+function validModelResult(overrides = {}) {
+  return {
+    answer: 'Test answer.',
+    sources: [],
+    confidence: 0.9,
+    missing_facts: [],
+    contradictions: [],
+    requires_validation: false,
+    validation_reason: '',
+    question_for_professional: '',
+    ...overrides,
+  };
+}
+
 test('Firm Manager defaults to all professional domains', () => {
   const request = buildProfessionalRequest({ application: 'firm_manager', query: 'Review this year-end situation' });
   assert.deepEqual(request.domains, ['accounting', 'audit', 'advisory']);
@@ -39,19 +53,35 @@ test('Firm Manager may explicitly narrow or combine domains', () => {
   assert.deepEqual(request.frameworks, ['SYSCOHADA', 'ISA']);
 });
 
+test('professional router sends a strict JSON schema to the generation adapter', async () => {
+  let receivedSchema = null;
+  await answerProfessional(
+    { application: 'firm_manager', domain: 'accounting', framework: 'SYSCOHADA', query: 'Analyse this invoice' },
+    {
+      searchKnowledge: async () => [],
+      searchMemory: async () => [],
+      generateJson: async ({ schema }) => {
+        receivedSchema = schema;
+        return validModelResult({ requires_validation: true, validation_reason: 'Test' });
+      },
+    }
+  );
+  assert.deepEqual(receivedSchema, PROFESSIONAL_RESPONSE_SCHEMA);
+  assert.equal(receivedSchema.additionalProperties, false);
+  assert.ok(receivedSchema.required.includes('answer'));
+  assert.ok(receivedSchema.required.includes('sources'));
+});
+
 test('a registered but unretrieved source cannot be cited as evidence', async () => {
   const result = await answerProfessional(
     { application: 'firm_manager', domain: 'accounting', framework: 'SYSCOHADA', query: 'Post this invoice' },
     {
       searchKnowledge: async () => [],
       searchMemory: async () => [],
-      generateJson: async () => ({
+      generateJson: async () => validModelResult({
         answer: 'Use an account.',
         sources: [{ sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Invented reference' }],
         confidence: 0.95,
-        missing_facts: [],
-        contradictions: [],
-        requires_validation: false,
       }),
     }
   );
@@ -66,13 +96,10 @@ test('retrieved evidence is accepted and reference is anchored to retrieved chun
     {
       searchKnowledge: async () => [OHADA_HIT],
       searchMemory: async () => [],
-      generateJson: async () => ({
+      generateJson: async () => validModelResult({
         answer: 'Proposed accounting treatment.',
         sources: [{ sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Made-up paragraph' }],
         confidence: 0.95,
-        missing_facts: [],
-        contradictions: [],
-        requires_validation: false,
       }),
     }
   );
@@ -98,16 +125,13 @@ test('Firm Manager combines accounting and audit evidence with one multi-domain 
         return [OHADA_HIT, ISA_HIT];
       },
       searchMemory: async () => [],
-      generateJson: async () => ({
+      generateJson: async () => validModelResult({
         answer: 'Combined accounting and audit analysis.',
         sources: [
           { sourceId: 'OHADA_AUDCIF_SYSCOHADA', reference: 'Test reference' },
           { sourceId: 'IAASB_2026_HANDBOOK', reference: 'ISA test reference' },
         ],
         confidence: 0.92,
-        missing_facts: [],
-        contradictions: [],
-        requires_validation: false,
       }),
     }
   );
