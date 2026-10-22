@@ -51,6 +51,36 @@ function sourceRegistryForRequest(request) {
   return [...new Map(rows.map((source) => [source.sourceId, source])).values()];
 }
 
+function compactKnowledgeForPrompt(knowledge) {
+  return safeArray(knowledge).slice(0, 8).map((hit) => ({
+    id: clean(hit?.id, 200),
+    domain: clean(hit?.domain, 40),
+    framework: clean(hit?.framework, 100),
+    sourceId: clean(hit?.sourceId, 160),
+    authority: clean(hit?.authority, 160),
+    reference: clean(hit?.reference, 400),
+    sourceUrl: clean(hit?.sourceUrl, 700),
+    topic: clean(hit?.topic, 120),
+    subtopic: clean(hit?.subtopic, 120),
+    sourceKind: clean(hit?.sourceKind, 100),
+    normativeText: Boolean(hit?.normativeText),
+    requiresNormativeFollowup: Boolean(hit?.requiresNormativeFollowup),
+    content: clean(hit?.content, 1600),
+  }));
+}
+
+function compactMemoryForPrompt(memory) {
+  return safeArray(memory).slice(0, 8).map((row) => ({
+    domain: clean(row?.domain, 40),
+    client: clean(row?.client, 160),
+    topic: clean(row?.topic, 120),
+    decision: clean(row?.decision, 800),
+    reason: clean(row?.reason, 700),
+    framework: clean(row?.framework, 100),
+    source: clean(row?.source, 100),
+  }));
+}
+
 export function buildProfessionalRequest(input = {}) {
   const domains = resolveDomains(input);
   const frameworks = resolveFrameworks(input);
@@ -64,7 +94,7 @@ export function buildProfessionalRequest(input = {}) {
     framework: frameworks.length === 1 ? frameworks[0] : '',
     professionalId: clean(input.professional_id || input.professionalId || 'default', 160),
     client: clean(input.client, 255),
-    query: clean(input.query, 24000),
+    query: clean(input.query, 12000),
   };
   if (!request.query) throw new Error('query is required');
   request.topics = detectTopicsForRequest(request);
@@ -73,40 +103,45 @@ export function buildProfessionalRequest(input = {}) {
 
 export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
   const sourceRegistry = sourceRegistryForRequest(request);
-  const sourceIds = sourceRegistry.map((source) => source.sourceId);
+  const compactRegistry = sourceRegistry.map((source) => ({
+    sourceId: source.sourceId,
+    domain: source.domain,
+    authority: source.authority,
+    authorityRole: source.authorityRole,
+    frameworks: source.frameworks,
+  }));
+  const compactKnowledge = compactKnowledgeForPrompt(knowledge);
+  const compactMemory = compactMemoryForPrompt(memory);
+
   return [
     'You are EYNOWA Lab, the shared professional intelligence layer for a professional-services firm.',
     `Active professional domains: ${request.domains.join(', ')}.`,
     `Detected business topics: ${request.topics.join(', ') || 'none'}.`,
     `Calling application: ${request.application || 'unknown'}.`,
-    'The calling application does not define or limit your professional capabilities; the requested domains and task do.',
     `Task: ${request.task || 'general professional analysis'}.`,
     `Country: ${request.country}. Framework hints: ${request.frameworks.join(', ') || 'not specified'}.`,
     '',
     'Rules:',
-    '- You may combine accounting, audit and advisory reasoning when the request spans several domains.',
-    '- Keep normative authorities separate by domain and framework; do not treat one framework as authority for another domain.',
+    '- Combine accounting, audit and advisory reasoning when requested.',
+    '- Keep authorities separate by domain and framework.',
     '- Never invent a standard, paragraph, legal rule, client fact or prior treatment.',
-    '- Professional memory is contextual evidence only; it is never normative authority.',
-    '- EYNOWA methodology may guide procedures, documents to request, anomaly detection and questions; it is not normative accounting authority.',
-    '- Cite only passages that appear in Retrieved professional knowledge below. A registered source that was not retrieved is not evidence.',
-    '- A public metadata/paraphrase chunk is context, not a substitute for detailed normative authority when an operational accounting conclusion requires the actual rule.',
-    '- If a retrieved hit says requiresNormativeFollowup=true, do not present it as sufficient detailed normative support.',
-    '- If facts are missing, sources conflict, only non-normative methodology supports an accounting conclusion, or the conclusion requires significant professional judgment, set requires_validation=true.',
-    '- Ask one precise question when professional validation is needed.',
-    '- Return JSON only.',
+    '- Professional memory is contextual evidence only, never normative authority.',
+    '- EYNOWA methodology guides procedures and anomaly detection but is not normative accounting authority.',
+    '- Cite only retrieved professional knowledge.',
+    '- Public metadata/paraphrases are context, not detailed normative authority.',
+    '- requiresNormativeFollowup=true means professional validation is mandatory before an operational accounting conclusion.',
+    '- If facts are missing, sources conflict, only methodology supports the accounting conclusion, or judgment is significant, set requires_validation=true.',
+    '- Ask one precise validation question when needed.',
+    '- Be concise and return JSON only.',
     '',
-    `Registered source ids: ${JSON.stringify(sourceIds)}.`,
-    `Registered sources: ${JSON.stringify(sourceRegistry)}.`,
-    '',
-    `Retrieved professional knowledge: ${JSON.stringify(knowledge).slice(0, 28000)}.`,
-    '',
-    `Local professional memory: ${JSON.stringify(memory).slice(0, 12000)}.`,
+    `Registered professional sources: ${JSON.stringify(compactRegistry)}.`,
+    `Retrieved professional knowledge: ${JSON.stringify(compactKnowledge)}.`,
+    `Local professional memory: ${JSON.stringify(compactMemory)}.`,
     '',
     'Required response shape:',
     JSON.stringify({
-      answer: 'string',
-      sources: [{ sourceId: 'retrieved registered id', authority: 'string', reference: 'retrieved reference', sourceUrl: 'string', domain: 'accounting|audit|advisory' }],
+      answer: 'concise string',
+      sources: [{ sourceId: 'retrieved source id', reference: 'retrieved reference' }],
       confidence: 0.0,
       missing_facts: ['string'],
       contradictions: ['string'],
@@ -114,7 +149,6 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
       validation_reason: 'string',
       question_for_professional: 'string',
     }),
-    '',
     `User request: ${request.query}`,
   ].join('\n');
 }
@@ -158,7 +192,7 @@ async function retrieveKnowledge(searchKnowledge, request) {
     country: request.country,
     query: request.query,
     task: request.task,
-    limit: request.domains.length > 1 ? 14 : 9,
+    limit: request.domains.length > 1 ? 8 : 6,
   }));
 }
 
@@ -169,23 +203,28 @@ async function retrieveMemory(searchMemory, request) {
     client: request.client,
     query: request.query,
     task: request.task,
-    limit: 8,
+    limit: 4,
   })));
-  return groups.flatMap(safeArray).slice(0, 16);
+  return groups.flatMap(safeArray).slice(0, 8);
 }
 
 export async function answerProfessional(input, adapters = {}) {
+  const totalStarted = Date.now();
   const request = buildProfessionalRequest(input);
   const { searchKnowledge = async () => [], searchMemory = async () => [], generateJson } = adapters;
   if (typeof generateJson !== 'function') throw new Error('generateJson adapter is required');
 
+  const retrievalStarted = Date.now();
   const [knowledge, memory] = await Promise.all([
     retrieveKnowledge(searchKnowledge, request),
     retrieveMemory(searchMemory, request),
   ]);
+  const retrievalMs = Date.now() - retrievalStarted;
 
   const prompt = buildSystemPrompt({ request, knowledge, memory });
+  const generationStarted = Date.now();
   const raw = await generateJson({ prompt, request });
+  const generationMs = Date.now() - generationStarted;
   const result = raw && typeof raw === 'object' ? raw : {};
   const sources = filterSources(result.sources, request, knowledge);
   const normativeFollowupHits = safeArray(knowledge).filter((hit) => hit?.requiresNormativeFollowup);
@@ -212,7 +251,7 @@ export async function answerProfessional(input, adapters = {}) {
     frameworks: request.frameworks,
     framework: request.framework,
     topics: request.topics,
-    answer: clean(result.answer, 30000),
+    answer: clean(result.answer, 12000),
     sources,
     confidence: validation.confidence,
     requires_validation: validation.requiresValidation,
@@ -224,5 +263,11 @@ export async function answerProfessional(input, adapters = {}) {
     knowledge_hits_by_domain: Object.fromEntries(request.domains.map((domain) => [domain, safeArray(knowledge).filter((hit) => hit?.domain === domain).length])),
     normative_followup_hits: normativeFollowupHits.length,
     memory_hits: safeArray(memory).length,
+    prompt_chars: prompt.length,
+    timings_ms: {
+      retrieval: retrievalMs,
+      generation: generationMs,
+      total: Date.now() - totalStarted,
+    },
   };
 }
