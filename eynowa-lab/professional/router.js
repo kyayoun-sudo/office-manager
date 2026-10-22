@@ -99,9 +99,9 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     `Registered source ids: ${JSON.stringify(sourceIds)}.`,
     `Registered sources: ${JSON.stringify(sourceRegistry)}.`,
     '',
-    `Retrieved professional knowledge: ${JSON.stringify(knowledge).slice(0, 40000)}.`,
+    `Retrieved professional knowledge: ${JSON.stringify(knowledge).slice(0, 28000)}.`,
     '',
-    `Local professional memory: ${JSON.stringify(memory).slice(0, 25000)}.`,
+    `Local professional memory: ${JSON.stringify(memory).slice(0, 12000)}.`,
     '',
     'Required response shape:',
     JSON.stringify({
@@ -150,20 +150,16 @@ function filterSources(candidateSources, request, knowledge) {
 }
 
 async function retrieveKnowledge(searchKnowledge, request) {
-  const groups = await Promise.all(request.domains.map(async (domain) => {
-    const relevantFrameworks = request.frameworks.filter((framework) => sourcesFor({ domain, framework }).length > 0);
-    return searchKnowledge({
-      domain,
-      frameworks: relevantFrameworks,
-      framework: relevantFrameworks.length === 1 ? relevantFrameworks[0] : '',
-      topics: domain === 'accounting' ? request.topics : [],
-      country: request.country,
-      query: request.query,
-      task: request.task,
-      limit: 10,
-    });
+  return safeArray(await searchKnowledge({
+    domains: request.domains,
+    frameworks: request.frameworks,
+    framework: request.framework,
+    topics: request.topics,
+    country: request.country,
+    query: request.query,
+    task: request.task,
+    limit: request.domains.length > 1 ? 14 : 9,
   }));
-  return groups.flatMap(safeArray);
 }
 
 async function retrieveMemory(searchMemory, request) {
@@ -173,9 +169,9 @@ async function retrieveMemory(searchMemory, request) {
     client: request.client,
     query: request.query,
     task: request.task,
-    limit: 12,
+    limit: 8,
   })));
-  return groups.flatMap(safeArray);
+  return groups.flatMap(safeArray).slice(0, 16);
 }
 
 export async function answerProfessional(input, adapters = {}) {
@@ -225,6 +221,7 @@ export async function answerProfessional(input, adapters = {}) {
     high_judgment: validation.highJudgment,
     high_judgment_domains: validation.highJudgmentDomains,
     knowledge_hits: safeArray(knowledge).length,
+    knowledge_hits_by_domain: Object.fromEntries(request.domains.map((domain) => [domain, safeArray(knowledge).filter((hit) => hit?.domain === domain).length])),
     normative_followup_hits: normativeFollowupHits.length,
     memory_hits: safeArray(memory).length,
   };
