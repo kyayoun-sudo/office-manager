@@ -81,7 +81,9 @@ test('retrieved evidence is accepted and reference is anchored to retrieved chun
   assert.equal(result.requires_validation, false);
 });
 
-test('Firm Manager can combine accounting and audit evidence', async () => {
+test('Firm Manager combines accounting and audit evidence with one multi-domain retrieval', async () => {
+  let calls = 0;
+  let receivedDomains = [];
   const result = await answerProfessional(
     {
       application: 'firm_manager',
@@ -90,7 +92,11 @@ test('Firm Manager can combine accounting and audit evidence', async () => {
       query: 'Assess year-end accounting and audit risk',
     },
     {
-      searchKnowledge: async ({ domain }) => domain === 'accounting' ? [OHADA_HIT] : [ISA_HIT],
+      searchKnowledge: async ({ domains }) => {
+        calls += 1;
+        receivedDomains = domains;
+        return [OHADA_HIT, ISA_HIT];
+      },
       searchMemory: async () => [],
       generateJson: async () => ({
         answer: 'Combined accounting and audit analysis.',
@@ -105,6 +111,9 @@ test('Firm Manager can combine accounting and audit evidence', async () => {
       }),
     }
   );
+  assert.equal(calls, 1);
+  assert.deepEqual(receivedDomains, ['accounting', 'audit']);
   assert.deepEqual(result.domains, ['accounting', 'audit']);
   assert.equal(result.sources.length, 2);
+  assert.deepEqual(result.knowledge_hits_by_domain, { accounting: 1, audit: 1 });
 });
