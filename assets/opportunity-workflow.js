@@ -83,7 +83,46 @@
     new MutationObserver(clarifyOpportunityRows).observe(box, { childList: true, subtree: true });
     clarifyOpportunityRows();
   }
-  function installPageRepairs() { installAgentPills(); installDirectCreateFix(); installListObserver(); }
+
+  // A detail page must never look dead while the full workbook is still being read. Read the
+  // lightweight opportunity register first, surface the current stage immediately, and only resume
+  // Firm Manager when the saved work has been stale for at least six minutes. This reuses the same
+  // idempotent opportunity-step and never rewinds the stage (read/file/prepare).
+  function primeRunningDetail() {
+    var id = new URLSearchParams(location.search).get('id');
+    if (!id || !window.OfficeManager || !window.OfficeManager.api) return;
+    window.OfficeManager.api('/api/app?route=opportunities').then(function (data) {
+      var rows = data && Array.isArray(data.opportunities) ? data.opportunities : [];
+      var summary = rows.find(function (x) { return String(x.id) === String(id); });
+      if (!summary) return;
+      var listView = document.getElementById('list-view'), detailView = document.getElementById('detail-view');
+      if (listView) listView.hidden = true;
+      if (detailView) detailView.hidden = false;
+      var title = document.getElementById('h-opp'), tag = document.getElementById('opp-status'), waiting = document.getElementById('opp-waiting');
+      if (title) title.textContent = summary.title || summary.client || 'Opportunité';
+      if (tag) tag.textContent = [summary.status, summary.stage].filter(Boolean).join(' · ');
+      if (waiting) waiting.textContent = summary.waiting || (summary.status === 'running' ? 'Le Firm Manager travaille sur le dossier.' : 'Ouverture du dossier…');
+      if (summary.status !== 'running') return;
+      var mineCard = document.getElementById('mine-card'), mine = document.getElementById('mine');
+      if (mineCard) mineCard.hidden = false;
+      if (mine) { mine.textContent = ''; mine.appendChild(node('p', 'Firm Manager travaille — étape : ' + (summary.stage || 'préparation') + '. Les choix apparaîtront dès que les faits nécessaires seront préparés.', 'q-done')); }
+      var last = Date.parse(summary.updated_at || summary.created_at || '');
+      if (Number.isFinite(last) && Date.now() - last < 6 * 60 * 1000) return;
+      var key = 'om-opportunity-resume:' + id, previous = Number(sessionStorage.getItem(key) || 0);
+      if (previous && Date.now() - previous < 2 * 60 * 1000) return;
+      sessionStorage.setItem(key, String(Date.now()));
+      if (waiting) waiting.textContent = 'Le Firm Manager avait été interrompu. Reprise automatique de l’étape « ' + (summary.stage || 'préparation') + ' »…';
+      return window.OfficeManager.api('/api/app?route=opportunity-step', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opportunity_id: id })
+      }).then(function () {
+        if (window.reloadOpportunity) window.reloadOpportunity();
+      }).catch(function (e) {
+        if (waiting) waiting.textContent = 'Reprise interrompue : ' + (e && e.message ? e.message : 'erreur inconnue') + '. Le dossier reste accessible.';
+      });
+    }).catch(function () { /* the regular page loader will display its own error */ });
+  }
+
+  function installPageRepairs() { installAgentPills(); installDirectCreateFix(); installListObserver(); primeRunningDetail(); }
 
   function render(o) {
     var anchor = document.getElementById('mine-card'), c = o.commercial;
