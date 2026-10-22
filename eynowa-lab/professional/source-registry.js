@@ -6,7 +6,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['IFRS', 'IAS', 'IFRIC', 'SIC', 'Conceptual Framework', 'IFRS for SMEs'],
     jurisdiction: 'International',
     sourceUrl: 'https://www.ifrs.org/issued-standards/list-of-standards/',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'LICENSE_REQUIRED_FOR_PRODUCT_INTEGRATION',
   },
   {
     sourceId: 'IFRS_ACCOUNTING_TAXONOMY',
@@ -15,7 +15,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['IFRS Accounting Taxonomy'],
     jurisdiction: 'International',
     sourceUrl: 'https://www.ifrs.org/issued-standards/ifrs-taxonomy/',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'VERIFY_BEFORE_INGESTION',
   },
   {
     sourceId: 'OHADA_AUDCIF_SYSCOHADA',
@@ -24,7 +24,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['AUDCIF', 'SYSCOHADA'],
     jurisdiction: 'OHADA',
     sourceUrl: 'https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/',
-    licenceRequiredForProductIntegration: false,
+    licenceStatus: 'VERIFY_BEFORE_INGESTION',
   },
   {
     sourceId: 'OHADA_SYCEBNL',
@@ -33,7 +33,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['SYCEBNL'],
     jurisdiction: 'OHADA',
     sourceUrl: 'https://www.ohada.org/acte-uniforme-relatif-au-systeme-comptable-des-entites-a-but-non-lucratif/',
-    licenceRequiredForProductIntegration: false,
+    licenceStatus: 'VERIFY_BEFORE_INGESTION',
   },
   {
     sourceId: 'IAASB_2026_HANDBOOK',
@@ -42,7 +42,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['ISA', 'ISQM', 'IAPN', 'ISA for LCE', 'ISSA 5000', 'ISAE', 'ISRE', 'ISRS'],
     jurisdiction: 'International',
     sourceUrl: 'https://www.iaasb.org/publications/2026-handbook-international-quality-management-auditing-review-sustainability-and-other-assurance',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'PERMISSION_REQUIRED_FOR_REPRODUCTION_OR_AI_INGESTION',
   },
   {
     sourceId: 'IESBA_2026_CODE',
@@ -51,7 +51,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['IESBA Code', 'International Independence Standards'],
     jurisdiction: 'International',
     sourceUrl: 'https://www.ethicsboard.org/publications/2026-handbook-international-code-ethics-professional-accountants',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'PERMISSION_REQUIRED_FOR_REPRODUCTION_OR_AI_INGESTION',
   },
   {
     sourceId: 'IFRS_SUSTAINABILITY_NAVIGATOR',
@@ -60,7 +60,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['IFRS S1', 'IFRS S2', 'SASB'],
     jurisdiction: 'International',
     sourceUrl: 'https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'LICENSE_REQUIRED_FOR_PRODUCT_INTEGRATION',
   },
   {
     sourceId: 'IVSC_IVS',
@@ -69,7 +69,7 @@ export const PROFESSIONAL_SOURCES = Object.freeze([
     frameworks: ['IVS'],
     jurisdiction: 'International',
     sourceUrl: 'https://ivsc.org/standards/',
-    licenceRequiredForProductIntegration: true,
+    licenceStatus: 'VERIFY_BEFORE_INGESTION',
   },
 ]);
 
