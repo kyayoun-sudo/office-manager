@@ -21,10 +21,29 @@ function extractJson(text) {
   }
 }
 
+function readableError(error, { model, timeoutMs, baseUrl }) {
+  const name = String(error?.name || 'Error');
+  const message = String(error?.message || error || 'Unknown Ollama error');
+  if (name === 'AbortError' || message.toLowerCase().includes('abort')) {
+    const wrapped = new Error(`OLLAMA_TIMEOUT after ${timeoutMs}ms using ${model}`);
+    wrapped.name = 'OllamaTimeoutError';
+    wrapped.cause = error;
+    wrapped.stage = 'ollama_generation';
+    wrapped.baseUrl = baseUrl;
+    return wrapped;
+  }
+  const wrapped = new Error(`OLLAMA_GENERATION_FAILED: ${message}`);
+  wrapped.name = name;
+  wrapped.cause = error;
+  wrapped.stage = 'ollama_generation';
+  wrapped.baseUrl = baseUrl;
+  return wrapped;
+}
+
 export function createOllamaJsonAdapter({
   baseUrl = process.env.OLLAMA_URL || process.env.OLLAMA_HOST || defaultOllamaUrl(),
   model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'llama3.2:3b',
-  timeoutMs = 120000,
+  timeoutMs = Number(process.env.EYNOWA_LAB_OLLAMA_TIMEOUT_MS || 180000),
 } = {}) {
   return async function generateJson({ prompt }) {
     const controller = new AbortController();
@@ -42,11 +61,13 @@ export function createOllamaJsonAdapter({
         }),
         signal: controller.signal,
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(`OLLAMA_${response.status}: ${data?.error || JSON.stringify(data)}`);
       }
       return extractJson(data?.message?.content || data?.response || '');
+    } catch (error) {
+      throw readableError(error, { model, timeoutMs, baseUrl });
     } finally {
       clearTimeout(timer);
     }
