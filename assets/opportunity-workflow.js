@@ -30,8 +30,70 @@
   }
   function button(text, fn) { var b = node('button', text, 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { fn(b); }); return b; }
   function documentId(value) { var v = String(value || '').trim(), m = v.match(/\/(?:d|folders)\/([-\w]+)|[?&]id=([-\w]+)/); return m ? m[1] || m[2] : /^[-\w]{25,}$/.test(v) ? v : ''; }
+
+  // Opportunities must visibly show which Office Manager agents participate in this workflow.
+  // These are capability/status indicators, not claims that an agent is currently executing a call.
+  function installAgentPills() {
+    if (document.getElementById('opportunity-agent-pills')) return;
+    var head = document.querySelector('.page-head');
+    if (!head) return;
+    var wrap = node('div', null, 'chips'); wrap.id = 'opportunity-agent-pills'; wrap.style.marginTop = '12px';
+    [['grand-controleur', 'Firm Manager'], ['mission-controller', 'Mission Controller'], ['orpailleur', 'Orpailleur'], ['enhanced-auditor', 'Enhanced Auditor'], ['sika', 'SIKA']].forEach(function (x) {
+      var pill = node('span', x[1], 'chip'); pill.dataset.agentKey = x[0]; pill.title = 'Agent disponible dans le workflow Office Manager'; wrap.appendChild(pill);
+    });
+    head.appendChild(wrap);
+  }
+
+  // A previous edit accidentally nested the direct-create listener inside the TDR submit handler.
+  // Capture the click here so “Sans TDR” works immediately on a fresh page and cannot double-submit.
+  function installDirectCreateFix() {
+    var b = document.getElementById('send-direct');
+    if (!b || b.dataset.directCreateFixed === '1') return;
+    b.dataset.directCreateFixed = '1';
+    b.addEventListener('click', function (event) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      var $ = function (id) { return document.getElementById(id); };
+      var client = $('direct-client').value.trim();
+      var say = $('say');
+      if (!client) { say.className = 'status error'; say.textContent = 'Indiquez au moins le nom du client.'; $('direct-client').focus(); return; }
+      b.disabled = true; say.className = 'status'; say.textContent = 'Création de l’opportunité…';
+      window.OfficeManager.api('/api/app?route=opportunities', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', entry_mode: 'direct', client: client, title: $('direct-title').value.trim(), reference: $('direct-reference').value.trim(), kind: $('direct-kind').value, period: $('direct-period').value.trim(), summary: $('direct-summary').value.trim(), source: 'saisie directe' })
+      }).then(function (r) {
+        if (!r || !r.opportunity || !r.opportunity.id) throw new Error('OPPORTUNITY_CREATION_FAILED');
+        location.href = '/opportunites.html?id=' + encodeURIComponent(r.opportunity.id);
+      }).catch(function (e) { say.className = 'status error'; say.textContent = e && e.message ? e.message : 'Création impossible.'; b.disabled = false; });
+    }, true);
+  }
+
+  // The old row looked like a passive status line. Make the navigation explicit while keeping
+  // the whole row clickable and accessible.
+  function clarifyOpportunityRows() {
+    var box = document.getElementById('list'); if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('a.link-item'), function (row) {
+      if (row.dataset.openHint === '1') return; row.dataset.openHint = '1';
+      var hint = node('span', 'Ouvrir', 'btn ghost'); hint.setAttribute('aria-hidden', 'true'); hint.style.pointerEvents = 'none';
+      row.appendChild(hint);
+    });
+  }
+  function installListObserver() {
+    var box = document.getElementById('list'); if (!box || box.dataset.agentObserver === '1') return;
+    box.dataset.agentObserver = '1';
+    new MutationObserver(clarifyOpportunityRows).observe(box, { childList: true, subtree: true });
+    clarifyOpportunityRows();
+  }
+  function installPageRepairs() { installAgentPills(); installDirectCreateFix(); installListObserver(); }
+
   function render(o) {
     var anchor = document.getElementById('mine-card'), c = o.commercial;
+    // Show actual activity without pretending that idle agents are working.
+    var active = [];
+    if (o.status === 'running' || (o.team && o.team.status === 'proposing')) active.push('grand-controleur');
+    if ((o.phase1 && o.phase1.status === 'preparing') || (o.handoff && ['queued', 'transferring', 'partial'].indexOf(o.handoff.status) >= 0) || (o.quotation && ['queued', 'preparing'].indexOf(o.quotation.status) >= 0) || (o.workspace && ['queued', 'preparing'].indexOf(o.workspace.status) >= 0)) active.push('mission-controller');
+    Array.prototype.forEach.call(document.querySelectorAll('#opportunity-agent-pills [data-agent-key]'), function (pill) {
+      var busy = active.indexOf(pill.dataset.agentKey) >= 0; pill.classList.toggle('on', busy); pill.title = busy ? 'Agent en cours de travail sur ce dossier' : 'Agent disponible dans le workflow Office Manager';
+    });
     if (!anchor || !c) return;
     var box = document.getElementById('workflow-overview');
     if (box && box.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
@@ -101,9 +163,12 @@
     if (w.summary) { var report = node('details'); report.appendChild(node('summary', 'Voir le travail réalisé et les prochaines actions')); var content = node('p', w.summary); content.style.whiteSpace = 'pre-wrap'; report.appendChild(content); workspace.appendChild(report); }
     if (o.handoff && o.handoff.url) workspace.appendChild(link('Ouvrir le dossier de mission', o.handoff.url));
     if (o.viewer && o.viewer.may_manage && o.mission_id && o.handoff && o.handoff.status === 'complete') {
-      var status = node('p', '', 'status'); var prepare = button(w.status ? 'Reprendre la préparation des fichiers' : 'Préparer les fichiers de travail', function (b) { post(o, 'prepare-mission-files', {}, b, status); });
-      prepare.disabled = ['queued', 'preparing'].indexOf(w.status) >= 0 && Date.now() - Date.parse(w.started_at || w.requested_at) < 600000; workspace.appendChild(prepare); workspace.appendChild(status);
+      var wsStatus = node('p', '', 'status'); var prepare = button(w.status ? 'Reprendre la préparation des fichiers' : 'Préparer les fichiers de travail', function (btn) { post(o, 'prepare-mission-files', {}, btn, wsStatus); });
+      prepare.disabled = ['queued', 'preparing'].indexOf(w.status) >= 0 && Date.now() - Date.parse(w.started_at || w.requested_at) < 600000; workspace.appendChild(prepare); workspace.appendChild(wsStatus);
     }
   }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installPageRepairs);
+  else installPageRepairs();
   window.OMWorkflow = { render: render };
 })();
