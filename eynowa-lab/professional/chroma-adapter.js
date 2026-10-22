@@ -1,5 +1,16 @@
+import { existsSync } from 'node:fs';
 import { ChromaClient } from 'chromadb';
 import { collectionForDomain, validateKnowledgeChunk } from './knowledge-contract.js';
+
+const RUNNING_IN_DOCKER = existsSync('/.dockerenv');
+
+function defaultChromaHost() {
+  return RUNNING_IN_DOCKER ? 'host.docker.internal' : '127.0.0.1';
+}
+
+function defaultOllamaUrl() {
+  return RUNNING_IN_DOCKER ? 'http://host.docker.internal:11434' : 'http://127.0.0.1:11434';
+}
 
 function number(value, fallback) {
   const parsed = Number(value);
@@ -8,14 +19,14 @@ function number(value, fallback) {
 
 function chromaClient() {
   return new ChromaClient({
-    host: process.env.CHROMA_HOST || '127.0.0.1',
+    host: process.env.CHROMA_HOST || defaultChromaHost(),
     port: number(process.env.CHROMA_PORT, 8000),
     ssl: String(process.env.CHROMA_SSL || '').toLowerCase() === 'true',
   });
 }
 
 async function embedTexts(texts) {
-  const base = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  const base = (process.env.OLLAMA_HOST || process.env.OLLAMA_URL || defaultOllamaUrl()).replace(/\/$/, '');
   const model = process.env.OLLAMA_EMBED_MODEL || 'embeddinggemma';
   const input = Array.isArray(texts) ? texts : [texts];
 
@@ -189,12 +200,13 @@ export async function searchChromaKnowledge({
 }
 
 export async function chromaHealth() {
+  const host = process.env.CHROMA_HOST || defaultChromaHost();
   const client = chromaClient();
   const heartbeat = await client.heartbeat();
   return {
     ok: true,
     heartbeat,
-    host: process.env.CHROMA_HOST || '127.0.0.1',
+    host,
     port: number(process.env.CHROMA_PORT, 8000),
     collections: ['eynowa_accounting', 'eynowa_audit', 'eynowa_advisory'],
     embeddingModel: process.env.OLLAMA_EMBED_MODEL || 'embeddinggemma',
