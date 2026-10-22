@@ -17,6 +17,15 @@ export function validateKnowledgeChunk(input = {}) {
   const licenceBasis = text(input.license_basis || input.licence_basis || input.licenseBasis, 500);
   if (!licenceBasis) throw new Error('LICENSE_BASIS_REQUIRED');
 
+  const authority = text(input.authority, 200);
+  if (!authority) throw new Error('AUTHORITY_REQUIRED');
+
+  const sourceUrl = text(input.source_url || input.sourceUrl, 1200);
+  if (!sourceUrl) throw new Error('SOURCE_URL_REQUIRED');
+
+  const reference = text(input.reference, 500);
+  if (!reference) throw new Error('SOURCE_REFERENCE_REQUIRED');
+
   const content = text(input.content, 50000);
   if (!content) throw new Error('KNOWLEDGE_CONTENT_REQUIRED');
 
@@ -25,16 +34,16 @@ export function validateKnowledgeChunk(input = {}) {
     domain,
     framework: text(input.framework, 120),
     sourceId,
-    authority: text(input.authority, 200),
+    authority,
     title: text(input.title, 500),
-    reference: text(input.reference, 500),
+    reference,
     version: text(input.version, 120),
     effectiveFrom: text(input.effective_from || input.effectiveFrom, 40),
     effectiveTo: text(input.effective_to || input.effectiveTo, 40),
     jurisdiction: text(input.jurisdiction, 120),
     country: text(input.country, 40).toUpperCase(),
     language: text(input.language || 'en', 20).toLowerCase(),
-    sourceUrl: text(input.source_url || input.sourceUrl, 1200),
+    sourceUrl,
     licenceBasis,
     content,
     metadata: input.metadata && typeof input.metadata === 'object' ? input.metadata : {},
