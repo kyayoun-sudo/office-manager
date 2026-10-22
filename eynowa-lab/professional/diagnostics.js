@@ -42,11 +42,22 @@ export async function runProfessionalDiagnostics() {
   }));
 
   steps.push(await runStep('ollama_generation', async () => {
-    const generateJson = createOllamaJsonAdapter({ timeoutMs: 45000, numPredict: 48, numCtx: 2048 });
+    const generateJson = createOllamaJsonAdapter({
+      timeoutMs: 10000,
+      fallbackTimeoutMs: 25000,
+      numPredict: 48,
+      fallbackNumPredict: 48,
+      numCtx: 1024,
+      fallbackNumCtx: 1024,
+    });
     const result = await generateJson({
       prompt: 'Return JSON only with exactly this semantic content: {"ok":true,"service":"eynowa-lab"}.',
     });
-    return result;
+    return {
+      ok: result?.ok === true,
+      service: result?.service || '',
+      generation: result?._eynowa_generation || {},
+    };
   }));
 
   return {
