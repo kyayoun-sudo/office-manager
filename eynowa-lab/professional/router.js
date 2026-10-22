@@ -1,5 +1,6 @@
 import { sourcesFor } from './source-registry.js';
 import { evaluateValidation } from './validation-gate.js';
+import { detectTopicsForRequest } from './topic-router.js';
 
 const ALL_DOMAINS = Object.freeze(['accounting', 'audit', 'advisory']);
 const ALLOWED_DOMAINS = new Set(ALL_DOMAINS);
@@ -14,26 +15,17 @@ function unique(values) {
 
 function normaliseDomain(value) {
   const domain = clean(value, 40).toLowerCase();
-  if (!ALLOWED_DOMAINS.has(domain)) {
-    throw new Error('domain must be accounting, audit or advisory');
-  }
+  if (!ALLOWED_DOMAINS.has(domain)) throw new Error('domain must be accounting, audit or advisory');
   return domain;
 }
 
 function resolveDomains(input = {}) {
-  if (Array.isArray(input.domains) && input.domains.length) {
-    return unique(input.domains.map(normaliseDomain));
-  }
-
+  if (Array.isArray(input.domains) && input.domains.length) return unique(input.domains.map(normaliseDomain));
   const legacyDomain = clean(input.domain, 40).toLowerCase();
   if (legacyDomain === 'all' || legacyDomain === '*') return [...ALL_DOMAINS];
   if (legacyDomain) return [normaliseDomain(legacyDomain)];
-
   const application = clean(input.application, 120).toLowerCase().replace(/[-\s]+/g, '_');
-  if (application === 'firm_manager' || application === 'office_manager') {
-    return [...ALL_DOMAINS];
-  }
-
+  if (application === 'firm_manager' || application === 'office_manager') return [...ALL_DOMAINS];
   throw new Error('domains (or legacy domain) is required');
 }
 
@@ -42,18 +34,14 @@ function safeArray(value) {
 }
 
 function resolveFrameworks(input = {}) {
-  const values = Array.isArray(input.frameworks)
-    ? input.frameworks
-    : (input.framework ? [input.framework] : []);
+  const values = Array.isArray(input.frameworks) ? input.frameworks : (input.framework ? [input.framework] : []);
   return unique(values.map((value) => clean(value, 100)).filter(Boolean));
 }
 
 function sourceRegistryForRequest(request) {
   const rows = [];
   for (const domain of request.domains) {
-    const matchingFrameworks = request.frameworks.filter((framework) =>
-      sourcesFor({ domain, framework }).length > 0
-    );
+    const matchingFrameworks = request.frameworks.filter((framework) => sourcesFor({ domain, framework }).length > 0);
     if (matchingFrameworks.length) {
       for (const framework of matchingFrameworks) rows.push(...sourcesFor({ domain, framework }));
     } else {
@@ -79,16 +67,17 @@ export function buildProfessionalRequest(input = {}) {
     query: clean(input.query, 24000),
   };
   if (!request.query) throw new Error('query is required');
+  request.topics = detectTopicsForRequest(request);
   return request;
 }
 
 export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
   const sourceRegistry = sourceRegistryForRequest(request);
   const sourceIds = sourceRegistry.map((source) => source.sourceId);
-
   return [
     'You are EYNOWA Lab, the shared professional intelligence layer for a professional-services firm.',
     `Active professional domains: ${request.domains.join(', ')}.`,
+    `Detected business topics: ${request.topics.join(', ') || 'none'}.`,
     `Calling application: ${request.application || 'unknown'}.`,
     'The calling application does not define or limit your professional capabilities; the requested domains and task do.',
     `Task: ${request.task || 'general professional analysis'}.`,
@@ -100,6 +89,8 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     '- Never invent a standard, paragraph, legal rule, client fact or prior treatment.',
     '- Professional memory is contextual evidence only; it is never normative authority.',
     '- Cite only passages that appear in Retrieved professional knowledge below. A registered source that was not retrieved is not evidence.',
+    '- A public metadata/paraphrase chunk is context, not a substitute for detailed normative authority when an operational accounting conclusion requires the actual rule.',
+    '- If a retrieved hit says requiresNormativeFollowup=true, do not present it as sufficient detailed normative support.',
     '- If facts are missing, sources conflict, or the conclusion requires significant professional judgment, set requires_validation=true.',
     '- Ask one precise question when professional validation is needed.',
     '- Return JSON only.',
@@ -137,36 +128,33 @@ function filterSources(candidateSources, request, knowledge) {
     rows.push(hit);
     retrievedBySource.set(sourceId, rows);
   }
-
-  return safeArray(candidateSources)
-    .map((source) => {
-      const sourceId = String(source?.sourceId || '');
-      const hits = retrievedBySource.get(sourceId) || [];
-      if (!hits.length) return null;
-      const registryRow = registered.get(sourceId);
-      const requestedReference = clean(source?.reference, 500);
-      const exactHit = hits.find((hit) => requestedReference && clean(hit.reference, 500) === requestedReference);
-      const evidence = exactHit || hits[0];
-      return {
-        sourceId,
-        authority: clean(evidence.authority || registryRow?.authority, 160),
-        reference: clean(evidence.reference, 500),
-        sourceUrl: clean(evidence.sourceUrl || registryRow?.sourceUrl, 1000),
-        domain: clean(evidence.domain || registryRow?.domain, 40),
-      };
-    })
-    .filter(Boolean);
+  return safeArray(candidateSources).map((source) => {
+    const sourceId = String(source?.sourceId || '');
+    const hits = retrievedBySource.get(sourceId) || [];
+    if (!hits.length) return null;
+    const registryRow = registered.get(sourceId);
+    const requestedReference = clean(source?.reference, 500);
+    const exactHit = hits.find((hit) => requestedReference && clean(hit.reference, 500) === requestedReference);
+    const evidence = exactHit || hits[0];
+    return {
+      sourceId,
+      authority: clean(evidence.authority || registryRow?.authority, 160),
+      reference: clean(evidence.reference, 500),
+      sourceUrl: clean(evidence.sourceUrl || registryRow?.sourceUrl, 1000),
+      domain: clean(evidence.domain || registryRow?.domain, 40),
+      topic: clean(evidence.topic, 120),
+    };
+  }).filter(Boolean);
 }
 
 async function retrieveKnowledge(searchKnowledge, request) {
   const groups = await Promise.all(request.domains.map(async (domain) => {
-    const relevantFrameworks = request.frameworks.filter((framework) =>
-      sourcesFor({ domain, framework }).length > 0
-    );
+    const relevantFrameworks = request.frameworks.filter((framework) => sourcesFor({ domain, framework }).length > 0);
     return searchKnowledge({
       domain,
       frameworks: relevantFrameworks,
       framework: relevantFrameworks.length === 1 ? relevantFrameworks[0] : '',
+      topics: domain === 'accounting' ? request.topics : [],
       country: request.country,
       query: request.query,
       task: request.task,
@@ -177,30 +165,21 @@ async function retrieveKnowledge(searchKnowledge, request) {
 }
 
 async function retrieveMemory(searchMemory, request) {
-  const groups = await Promise.all(request.domains.map((domain) =>
-    searchMemory({
-      professionalId: request.professionalId,
-      domain,
-      client: request.client,
-      query: request.query,
-      task: request.task,
-      limit: 12,
-    })
-  ));
+  const groups = await Promise.all(request.domains.map((domain) => searchMemory({
+    professionalId: request.professionalId,
+    domain,
+    client: request.client,
+    query: request.query,
+    task: request.task,
+    limit: 12,
+  })));
   return groups.flatMap(safeArray);
 }
 
 export async function answerProfessional(input, adapters = {}) {
   const request = buildProfessionalRequest(input);
-  const {
-    searchKnowledge = async () => [],
-    searchMemory = async () => [],
-    generateJson,
-  } = adapters;
-
-  if (typeof generateJson !== 'function') {
-    throw new Error('generateJson adapter is required');
-  }
+  const { searchKnowledge = async () => [], searchMemory = async () => [], generateJson } = adapters;
+  if (typeof generateJson !== 'function') throw new Error('generateJson adapter is required');
 
   const [knowledge, memory] = await Promise.all([
     retrieveKnowledge(searchKnowledge, request),
@@ -211,6 +190,7 @@ export async function answerProfessional(input, adapters = {}) {
   const raw = await generateJson({ prompt, request });
   const result = raw && typeof raw === 'object' ? raw : {};
   const sources = filterSources(result.sources, request, knowledge);
+  const normativeFollowupHits = safeArray(knowledge).filter((hit) => hit?.requiresNormativeFollowup);
 
   const validation = evaluateValidation({
     domains: request.domains,
@@ -220,8 +200,8 @@ export async function answerProfessional(input, adapters = {}) {
     missingFacts: safeArray(result.missing_facts),
     contradictions: safeArray(result.contradictions),
     confidence: result.confidence,
-    modelRequiresValidation: Boolean(result.requires_validation),
-    validationReason: clean(result.validation_reason, 2000),
+    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0,
+    validationReason: clean(result.validation_reason || (normativeFollowupHits.length ? 'Le contexte public récupéré exige une vérification sur le corpus normatif autorisé avant conclusion opérationnelle.' : ''), 2000),
     questionForProfessional: clean(result.question_for_professional, 2000),
   });
 
@@ -233,6 +213,7 @@ export async function answerProfessional(input, adapters = {}) {
     country: request.country,
     frameworks: request.frameworks,
     framework: request.framework,
+    topics: request.topics,
     answer: clean(result.answer, 30000),
     sources,
     confidence: validation.confidence,
@@ -242,6 +223,7 @@ export async function answerProfessional(input, adapters = {}) {
     high_judgment: validation.highJudgment,
     high_judgment_domains: validation.highJudgmentDomains,
     knowledge_hits: safeArray(knowledge).length,
+    normative_followup_hits: normativeFollowupHits.length,
     memory_hits: safeArray(memory).length,
   };
 }
