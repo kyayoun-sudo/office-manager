@@ -141,3 +141,30 @@ test('Firm Manager combines accounting and audit evidence with one multi-domain 
   assert.equal(result.sources.length, 2);
   assert.deepEqual(result.knowledge_hits_by_domain, { accounting: 1, audit: 1 });
 });
+
+test('Ollama timeout returns grounded deterministic fallback instead of throwing', async () => {
+  const result = await answerProfessional(
+    {
+      application: 'firm_manager',
+      domains: ['accounting', 'audit'],
+      frameworks: ['SYSCOHADA', 'ISA'],
+      query: 'Analyse year-end revenue and receivables.',
+    },
+    {
+      searchKnowledge: async () => [OHADA_HIT, ISA_HIT],
+      searchMemory: async () => [],
+      generateJson: async () => {
+        const error = new Error('OLLAMA_TIMEOUT after 12000ms');
+        error.code = 'OLLAMA_TIMEOUT';
+        throw error;
+      },
+    }
+  );
+
+  assert.equal(result.generation_deterministic_fallback, true);
+  assert.equal(result.generation_model, 'deterministic_grounded_fallback');
+  assert.equal(result.requires_validation, true);
+  assert.equal(result.sources.length, 2);
+  assert.match(result.answer, /Mode local dégradé/i);
+  assert.match(result.generation_error, /OLLAMA_TIMEOUT/i);
+});
