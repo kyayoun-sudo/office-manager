@@ -32,6 +32,9 @@ export function createProfessionalGatewayDispatcher(options = {}) {
   };
 }
 
+// These helpers intentionally do not implement authentication. The existing EYNOWA
+// Lab Gateway remains the security boundary and must authenticate/authorise requests
+// before delegating sensitive memory-write or knowledge-import routes here.
 export async function readJsonRequest(req, { maxBytes = 2_000_000 } = {}) {
   let total = 0;
   const chunks = [];
