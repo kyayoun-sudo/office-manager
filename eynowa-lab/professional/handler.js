@@ -7,13 +7,11 @@ export function createProfessionalHandler({ searchKnowledge, generateJson } = {}
   const localGenerateJson = generateJson || createOllamaJsonAdapter();
 
   return async function handleProfessionalRequest(body = {}) {
-    const result = await answerProfessional(body, {
+    return answerProfessional(body, {
       searchKnowledge: searchKnowledge || searchChromaKnowledge,
       searchMemory: searchProfessionalMemory,
       generateJson: localGenerateJson,
     });
-
-    return result;
   };
 }
 
