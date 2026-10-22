@@ -23,7 +23,7 @@ function extractJson(text) {
 
 export function createOllamaJsonAdapter({
   baseUrl = process.env.OLLAMA_URL || process.env.OLLAMA_HOST || defaultOllamaUrl(),
-  model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'qwen2.5:14b',
+  model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'llama3.2:3b',
   timeoutMs = 120000,
 } = {}) {
   return async function generateJson({ prompt }) {
