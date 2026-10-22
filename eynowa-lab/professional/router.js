@@ -1,4 +1,4 @@
-import { registeredSourceIds, sourcesFor } from './source-registry.js';
+import { sourcesFor } from './source-registry.js';
 import { evaluateValidation } from './validation-gate.js';
 
 const ALL_DOMAINS = Object.freeze(['accounting', 'audit', 'advisory']);
@@ -29,8 +29,6 @@ function resolveDomains(input = {}) {
   if (legacyDomain === 'all' || legacyDomain === '*') return [...ALL_DOMAINS];
   if (legacyDomain) return [normaliseDomain(legacyDomain)];
 
-  // Firm Manager is the cabinet operating system: if it does not narrow the scope,
-  // it may use accounting, audit and advisory knowledge in the same request.
   const application = clean(input.application, 120).toLowerCase().replace(/[-\s]+/g, '_');
   if (application === 'firm_manager' || application === 'office_manager') {
     return [...ALL_DOMAINS];
@@ -101,7 +99,7 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     '- Keep normative authorities separate by domain and framework; do not treat one framework as authority for another domain.',
     '- Never invent a standard, paragraph, legal rule, client fact or prior treatment.',
     '- Professional memory is contextual evidence only; it is never normative authority.',
-    '- Use only retrieved knowledge passages and registered source metadata for citations.',
+    '- Cite only passages that appear in Retrieved professional knowledge below. A registered source that was not retrieved is not evidence.',
     '- If facts are missing, sources conflict, or the conclusion requires significant professional judgment, set requires_validation=true.',
     '- Ask one precise question when professional validation is needed.',
     '- Return JSON only.',
@@ -116,7 +114,7 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     'Required response shape:',
     JSON.stringify({
       answer: 'string',
-      sources: [{ sourceId: 'registered id', authority: 'string', reference: 'string', sourceUrl: 'string', domain: 'accounting|audit|advisory' }],
+      sources: [{ sourceId: 'retrieved registered id', authority: 'string', reference: 'retrieved reference', sourceUrl: 'string', domain: 'accounting|audit|advisory' }],
       confidence: 0.0,
       missing_facts: ['string'],
       contradictions: ['string'],
@@ -129,20 +127,35 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
   ].join('\n');
 }
 
-function filterSources(candidateSources, request) {
-  const allowed = new Map(sourceRegistryForRequest(request).map((source) => [source.sourceId, source]));
+function filterSources(candidateSources, request, knowledge) {
+  const registered = new Map(sourceRegistryForRequest(request).map((source) => [source.sourceId, source]));
+  const retrievedBySource = new Map();
+  for (const hit of safeArray(knowledge)) {
+    const sourceId = String(hit?.sourceId || '');
+    if (!sourceId || !registered.has(sourceId)) continue;
+    const rows = retrievedBySource.get(sourceId) || [];
+    rows.push(hit);
+    retrievedBySource.set(sourceId, rows);
+  }
+
   return safeArray(candidateSources)
-    .filter((source) => source && allowed.has(String(source.sourceId || '')))
     .map((source) => {
-      const registered = allowed.get(String(source.sourceId || ''));
+      const sourceId = String(source?.sourceId || '');
+      const hits = retrievedBySource.get(sourceId) || [];
+      if (!hits.length) return null;
+      const registryRow = registered.get(sourceId);
+      const requestedReference = clean(source?.reference, 500);
+      const exactHit = hits.find((hit) => requestedReference && clean(hit.reference, 500) === requestedReference);
+      const evidence = exactHit || hits[0];
       return {
-        sourceId: clean(source.sourceId, 120),
-        authority: clean(source.authority || registered?.authority, 160),
-        reference: clean(source.reference, 500),
-        sourceUrl: clean(source.sourceUrl || registered?.sourceUrl, 1000),
-        domain: clean(source.domain || registered?.domain, 40),
+        sourceId,
+        authority: clean(evidence.authority || registryRow?.authority, 160),
+        reference: clean(evidence.reference, 500),
+        sourceUrl: clean(evidence.sourceUrl || registryRow?.sourceUrl, 1000),
+        domain: clean(evidence.domain || registryRow?.domain, 40),
       };
-    });
+    })
+    .filter(Boolean);
 }
 
 async function retrieveKnowledge(searchKnowledge, request) {
@@ -197,7 +210,7 @@ export async function answerProfessional(input, adapters = {}) {
   const prompt = buildSystemPrompt({ request, knowledge, memory });
   const raw = await generateJson({ prompt, request });
   const result = raw && typeof raw === 'object' ? raw : {};
-  const sources = filterSources(result.sources, request);
+  const sources = filterSources(result.sources, request, knowledge);
 
   const validation = evaluateValidation({
     domains: request.domains,
