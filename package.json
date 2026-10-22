@@ -10,7 +10,8 @@
     "test:lab": "node --test eynowa-lab/professional/*.test.js",
     "lab:import": "node eynowa-lab/professional/import-knowledge.js",
     "lab:import:ohada": "node eynowa-lab/professional/packs/ohada/import-ohada.js",
-    "lab:import:ohada:starter": "node eynowa-lab/professional/packs/ohada/import-ohada.js eynowa-lab/professional/packs/ohada/public-starter-pack.json"
+    "lab:import:ohada:starter": "node eynowa-lab/professional/packs/ohada/import-ohada.js eynowa-lab/professional/packs/ohada/public-starter-pack.json",
+    "lab:import:ohada:immobilisations": "node eynowa-lab/professional/packs/ohada/import-ohada.js eynowa-lab/professional/packs/ohada/immobilisations-public-guidance.json"
   },
   "dependencies": {
     "chromadb": "3.5.0"
