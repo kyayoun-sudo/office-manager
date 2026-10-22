@@ -25,22 +25,48 @@ function chromaClient() {
   });
 }
 
-async function embedTexts(texts) {
+async function withTimeout(promise, timeoutMs, code) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${code} after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function embedTexts(texts, { timeoutMs = number(process.env.OLLAMA_EMBED_TIMEOUT_MS, 45000) } = {}) {
   const base = (process.env.OLLAMA_HOST || process.env.OLLAMA_URL || defaultOllamaUrl()).replace(/\/$/, '');
   const model = process.env.OLLAMA_EMBED_MODEL || 'embeddinggemma';
   const input = Array.isArray(texts) ? texts : [texts];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  const response = await fetch(`${base}/api/embed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, input }),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`OLLAMA_EMBED_${response.status}: ${data?.error || response.statusText}`);
-  if (!Array.isArray(data?.embeddings) || data.embeddings.length !== input.length) {
-    throw new Error('OLLAMA_EMBED_INVALID_RESPONSE');
+  try {
+    const response = await fetch(`${base}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, input }),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`OLLAMA_EMBED_${response.status}: ${data?.error || response.statusText}`);
+    if (!Array.isArray(data?.embeddings) || data.embeddings.length !== input.length) {
+      throw new Error('OLLAMA_EMBED_INVALID_RESPONSE');
+    }
+    return data.embeddings;
+  } catch (error) {
+    if (error?.name === 'AbortError' || Number(error?.code) === 20) {
+      throw new Error(`OLLAMA_EMBED_TIMEOUT after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return data.embeddings;
 }
 
 function primitiveMetadata(chunk) {
@@ -82,11 +108,11 @@ function stableId(chunk) {
 
 async function getCollection(domain) {
   const client = chromaClient();
-  return client.getOrCreateCollection({
+  return withTimeout(client.getOrCreateCollection({
     name: collectionForDomain(domain),
     embeddingFunction: null,
     metadata: { purpose: 'EYNOWA Lab professional knowledge', domain },
-  });
+  }), number(process.env.CHROMA_COLLECTION_TIMEOUT_MS, 15000), `CHROMA_COLLECTION_TIMEOUT_${domain}`);
 }
 
 function resultRows(result, domain) {
@@ -156,7 +182,7 @@ function rankRows(rows, topics) {
 
 function balancedRows(rows, domains, topics, limit) {
   const requested = Array.isArray(domains) ? domains.filter(Boolean) : [];
-  const target = Math.max(1, Number(limit) || 10);
+  const target = Math.max(1, Number(limit) || 8);
   if (requested.length <= 1) return rankRows(rows, topics).slice(0, target);
 
   const quota = Math.max(2, Math.floor(target / requested.length));
@@ -198,12 +224,12 @@ export async function upsertKnowledgeChunks(inputs = []) {
     const collection = await getCollection(domain);
     const embeddings = await embedTexts(rows.map((row) => row.content));
     const ids = rows.map(stableId);
-    await collection.upsert({
+    await withTimeout(collection.upsert({
       ids,
       embeddings,
       documents: rows.map((row) => row.content),
       metadatas: rows.map(primitiveMetadata),
-    });
+    }), number(process.env.CHROMA_UPSERT_TIMEOUT_MS, 30000), `CHROMA_UPSERT_TIMEOUT_${domain}`);
     summary.push({ domain, collection: collectionForDomain(domain), count: rows.length, ids });
   }
   return summary;
@@ -217,7 +243,7 @@ export async function searchChromaKnowledge({
   topics = [],
   country = '',
   query = '',
-  limit = 10,
+  limit = 8,
 } = {}) {
   if (!String(query || '').trim()) return [];
   const requestedDomains = Array.isArray(domains) && domains.length ? domains : (domain ? [domain] : ['accounting', 'audit', 'advisory']);
@@ -226,26 +252,30 @@ export async function searchChromaKnowledge({
   const collectionStates = await Promise.all(requestedDomains.map(async (currentDomain) => {
     const collection = await getCollection(currentDomain);
     let count = 0;
-    try { count = Number(await collection.count()) || 0; } catch { count = 0; }
+    try {
+      count = Number(await withTimeout(collection.count(), number(process.env.CHROMA_COUNT_TIMEOUT_MS, 10000), `CHROMA_COUNT_TIMEOUT_${currentDomain}`)) || 0;
+    } catch (error) {
+      throw new Error(`${error.message}; domain=${currentDomain}`);
+    }
     return { domain: currentDomain, collection, count };
   }));
   const searchable = collectionStates.filter((item) => item.count > 0);
   if (!searchable.length) return [];
 
-  // Compute one query embedding and reuse it across all requested professional domains.
   const queryEmbedding = (await embedTexts([String(query)]))[0];
-  const perDomainLimit = Math.max(6, Math.ceil((Number(limit) || 10) / searchable.length) * 4);
-  const rows = [];
+  const perDomainLimit = Math.max(4, Math.ceil((Number(limit) || 8) / searchable.length) * 3);
+  const queryTimeoutMs = number(process.env.CHROMA_QUERY_TIMEOUT_MS, 20000);
 
-  for (const item of searchable) {
-    const result = await item.collection.query({
+  const queryResults = await Promise.all(searchable.map(async (item) => {
+    const result = await withTimeout(item.collection.query({
       queryEmbeddings: [queryEmbedding],
       nResults: Math.max(1, Math.min(perDomainLimit, item.count)),
       include: ['documents', 'metadatas', 'distances'],
-    });
-    rows.push(...resultRows(result, item.domain));
-  }
+    }), queryTimeoutMs, `CHROMA_QUERY_TIMEOUT_${item.domain}`);
+    return resultRows(result, item.domain);
+  }));
 
+  const rows = queryResults.flat();
   const filtered = rows
     .filter((row) => frameworkMatches(row, requestedFrameworks))
     .filter((row) => countryMatches(row, country));
@@ -256,7 +286,7 @@ export async function searchChromaKnowledge({
 export async function chromaHealth() {
   const host = process.env.CHROMA_HOST || defaultChromaHost();
   const client = chromaClient();
-  const heartbeat = await client.heartbeat();
+  const heartbeat = await withTimeout(client.heartbeat(), number(process.env.CHROMA_HEALTH_TIMEOUT_MS, 10000), 'CHROMA_HEALTH_TIMEOUT');
   return {
     ok: true,
     heartbeat,
