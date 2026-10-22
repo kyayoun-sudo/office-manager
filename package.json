@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=20"
   },
+  "scripts": {
+    "test:lab": "node --test eynowa-lab/professional/*.test.js"
+  },
   "dependencies": {
     "chromadb": "3.5.0"
   }
