@@ -153,9 +153,9 @@
       return box;
     },
     requireLogin: function (start) {
-      // opportunites.html currently has no #list-view wrapper. Do not move DOM nodes to rebuild it:
-      // the malformed legacy wrapper around the header makes browsers reorder the page and creates
-      // a large blank gap. Instead add only a zero-size marker so loadDetail() can hide it safely.
+      // opportunites.html currently has no #list-view wrapper. Keep the legacy list in place,
+      // but repair the parsed DOM: malformed closing tags can leave #detail-view outside <main>.
+      // Moving it back into <main> makes the detail replace the list at the same vertical position.
       if (location.pathname === '/opportunites.html' && !document.getElementById('list-view')) {
         var main = document.querySelector('main.main');
         var detail = document.getElementById('detail-view');
@@ -164,10 +164,14 @@
           listView.id = 'list-view';
           listView.hidden = true;
           listView.style.display = 'none';
-          main.insertBefore(listView, detail);
+          if (detail.parentNode === main) main.insertBefore(listView, detail);
+          else {
+            main.appendChild(listView);
+            main.appendChild(detail);
+          }
 
-          // On a detail URL, hide the existing list/create blocks in place. Nothing is moved, so
-          // there is no layout hole and the detail starts where the list normally sits.
+          // On a detail URL, hide the list/create blocks where they already are. Nothing else is
+          // moved, so there is no blank layout region above the opened opportunity.
           if (new URLSearchParams(location.search).get('id')) {
             var head = main.querySelector('.page-head');
             var signals = document.getElementById('signals-card');
