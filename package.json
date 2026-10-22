@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test:lab": "node --test eynowa-lab/professional/*.test.js",
-    "lab:import": "node eynowa-lab/professional/import-knowledge.js"
+    "lab:import": "node eynowa-lab/professional/import-knowledge.js",
+    "lab:import:ohada": "node eynowa-lab/professional/packs/ohada/import-ohada.js"
   },
   "dependencies": {
     "chromadb": "3.5.0"
