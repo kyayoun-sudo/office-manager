@@ -1,0 +1,30 @@
+{
+  "pack_id": "ohada-accounting-v1",
+  "version": "0.2.0",
+  "legend": {
+    "public_context_ready": "Le pack contient déjà du contexte public officiel/paraphrasé utile, mais pas nécessairement la règle normative détaillée.",
+    "normative_content_required": "Le moteur doit demander validation ou vérifier un corpus normatif autorisé avant un traitement comptable opérationnel.",
+    "mixed": "Contexte public disponible, mais décision opérationnelle conditionnée à une source normative autorisée."
+  },
+  "topics": [
+    {"id":"framework_and_scope","status":"public_context_ready","priority":1},
+    {"id":"accounting_plan","status":"mixed","priority":2},
+    {"id":"purchases_and_expenses","status":"normative_content_required","priority":3},
+    {"id":"sales_and_revenue","status":"normative_content_required","priority":3},
+    {"id":"property_plant_equipment","status":"normative_content_required","priority":1},
+    {"id":"inventories","status":"normative_content_required","priority":1},
+    {"id":"receivables","status":"normative_content_required","priority":2},
+    {"id":"payables","status":"normative_content_required","priority":2},
+    {"id":"cash_and_banking","status":"normative_content_required","priority":2},
+    {"id":"payroll_and_employee_costs","status":"normative_content_required","priority":3},
+    {"id":"taxes_and_levies","status":"normative_content_required","priority":2},
+    {"id":"provisions_and_contingencies","status":"normative_content_required","priority":1},
+    {"id":"borrowings_and_financing","status":"normative_content_required","priority":2},
+    {"id":"equity","status":"normative_content_required","priority":3},
+    {"id":"foreign_currency","status":"normative_content_required","priority":2},
+    {"id":"period_end_close","status":"normative_content_required","priority":1},
+    {"id":"financial_statements","status":"mixed","priority":1},
+    {"id":"consolidated_and_combined_accounts","status":"mixed","priority":2},
+    {"id":"not_for_profit_specifics","status":"mixed","priority":1}
+  ]
+}
