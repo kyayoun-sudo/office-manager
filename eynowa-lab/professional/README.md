@@ -104,6 +104,8 @@ Every ingested chunk must pass `knowledge-contract.js` and include:
 - `license_basis`
 - `content`
 
+`authority`, `reference`, `source_url`, `license_basis` and `content` are mandatory. This prevents anonymous or unverifiable material from silently entering the professional knowledge base.
+
 Import authorised JSON or JSONL chunks with:
 
 ```bash
