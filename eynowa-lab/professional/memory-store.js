@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 
 const DEFAULT_HOME = process.env.EYNOWA_LAB_HOME || path.join(os.homedir(), '.eynowa-lab');
 const MEMORY_FILE = process.env.EYNOWA_LAB_MEMORY_FILE || path.join(DEFAULT_HOME, 'professional-memory.jsonl');
@@ -44,7 +45,7 @@ async function readAll() {
 
 export async function rememberProfessionalMemory(entry = {}) {
   const record = {
-    id: entry.id || crypto.randomUUID(),
+    id: entry.id || randomUUID(),
     professionalId: String(entry.professionalId || entry.professional_id || 'default'),
     domain: String(entry.domain || '').toLowerCase(),
     client: String(entry.client || ''),
