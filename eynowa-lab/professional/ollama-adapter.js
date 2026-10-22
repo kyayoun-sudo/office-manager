@@ -92,12 +92,12 @@ export function createOllamaJsonAdapter({
   baseUrl = process.env.OLLAMA_URL || process.env.OLLAMA_HOST || defaultOllamaUrl(),
   model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'llama3.2:3b',
   fallbackModel = process.env.EYNOWA_LAB_FALLBACK_MODEL || 'llama3.2:1b',
-  timeoutMs = number(process.env.OLLAMA_GENERATION_TIMEOUT_MS, 60000),
-  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 35000),
-  numPredict = number(process.env.OLLAMA_NUM_PREDICT, 420),
-  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 260),
+  timeoutMs = number(process.env.OLLAMA_GENERATION_TIMEOUT_MS, 25000),
+  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 30000),
+  numPredict = number(process.env.OLLAMA_NUM_PREDICT, 320),
+  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 180),
   numCtx = number(process.env.OLLAMA_NUM_CTX, 4096),
-  fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 3072),
+  fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 2048),
   allowFallback = String(process.env.EYNOWA_LAB_ALLOW_FALLBACK || 'true').toLowerCase() !== 'false',
 } = {}) {
   return async function generateJson({ prompt }) {
