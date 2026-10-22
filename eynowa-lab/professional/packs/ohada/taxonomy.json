@@ -1,0 +1,24 @@
+{
+  "pack_id": "ohada-accounting-v0",
+  "topics": [
+    {"id":"framework_and_scope","label":"Cadre AUDCIF et champ d'application","frameworks":["AUDCIF","SYSCOHADA"],"keywords":["AUDCIF","SYSCOHADA","champ d'application","droit comptable","information financière"]},
+    {"id":"accounting_plan","label":"Plan comptable OHADA","frameworks":["SYSCOHADA"],"keywords":["plan comptable","comptes","classes","imputation"]},
+    {"id":"purchases_and_expenses","label":"Achats et charges","frameworks":["SYSCOHADA"],"keywords":["achats","charges","fournisseurs","factures"]},
+    {"id":"sales_and_revenue","label":"Ventes et produits","frameworks":["SYSCOHADA"],"keywords":["ventes","produits","clients","chiffre d'affaires"]},
+    {"id":"property_plant_equipment","label":"Immobilisations corporelles et incorporelles","frameworks":["SYSCOHADA"],"keywords":["immobilisation","amortissement","dépréciation","cession"]},
+    {"id":"inventories","label":"Stocks et en-cours","frameworks":["SYSCOHADA"],"keywords":["stocks","inventaire","en-cours","dépréciation"]},
+    {"id":"receivables","label":"Créances et clients","frameworks":["SYSCOHADA"],"keywords":["créances","clients","impayés","dépréciation"]},
+    {"id":"payables","label":"Dettes et fournisseurs","frameworks":["SYSCOHADA"],"keywords":["dettes","fournisseurs","charges à payer","factures non parvenues"]},
+    {"id":"cash_and_banking","label":"Trésorerie et banques","frameworks":["SYSCOHADA"],"keywords":["banque","caisse","rapprochement bancaire","trésorerie"]},
+    {"id":"payroll_and_employee_costs","label":"Personnel et charges sociales","frameworks":["SYSCOHADA"],"keywords":["salaires","personnel","charges sociales","paie"]},
+    {"id":"taxes_and_levies","label":"Impôts et taxes","frameworks":["SYSCOHADA"],"keywords":["TVA","impôt","taxe","fiscalité"]},
+    {"id":"provisions_and_contingencies","label":"Provisions et passifs éventuels","frameworks":["SYSCOHADA"],"keywords":["provision","risque","litige","charge à payer"]},
+    {"id":"borrowings_and_financing","label":"Emprunts et financement","frameworks":["SYSCOHADA"],"keywords":["emprunt","intérêt","dette financière","financement"]},
+    {"id":"equity","label":"Capitaux propres","frameworks":["SYSCOHADA"],"keywords":["capital","réserves","résultat","report à nouveau"]},
+    {"id":"foreign_currency","label":"Opérations en devises","frameworks":["SYSCOHADA"],"keywords":["devise","change","écart de change","réévaluation"]},
+    {"id":"period_end_close","label":"Clôture comptable","frameworks":["AUDCIF","SYSCOHADA"],"keywords":["clôture","cut-off","inventaire","régularisation"]},
+    {"id":"financial_statements","label":"États financiers et information financière","frameworks":["AUDCIF","SYSCOHADA"],"keywords":["bilan","compte de résultat","tableau de flux","notes annexes","états financiers"]},
+    {"id":"consolidated_and_combined_accounts","label":"Comptes consolidés et combinés","frameworks":["AUDCIF","SYSCOHADA"],"keywords":["consolidation","comptes combinés","groupe"]},
+    {"id":"not_for_profit_specifics","label":"Spécificités des entités à but non lucratif","frameworks":["SYCEBNL"],"keywords":["ONG","association","fondation","dons","subventions","cotisations","fonds dédiés","donateurs"]}
+  ]
+}
