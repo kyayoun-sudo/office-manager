@@ -45,12 +45,19 @@ export function evaluateValidation({
     (HIGH_JUDGMENT[selectedDomain] || []).some((term) => haystack.includes(term))
   );
   const highJudgment = highJudgmentDomains.length > 0;
-  const authoritativeSources = sources.filter((source) => source?.authority && source?.sourceId);
+  const authoritativeSources = sources.filter((source) =>
+    source?.authority && source?.sourceId && source?.supportRole !== 'methodology_non_normative'
+  );
+  const methodologyOnly = sources.length > 0 && authoritativeSources.length === 0;
   const numericConfidence = Number(confidence);
   const confidenceKnown = Number.isFinite(numericConfidence);
 
   const reasons = [];
-  if (!authoritativeSources.length) reasons.push('Aucune source professionnelle vérifiable n’appuie la conclusion.');
+  if (!authoritativeSources.length) {
+    reasons.push(methodologyOnly
+      ? 'La conclusion est appuyée uniquement par une méthodologie EYNOWA non normative ; une source normative ou officielle applicable reste nécessaire.'
+      : 'Aucune source professionnelle vérifiable n’appuie la conclusion.');
+  }
   if (missingFacts.length) reasons.push(`Informations manquantes : ${missingFacts.join(', ')}.`);
   if (contradictions.length) reasons.push('Des sources ou faits sont contradictoires.');
   if (highJudgment) reasons.push(`Le sujet nécessite un jugement professionnel élevé (${highJudgmentDomains.join(', ')}).`);
