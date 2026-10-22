@@ -2,6 +2,7 @@ import { answerProfessional } from './router.js';
 import { createOllamaJsonAdapter } from './ollama-adapter.js';
 import { searchProfessionalMemory, rememberProfessionalMemory } from './memory-store.js';
 import { searchChromaKnowledge, upsertKnowledgeChunks, chromaHealth } from './chroma-adapter.js';
+import { runProfessionalDiagnostics } from './diagnostics.js';
 
 export function createProfessionalHandler({ searchKnowledge, generateJson } = {}) {
   const localGenerateJson = generateJson || createOllamaJsonAdapter();
@@ -37,4 +38,8 @@ export async function handleProfessionalKnowledgeImport(body = {}) {
 
 export async function handleProfessionalHealth() {
   return chromaHealth();
+}
+
+export async function handleProfessionalDiagnostics() {
+  return runProfessionalDiagnostics();
 }
