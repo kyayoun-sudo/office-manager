@@ -1,12 +1,12 @@
 const ACCOUNTING_TOPICS = Object.freeze([
   { id: 'framework_and_scope', keywords: ['audcif','syscohada','champ d application','droit comptable','information financiere','information financière','referentiel','référentiel'] },
   { id: 'accounting_plan', keywords: ['plan comptable','numero de compte','numéro de compte','classe de compte','imputation','quel compte','compte comptable'] },
-  { id: 'purchases_and_expenses', keywords: ['achat','achats','charge','charges','facture fournisseur','fournisseur','depense','dépense'] },
+  { id: 'purchases_and_expenses', keywords: ['achat','achats','charge','charges','facture fournisseur','fournisseur','depense','dépense','bon de commande','commande fournisseur','bon de reception','bon de réception','reception fournisseur','réception fournisseur','three way match','3 way match','purchase order','invoice matching'] },
   { id: 'sales_and_revenue', keywords: ['vente','ventes','produit','produits','facture client','client','chiffre d affaires','chiffre d’affaires','revenu'] },
   { id: 'property_plant_equipment', keywords: ['immobilisation','immobilisations','machine','materiel','matériel','equipement','équipement','amortissement','depreciation','dépréciation','cession d actif','cession d’actif'] },
   { id: 'inventories', keywords: ['stock','stocks','inventaire','en cours','en-cours','marchandise','matiere premiere','matière première','obsolescence'] },
   { id: 'receivables', keywords: ['creance','créance','creances','créances','client douteux','impaye','impayé','recouvrement'] },
-  { id: 'payables', keywords: ['dette fournisseur','dettes fournisseurs','fnp','facture non parvenue','charge a payer','charge à payer','fournisseur'] },
+  { id: 'payables', keywords: ['dette fournisseur','dettes fournisseurs','fnp','facture non parvenue','factures non parvenues','charge a payer','charge à payer','charges a payer','charges à payer','fournisseur','gr ir','gr/ir','goods received not invoiced','reception non facturee','réception non facturée','paiement posterieur','paiement postérieur','releve fournisseur','relevé fournisseur','solde fournisseur debiteur','solde fournisseur débiteur'] },
   { id: 'cash_and_banking', keywords: ['banque','bancaire','caisse','tresorerie','trésorerie','rapprochement bancaire','releve bancaire','relevé bancaire'] },
   { id: 'payroll_and_employee_costs', keywords: ['salaire','salaires','personnel','paie','charges sociales','cotisations sociales','employe','employé'] },
   { id: 'taxes_and_levies', keywords: ['tva','impot','impôt','taxe','taxes','fiscalite','fiscalité','retenue a la source','retenue à la source'] },
@@ -14,7 +14,7 @@ const ACCOUNTING_TOPICS = Object.freeze([
   { id: 'borrowings_and_financing', keywords: ['emprunt','emprunts','pret','prêt','interet','intérêt','dette financiere','dette financière','financement'] },
   { id: 'equity', keywords: ['capital','capitaux propres','reserve','réserve','reserves','réserves','report a nouveau','report à nouveau','dividende'] },
   { id: 'foreign_currency', keywords: ['devise','devises','change','ecart de change','écart de change','reevaluation','réévaluation','monnaie etrangere','monnaie étrangère'] },
-  { id: 'period_end_close', keywords: ['cloture','clôture','cut off','cut-off','regularisation','régularisation','fin d exercice','fin d’exercice','inventaire de cloture','inventaire de clôture'] },
+  { id: 'period_end_close', keywords: ['cloture','clôture','cut off','cut-off','cutoff','regularisation','régularisation','fin d exercice','fin d’exercice','inventaire de cloture','inventaire de clôture','facture apres cloture','facture après clôture','paiement apres cloture','paiement après clôture'] },
   { id: 'financial_statements', keywords: ['etats financiers','états financiers','bilan','compte de resultat','compte de résultat','tableau de flux','notes annexes','annexe'] },
   { id: 'consolidated_and_combined_accounts', keywords: ['consolidation','consolide','consolidé','comptes combines','comptes combinés','groupe','filiale'] },
   { id: 'not_for_profit_specifics', keywords: ['sycebnl','ong','association','fondation','don','dons','subvention','subventions','cotisation','cotisations','fonds dedies','fonds dédiés','donateur','donateurs'] },
@@ -26,7 +26,7 @@ function normalise(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, ' ')
-    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/[^a-z0-9\s/-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -54,9 +54,7 @@ export function detectAccountingTopics({ query = '', task = '', frameworks = [] 
 export function detectTopicsForRequest(request = {}) {
   const topics = [];
   const domains = Array.isArray(request.domains) ? request.domains : [];
-  if (domains.includes('accounting')) {
-    topics.push(...detectAccountingTopics(request));
-  }
+  if (domains.includes('accounting')) topics.push(...detectAccountingTopics(request));
   return [...new Set(topics)];
 }
 
