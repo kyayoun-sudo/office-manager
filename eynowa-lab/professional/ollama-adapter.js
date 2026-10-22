@@ -24,21 +24,40 @@ function number(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function installedModels(baseUrl, timeoutMs = 5000) {
+async function fetchJson(url, timeoutMs = 5000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/tags`, { signal: controller.signal });
-    if (!response.ok) return [];
-    const data = await response.json().catch(() => ({}));
-    return Array.isArray(data?.models)
-      ? data.models.map((row) => String(row?.name || row?.model || '')).filter(Boolean)
-      : [];
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    return response.json().catch(() => null);
   } catch {
-    return [];
+    return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function installedModels(baseUrl, timeoutMs = 5000) {
+  const data = await fetchJson(`${baseUrl.replace(/\/$/, '')}/api/tags`, timeoutMs);
+  return Array.isArray(data?.models)
+    ? data.models.map((row) => String(row?.name || row?.model || '')).filter(Boolean)
+    : [];
+}
+
+async function runtimeProfile(baseUrl, timeoutMs = 5000) {
+  const data = await fetchJson(`${baseUrl.replace(/\/$/, '')}/api/ps`, timeoutMs);
+  const models = Array.isArray(data?.models) ? data.models : [];
+  const loaded = models.map((row) => ({
+    name: String(row?.name || row?.model || ''),
+    sizeVram: Number(row?.size_vram || 0),
+    size: Number(row?.size || 0),
+  })).filter((row) => row.name);
+  return {
+    known: loaded.length > 0,
+    cpuOnly: loaded.length > 0 && loaded.every((row) => row.sizeVram === 0),
+    loaded,
+  };
 }
 
 function modelInstalled(models, wanted) {
@@ -91,16 +110,56 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
 export function createOllamaJsonAdapter({
   baseUrl = process.env.OLLAMA_URL || process.env.OLLAMA_HOST || defaultOllamaUrl(),
   model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'llama3.2:3b',
+  cpuModel = process.env.EYNOWA_LAB_CPU_MODEL || 'qwen2.5:0.5b-instruct',
   fallbackModel = process.env.EYNOWA_LAB_FALLBACK_MODEL || 'llama3.2:1b',
   timeoutMs = number(process.env.OLLAMA_GENERATION_TIMEOUT_MS, 25000),
+  cpuTimeoutMs = number(process.env.OLLAMA_CPU_TIMEOUT_MS, 30000),
   fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 30000),
   numPredict = number(process.env.OLLAMA_NUM_PREDICT, 320),
+  cpuNumPredict = number(process.env.OLLAMA_CPU_NUM_PREDICT, 220),
   fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 180),
   numCtx = number(process.env.OLLAMA_NUM_CTX, 4096),
+  cpuNumCtx = number(process.env.OLLAMA_CPU_NUM_CTX, 2048),
   fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 2048),
   allowFallback = String(process.env.EYNOWA_LAB_ALLOW_FALLBACK || 'true').toLowerCase() !== 'false',
 } = {}) {
   return async function generateJson({ prompt }) {
+    const [models, runtime] = await Promise.all([
+      installedModels(baseUrl),
+      runtimeProfile(baseUrl),
+    ]);
+
+    const cpuCandidate = String(cpuModel || '').trim();
+    const fallbackCandidate = String(fallbackModel || '').trim();
+
+    // If Ollama is demonstrably CPU-only, skip the 3B model entirely when a lightweight CPU model is installed.
+    if (runtime.cpuOnly && allowFallback) {
+      const directCpuModel = [cpuCandidate, fallbackCandidate]
+        .find((candidate) => candidate && candidate !== model && modelInstalled(models, candidate));
+
+      if (directCpuModel) {
+        const usingPreferredCpuModel = directCpuModel === cpuCandidate;
+        const cpuResult = await callOllamaJson({
+          baseUrl,
+          model: directCpuModel,
+          prompt,
+          timeoutMs: usingPreferredCpuModel ? cpuTimeoutMs : fallbackTimeoutMs,
+          numPredict: usingPreferredCpuModel ? cpuNumPredict : fallbackNumPredict,
+          numCtx: usingPreferredCpuModel ? cpuNumCtx : fallbackNumCtx,
+        });
+        return {
+          ...cpuResult.value,
+          _eynowa_generation: {
+            model: cpuResult.model,
+            fallbackUsed: true,
+            cpuMode: true,
+            primarySkipped: true,
+            elapsedMs: cpuResult.elapsedMs,
+          },
+        };
+      }
+    }
+
     try {
       const primary = await callOllamaJson({
         baseUrl,
@@ -115,33 +174,38 @@ export function createOllamaJsonAdapter({
         _eynowa_generation: {
           model: primary.model,
           fallbackUsed: false,
+          cpuMode: runtime.cpuOnly,
+          primarySkipped: false,
           elapsedMs: primary.elapsedMs,
         },
       };
     } catch (primaryError) {
-      const fallbackCandidate = String(fallbackModel || '').trim();
-      if (!allowFallback || !fallbackCandidate || fallbackCandidate === model) throw primaryError;
+      if (!allowFallback) throw primaryError;
 
-      const models = await installedModels(baseUrl);
-      if (!modelInstalled(models, fallbackCandidate)) {
-        const error = new Error(`${primaryError.message}; FALLBACK_MODEL_NOT_INSTALLED: ${fallbackCandidate}`);
+      const secondary = [cpuCandidate, fallbackCandidate]
+        .find((candidate) => candidate && candidate !== model && modelInstalled(models, candidate));
+      if (!secondary) {
+        const error = new Error(`${primaryError.message}; NO_LIGHTWEIGHT_FALLBACK_MODEL_INSTALLED`);
         error.code = primaryError.code || 'OLLAMA_PRIMARY_FAILED';
         throw error;
       }
 
+      const usingPreferredCpuModel = secondary === cpuCandidate;
       const fallback = await callOllamaJson({
         baseUrl,
-        model: fallbackCandidate,
+        model: secondary,
         prompt,
-        timeoutMs: fallbackTimeoutMs,
-        numPredict: fallbackNumPredict,
-        numCtx: fallbackNumCtx,
+        timeoutMs: usingPreferredCpuModel ? cpuTimeoutMs : fallbackTimeoutMs,
+        numPredict: usingPreferredCpuModel ? cpuNumPredict : fallbackNumPredict,
+        numCtx: usingPreferredCpuModel ? cpuNumCtx : fallbackNumCtx,
       });
       return {
         ...fallback.value,
         _eynowa_generation: {
           model: fallback.model,
           fallbackUsed: true,
+          cpuMode: runtime.cpuOnly,
+          primarySkipped: false,
           elapsedMs: fallback.elapsedMs,
           primaryFailure: primaryError.message,
         },
