@@ -22,10 +22,6 @@
       if (!a && !b) return 'Dates à renseigner';
       return (UI.date(a) || '?') + ' → ' + (UI.date(b) || '?');
     },
-    // Agents' answers, written in Markdown, shown as a formatted document (Paul, 2026-10-07: « les
-    // réponses ne sont pas belles… gras, souligné, mais pas ces étoiles partout »): titles,
-    // paragraphs, bold, underline, italics, lists, tables, links. Built element by element (no HTML
-    // is injected); stray asterisks are removed.
     richText: function (box, md) {
       box.textContent = ''; box.classList.add('rich');
       var lines = String(md || '').replace(/\r\n?/g, '\n').split('\n');
@@ -72,7 +68,6 @@
       }
       flushPara();
     },
-    // Follows a background job (engagement preparation, review…) until it is done or failed.
     poll: function (url, onData, every) {
       var stop = false, timer = null;
       function tick() {
@@ -84,7 +79,6 @@
       tick();
       return function () { stop = true; clearTimeout(timer); };
     },
-    // Drive file ids from pasted links or ids (one per line, or separated by spaces).
     driveIds: function (text) {
       var out = [];
       String(text || '').split(/[\s,;]+/).forEach(function (t) {
@@ -93,7 +87,6 @@
       });
       return out;
     },
-    // A small table from rows of cells (strings or elements).
     table: function (head, rows) {
       var box = UI.el('div', null, 'table-box'), t = document.createElement('table'), tr = document.createElement('tr');
       head.forEach(function (h) { tr.appendChild(UI.el('th', h)); });
@@ -102,7 +95,6 @@
       rows.forEach(function (r) { var row = document.createElement('tr'); r.forEach(function (c) { var td = document.createElement('td'); if (c && c.nodeType) td.appendChild(c); else td.textContent = c == null || c === '' ? '–' : String(c); row.appendChild(td); }); tb.appendChild(row); });
       t.appendChild(tb); box.appendChild(t); return box;
     },
-    // One line of text without Markdown signs (lists, previews).
     plain: function (md) { return String(md || '').replace(/\*\*|__|\+\+|`|^#+\s*/gm, '').replace(/(^|\s)[*_]([^*_]+)[*_]/g, '$1$2').replace(/\*/g, ''); },
     fail: function (box, err) {
       box.textContent = '';
@@ -143,7 +135,6 @@
       });
       if (data.query) { var more = UI.el('a', 'Voir tous les résultats et filtrer'); more.href = '/recherche.html?q=' + encodeURIComponent(data.query); box.appendChild(more); }
     },
-    // « À qui la confier ? » — a person picker that gives an action to someone (managers).
     assignPicker: function (actionId, onDone) {
       var box = UI.el('div', null, 'assign');
       var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Personne à qui confier cette action');
@@ -161,8 +152,27 @@
       });
       return box;
     },
-    // Shows the login card when no token is stored, then calls start().
     requireLogin: function (start) {
+      // opportunites.html lost its #list-view wrapper during the Avec/Sans TDR UI edit.
+      // Rebuild it before the page calls loadDetail(), otherwise loadDetail() crashes on
+      // document.getElementById('list-view').hidden and only the lightweight summary is visible.
+      if (location.pathname === '/opportunites.html' && !document.getElementById('list-view')) {
+        var main = document.querySelector('main.main');
+        var detail = document.getElementById('detail-view');
+        var head = main && main.querySelector('.page-head');
+        if (main && detail && head) {
+          var listView = document.createElement('div');
+          listView.id = 'list-view';
+          listView.className = 'stack';
+          main.insertBefore(listView, head);
+          var n = head;
+          while (n && n !== detail) {
+            var next = n.nextSibling;
+            listView.appendChild(n);
+            n = next;
+          }
+        }
+      }
       var login = document.getElementById('login');
       var btn = document.getElementById('connect');
       if (btn) btn.addEventListener('click', function () {
