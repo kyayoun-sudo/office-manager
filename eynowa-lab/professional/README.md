@@ -192,3 +192,18 @@ End-to-end RAG testing additionally requires the real local Chroma and Ollama se
 ## Current integration state
 
 The shared professional module, multi-domain router, Chroma adapter, local Ollama generation/embeddings, validation gate, personal memory, import CLI and framework-neutral Gateway dispatcher are versioned on the feature branch. The remaining local-only step is to import the dispatcher into the user's existing `lab-gateway-server.js` and run end-to-end checks against the user's actual Chroma/Ollama containers before merging.
+
+### Local activation sequence
+
+On the machine that hosts EYNOWA Lab:
+
+```powershell
+cd C:\eynowa-lab\office-manager
+git fetch origin
+git checkout feat/eynowa-lab-professional-brains
+npm install
+ollama pull embeddinggemma
+npm run test:lab
+```
+
+Then preserve the existing Gateway and integrate `gateway-dispatcher.js` into that existing `lab-gateway-server.js`. Do not replace the Gateway wholesale. After integration, test `GET /v1/professional/health`, then a harmless multi-domain query before importing any professional corpus.
