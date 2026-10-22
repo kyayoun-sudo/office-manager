@@ -1,13 +1,20 @@
 {
-  "pack_id": "ohada-accounting-v0",
+  "pack_id": "ohada-accounting-v1",
   "name": "EYNOWA Lab OHADA Accounting Pack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "domain": "accounting",
   "jurisdiction": "OHADA",
   "languages": ["fr"],
   "frameworks": ["AUDCIF", "SYSCOHADA", "SYCEBNL"],
   "target_collection": "eynowa_accounting",
   "source_ids": ["OHADA_AUDCIF_SYSCOHADA", "OHADA_SYCEBNL"],
+  "features": {
+    "topic_detection": true,
+    "topic_aware_retrieval": true,
+    "public_context_chunks": true,
+    "normative_followup_flag": true,
+    "human_validation_gate": true
+  },
   "content_policy": {
     "public_metadata_and_paraphrase": true,
     "full_normative_text_bundled": false,
