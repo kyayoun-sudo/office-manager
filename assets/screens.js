@@ -153,23 +153,29 @@
       return box;
     },
     requireLogin: function (start) {
-      // opportunites.html lost its #list-view wrapper during the Avec/Sans TDR UI edit.
-      // Rebuild it before the page calls loadDetail(), otherwise loadDetail() crashes on
-      // document.getElementById('list-view').hidden and only the lightweight summary is visible.
+      // opportunites.html currently has no #list-view wrapper. Do not move DOM nodes to rebuild it:
+      // the malformed legacy wrapper around the header makes browsers reorder the page and creates
+      // a large blank gap. Instead add only a zero-size marker so loadDetail() can hide it safely.
       if (location.pathname === '/opportunites.html' && !document.getElementById('list-view')) {
         var main = document.querySelector('main.main');
         var detail = document.getElementById('detail-view');
-        var head = main && main.querySelector('.page-head');
-        if (main && detail && head) {
+        if (main && detail) {
           var listView = document.createElement('div');
           listView.id = 'list-view';
-          listView.className = 'stack';
-          main.insertBefore(listView, head);
-          var n = head;
-          while (n && n !== detail) {
-            var next = n.nextSibling;
-            listView.appendChild(n);
-            n = next;
+          listView.hidden = true;
+          listView.style.display = 'none';
+          main.insertBefore(listView, detail);
+
+          // On a detail URL, hide the existing list/create blocks in place. Nothing is moved, so
+          // there is no layout hole and the detail starts where the list normally sits.
+          if (new URLSearchParams(location.search).get('id')) {
+            var head = main.querySelector('.page-head');
+            var signals = document.getElementById('signals-card');
+            var list = document.getElementById('list');
+            var listSection = list && list.closest('section');
+            if (head) head.hidden = true;
+            if (signals) signals.hidden = true;
+            if (listSection) listSection.hidden = true;
           }
         }
       }
