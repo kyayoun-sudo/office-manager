@@ -21,8 +21,14 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function normaliseDomains(domain, domains) {
+  const values = Array.isArray(domains) && domains.length ? domains : [domain];
+  return unique(values.map(normalise).filter((value) => HIGH_JUDGMENT[value]));
+}
+
 export function evaluateValidation({
   domain,
+  domains,
   task,
   answer,
   sources = [],
@@ -33,9 +39,12 @@ export function evaluateValidation({
   validationReason = '',
   questionForProfessional = '',
 } = {}) {
-  const d = normalise(domain);
+  const selectedDomains = normaliseDomains(domain, domains);
   const haystack = `${normalise(task)} ${normalise(answer)}`;
-  const highJudgment = (HIGH_JUDGMENT[d] || []).some((term) => haystack.includes(term));
+  const highJudgmentDomains = selectedDomains.filter((selectedDomain) =>
+    (HIGH_JUDGMENT[selectedDomain] || []).some((term) => haystack.includes(term))
+  );
+  const highJudgment = highJudgmentDomains.length > 0;
   const authoritativeSources = sources.filter((source) => source?.authority && source?.sourceId);
   const numericConfidence = Number(confidence);
   const confidenceKnown = Number.isFinite(numericConfidence);
@@ -44,7 +53,7 @@ export function evaluateValidation({
   if (!authoritativeSources.length) reasons.push('Aucune source professionnelle vérifiable n’appuie la conclusion.');
   if (missingFacts.length) reasons.push(`Informations manquantes : ${missingFacts.join(', ')}.`);
   if (contradictions.length) reasons.push('Des sources ou faits sont contradictoires.');
-  if (highJudgment) reasons.push('Le sujet nécessite un jugement professionnel élevé.');
+  if (highJudgment) reasons.push(`Le sujet nécessite un jugement professionnel élevé (${highJudgmentDomains.join(', ')}).`);
   if (confidenceKnown && numericConfidence < 0.8) reasons.push('Le niveau de confiance est insuffisant pour automatiser la décision.');
   if (modelRequiresValidation) reasons.push(validationReason || 'Le moteur a demandé une validation professionnelle.');
 
@@ -58,6 +67,7 @@ export function evaluateValidation({
     reasons: unique(reasons),
     questionForProfessional: question,
     highJudgment,
+    highJudgmentDomains,
     confidence: confidenceKnown ? Math.max(0, Math.min(1, numericConfidence)) : null,
   };
 }
