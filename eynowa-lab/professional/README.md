@@ -41,10 +41,12 @@ Legacy `domain` remains accepted for compatibility. `domain=all` also activates 
 
 Default integration targets:
 
-- EYNOWA Lab Gateway: existing local gateway
+- EYNOWA Lab Gateway: existing local Node HTTP gateway on port `8787`
 - Ollama generation: `http://127.0.0.1:11434`
 - Chroma: `127.0.0.1:8000`
 - Ollama embeddings: `embeddinggemma`
+
+The existing Gateway already owns authentication (Bearer or `X-EYNOWA-API-Key`) and existing routes such as `/health`, `/ai/local-chat`, `/memory/*`, `/search/*`, `/document/*` and `/workflow/run`. The professional module must be added behind that same authentication boundary and must not replace those routes.
 
 Environment overrides:
 
@@ -127,7 +129,7 @@ Memory is compartmentalised by professional + domain + client. Firm Manager can 
 
 ## Gateway routes
 
-The existing local `lab-gateway-server.js` should delegate these paths to `gateway-dispatcher.js`:
+The existing local `lab-gateway-server.js` should delegate these new paths to `gateway-dispatcher.js` after its current authentication check:
 
 - `POST /v1/professional/query`
 - `POST /v1/professional/memory/remember`
@@ -147,7 +149,7 @@ import {
 
 const dispatchProfessional = createProfessionalGatewayDispatcher();
 
-// Inside the existing HTTP request handler, after its existing authentication:
+// Inside the existing HTTP request handler, AFTER its current API-key check:
 const body = req.method === 'POST' ? await readJsonRequest(req) : {};
 const result = await dispatchProfessional({ method: req.method, path: req.url, body });
 if (result.handled) {
@@ -156,7 +158,7 @@ if (result.handled) {
 }
 ```
 
-Keep the Gateway's existing authentication around the knowledge-import and memory-write routes.
+Do not remove or bypass the existing timing-safe API-key authentication. The knowledge-import and memory-write routes are sensitive local operations.
 
 ## Validation gate
 
