@@ -5,6 +5,15 @@ import {
   handleProfessionalHealth,
 } from './handler.js';
 
+function serialiseError(error, fallbackStage = 'professional_gateway') {
+  return {
+    error: String(error?.message || error || 'UNKNOWN_ERROR'),
+    error_name: String(error?.name || 'Error'),
+    error_code: error?.code == null ? null : String(error.code),
+    stage: String(error?.stage || fallbackStage),
+  };
+}
+
 export function createProfessionalGatewayDispatcher(options = {}) {
   const handleQuery = createProfessionalHandler(options);
 
@@ -12,19 +21,27 @@ export function createProfessionalGatewayDispatcher(options = {}) {
     const verb = String(method || 'GET').toUpperCase();
     const pathname = String(path || '').split('?')[0].replace(/\/$/, '') || '/';
 
-    if (verb === 'POST' && pathname === '/v1/professional/query') {
-      return { handled: true, status: 200, body: await handleQuery(body || {}) };
+    try {
+      if (verb === 'POST' && pathname === '/v1/professional/query') {
+        return { handled: true, status: 200, body: await handleQuery(body || {}) };
+      }
+      if (verb === 'POST' && pathname === '/v1/professional/memory/remember') {
+        return { handled: true, status: 200, body: await handleProfessionalMemory(body || {}) };
+      }
+      if (verb === 'POST' && pathname === '/v1/professional/knowledge/import') {
+        return { handled: true, status: 200, body: { imported: await handleProfessionalKnowledgeImport(body || {}) } };
+      }
+      if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/health') {
+        return { handled: true, status: 200, body: await handleProfessionalHealth() };
+      }
+      return { handled: false };
+    } catch (error) {
+      return {
+        handled: true,
+        status: 500,
+        body: serialiseError(error),
+      };
     }
-    if (verb === 'POST' && pathname === '/v1/professional/memory/remember') {
-      return { handled: true, status: 200, body: await handleProfessionalMemory(body || {}) };
-    }
-    if (verb === 'POST' && pathname === '/v1/professional/knowledge/import') {
-      return { handled: true, status: 200, body: { imported: await handleProfessionalKnowledgeImport(body || {}) } };
-    }
-    if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/health') {
-      return { handled: true, status: 200, body: await handleProfessionalHealth() };
-    }
-    return { handled: false };
   };
 }
 
