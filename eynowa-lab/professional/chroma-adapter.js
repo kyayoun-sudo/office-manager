@@ -141,9 +141,47 @@ function countryMatches(row, country) {
 
 function topicRank(row, topics) {
   if (!Array.isArray(topics) || !topics.length) return 1;
+  if (row.domain !== 'accounting') return 1;
   const topic = String(row.topic || '').trim();
   if (!topic) return 2;
   return topics.includes(topic) ? 0 : 3;
+}
+
+function rankRows(rows, topics) {
+  return [...rows].sort((a, b) =>
+    topicRank(a, topics) - topicRank(b, topics) ||
+    (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY)
+  );
+}
+
+function balancedRows(rows, domains, topics, limit) {
+  const requested = Array.isArray(domains) ? domains.filter(Boolean) : [];
+  const target = Math.max(1, Number(limit) || 10);
+  if (requested.length <= 1) return rankRows(rows, topics).slice(0, target);
+
+  const quota = Math.max(2, Math.floor(target / requested.length));
+  const selected = [];
+  const selectedIds = new Set();
+
+  for (const domain of requested) {
+    const domainRows = rankRows(rows.filter((row) => row.domain === domain), topics).slice(0, quota);
+    for (const row of domainRows) {
+      if (selectedIds.has(row.id)) continue;
+      selected.push(row);
+      selectedIds.add(row.id);
+    }
+  }
+
+  if (selected.length < target) {
+    for (const row of rankRows(rows, topics)) {
+      if (selected.length >= target) break;
+      if (selectedIds.has(row.id)) continue;
+      selected.push(row);
+      selectedIds.add(row.id);
+    }
+  }
+
+  return selected.slice(0, target);
 }
 
 export async function upsertKnowledgeChunks(inputs = []) {
@@ -194,8 +232,9 @@ export async function searchChromaKnowledge({
   const searchable = collectionStates.filter((item) => item.count > 0);
   if (!searchable.length) return [];
 
+  // Compute one query embedding and reuse it across all requested professional domains.
   const queryEmbedding = (await embedTexts([String(query)]))[0];
-  const perDomainLimit = Math.max(6, Math.ceil((Number(limit) || 10) / searchable.length) * 5);
+  const perDomainLimit = Math.max(6, Math.ceil((Number(limit) || 10) / searchable.length) * 4);
   const rows = [];
 
   for (const item of searchable) {
@@ -207,11 +246,11 @@ export async function searchChromaKnowledge({
     rows.push(...resultRows(result, item.domain));
   }
 
-  return rows
+  const filtered = rows
     .filter((row) => frameworkMatches(row, requestedFrameworks))
-    .filter((row) => countryMatches(row, country))
-    .sort((a, b) => topicRank(a, topics) - topicRank(b, topics) || (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
-    .slice(0, Math.max(1, Number(limit) || 10));
+    .filter((row) => countryMatches(row, country));
+
+  return balancedRows(filtered, requestedDomains, topics, limit);
 }
 
 export async function chromaHealth() {
