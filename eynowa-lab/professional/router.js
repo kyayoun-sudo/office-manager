@@ -88,10 +88,11 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     '- Keep normative authorities separate by domain and framework; do not treat one framework as authority for another domain.',
     '- Never invent a standard, paragraph, legal rule, client fact or prior treatment.',
     '- Professional memory is contextual evidence only; it is never normative authority.',
+    '- EYNOWA methodology may guide procedures, documents to request, anomaly detection and questions; it is not normative accounting authority.',
     '- Cite only passages that appear in Retrieved professional knowledge below. A registered source that was not retrieved is not evidence.',
     '- A public metadata/paraphrase chunk is context, not a substitute for detailed normative authority when an operational accounting conclusion requires the actual rule.',
     '- If a retrieved hit says requiresNormativeFollowup=true, do not present it as sufficient detailed normative support.',
-    '- If facts are missing, sources conflict, or the conclusion requires significant professional judgment, set requires_validation=true.',
+    '- If facts are missing, sources conflict, only non-normative methodology supports an accounting conclusion, or the conclusion requires significant professional judgment, set requires_validation=true.',
     '- Ask one precise question when professional validation is needed.',
     '- Return JSON only.',
     '',
@@ -143,6 +144,7 @@ function filterSources(candidateSources, request, knowledge) {
       sourceUrl: clean(evidence.sourceUrl || registryRow?.sourceUrl, 1000),
       domain: clean(evidence.domain || registryRow?.domain, 40),
       topic: clean(evidence.topic, 120),
+      supportRole: clean(registryRow?.authorityRole || 'professional_source', 80),
     };
   }).filter(Boolean);
 }
