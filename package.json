@@ -14,7 +14,8 @@
     "lab:import:ohada:immobilisations": "node eynowa-lab/professional/packs/ohada/import-ohada.js eynowa-lab/professional/packs/ohada/immobilisations-public-guidance.json",
     "lab:import:ohada:stocks": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/stocks/starter-pack.json",
     "lab:import:ohada:purchases": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/purchases/eynowa-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/purchases/audit-public-guidance.json",
-    "lab:import:ohada:sales": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/sales-receivables/eynowa-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/sales-receivables/audit-public-guidance.json"
+    "lab:import:ohada:sales": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/sales-receivables/eynowa-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/sales-receivables/audit-public-guidance.json",
+    "lab:import:ohada:treasury": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/eynowa-accounting-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/eynowa-audit-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/audit-public-guidance.json"
   },
   "dependencies": {
     "chromadb": "3.5.0"
