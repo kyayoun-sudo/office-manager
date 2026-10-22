@@ -88,7 +88,7 @@ test('text fallback can start at any configured provider and continues until one
   assert.equal(research.web, false);
   assert.deepEqual(calls, []);
 
-  assert.deepEqual(providerOrder(['mistral'], env, () => .2, { files: [{}] }), ['openrouter', 'openai']);
+  assert.deepEqual(providerOrder(['mistral'], env, () => .2, { files: [{}] }), ['openai', 'openrouter']);
 });
 
 test('legacy agent entry respects explicit choice, falls back and keeps independent high-risk review', async () => {
