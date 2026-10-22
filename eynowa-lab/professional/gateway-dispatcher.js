@@ -3,6 +3,7 @@ import {
   handleProfessionalMemory,
   handleProfessionalKnowledgeImport,
   handleProfessionalHealth,
+  handleProfessionalDiagnostics,
 } from './handler.js';
 
 function serialiseError(error, fallbackStage = 'professional_gateway') {
@@ -33,6 +34,9 @@ export function createProfessionalGatewayDispatcher(options = {}) {
       }
       if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/health') {
         return { handled: true, status: 200, body: await handleProfessionalHealth() };
+      }
+      if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/diagnostics') {
+        return { handled: true, status: 200, body: await handleProfessionalDiagnostics() };
       }
       return { handled: false };
     } catch (error) {
