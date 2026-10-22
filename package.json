@@ -5,5 +5,8 @@
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "chromadb": "3.5.0"
   }
 }
