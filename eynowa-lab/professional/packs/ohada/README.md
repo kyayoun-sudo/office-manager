@@ -1,56 +1,25 @@
 # EYNOWA Lab — OHADA Accounting Pack V1
 
-Reusable professional knowledge pack for EYNOWA Lab accounting.
+Reusable professional knowledge pack for EYNOWA Lab across Accounting and Audit.
 
 ## Scope
 
 - AUDCIF — Acte uniforme relatif au droit comptable et à l'information financière
 - SYSCOHADA — Système comptable OHADA révisé annexé à l'AUDCIF
 - SYCEBNL — Système comptable des entités à but non lucratif
+- EYNOWA Accounting Methodology
+- EYNOWA Audit Methodology
+- Public OHADA ISA implementation guidance where safely reusable
 
 Official source pages:
 
 - AUDCIF / SYSCOHADA: https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/
 - SYCEBNL: https://www.ohada.org/acte-uniforme-relatif-au-systeme-comptable-des-entites-a-but-non-lucratif/
+- OHADA ISA tools: https://www.ohada.org/outils-pratiques-de-mise-en-oeuvre-des-normes-isa/
 
-## V1 capabilities
+## V1 status — methodology complete
 
-V1 adds topic-aware professional retrieval on top of the V0 source/rights controls.
-
-- 19 accounting topics
-- deterministic topic detection before RAG retrieval
-- topic metadata persisted in Chroma
-- topic-matching evidence ranked before unrelated evidence
-- public/non-normative context distinguished from authorised normative text
-- `requires_normative_followup` carried through retrieval
-- professional validation forced when public context is insufficient for an operational conclusion
-
-## Pack files
-
-- `manifest.json` — V1 identity, frameworks, features, sources and content policy.
-- `taxonomy.json` — 19 professional accounting topics.
-- `v1-topic-status.json` — readiness matrix for each topic.
-- `public-starter-pack.json` — importable EYNOWA paraphrases of public OHADA facts/metadata; no full normative text.
-- `normative-chunk-template.json` — template for authorised normative material.
-- `official-overview.json` — initial AUDCIF/SYSCOHADA overview.
-- `sycebnl-official-overview.json` — initial SYCEBNL overview.
-- `import-ohada.js` — OHADA-only importer.
-- `test-only-sample.json` — non-normative pipeline test content.
-
-## Official dates
-
-AUDCIF:
-- adopted: 2017-01-26
-- Official Journal publication: 2017-02-15
-- effective for individual/entity accounts: 2018-01-01
-- effective for consolidated/combined accounts and IFRS financial statements covered by the Act: 2019-01-01
-
-SYCEBNL:
-- adopted: 2022-12-22
-- Official Journal publication: 2023-02-22
-- effective: 2024-01-01
-
-## Topic taxonomy
+EYNOWA Lab now has methodology coverage for all 19 accounting topics:
 
 1. framework and scope
 2. accounting plan
@@ -70,57 +39,48 @@ SYCEBNL:
 16. period-end close
 17. financial statements
 18. consolidated and combined accounts
-19. not-for-profit specifics
+19. not-for-profit specifics / SYCEBNL
 
-Examples of automatic routing:
+`v1-topic-status.json` is the coverage matrix. Every topic is now `methodology_ready=true`.
 
-- `machine / amortissement / immobilisation` → `property_plant_equipment`
-- `stock / inventaire / obsolescence` → `inventories`
-- `FNP / fournisseur / charge à payer` → `payables`
-- `clôture / cut-off / fin d'exercice` → `period_end_close`
-- `ONG / subvention / donateur` → `not_for_profit_specifics`
+**Important:** methodology readiness is not the same as normative completeness. Detailed operational accounting conclusions still require an authorised normative passage or professional validation when `requires_normative_followup=true`.
 
-The router may select up to four relevant topics for a cross-topic question.
+## Main pack structure
 
-## Topic readiness
+- `public-starter-pack.json` — safe public OHADA context.
+- `immobilisations-*` — fixed-assets guidance.
+- `stocks/` — inventory methodology and audit guidance.
+- `purchases/` — purchases, payables, FNP and GR/IR.
+- `sales-receivables/` — sales, cut-off and receivables.
+- `treasury/` — banks, cash and bank reconciliations.
+- `provisions/` — provisions, accruals, contingencies and litigation.
+- `core-final/` — borrowings, payroll, taxes, FX, equity, close, financial statements, consolidation and SYCEBNL.
+- `normative-chunk-template.json` — template for authorised normative enrichment.
 
-`v1-topic-status.json` distinguishes:
+## Automatic routing
 
-- `public_context_ready` — enough public context for framework/explanatory answers;
-- `mixed` — public context exists but operational conclusions require normative verification;
-- `normative_content_required` — detailed accounting guidance must come from an authorised normative source before Lab can rely on it.
+The router may select up to four topics per request. Examples:
 
-## Mandatory chunk metadata
+- `machine / amortissement` → `property_plant_equipment`
+- `GR/IR / FNP` → `payables`, `purchases_and_expenses`, `period_end_close`
+- `facture avant livraison / avoir après clôture` → `sales_and_revenue`, `receivables`, `period_end_close`
+- `rapprochement bancaire / chèque ancien` → `cash_and_banking`
+- `litige / provision / avocat` → `provisions_and_contingencies`
+- `covenant / waiver / emprunt` → `borrowings_and_financing`
+- `journal de paie / primes` → `payroll_and_employee_costs`
+- `contrôle fiscal / TVA` → `taxes_and_levies`
+- `cours de clôture / écarts de change` → `foreign_currency`
+- `mapping balance / annexes` → `financial_statements`
+- `intercompagnie / périmètre de consolidation` → `consolidated_and_combined_accounts`
+- `bailleur / fonds affectés / registre donateurs` → `not_for_profit_specifics`
 
-Every chunk must include at least:
+## Rights and authority rule
 
-- `source_id`
-- `domain = accounting`
-- `framework = AUDCIF | SYSCOHADA | SYCEBNL`
-- `authority = OHADA`
-- `reference`
-- `version`
-- `effective_from`
-- `jurisdiction = OHADA`
-- `source_url`
-- `license_basis`
-- `content`
+Do not ingest the full AUDCIF, SYSCOHADA, SYCEBNL, ISA, IAASB or IESBA corpus merely because it is downloadable online.
 
-Recommended `metadata` fields:
+Before importing substantive normative text into a commercial EYNOWA product, document the licence/permission basis in `license_basis`.
 
-- `topic`
-- `subtopic`
-- `source_kind`
-- `normative_text`
-- `requires_normative_followup`
-
-## Rights rule
-
-Do not ingest the full AUDCIF, SYSCOHADA or SYCEBNL text merely because it is downloadable online.
-
-Before importing substantive normative text into a commercial EYNOWA product, document the legal/permission basis in `license_basis`.
-
-The public starter pack uses EYNOWA-authored paraphrases of facts visible on official OHADA webpages and explicitly marks them as non-normative. Detailed accounting conclusions must continue to trigger professional validation until an authorised normative passage is retrieved.
+The current public chunks are EYNOWA-authored summaries/paraphrases with explicit source metadata. EYNOWA-owned methodologies guide procedures, evidence requests, controls and anomaly detection; they are not normative authority.
 
 ## Install / update
 
@@ -130,51 +90,36 @@ git pull --ff-only origin feat/eynowa-lab-professional-brains
 npm.cmd run test:lab
 ```
 
-Copy the updated professional modules into the running local Gateway when testing the local Docker stack:
+## Import everything — recommended
+
+```powershell
+npm.cmd run lab:import:ohada:all
+```
+
+This imports/re-imports all maintained OHADA V1 packs using stable chunk ids.
+
+Individual import commands remain available, including:
+
+```powershell
+npm.cmd run lab:import:ohada:stocks
+npm.cmd run lab:import:ohada:purchases
+npm.cmd run lab:import:ohada:sales
+npm.cmd run lab:import:ohada:treasury
+npm.cmd run lab:import:ohada:provisions
+npm.cmd run lab:import:ohada:core-final
+```
+
+Then reload the professional modules in the local Gateway:
 
 ```powershell
 docker cp .\eynowa-lab\professional\. eynowa-gateway:/app/eynowa-lab/professional/
 docker restart eynowa-gateway
 ```
 
-## Import public starter pack
+## Chroma
 
-```powershell
-npm.cmd run lab:import:ohada:starter
-```
+Accounting chunks are stored in `eynowa_accounting`; audit chunks are stored in `eynowa_audit`. Framework, topic, source kind, normative status and follow-up metadata are preserved for retrieval.
 
-Generic authorised OHADA import:
+## Next workstream
 
-```powershell
-npm.cmd run lab:import:ohada -- .\authorised-ohada.jsonl
-```
-
-The importer rejects non-OHADA source IDs before Chroma ingestion.
-
-## Target Chroma collection
-
-All chunks in this pack are stored in:
-
-`eynowa_accounting`
-
-Framework and topic metadata are retained so EYNOWA Lab can distinguish AUDCIF, SYSCOHADA and SYCEBNL and prioritise the relevant accounting topic during retrieval.
-
-## Next enrichment phase
-
-Substantive professional content is added topic by topic from one of these bases:
-
-- authorised/licensed normative material;
-- user-owned TATY/EYNOWA methodologies;
-- professionally reviewed summaries created specifically for EYNOWA;
-- official public guidance whose reuse basis is documented.
-
-Priority topics for the first authorised normative enrichment:
-
-1. property, plant and equipment
-2. inventories
-3. provisions and contingencies
-4. period-end close
-5. financial statements
-6. purchases/payables
-7. sales/receivables
-8. foreign currency
+The OHADA **methodology layer is complete**. The next OHADA workstream is no longer topic construction; it is **authorised normative enrichment**: attaching licensed/permissioned SYSCOHADA, SYCEBNL and other authoritative passages to the existing topics so Lab can move from professional triage to stronger norm-grounded conclusions.
