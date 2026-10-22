@@ -226,8 +226,15 @@ export async function answerProfessional(input, adapters = {}) {
   const raw = await generateJson({ prompt, request });
   const generationMs = Date.now() - generationStarted;
   const result = raw && typeof raw === 'object' ? raw : {};
+  const generationMeta = result?._eynowa_generation && typeof result._eynowa_generation === 'object'
+    ? result._eynowa_generation
+    : {};
+  const fallbackUsed = Boolean(generationMeta.fallbackUsed);
   const sources = filterSources(result.sources, request, knowledge);
   const normativeFollowupHits = safeArray(knowledge).filter((hit) => hit?.requiresNormativeFollowup);
+  const fallbackReason = fallbackUsed
+    ? `Le modèle local de secours ${clean(generationMeta.model, 120) || 'fallback'} a été utilisé après indisponibilité ou lenteur du modèle principal ; validation professionnelle obligatoire.`
+    : '';
 
   const validation = evaluateValidation({
     domains: request.domains,
@@ -237,8 +244,13 @@ export async function answerProfessional(input, adapters = {}) {
     missingFacts: safeArray(result.missing_facts),
     contradictions: safeArray(result.contradictions),
     confidence: result.confidence,
-    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0,
-    validationReason: clean(result.validation_reason || (normativeFollowupHits.length ? 'Le contexte public récupéré exige une vérification sur le corpus normatif autorisé avant conclusion opérationnelle.' : ''), 2000),
+    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0 || fallbackUsed,
+    validationReason: clean(
+      result.validation_reason ||
+      fallbackReason ||
+      (normativeFollowupHits.length ? 'Le contexte public récupéré exige une vérification sur le corpus normatif autorisé avant conclusion opérationnelle.' : ''),
+      2000
+    ),
     questionForProfessional: clean(result.question_for_professional, 2000),
   });
 
@@ -263,6 +275,8 @@ export async function answerProfessional(input, adapters = {}) {
     knowledge_hits_by_domain: Object.fromEntries(request.domains.map((domain) => [domain, safeArray(knowledge).filter((hit) => hit?.domain === domain).length])),
     normative_followup_hits: normativeFollowupHits.length,
     memory_hits: safeArray(memory).length,
+    generation_model: clean(generationMeta.model, 120),
+    generation_fallback: fallbackUsed,
     prompt_chars: prompt.length,
     timings_ms: {
       retrieval: retrievalMs,
