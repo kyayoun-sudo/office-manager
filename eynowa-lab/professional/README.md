@@ -12,13 +12,9 @@ It is **not** a second Lab and must not be deployed as an independent SaaS servi
 
 The calling application does **not** define or restrict the professional domain. The task does.
 
-### Firm Manager
+Firm Manager is the cabinet operating system, not an audit-only application. If Firm Manager sends no explicit domain scope, EYNOWA Lab defaults to all three brains and can combine them in a single request.
 
-Firm Manager is the cabinet operating system, not an audit-only application. It can use all three professional brains and can combine them in one request.
-
-If Firm Manager sends no explicit domain scope, EYNOWA Lab defaults to all three brains.
-
-Example cross-disciplinary request:
+Example:
 
 ```json
 {
@@ -33,20 +29,18 @@ Example cross-disciplinary request:
 }
 ```
 
-Accounting AI will normally use `domains: ["accounting"]`, but it calls the same shared Lab.
-
-Legacy `domain` remains accepted for compatibility. `domain=all` also activates all three brains.
+Accounting AI will normally use `domains: ["accounting"]`, but it calls the same shared Lab. Legacy `domain` remains accepted; `domain=all` activates all three brains.
 
 ## Local services
 
 Default integration targets:
 
-- EYNOWA Lab Gateway: existing local Node HTTP gateway on port `8787`
-- Ollama generation: `http://127.0.0.1:11434`
-- Chroma: `127.0.0.1:8000`
-- Ollama embeddings: `embeddinggemma`
+- existing local Node HTTP EYNOWA Lab Gateway on port `8787`
+- Ollama generation on `http://127.0.0.1:11434`
+- Chroma on `127.0.0.1:8000`
+- Ollama embeddings with `embeddinggemma`
 
-The existing Gateway already owns authentication (Bearer or `X-EYNOWA-API-Key`) and existing routes such as `/health`, `/ai/local-chat`, `/memory/*`, `/search/*`, `/document/*` and `/workflow/run`. The professional module must be added behind that same authentication boundary and must not replace those routes.
+The existing Gateway already owns Bearer / `X-EYNOWA-API-Key` authentication and routes such as `/health`, `/ai/local-chat`, `/memory/*`, `/search/*`, `/document/*` and `/workflow/run`. The professional module is added behind that same authentication boundary and does not replace existing routes.
 
 Environment overrides:
 
@@ -68,17 +62,17 @@ The Node client dependency is `chromadb` 3.5.0.
 - `eynowa_audit`
 - `eynowa_advisory`
 
-EYNOWA Lab generates query and document embeddings with the local Ollama `/api/embed` endpoint and supplies those embeddings to Chroma. The same embedding model must be used for indexing and retrieval.
+Lab creates document/query embeddings locally with Ollama `/api/embed` and stores/searches those vectors in Chroma. The same embedding model must be used for indexing and retrieval.
 
-For a multi-domain Firm Manager request, Lab queries each relevant collection, combines the labelled evidence, then sends the evidence to the local generation model.
+For a multi-domain Firm Manager request, Lab queries the relevant collections, combines the labelled evidence, and sends it to the local generation model.
 
-A model citation is accepted only when the cited source was actually retrieved from Chroma for the current request. Merely being present in the source registry is not enough.
+A citation is accepted only when the source was actually retrieved from Chroma for the current request. Merely being present in the registry is not evidence.
 
-## Registered professional source families
+## Registered source families
 
-The registry currently includes source metadata for:
+Metadata is registered for:
 
-- IFRS Accounting Standards / IAS / IFRIC / SIC / Conceptual Framework / IFRS for SMEs
+- IFRS Accounting / IAS / IFRIC / SIC / Conceptual Framework / IFRS for SMEs
 - IFRS Accounting Taxonomy
 - OHADA AUDCIF / SYSCOHADA
 - OHADA SYCEBNL
@@ -88,57 +82,39 @@ The registry currently includes source metadata for:
 - IFRS Sustainability / ISSB
 - IVSC / IVS valuation standards
 
-The registry is metadata only and is not evidence until an authorised passage has actually been ingested and retrieved.
+The registry is metadata only. It becomes evidence only after an authorised passage is ingested and retrieved.
 
 ## Knowledge ingestion
 
-Every ingested chunk must pass `knowledge-contract.js` and include:
+Every chunk passes `knowledge-contract.js`. Mandatory fields include `source_id`, `domain`, `authority`, `reference`, `source_url`, `license_basis` and `content`; framework/version/effective-date/jurisdiction metadata is retained when available.
 
-- `source_id`
-- `domain`
-- `framework`
-- `authority`
-- `reference`
-- `version`
-- `effective_from`
-- `jurisdiction`
-- `source_url`
-- `license_basis`
-- `content`
-
-`authority`, `reference`, `source_url`, `license_basis` and `content` are mandatory. This prevents anonymous or unverifiable material from silently entering the professional knowledge base.
-
-Import authorised JSON or JSONL chunks with:
+Import authorised JSON/JSONL chunks with:
 
 ```bash
 npm install
 npm run lab:import -- ./authorised-chunks.jsonl
 ```
 
-Protected standards are not bundled in this repository. IFRS/IAASB/IESBA material must only be ingested when the applicable licence or permission basis has been documented. OHADA and IVSC content remains subject to rights verification before ingestion unless an authorised basis is documented.
+Protected standards are not bundled. IFRS/IAASB/IESBA material must only be ingested when the applicable licence/permission basis has been documented. OHADA and IVSC content remains flagged for rights verification unless an authorised basis is documented.
 
 ## Professional memory
 
-Personal memory is local to the professional computer by default:
+Local memory defaults to:
 
 `~/.eynowa-lab/professional-memory.jsonl`
 
-Only `HUMAN_VALIDATED` decisions can be written automatically.
-
-Memory is compartmentalised by professional + domain + client. Firm Manager can retrieve several domain compartments for a cross-disciplinary task, but memory remains contextual evidence, never normative authority.
+Only `HUMAN_VALIDATED` decisions can be persisted automatically. Memory is compartmentalised by professional + domain + client and is contextual evidence, never normative authority.
 
 ## Gateway routes
 
-The existing local `lab-gateway-server.js` should delegate these new paths to `gateway-dispatcher.js` after its current authentication check:
+The existing local `lab-gateway-server.js` should delegate these routes to `gateway-dispatcher.js` after its current API-key check:
 
 - `POST /v1/professional/query`
 - `POST /v1/professional/memory/remember`
 - `POST /v1/professional/knowledge/import`
 - `GET /v1/professional/health`
 
-The gateway itself is currently local and not versioned in this repository. Do not replace it blindly. The dispatcher is framework-neutral so the existing Gateway only needs to pass `method`, `path` and parsed `body`.
-
-Example:
+The Gateway itself is local and is not currently versioned in this repository. Do not replace it wholesale.
 
 ```js
 import {
@@ -149,7 +125,7 @@ import {
 
 const dispatchProfessional = createProfessionalGatewayDispatcher();
 
-// Inside the existing HTTP request handler, AFTER its current API-key check:
+// AFTER the Gateway's existing authentication check:
 const body = req.method === 'POST' ? await readJsonRequest(req) : {};
 const result = await dispatchProfessional({ method: req.method, path: req.url, body });
 if (result.handled) {
@@ -158,19 +134,11 @@ if (result.handled) {
 }
 ```
 
-Do not remove or bypass the existing timing-safe API-key authentication. The knowledge-import and memory-write routes are sensitive local operations.
+Do not remove/bypass the existing timing-safe API-key authentication. Knowledge import and memory writes are sensitive local operations.
 
 ## Validation gate
 
-The final answer requires professional validation when, among other things:
-
-- no retrieved professional source supports the conclusion;
-- facts are missing;
-- sources/facts conflict;
-- model confidence is below the automatic threshold;
-- the subject requires significant professional judgment in accounting, audit or advisory.
-
-Response shape:
+The final answer requires professional validation when there is no retrieved professional support, facts are missing or contradictory, confidence is insufficient, or the subject requires significant professional judgment.
 
 ```json
 {
@@ -183,23 +151,15 @@ Response shape:
 }
 ```
 
-## Tests
+## Tests and local activation
 
-Pure routing/validation tests do not require Chroma or Ollama:
+Pure routing/validation tests:
 
 ```bash
 npm run test:lab
 ```
 
-End-to-end RAG testing additionally requires the real local Chroma and Ollama services plus an authorised test knowledge chunk.
-
-## Current integration state
-
-The shared professional module, multi-domain router, Chroma adapter, local Ollama generation/embeddings, validation gate, personal memory, import CLI and framework-neutral Gateway dispatcher are versioned on the feature branch. The remaining local-only step is to import the dispatcher into the user's existing `lab-gateway-server.js` and run end-to-end checks against the user's actual Chroma/Ollama containers before merging.
-
-### Local activation sequence
-
-On the machine that hosts EYNOWA Lab:
+On the EYNOWA Lab machine:
 
 ```powershell
 cd C:\eynowa-lab\office-manager
@@ -210,4 +170,6 @@ ollama pull embeddinggemma
 npm run test:lab
 ```
 
-Then preserve the existing Gateway and integrate `gateway-dispatcher.js` into that existing `lab-gateway-server.js`. Do not replace the Gateway wholesale. After integration, test `GET /v1/professional/health`, then a harmless multi-domain query before importing any professional corpus.
+Then integrate `gateway-dispatcher.js` into the existing `lab-gateway-server.js`, test `GET /v1/professional/health`, and run a harmless multi-domain query before importing any professional corpus.
+
+The shared professional module, multi-domain router, Chroma adapter, local Ollama generation/embeddings, validation gate, personal memory, import CLI and framework-neutral Gateway dispatcher are already versioned on this feature branch. The remaining step is local Gateway integration and end-to-end testing before merge.
