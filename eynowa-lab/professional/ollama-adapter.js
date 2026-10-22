@@ -1,3 +1,11 @@
+import { existsSync } from 'node:fs';
+
+const RUNNING_IN_DOCKER = existsSync('/.dockerenv');
+
+function defaultOllamaUrl() {
+  return RUNNING_IN_DOCKER ? 'http://host.docker.internal:11434' : 'http://127.0.0.1:11434';
+}
+
 function extractJson(text) {
   const raw = String(text || '').trim();
   if (!raw) throw new Error('OLLAMA_EMPTY_RESPONSE');
@@ -14,7 +22,7 @@ function extractJson(text) {
 }
 
 export function createOllamaJsonAdapter({
-  baseUrl = process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
+  baseUrl = process.env.OLLAMA_URL || process.env.OLLAMA_HOST || defaultOllamaUrl(),
   model = process.env.EYNOWA_LAB_MODEL || process.env.OLLAMA_MODEL || 'qwen2.5:14b',
   timeoutMs = 120000,
 } = {}) {
