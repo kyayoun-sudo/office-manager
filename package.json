@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "test:lab": "node --test eynowa-lab/professional/*.test.js"
+    "test:lab": "node --test eynowa-lab/professional/*.test.js",
+    "lab:import": "node eynowa-lab/professional/import-knowledge.js"
   },
   "dependencies": {
     "chromadb": "3.5.0"
