@@ -11,11 +11,17 @@ function extractJson(text) {
   if (!raw) throw new Error('OLLAMA_EMPTY_RESPONSE');
   try {
     return JSON.parse(raw);
-  } catch {
+  } catch (firstError) {
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
-    if (start >= 0 && end > start) return JSON.parse(raw.slice(start, end + 1));
-    throw new Error('OLLAMA_INVALID_JSON');
+    if (start >= 0 && end > start) {
+      const sliced = raw.slice(start, end + 1);
+      try { return JSON.parse(sliced); } catch {}
+    }
+    const error = new Error(`OLLAMA_INVALID_JSON: ${firstError?.message || 'parse failure'}`);
+    error.code = 'OLLAMA_INVALID_JSON';
+    error.raw = raw.slice(0, 6000);
+    throw error;
   }
 }
 
@@ -66,7 +72,7 @@ function modelInstalled(models, wanted) {
   return models.some((name) => name === target || name.startsWith(`${target}:`) || target.startsWith(`${name}:`));
 }
 
-async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, numCtx }) {
+async function ollamaChat({ baseUrl, model, prompt, timeoutMs, numPredict, numCtx, schema }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
@@ -77,7 +83,7 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
       body: JSON.stringify({
         model,
         stream: false,
-        format: 'json',
+        format: schema && typeof schema === 'object' ? schema : 'json',
         keep_alive: '30m',
         messages: [{ role: 'user', content: prompt }],
         options: {
@@ -91,7 +97,7 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(`OLLAMA_${response.status}: ${data?.error || response.statusText}`);
     return {
-      value: extractJson(data?.message?.content || data?.response || ''),
+      raw: String(data?.message?.content || data?.response || ''),
       model,
       elapsedMs: Date.now() - startedAt,
     };
@@ -101,9 +107,50 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
       timeout.code = 'OLLAMA_TIMEOUT';
       throw timeout;
     }
+    if (error?.code === 'OLLAMA_INVALID_JSON') throw error;
     throw new Error(`OLLAMA_GENERATION_FAILED: model=${model}; ${error?.message || String(error)}`);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, numCtx, schema }) {
+  const first = await ollamaChat({ baseUrl, model, prompt, timeoutMs, numPredict, numCtx, schema });
+  try {
+    return {
+      value: extractJson(first.raw),
+      model,
+      elapsedMs: first.elapsedMs,
+      repaired: false,
+    };
+  } catch (parseError) {
+    if (parseError?.code !== 'OLLAMA_INVALID_JSON') throw parseError;
+
+    // Small local models occasionally emit malformed JSON despite structured mode.
+    // Retry once with a short repair prompt instead of failing the professional request.
+    const repairPrompt = [
+      'Repair the following malformed JSON.',
+      'Return JSON only. Preserve the semantic content. Do not add commentary.',
+      schema ? `The JSON must match this schema: ${JSON.stringify(schema)}` : '',
+      `Malformed JSON: ${String(parseError.raw || first.raw).slice(0, 6000)}`,
+    ].filter(Boolean).join('\n');
+
+    const repair = await ollamaChat({
+      baseUrl,
+      model,
+      prompt: repairPrompt,
+      timeoutMs: Math.max(12000, Math.min(timeoutMs, 30000)),
+      numPredict: Math.max(numPredict, 420),
+      numCtx,
+      schema,
+    });
+
+    return {
+      value: extractJson(repair.raw),
+      model,
+      elapsedMs: first.elapsedMs + repair.elapsedMs,
+      repaired: true,
+    };
   }
 }
 
@@ -113,17 +160,17 @@ export function createOllamaJsonAdapter({
   cpuModel = process.env.EYNOWA_LAB_CPU_MODEL || 'qwen2.5:0.5b-instruct',
   fallbackModel = process.env.EYNOWA_LAB_FALLBACK_MODEL || 'llama3.2:1b',
   timeoutMs = number(process.env.OLLAMA_GENERATION_TIMEOUT_MS, 25000),
-  cpuTimeoutMs = number(process.env.OLLAMA_CPU_TIMEOUT_MS, 30000),
-  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 30000),
-  numPredict = number(process.env.OLLAMA_NUM_PREDICT, 320),
-  cpuNumPredict = number(process.env.OLLAMA_CPU_NUM_PREDICT, 220),
-  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 180),
+  cpuTimeoutMs = number(process.env.OLLAMA_CPU_TIMEOUT_MS, 45000),
+  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 35000),
+  numPredict = number(process.env.OLLAMA_NUM_PREDICT, 520),
+  cpuNumPredict = number(process.env.OLLAMA_CPU_NUM_PREDICT, 520),
+  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 420),
   numCtx = number(process.env.OLLAMA_NUM_CTX, 4096),
-  cpuNumCtx = number(process.env.OLLAMA_CPU_NUM_CTX, 2048),
-  fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 2048),
+  cpuNumCtx = number(process.env.OLLAMA_CPU_NUM_CTX, 3072),
+  fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 3072),
   allowFallback = String(process.env.EYNOWA_LAB_ALLOW_FALLBACK || 'true').toLowerCase() !== 'false',
 } = {}) {
-  return async function generateJson({ prompt }) {
+  return async function generateJson({ prompt, schema }) {
     const [models, runtime] = await Promise.all([
       installedModels(baseUrl),
       runtimeProfile(baseUrl),
@@ -132,7 +179,6 @@ export function createOllamaJsonAdapter({
     const cpuCandidate = String(cpuModel || '').trim();
     const fallbackCandidate = String(fallbackModel || '').trim();
 
-    // If Ollama is demonstrably CPU-only, skip the 3B model entirely when a lightweight CPU model is installed.
     if (runtime.cpuOnly && allowFallback) {
       const directCpuModel = [cpuCandidate, fallbackCandidate]
         .find((candidate) => candidate && candidate !== model && modelInstalled(models, candidate));
@@ -146,6 +192,7 @@ export function createOllamaJsonAdapter({
           timeoutMs: usingPreferredCpuModel ? cpuTimeoutMs : fallbackTimeoutMs,
           numPredict: usingPreferredCpuModel ? cpuNumPredict : fallbackNumPredict,
           numCtx: usingPreferredCpuModel ? cpuNumCtx : fallbackNumCtx,
+          schema,
         });
         return {
           ...cpuResult.value,
@@ -154,6 +201,7 @@ export function createOllamaJsonAdapter({
             fallbackUsed: true,
             cpuMode: true,
             primarySkipped: true,
+            repairedJson: Boolean(cpuResult.repaired),
             elapsedMs: cpuResult.elapsedMs,
           },
         };
@@ -168,6 +216,7 @@ export function createOllamaJsonAdapter({
         timeoutMs,
         numPredict,
         numCtx,
+        schema,
       });
       return {
         ...primary.value,
@@ -176,6 +225,7 @@ export function createOllamaJsonAdapter({
           fallbackUsed: false,
           cpuMode: runtime.cpuOnly,
           primarySkipped: false,
+          repairedJson: Boolean(primary.repaired),
           elapsedMs: primary.elapsedMs,
         },
       };
@@ -198,6 +248,7 @@ export function createOllamaJsonAdapter({
         timeoutMs: usingPreferredCpuModel ? cpuTimeoutMs : fallbackTimeoutMs,
         numPredict: usingPreferredCpuModel ? cpuNumPredict : fallbackNumPredict,
         numCtx: usingPreferredCpuModel ? cpuNumCtx : fallbackNumCtx,
+        schema,
       });
       return {
         ...fallback.value,
@@ -206,6 +257,7 @@ export function createOllamaJsonAdapter({
           fallbackUsed: true,
           cpuMode: runtime.cpuOnly,
           primarySkipped: false,
+          repairedJson: Boolean(fallback.repaired),
           elapsedMs: fallback.elapsedMs,
           primaryFailure: primaryError.message,
         },
