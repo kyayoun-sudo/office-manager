@@ -126,8 +126,6 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
   } catch (parseError) {
     if (parseError?.code !== 'OLLAMA_INVALID_JSON') throw parseError;
 
-    // Small local models occasionally emit malformed JSON despite structured mode.
-    // Retry once with a short repair prompt instead of failing the professional request.
     const repairPrompt = [
       'Repair the following malformed JSON.',
       'Return JSON only. Preserve the semantic content. Do not add commentary.',
@@ -139,8 +137,8 @@ async function callOllamaJson({ baseUrl, model, prompt, timeoutMs, numPredict, n
       baseUrl,
       model,
       prompt: repairPrompt,
-      timeoutMs: Math.max(12000, Math.min(timeoutMs, 30000)),
-      numPredict: Math.max(numPredict, 420),
+      timeoutMs: Math.max(8000, Math.min(timeoutMs, 12000)),
+      numPredict: Math.max(numPredict, 320),
       numCtx,
       schema,
     });
@@ -160,11 +158,11 @@ export function createOllamaJsonAdapter({
   cpuModel = process.env.EYNOWA_LAB_CPU_MODEL || 'qwen2.5:0.5b-instruct',
   fallbackModel = process.env.EYNOWA_LAB_FALLBACK_MODEL || 'llama3.2:1b',
   timeoutMs = number(process.env.OLLAMA_GENERATION_TIMEOUT_MS, 25000),
-  cpuTimeoutMs = number(process.env.OLLAMA_CPU_TIMEOUT_MS, 45000),
-  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 35000),
+  cpuTimeoutMs = number(process.env.OLLAMA_CPU_TIMEOUT_MS, 12000),
+  fallbackTimeoutMs = number(process.env.OLLAMA_FALLBACK_TIMEOUT_MS, 15000),
   numPredict = number(process.env.OLLAMA_NUM_PREDICT, 520),
-  cpuNumPredict = number(process.env.OLLAMA_CPU_NUM_PREDICT, 520),
-  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 420),
+  cpuNumPredict = number(process.env.OLLAMA_CPU_NUM_PREDICT, 320),
+  fallbackNumPredict = number(process.env.OLLAMA_FALLBACK_NUM_PREDICT, 280),
   numCtx = number(process.env.OLLAMA_NUM_CTX, 4096),
   cpuNumCtx = number(process.env.OLLAMA_CPU_NUM_CTX, 3072),
   fallbackNumCtx = number(process.env.OLLAMA_FALLBACK_NUM_CTX, 3072),
