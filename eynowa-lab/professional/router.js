@@ -1,6 +1,7 @@
 import { sourcesFor } from './source-registry.js';
 import { evaluateValidation } from './validation-gate.js';
 import { detectTopicsForRequest } from './topic-router.js';
+import { buildGroundedFallbackRaw } from './deterministic-fallback.js';
 
 const ALL_DOMAINS = Object.freeze(['accounting', 'audit', 'advisory']);
 const ALLOWED_DOMAINS = new Set(ALL_DOMAINS);
@@ -250,19 +251,30 @@ export async function answerProfessional(input, adapters = {}) {
 
   const prompt = buildSystemPrompt({ request, knowledge, memory });
   const generationStarted = Date.now();
-  const raw = await generateJson({ prompt, request, schema: PROFESSIONAL_RESPONSE_SCHEMA });
+  let raw;
+  let generationError = null;
+  try {
+    raw = await generateJson({ prompt, request, schema: PROFESSIONAL_RESPONSE_SCHEMA });
+  } catch (error) {
+    generationError = error;
+    raw = buildGroundedFallbackRaw({ request, knowledge, memory, error });
+  }
   const generationMs = Date.now() - generationStarted;
+
   const result = raw && typeof raw === 'object' ? raw : {};
   const generationMeta = result?._eynowa_generation && typeof result._eynowa_generation === 'object'
     ? result._eynowa_generation
     : {};
   const fallbackUsed = Boolean(generationMeta.fallbackUsed);
   const repairedJson = Boolean(generationMeta.repairedJson);
+  const deterministicFallback = Boolean(generationMeta.deterministicFallback);
   const sources = filterSources(result.sources, request, knowledge);
   const normativeFollowupHits = safeArray(knowledge).filter((hit) => hit?.requiresNormativeFollowup);
-  const fallbackReason = fallbackUsed
-    ? `Le modèle local de secours ${clean(generationMeta.model, 120) || 'fallback'} a été utilisé après indisponibilité ou lenteur du modèle principal ; validation professionnelle obligatoire.`
-    : '';
+  const fallbackReason = deterministicFallback
+    ? 'Le moteur génératif local était indisponible ou trop lent ; EYNOWA Lab a basculé sur une réponse déterministe strictement fondée sur les passages récupérés. Validation professionnelle obligatoire.'
+    : fallbackUsed
+      ? `Le modèle local de secours ${clean(generationMeta.model, 120) || 'fallback'} a été utilisé après indisponibilité ou lenteur du modèle principal ; validation professionnelle obligatoire.`
+      : '';
   const repairReason = repairedJson
     ? 'La sortie JSON du modèle local a nécessité une réparation automatique ; validation professionnelle obligatoire.'
     : '';
@@ -275,7 +287,7 @@ export async function answerProfessional(input, adapters = {}) {
     missingFacts: safeArray(result.missing_facts),
     contradictions: safeArray(result.contradictions),
     confidence: result.confidence,
-    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0 || fallbackUsed || repairedJson,
+    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0 || fallbackUsed || repairedJson || deterministicFallback,
     validationReason: clean(
       result.validation_reason ||
       repairReason ||
@@ -310,6 +322,8 @@ export async function answerProfessional(input, adapters = {}) {
     generation_model: clean(generationMeta.model, 120),
     generation_fallback: fallbackUsed,
     generation_json_repaired: repairedJson,
+    generation_deterministic_fallback: deterministicFallback,
+    generation_error: generationError ? clean(generationError?.message || generationError, 1000) : '',
     prompt_chars: prompt.length,
     timings_ms: {
       retrieval: retrievalMs,
