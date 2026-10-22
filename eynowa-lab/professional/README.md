@@ -4,28 +4,75 @@ This module is the shared professional layer for the single EYNOWA Lab running o
 
 It is **not** a second Lab and must not be deployed as an independent SaaS service.
 
-## Domains
+## Professional brains
 
 - `accounting`
 - `audit`
 - `advisory`
 
-Calling applications must send their context explicitly. Example:
+The calling application does **not** define or restrict the professional domain. The task does.
+
+### Firm Manager
+
+Firm Manager is the cabinet operating system, not an audit-only application. It can use all three professional brains and can combine them in one request.
+
+If Firm Manager sends no explicit domain scope, EYNOWA Lab defaults to:
+
+```json
+{
+  "application": "firm_manager",
+  "domains": ["accounting", "audit", "advisory"]
+}
+```
+
+It can also narrow a task when useful:
+
+```json
+{
+  "application": "firm_manager",
+  "domains": ["audit"],
+  "task": "risk_assessment",
+  "frameworks": ["ISA"],
+  "country": "CI",
+  "professional_id": "user-123",
+  "client": "ABC SARL",
+  "query": "Identify significant risks for this engagement."
+}
+```
+
+Or combine several disciplines:
+
+```json
+{
+  "application": "firm_manager",
+  "domains": ["accounting", "audit", "advisory"],
+  "task": "year_end_review",
+  "frameworks": ["SYSCOHADA", "IFRS", "ISA"],
+  "country": "CI",
+  "professional_id": "user-123",
+  "client": "ABC SARL",
+  "query": "Review the year-end accounting treatment, audit implications and recommended management actions."
+}
+```
+
+### Accounting AI
+
+Accounting AI will normally call the accounting brain explicitly:
 
 ```json
 {
   "application": "accounting_ai",
-  "domain": "accounting",
+  "domains": ["accounting"],
   "task": "invoice_posting",
   "country": "CI",
-  "framework": "SYSCOHADA",
+  "frameworks": ["SYSCOHADA"],
   "professional_id": "user-123",
   "client": "ABC SARL",
   "query": "How should this invoice be posted?"
 }
 ```
 
-Firm Manager should use `domain=audit`; other tools can use `advisory` when appropriate.
+Legacy `domain` remains accepted for compatibility. `domain=all` also activates all three brains.
 
 ## Intended Gateway route
 
@@ -59,6 +106,8 @@ Recommended Chroma collections:
 - `eynowa_audit`
 - `eynowa_advisory`
 
+For a multi-domain Firm Manager request, Lab queries all relevant collections and gives Ollama one combined, labelled professional context.
+
 Every ingested chunk must include at least:
 
 - `source_id`
@@ -82,7 +131,7 @@ Personal memory is local to the professional computer by default:
 
 Only `HUMAN_VALIDATED` decisions can be written automatically.
 
-Memory is contextual evidence, never normative authority.
+Memory is compartmentalised by professional + domain + client. Firm Manager can retrieve several domain compartments for a cross-disciplinary task, but memory is still contextual evidence, never normative authority.
 
 ## Validation gate
 
@@ -92,7 +141,7 @@ The final answer is blocked for professional validation when, among other things
 - facts are missing;
 - sources/facts conflict;
 - model confidence is below the automatic threshold;
-- the subject requires significant professional judgment.
+- the subject requires significant professional judgment in accounting, audit or advisory.
 
 The API response includes:
 
