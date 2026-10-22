@@ -5,6 +5,42 @@ import { detectTopicsForRequest } from './topic-router.js';
 const ALL_DOMAINS = Object.freeze(['accounting', 'audit', 'advisory']);
 const ALLOWED_DOMAINS = new Set(ALL_DOMAINS);
 
+export const PROFESSIONAL_RESPONSE_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: {
+    answer: { type: 'string' },
+    sources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          sourceId: { type: 'string' },
+          reference: { type: 'string' },
+        },
+        required: ['sourceId', 'reference'],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: 'number' },
+    missing_facts: { type: 'array', items: { type: 'string' } },
+    contradictions: { type: 'array', items: { type: 'string' } },
+    requires_validation: { type: 'boolean' },
+    validation_reason: { type: 'string' },
+    question_for_professional: { type: 'string' },
+  },
+  required: [
+    'answer',
+    'sources',
+    'confidence',
+    'missing_facts',
+    'contradictions',
+    'requires_validation',
+    'validation_reason',
+    'question_for_professional',
+  ],
+  additionalProperties: false,
+});
+
 function clean(value, max = 4000) {
   return String(value || '').trim().slice(0, max);
 }
@@ -132,23 +168,14 @@ export function buildSystemPrompt({ request, knowledge = [], memory = [] }) {
     '- requiresNormativeFollowup=true means professional validation is mandatory before an operational accounting conclusion.',
     '- If facts are missing, sources conflict, only methodology supports the accounting conclusion, or judgment is significant, set requires_validation=true.',
     '- Ask one precise validation question when needed.',
-    '- Be concise and return JSON only.',
+    '- Keep answer concise enough to fit the structured response budget.',
+    '- Return JSON only and respect the provided JSON schema exactly.',
     '',
     `Registered professional sources: ${JSON.stringify(compactRegistry)}.`,
     `Retrieved professional knowledge: ${JSON.stringify(compactKnowledge)}.`,
     `Local professional memory: ${JSON.stringify(compactMemory)}.`,
     '',
-    'Required response shape:',
-    JSON.stringify({
-      answer: 'concise string',
-      sources: [{ sourceId: 'retrieved source id', reference: 'retrieved reference' }],
-      confidence: 0.0,
-      missing_facts: ['string'],
-      contradictions: ['string'],
-      requires_validation: false,
-      validation_reason: 'string',
-      question_for_professional: 'string',
-    }),
+    `Required JSON schema: ${JSON.stringify(PROFESSIONAL_RESPONSE_SCHEMA)}.`,
     `User request: ${request.query}`,
   ].join('\n');
 }
@@ -223,17 +250,21 @@ export async function answerProfessional(input, adapters = {}) {
 
   const prompt = buildSystemPrompt({ request, knowledge, memory });
   const generationStarted = Date.now();
-  const raw = await generateJson({ prompt, request });
+  const raw = await generateJson({ prompt, request, schema: PROFESSIONAL_RESPONSE_SCHEMA });
   const generationMs = Date.now() - generationStarted;
   const result = raw && typeof raw === 'object' ? raw : {};
   const generationMeta = result?._eynowa_generation && typeof result._eynowa_generation === 'object'
     ? result._eynowa_generation
     : {};
   const fallbackUsed = Boolean(generationMeta.fallbackUsed);
+  const repairedJson = Boolean(generationMeta.repairedJson);
   const sources = filterSources(result.sources, request, knowledge);
   const normativeFollowupHits = safeArray(knowledge).filter((hit) => hit?.requiresNormativeFollowup);
   const fallbackReason = fallbackUsed
     ? `Le modèle local de secours ${clean(generationMeta.model, 120) || 'fallback'} a été utilisé après indisponibilité ou lenteur du modèle principal ; validation professionnelle obligatoire.`
+    : '';
+  const repairReason = repairedJson
+    ? 'La sortie JSON du modèle local a nécessité une réparation automatique ; validation professionnelle obligatoire.'
     : '';
 
   const validation = evaluateValidation({
@@ -244,9 +275,10 @@ export async function answerProfessional(input, adapters = {}) {
     missingFacts: safeArray(result.missing_facts),
     contradictions: safeArray(result.contradictions),
     confidence: result.confidence,
-    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0 || fallbackUsed,
+    modelRequiresValidation: Boolean(result.requires_validation) || normativeFollowupHits.length > 0 || fallbackUsed || repairedJson,
     validationReason: clean(
       result.validation_reason ||
+      repairReason ||
       fallbackReason ||
       (normativeFollowupHits.length ? 'Le contexte public récupéré exige une vérification sur le corpus normatif autorisé avant conclusion opérationnelle.' : ''),
       2000
@@ -277,6 +309,7 @@ export async function answerProfessional(input, adapters = {}) {
     memory_hits: safeArray(memory).length,
     generation_model: clean(generationMeta.model, 120),
     generation_fallback: fallbackUsed,
+    generation_json_repaired: repairedJson,
     prompt_chars: prompt.length,
     timings_ms: {
       retrieval: retrievalMs,
