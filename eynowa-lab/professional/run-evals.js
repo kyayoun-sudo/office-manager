@@ -31,13 +31,25 @@ function progress(index, total, row, elapsedMs) {
   console.error(`[${index}/${total}] ${status} ${row.id} ${elapsedMs}ms ${details}`);
 }
 
+function selectedCases() {
+  const requestedIds = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+  if (!requestedIds.length) return EVALUATION_CASES;
+
+  const wanted = new Set(requestedIds);
+  const selected = EVALUATION_CASES.filter((testCase) => wanted.has(testCase.id));
+  const missing = requestedIds.filter((id) => !selected.some((testCase) => testCase.id === id));
+  if (missing.length) throw new Error(`UNKNOWN_EVAL_CASES: ${missing.join(', ')}`);
+  return selected;
+}
+
 async function main() {
   const live = process.argv.includes('--live');
+  const cases = selectedCases();
   const results = [];
-  const totalCases = EVALUATION_CASES.length;
+  const totalCases = cases.length;
 
   for (let index = 0; index < totalCases; index += 1) {
-    const testCase = EVALUATION_CASES[index];
+    const testCase = cases[index];
     const started = Date.now();
     let row;
 
@@ -67,6 +79,7 @@ async function main() {
   const failed = results.filter((row) => !row.pass);
   const summary = {
     mode: live ? 'live' : 'offline-routing',
+    selected_case_ids: cases.length === EVALUATION_CASES.length ? 'all' : cases.map((row) => row.id),
     total: results.length,
     passed,
     failed: failed.length,
