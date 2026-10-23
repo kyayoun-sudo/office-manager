@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Revue analytique</title>
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/screens.css">
+<style>
+  .choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .choice{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--surface)}
+  .choice h3{margin-top:0}
+  .dropzone{border:2px dashed var(--line);border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:var(--surface)}
+  .dropzone.over{border-color:var(--brand);background:var(--soft)}
+  .req{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(160px,2fr) auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .req:last-child{border-bottom:0}.req strong{display:block}.req .meta{display:block}
+  .ok{color:var(--ok,#18794e)}.missing{color:#a33}.recommended{color:#8a6200}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.actions input[type=file]{max-width:100%}
+  .result-box{white-space:pre-wrap;line-height:1.5}
+  .step{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 9px;border-radius:999px;background:var(--soft);margin-right:6px}
+  @media(max-width:700px){.req{grid-template-columns:1fr}.req .tag{justify-self:start}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="nav" aria-label="Navigation principale">
+    <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
+    <a href="/accueil.html">Accueil</a>
+    <a href="/mission.html" aria-current="page">Missions</a>
+    <a href="/auditeur.html">Enhanced Auditor</a>
+    <a href="/methodologie.html">Méthodologie</a>
+    <a href="/validations.html">À valider</a>
+    <div class="who"><span data-user-name>Utilisateur</span></div>
+  </nav>
+
+  <main class="main" data-no-tabs>
+    <section class="card" id="login" hidden>
+      <h2>Connexion</h2>
+      <div class="field"><label for="token">Code d'accès du cabinet</label><input id="token" type="password" autocomplete="off"></div>
+      <button class="btn" id="connect" type="button">Se connecter</button>
+    </section>
+
+    <header class="page-head">
+      <p class="meta"><a id="back" href="/mission.html">← Retour à la mission</a></p>
+      <div><span class="step">1 · Revue analytique</span><span class="step">2 · Programme de travail</span></div>
+      <h1 id="title">Revue analytique</h1>
+      <p class="lead">Première étape de planification après la création de la mission. Faites la revue dans l’application ou déposez votre revue Excel existante. Le programme de travail vient ensuite.</p>
+      <p class="status" id="page-status" role="status" aria-live="polite"></p>
+    </header>
+
+    <section class="card" aria-labelledby="h-docs">
+      <div class="card-head"><div><h2 id="h-docs">Documents nécessaires</h2><p class="meta">Firm Manager vérifie d’abord ce qui est déjà dans la mission. Un document trouvé n’est pas redemandé.</p></div><button class="btn ghost" id="refresh" type="button">Actualiser</button></div>
+      <div id="requirements"></div>
+      <div class="dropzone" id="source-drop" tabindex="0" role="button" aria-label="Déposer les documents nécessaires">
+        <strong>Déposer les documents manquants ici</strong><br><span class="meta">Balance, grand livre, états financiers, comparatifs, budget…</span>
+      </div>
+      <input id="source-files" type="file" multiple hidden>
+      <div class="actions" style="margin-top:10px"><button class="btn ghost" id="source-choose" type="button">Choisir des fichiers</button><span class="status" id="source-status"></span></div>
+      <div id="source-list"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-mode">
+      <h2 id="h-mode">Comment voulez-vous faire la revue ?</h2>
+      <div class="choice-grid">
+        <div class="choice">
+          <h3>Faire la revue dans Firm Manager</h3>
+          <p>Enhanced Auditor utilise les documents de la mission pour rechercher les variations, tendances, incohérences, zones significatives et questions à approfondir avant le programme de travail.</p>
+          <button class="btn" id="run-review" type="button">Lancer la revue analytique</button>
+          <p class="status" id="run-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="choice">
+          <h3>Importer une revue existante</h3>
+          <p>Déposez votre fichier Excel. Il reste dans la mission et peut être utilisé comme source de planification du programme de travail.</p>
+          <div class="actions"><input id="review-file" type="file" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"><button class="btn ghost" id="review-upload" type="button">Déposer et utiliser</button></div>
+          <p class="status" id="review-status" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-result">
+      <div class="card-head"><h2 id="h-result">Résultat de la revue</h2><a id="auditor-link" class="btn ghost" href="/auditeur.html">Ouvrir dans Enhanced Auditor</a></div>
+      <div id="result"><p class="empty">Aucune revue analytique lancée pour cette mission.</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-next">
+      <h2 id="h-next">Étape suivante : programme de travail</h2>
+      <p class="meta">Le programme vient après la revue analytique. Vous pourrez le construire dans Firm Manager ou déposer/importer votre Excel.</p>
+      <a id="programme" class="btn" href="/programme.html">Continuer vers le programme de travail</a>
+    </section>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script src="/assets/screens.js"></script>
+<script>
+(function(){
+  var OM=window.OfficeManager, UI=window.OMScreens, $=function(id){return document.getElementById(id);}, el=UI.el;
+  var params=new URLSearchParams(location.search), missionId=params.get('mission_id')||params.get('id')||'';
+  var mission=null, docs=[], selected=[];
+  var REQUIREMENTS=[
+    {key:'tb_current',label:'Balance générale de la période',why:'Base de comparaison et de matérialité',required:true,match:[/balance\s*(g[eé]n[eé]rale)?/i,/trial\s*balance/i]},
+    {key:'ledger',label:'Grand livre',why:'Détail des mouvements et investigations',required:true,match:[/grand\s*livre/i,/general\s*ledger/i,/ledger/i]},
+    {key:'comparative',label:'Comparatif N-1',why:'Variations par rapport à la période précédente',required:false,match:[/n\s*[-–]?\s*1/i,/n-1/i,/pr[eé]c[eé]dent/i,/previous/i,/comparatif/i]},
+    {key:'fs',label:'États financiers',why:'Cohérence globale et principaux agrégats',required:false,match:[/[eé]tats?\s*financiers?/i,/financial\s*statements?/i,/bilan/i,/compte\s*de\s*r[eé]sultat/i,/income\s*statement/i]},
+    {key:'budget',label:'Budget / prévisions',why:'Analyse réel vs prévision si disponible',required:false,match:[/budget/i,/forecast/i,/pr[eé]vision/i]}
+  ];
+  function docText(d){return [d.name,d.document_type,d.summary].filter(Boolean).join(' ');}
+  function foundFor(r){return docs.filter(function(d){return r.match.some(function(re){return re.test(docText(d));});});}
+  function renderRequirements(){
+    var box=$('requirements');box.textContent='';
+    REQUIREMENTS.forEach(function(r){
+      var found=foundFor(r), row=el('div',null,'req'), left=el('div');
+      left.appendChild(el('strong',r.label));left.appendChild(el('span',r.why,'meta'));row.appendChild(left);
+      var mid=el('div');
+      if(found.length){found.slice(0,3).forEach(function(d){var line=el('div');line.appendChild(d.web_url?UI.safeLink(d.web_url,d.name||r.label):el('span',d.name||r.label));mid.appendChild(line);});}
+      else mid.appendChild(el('span',r.required?'À déposer avant de lancer la revue':'Recommandé si disponible',r.required?'missing':'recommended'));
+      row.appendChild(mid);row.appendChild(el('span',found.length?'Disponible':(r.required?'Manquant':'Recommandé'),found.length?'tag':'tag warn'));box.appendChild(row);
+    });
+    var missing=REQUIREMENTS.filter(function(r){return r.required&&!foundFor(r).length;});
+    $('run-review').disabled=missing.length>0;
+    $('run-status').textContent=missing.length?'Il manque : '+missing.map(function(x){return x.label;}).join(', ')+'. Déposez-les ci-dessus.':'';
+  }
+  function renderSelected(){var box=$('source-list');box.textContent='';selected.forEach(function(f){var r=el('div',null,'item');r.appendChild(el('span',f.name));r.appendChild(el('span',Math.round(f.size/1024)+' Ko','meta'));box.appendChild(r);});}
+  function addFiles(list){Array.prototype.forEach.call(list||[],function(f){if(!selected.some(function(x){return x.name===f.name&&x.size===f.size;}))selected.push(f);});renderSelected();if(selected.length)uploadSources();}
+  function b64(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(',')[1]||'');};r.onerror=rej;r.readAsDataURL(file);});}
+  function uploadOne(file,forcedName){
+    var name=forcedName||file.name, mime=file.type||'application/octet-stream';
+    if(file.size<=3*1024*1024)return b64(file).then(function(data){return OM.api('/api/app?route=mission-quick',{method:'POST',body:JSON.stringify({action:'piece',mission_id:missionId,name:name,mime:mime,base64:data})});});
+    return OM.api('/api/app?route=mission-quick',{method:'POST',body:JSON.stringify({action:'piece-start',mission_id:missionId,name:name,mime:mime,size:file.size})}).then(function(s){return fetch(s.upload_url,{method:'PUT',body:file}).then(function(r){if(!r.ok)throw new Error('Envoi vers Google refusé ('+r.status+')');return r.json();}).then(function(g){return {file_id:g.id,name:g.name||s.name};});});
+  }
+  function registerFiles(files,note){return OM.api('/api/app?route=mission-quick',{method:'POST',body:JSON.stringify({action:'pieces-done',mission_id:missionId,note:note||'Documents pour la revue analytique préliminaire',files:files.map(function(x){return {id:x.file_id};})})});}
+  function uploadSources(){
+    if(!selected.length)return;var list=selected.slice(),done=[];$('source-status').textContent='Dépôt dans la mission…';$('source-choose').disabled=true;
+    list.reduce(function(p,f){return p.then(function(){return uploadOne(f).then(function(r){done.push(r);});});},Promise.resolve()).then(function(){return registerFiles(done,'Documents déposés pour la revue analytique préliminaire. Identifier leur nature, leur période et les rattacher à cette mission.');}).then(function(){selected=[];renderSelected();$('source-status').textContent=done.length+' document(s) déposé(s). Les agents les lisent ; actualisation…';setTimeout(load,2500);}).catch(function(e){$('source-status').textContent='Impossible : '+e.message;}).then(function(){$('source-choose').disabled=false;});
+  }
+  function reviewFocus(importedName){
+    return '[REVUE_ANALYTIQUE_PRELIMINAIRE] '+(importedName?'Une revue analytique Excel existante vient d’être déposée (« '+importedName+' »). Lis-la comme source principale et rapproche-la des autres documents de la mission. ':'Effectue la revue analytique préliminaire avant le programme de travail. ')+
+      'Analyse les évolutions N/N-1 quand elles sont disponibles, tendances, ratios pertinents, soldes ou mouvements inhabituels, comptes nouveaux/disparus, incohérences et zones significatives. Distingue les faits des hypothèses. Fais ressortir les anomalies potentielles, questions à poser au client, documents complémentaires nécessaires et conséquences possibles sur les risques et le futur programme de travail. Ne prétends pas qu’un test d’audit a été exécuté si ce n’est pas le cas.';
+  }
+  function runReview(importedName){
+    var b=$('run-review');b.disabled=true;$('run-status').textContent='Revue analytique en cours…';
+    return OM.api('/api/app?route=auditor',{method:'POST',body:JSON.stringify({mission_id:missionId,focus:reviewFocus(importedName)})}).then(function(){pollReview();}).catch(function(e){$('run-status').textContent='Impossible : '+e.message;if(!importedName)renderRequirements();throw e;});
+  }
+  function drawReview(r){
+    var box=$('result');box.textContent='';
+    if(!r||r.status==='none'||(r.focus&&r.focus.indexOf('[REVUE_ANALYTIQUE_PRELIMINAIRE]')<0)){box.appendChild(el('p','Aucune revue analytique lancée pour cette mission.','empty'));return;}
+    if(r.status==='running'){box.appendChild(el('p','Analyse en cours : '+(r.stage||'lecture des documents')+'…','status'));if((r.log||[]).length)box.appendChild(el('p',r.log.slice(-3).map(function(x){return x.m;}).join(' · '),'meta'));return;}
+    if(r.status==='failed'||r.status==='error'){box.appendChild(el('p','La revue n’a pas abouti : '+(r.error||'erreur'),'empty'));return;}
+    if(r.summary)box.appendChild(el('p',r.summary,'result-box'));
+    if(Array.isArray(r.priority_actions)&&r.priority_actions.length){box.appendChild(el('h3','Points à traiter avant / dans le programme'));var ul=el('ul');r.priority_actions.forEach(function(x){ul.appendChild(el('li',x));});box.appendChild(ul);}
+    if(Array.isArray(r.patterns_reading)&&r.patterns_reading.length){box.appendChild(el('h3','Constats analytiques'));var ul2=el('ul');r.patterns_reading.forEach(function(x){ul2.appendChild(el('li',x));});box.appendChild(ul2);}
+    if(r.report){var a=UI.safeLink(r.report.url||r.report,r.report.name||'Ouvrir le rapport de revue');a.className='btn ghost';box.appendChild(a);}
+    $('run-status').textContent='Revue terminée. Vous pouvez passer au programme de travail.';
+  }
+  function pollReview(){
+    var stop=false;
+    function tick(){OM.api('/api/app?route=auditor&mission_id='+encodeURIComponent(missionId)).then(function(r){drawReview(r);if(r&&r.status==='running')setTimeout(tick,4000);else{$('run-review').disabled=false;}}).catch(function(e){$('run-status').textContent='Suivi indisponible : '+e.message;$('run-review').disabled=false;});}
+    tick();return function(){stop=true;};
+  }
+  function load(){
+    if(!missionId){$('page-status').textContent='Mission manquante.';return;}
+    $('back').href='/mission.html?id='+encodeURIComponent(missionId);$('programme').href='/programme.html?mission_id='+encodeURIComponent(missionId);$('auditor-link').href='/auditeur.html?mission='+encodeURIComponent(missionId);
+    OM.api('/api/app?route=mission-view&mission_id='+encodeURIComponent(missionId)).then(function(d){mission=d.mission||{};docs=d.documents||[];$('title').textContent='Revue analytique — '+(mission.name||'Mission');renderRequirements();
+      var imported=docs.filter(function(x){return /REVUE[_\s-]*ANALYTIQUE/i.test(x.name||'');});if(imported.length)$('review-status').textContent='Revue Excel déjà déposée : '+imported[0].name+'.';
+    }).catch(function(e){$('page-status').textContent='Mission indisponible : '+e.message;});
+    if(OM.isManager())OM.api('/api/app?route=auditor&mission_id='+encodeURIComponent(missionId)).then(drawReview).catch(function(){});
+  }
+  $('refresh').addEventListener('click',load);$('source-choose').addEventListener('click',function(){$('source-files').click();});$('source-files').addEventListener('change',function(){addFiles(this.files);this.value='';});
+  ['dragenter','dragover'].forEach(function(t){$('source-drop').addEventListener(t,function(e){e.preventDefault();this.classList.add('over');});});['dragleave','drop'].forEach(function(t){$('source-drop').addEventListener(t,function(e){e.preventDefault();this.classList.remove('over');if(t==='drop')addFiles(e.dataTransfer.files);});});$('source-drop').addEventListener('click',function(){$('source-files').click();});
+  $('run-review').addEventListener('click',function(){runReview(null);});
+  $('review-upload').addEventListener('click',function(){var f=$('review-file').files&&$('review-file').files[0];if(!f){$('review-status').textContent='Choisissez un fichier Excel.';return;}var b=this;b.disabled=true;$('review-status').textContent='Dépôt de la revue Excel…';var renamed='REVUE_ANALYTIQUE_'+f.name.replace(/^REVUE[_\s-]*ANALYTIQUE[_\s-]*/i,'');uploadOne(f,renamed).then(function(r){return registerFiles([r],'Revue analytique préparée hors de Firm Manager. La conserver comme source de planification et en extraire les constats.').then(function(){return runReview(renamed);});}).then(function(){$('review-status').textContent='Revue Excel déposée et prise en compte.';setTimeout(load,1500);}).catch(function(e){$('review-status').textContent='Impossible : '+e.message;}).then(function(){b.disabled=false;});});
+  UI.requireLogin(load);
+})();
+</script>
+</body>
+</html>
