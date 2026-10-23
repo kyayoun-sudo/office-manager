@@ -51,7 +51,7 @@ export async function recordProfessionalTelemetry({ request = {}, result = {}, s
 
 export async function recordProfessionalFeedback(body = {}) {
   const rating = String(body.rating || '').toLowerCase();
-  if (!['accepted', 'corrected', 'rejected', 'helpful', 'not_helpful'].includes(rating)) {
+  if (!['accepted', 'corrected', 'rejected', 'needs_evidence', 'helpful', 'not_helpful'].includes(rating)) {
     throw new Error('INVALID_PROFESSIONAL_FEEDBACK_RATING');
   }
   const row = {
@@ -93,6 +93,7 @@ export async function professionalMetrics({ limit = 5000 } = {}) {
       accepted: feedback.filter((row) => row.rating === 'accepted').length,
       corrected: feedback.filter((row) => row.rating === 'corrected').length,
       rejected: feedback.filter((row) => row.rating === 'rejected').length,
+      needs_evidence: feedback.filter((row) => row.rating === 'needs_evidence').length,
       helpful: feedback.filter((row) => row.rating === 'helpful').length,
       not_helpful: feedback.filter((row) => row.rating === 'not_helpful').length,
     },
