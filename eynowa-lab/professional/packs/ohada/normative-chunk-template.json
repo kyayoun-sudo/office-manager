@@ -1,0 +1,24 @@
+{
+  "id": "replace-with-stable-id",
+  "source_id": "OHADA_AUDCIF_SYSCOHADA",
+  "domain": "accounting",
+  "framework": "SYSCOHADA",
+  "authority": "OHADA",
+  "title": "Titre précis du passage autorisé",
+  "reference": "Article / section / page exacte",
+  "version": "2017",
+  "effective_from": "2018-01-01",
+  "jurisdiction": "OHADA",
+  "country": "CI",
+  "language": "fr",
+  "source_url": "https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/",
+  "license_basis": "DOCUMENTED_PERMISSION_OR_OTHER_VALID_BASIS",
+  "content": "Insérer uniquement le passage dont l'utilisation dans EYNOWA Lab est autorisée.",
+  "metadata": {
+    "topic": "property_plant_equipment",
+    "subtopic": "recognition_or_measurement",
+    "source_kind": "authorised_normative_text",
+    "normative_text": true,
+    "requires_normative_followup": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "source_id": "OHADA_AUDCIF_SYSCOHADA",
+  "domain": "accounting",
+  "framework": "AUDCIF",
+  "authority": "OHADA",
+  "reference": "Official OHADA overview page — AUDCIF presentation and effective dates",
+  "version": "2017",
+  "effective_from": "2018-01-01",
+  "jurisdiction": "OHADA",
+  "country": "CI",
+  "language": "fr",
+  "source_url": "https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/",
+  "license_basis": "EYNOWA_AUTHORED_SUMMARY_OF_PUBLIC_OFFICIAL_METADATA_NOT_STANDARD_TEXT",
+  "content": "Résumé EYNOWA fondé sur la page officielle OHADA : l’AUDCIF a été adopté le 26 janvier 2017 et publié au Journal officiel le 15 février 2017. Il remplace l’ancien acte comptable de 2000. Le SYSCOHADA révisé est annexé à l’AUDCIF et comprend notamment le plan comptable général OHADA ainsi que le dispositif applicable aux comptes consolidés et combinés. L’entrée en vigueur indiquée par l’OHADA est le 1er janvier 2018 pour les comptes personnels des entités et le 1er janvier 2019 pour les comptes consolidés, combinés et les états financiers IFRS visés par le dispositif. Ce résumé décrit le référentiel et ses dates ; il ne remplace pas le texte normatif et ne suffit pas, seul, pour justifier un traitement comptable précis.",
+  "metadata": {
+    "pack": "ohada-accounting",
+    "kind": "official_source_overview",
+    "normative_text_included": false,
+    "adopted_at": "2017-01-26",
+    "official_journal_date": "2017-02-15"
+  }
+}

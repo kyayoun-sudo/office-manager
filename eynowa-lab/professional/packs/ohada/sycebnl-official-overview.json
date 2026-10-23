@@ -1,0 +1,21 @@
+{
+  "source_id": "OHADA_SYCEBNL",
+  "domain": "accounting",
+  "framework": "SYCEBNL",
+  "authority": "OHADA",
+  "reference": "Official OHADA overview — SYCEBNL availability and effective date",
+  "version": "2022",
+  "effective_from": "2024-01-01",
+  "jurisdiction": "OHADA",
+  "country": "CI",
+  "language": "fr",
+  "source_url": "https://www.ohada.org/en/availability-of-the-uniform-act-on-the-accounting-system-for-not-for-profit-entities/",
+  "license_basis": "EYNOWA_AUTHORED_SUMMARY_OF_PUBLIC_OFFICIAL_METADATA_NOT_STANDARD_TEXT",
+  "content": "Résumé EYNOWA fondé sur la publication officielle OHADA : l’Acte uniforme relatif au système comptable des entités à but non lucratif a été adopté en décembre 2022 et le SYCEBNL qui lui est annexé est entré en vigueur le 1er janvier 2024. Le dispositif vise les entités à but non lucratif concernées dans l’espace OHADA et complète le cadre comptable OHADA pour ces entités. Ce résumé décrit uniquement le référentiel et sa date d’entrée en vigueur ; il ne remplace pas le texte normatif et ne suffit pas, seul, pour justifier un traitement comptable précis.",
+  "metadata": {
+    "pack": "ohada-accounting",
+    "kind": "official_source_overview",
+    "normative_text_included": false,
+    "effective_from": "2024-01-01"
+  }
+}
