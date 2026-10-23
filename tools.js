@@ -128,16 +128,22 @@ function commonReadTools(runtime, agentKey) {
         country: z.string().optional(),
         client: z.string().optional()
       }),
-      execute: args => consultEynowaLab({
-        application: "firm_manager",
-        query: args.query,
-        task: [args.task, `calling_agent:${agentKey}`].filter(Boolean).join(" | "),
-        domains: args.domains,
-        frameworks: args.frameworks || [],
-        country: args.country || "CI",
-        professionalId: runtime.professionalId || "default",
-        client: args.client || ""
-      })
+      execute: async args => {
+        const result = await consultEynowaLab({
+          application: "firm_manager",
+          query: args.query,
+          task: [args.task, `calling_agent:${agentKey}`].filter(Boolean).join(" | "),
+          domains: args.domains,
+          frameworks: args.frameworks || [],
+          country: args.country || "CI",
+          professionalId: runtime.professionalId || "default",
+          client: args.client || ""
+        });
+        if (Array.isArray(runtime.eynowaLabConsultations)) {
+          runtime.eynowaLabConsultations.push(result);
+        }
+        return result;
+      }
     }));
   }
 
