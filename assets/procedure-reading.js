@@ -11,7 +11,10 @@
   };
 
   // The Working File workboard is additive: the existing procedure page and chat stay intact.
-  // It is loaded only on the procedure workspace and uses the existing steps / step-plan / step-run APIs.
+  // First build a deterministic understanding of the whole workbook (guide, PGA/programme,
+  // risks, PBC, populations, reconciliations and tests). Only then load the existing
+  // step-by-step Enhanced Auditor workboard. If understanding fails, that script still loads
+  // the existing workboard so this layer cannot remove an acquired capability.
   if (document.getElementById('procedure-workspace')) {
     var css = document.createElement('link');
     css.rel = 'stylesheet';
@@ -19,8 +22,9 @@
     document.head.appendChild(css);
 
     var script = document.createElement('script');
-    script.src = '/assets/working-file-agent-panel.js';
+    script.src = '/assets/working-file-understanding-panel.js';
     script.defer = true;
+    script.dataset.workingFileUnderstanding = '1';
     document.head.appendChild(script);
   }
 })();
