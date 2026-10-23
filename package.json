@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "scripts": {
     "test:lab": "node --test eynowa-lab/professional/*.test.js",
     "lab:import": "node eynowa-lab/professional/import-knowledge.js",
@@ -18,9 +16,11 @@
     "lab:import:ohada:treasury": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/eynowa-accounting-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/eynowa-audit-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/treasury/audit-public-guidance.json",
     "lab:import:ohada:provisions": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/provisions/eynowa-accounting-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/provisions/eynowa-audit-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/provisions/audit-public-guidance.json",
     "lab:import:ohada:core-final": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/core-final/eynowa-accounting-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/core-final/eynowa-audit-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ohada/core-final/official-public-guidance.json",
-    "lab:import:ohada:all": "npm run lab:import:ohada:starter && npm run lab:import:ohada:immobilisations && npm run lab:import:ohada:stocks && npm run lab:import:ohada:purchases && npm run lab:import:ohada:sales && npm run lab:import:ohada:treasury && npm run lab:import:ohada:provisions && npm run lab:import:ohada:core-final"
+    "lab:import:ohada:all": "npm run lab:import:ohada:starter && npm run lab:import:ohada:immobilisations && npm run lab:import:ohada:stocks && npm run lab:import:ohada:purchases && npm run lab:import:ohada:sales && npm run lab:import:ohada:treasury && npm run lab:import:ohada:provisions && npm run lab:import:ohada:core-final",
+    "lab:import:ifrs": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ifrs/core/eynowa-accounting-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/ifrs/core/official-public-metadata.json",
+    "lab:import:audit": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/audit/core/eynowa-audit-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/audit/core/official-public-metadata.json",
+    "lab:import:advisory": "node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/advisory/core/eynowa-advisory-methodology.json && node eynowa-lab/professional/import-knowledge.js eynowa-lab/professional/packs/advisory/core/official-public-metadata.json",
+    "lab:import:professional:all": "npm run lab:import:ohada:all && npm run lab:import:ifrs && npm run lab:import:audit && npm run lab:import:advisory"
   },
-  "dependencies": {
-    "chromadb": "3.5.0"
-  }
+  "dependencies": { "chromadb": "3.5.0" }
 }
