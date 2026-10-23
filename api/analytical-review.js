@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     const body = req.body || {}, action = String(body.action || '');
     let result;
-    if (action === 'choose-manager') result = await chooseAnalyticalManager(orgId, missionId, String(body.candidate_id || body.assignment_id || ''), account);
+    if (action === 'choose-manager') result = await chooseAnalyticalManager(orgId, missionId, String(body.candidate_id || body.assignment_id || ''), account, {}, { planned_start: body.planned_start, planned_end: body.planned_end });
     else if (action === 'organize-file') result = await organizeAnalyticalFile(orgId, missionId, String(body.file_id || ''), body.kind === 'review' ? 'review' : 'source', account);
     else if (action === 'import-review') result = await importAnalyticalReview(orgId, missionId, String(body.file_id || ''), account);
     else if (action === 'stage-files') result = await stageAnalyticalFiles(orgId, missionId, Array.isArray(body.file_ids) ? body.file_ids : [], account);

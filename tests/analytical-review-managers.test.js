@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { analyticalReviewContext, chooseAnalyticalManager, startAnalyticalReview } from '../lib/analytical-review.js';
 import { setMissionFunction } from '../lib/mission-function.js';
 const M='11111111-1111-1111-1111-111111111111', owner={role:'owner',email:'owner@example.test',display_name:'Propriétaire'};
-function setup({emptyStaff=false}={}) {
+function setup({emptyStaff=false,plannedStart='2026-10-01',plannedEnd='2026-10-31'}={}) {
   const staff=emptyStaff?[]:[{id:'person',org_id:'org',full_name:'Amina Manager',email:'amina@example.test',active:true},{id:'inactive',org_id:'org',full_name:'Ancien membre',email:'old@example.test',active:false}];
   const users=[{...owner,org_id:'org',active:true},{org_id:'org',email:'amina@example.test',display_name:'Amina Manager',role:'manager',active:true},{org_id:'org',email:'account@example.test',display_name:'Compte sans fiche',role:'manager',active:true}];
   const assignments=[],writes=[],files=new Map();
@@ -13,10 +13,10 @@ function setup({emptyStaff=false}={}) {
   const d={drive,folder:'memory',audit:async()=>{},missionDocuments:async()=>[{id:'source',name:'Export_01.xlsx',deposit:'analytical_review_pending'}],
     fetchRows:async(path,o={})=>{
       const table=path.split('?')[0],params=new URLSearchParams(path.split('?')[1]);
-      if(table==='office_missions')return[{id:M,name:'Audit',drive_folder_id:'mission'}];
+      if(table==='office_missions')return[{id:M,name:'Audit',drive_folder_id:'mission',planned_start:plannedStart,planned_end:plannedEnd}];
       const rows=table==='office_staff_profiles'?staff:table==='office_app_users'?users:table==='office_mission_assignments'?assignments:[];
       const match=r=>['org_id','office_mission_id','id','email'].every(key=>{const v=params.get(key);return !v||v.startsWith('eq.')? !v||String(r[key])===v.slice(3):v.startsWith('in.(')?v.slice(4,-1).split(',').includes(String(r[key])):true;})&&(!params.get('active')||r.active===true)&&(!params.get('status')||!['completed','cancelled','canceled','rejected'].includes(r.status));
-      if(o.method==='POST'){const body=JSON.parse(o.body);assert.equal(body.org_id,'org');writes.push({table,body});let r=rows.find(x=>x.id===body.id);if(r)Object.assign(r,body);else{r={...body};rows.push(r);}return[r];}
+      if(o.method==='POST'){const body=JSON.parse(o.body);assert.equal(body.org_id,'org');if(table==='office_mission_assignments'){assert(body.planned_start,'planned_start is NOT NULL');assert(body.planned_end,'planned_end is NOT NULL');assert.notEqual(body.allocation_pct,null);}writes.push({table,body});let r=rows.find(x=>x.id===body.id);if(r)Object.assign(r,body);else{r={...body};rows.push(r);}return[r];}
       if(o.method==='PATCH'){const body=JSON.parse(o.body);writes.push({table,body});rows.filter(match).forEach(r=>Object.assign(r,body));return[];}
       assert.equal(params.get('org_id'),'eq.org');return rows.filter(match).map(r=>({...r}));
     }};
@@ -51,9 +51,9 @@ test('ordinary members cannot appoint themselves or anyone, and invented or inac
 const html=await readFile(new URL('../revue-analytique.html',import.meta.url),'utf8');
 const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
 const flush=async()=>{for(let i=0;i<50;i++)await Promise.resolve();};
-function page({hasManager=false,docs=[]}={}) {
+function page({hasManager=false,docs=[],missionDates=true}={}) {
  const nodes=new Map(),calls=[],storage=new Map();let ready,review={status:'none'};
- let ctx={mission:{name:'Mission',period_label:'2026'},manager:hasManager?{full_name:'Amina'}:null,manager_required:!hasManager,can_choose_manager:true,team:[],manager_candidates:[{id:'staff:person',full_name:'Amina Manager',email:'amina@example.test'}],documents:docs,requirements:[{key:'trial_balance_current',label:'Balance N',required:true,match_terms:['balance generale']},{key:'trial_balance_prior',label:'Balance N-1',required:true,match_terms:['balance n-1']},{key:'general_ledger',label:'Grand livre',required:true,match_terms:['grand livre']}],finalized:false};
+ let ctx={mission:{name:'Mission',period_label:'2026',planned_start:missionDates?'2026-10-01':null,planned_end:missionDates?'2026-10-31':null},manager:hasManager?{full_name:'Amina'}:null,manager_required:!hasManager,can_choose_manager:true,team:[],manager_candidates:[{id:'staff:person',full_name:'Amina Manager',email:'amina@example.test'}],documents:docs,requirements:[{key:'trial_balance_current',label:'Balance N',required:true,match_terms:['balance generale']},{key:'trial_balance_prior',label:'Balance N-1',required:true,match_terms:['balance n-1']},{key:'general_ledger',label:'Grand livre',required:true,match_terms:['grand livre']}],finalized:false};
  function element(tag='div') {
    const classes=new Set();let content='';
    const n={tag,value:'',hidden:false,disabled:false,files:[],children:[],attrs:{},listeners:{},className:'',
@@ -105,4 +105,40 @@ test('partner can accept manager responsibility only through this explicit setup
  await chooseAnalyticalManager('org',M,'user:partner@example.test',partner,d);assert.equal(assignments[0].mission_function,'manager');
  await assert.rejects(setMissionFunction('org',{mission_id:M,assignment_id:assignments[0].id,function:'manager'},partner,d),/NO_SELF_FUNCTION_CHANGE/);
  assert.equal(users.at(-1).role,'partner');
+});
+
+
+test('new manager assignment includes the mission dates and an explicit allocation; retry preserves existing planning',async()=>{
+ const {d,assignments}=setup();await chooseAnalyticalManager('org',M,'staff:person',owner,d);
+ assert.equal(assignments[0].planned_start,'2026-10-01');assert.equal(assignments[0].planned_end,'2026-10-31');assert.equal(assignments[0].allocation_pct,0);
+ assignments[0].planned_start='2026-10-07';assignments[0].allocation_pct=25;
+ await chooseAnalyticalManager('org',M,'staff:person',owner,d);assert.equal(assignments[0].planned_start,'2026-10-07');assert.equal(assignments[0].allocation_pct,25);
+});
+test('missing dates cause an actionable validation error before creating any profile or assignment',async()=>{
+ const {d,writes}=setup({emptyStaff:true,plannedStart:null,plannedEnd:null});
+ await assert.rejects(chooseAnalyticalManager('org',M,'user:account@example.test',owner,d),/MANAGER_ASSIGNMENT_DATES_REQUIRED/);assert.equal(writes.length,0);
+ await chooseAnalyticalManager('org',M,'user:account@example.test',owner,d,{planned_start:'2026-10-23',planned_end:'2026-10-31'});
+ assert(writes.some(x=>x.table==='office_mission_assignments'&&x.body.planned_start==='2026-10-23'));
+});
+test('invalid calendar dates or a reversed range never reach the database',async()=>{
+ const {d,writes}=setup({plannedStart:null,plannedEnd:null});
+ for(const dates of [{planned_start:'2026-02-30',planned_end:'2026-03-31'},{planned_start:'2026-10-31',planned_end:'2026-10-01'}]) await assert.rejects(chooseAnalyticalManager('org',M,'staff:person',owner,d,dates),/MANAGER_ASSIGNMENT_DATES_INVALID/);
+ assert.equal(writes.length,0);
+});
+test('UI asks for missing dates beside the manager selection and submits them',async()=>{
+ const p=page({missionDates:false});await p.ready;await flush();const select=p.get('manager-select');select.value='staff:person';select.onchange();
+ const button=p.get('manager-content').children[0].children[1];assert.equal(button.disabled,true);assert.equal(p.get('manager-content').children[1].hidden,false);
+ p.get('manager-start').value='2026-10-23';p.get('manager-end').value='2026-10-31';p.get('manager-end').onchange();assert.equal(button.disabled,false);button.click();await flush();
+ const call=p.calls.find(c=>c.body?.action==='choose-manager');assert.equal(call.body.planned_start,'2026-10-23');assert.equal(call.body.planned_end,'2026-10-31');
+});
+test('real PostgreSQL NOT NULL constraints reproduce the screenshot and accept the corrected payload',async()=>{
+ const {PGlite}=await import('@electric-sql/pglite');const db=new PGlite();
+ try{
+  await db.exec('create table office_mission_assignments(id text primary key, planned_start date not null, planned_end date not null, allocation_pct numeric not null check(allocation_pct between 0 and 100))');
+  await assert.rejects(db.query('insert into office_mission_assignments(id) values ($1)',['old']),e=>e.code==='23502');
+  const {d,assignments}=setup();await chooseAnalyticalManager('org',M,'staff:person',owner,d);const row=assignments[0];
+  await db.query('insert into office_mission_assignments values ($1,$2,$3,$4)',[row.id,row.planned_start,row.planned_end,row.allocation_pct]);
+  const saved=await db.query('select planned_start::text as start, planned_end::text as end, allocation_pct::text as allocation from office_mission_assignments');
+  assert.deepEqual(saved.rows,[{start:'2026-10-01',end:'2026-10-31',allocation:'0'}]);
+ }finally{await db.close();}
 });
