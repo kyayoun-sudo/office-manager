@@ -65,7 +65,7 @@ export function shouldConsultEynowaLab({ message = '', mode = 'auto' } = {}) {
   const selected = normalise(mode || 'auto').trim();
   if (['off','false','disabled','never'].includes(selected)) return false;
   if (['on','true','force','always'].includes(selected)) return true;
-  if (!eyn owaLabConfiguredSafe()) return false;
+  if (!eynowaLabConfiguredSafe()) return false;
   return inferEynowaLabDomains(message).length > 0;
 }
 
