@@ -17,6 +17,7 @@ export function buildValidationCard(result = {}, request = {}) {
     status: 'PENDING_HUMAN_VALIDATION',
     title: 'Validation professionnelle requise',
     application: clean(request.application || result.application, 120),
+    professional_id: clean(request.professional_id || request.professionalId || 'default', 160),
     domains: Array.isArray(result.domains) ? result.domains : [],
     topics: Array.isArray(result.topics) ? result.topics : [],
     client: clean(request.client, 255),
