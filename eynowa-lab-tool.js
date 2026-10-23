@@ -54,6 +54,10 @@ export function makeEynowaLabManagerTool(runtime = {}) {
           client: args.client || ""
         });
 
+        if (Array.isArray(runtime.eynowaLabConsultations)) {
+          runtime.eynowaLabConsultations.push(result);
+        }
+
         if (event?.id) {
           await finishToolEvent(event.id, {
             phase: "completed",
