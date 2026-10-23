@@ -1,5 +1,6 @@
 import { tool } from "@openai/agents";
 import { z } from "zod";
+import { consultEynowaLab, eynowaLabConfigured } from "./eynowa-lab-client.js";
 import {
   createActionProposal,
   createToolEvent,
@@ -109,7 +110,38 @@ function commonReadTools(runtime, agentKey) {
     execute: ({ query }) => getOpenActions(orgId, query, 50)
   });
 
-  return [searchTeam, openActions];
+  const tools = [searchTeam, openActions];
+
+  if (eynowaLabConfigured()) {
+    tools.push(instrument({
+      orgId,
+      runId,
+      agentKey,
+      name: "consult_eynowa_lab",
+      description:
+        "Consult EYNOWA Lab as a professional métier specialist for accounting, audit or advisory reasoning. Lab is a helper only: use its evidence, sources, confidence and validation flag to improve your own work. It does not replace your role, decide for you, approve work, execute actions or override verified mission facts. Consult it when professional standards, accounting treatment, audit methodology, risk, finance or advisory expertise materially helps the task.",
+      parameters: z.object({
+        query: z.string(),
+        task: z.string().optional(),
+        domains: z.array(z.enum(["accounting", "audit", "advisory"])).optional(),
+        frameworks: z.array(z.string()).optional(),
+        country: z.string().optional(),
+        client: z.string().optional()
+      }),
+      execute: args => consultEynowaLab({
+        application: "firm_manager",
+        query: args.query,
+        task: [args.task, `calling_agent:${agentKey}`].filter(Boolean).join(" | "),
+        domains: args.domains,
+        frameworks: args.frameworks || [],
+        country: args.country || "CI",
+        professionalId: runtime.professionalId || "default",
+        client: args.client || ""
+      })
+    }));
+  }
+
+  return tools;
 }
 
 export function makeSpecialistTools(agentKey, runtime = {}) {
