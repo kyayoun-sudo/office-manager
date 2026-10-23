@@ -13,6 +13,7 @@ const fail = (code, statusCode = 400) => Object.assign(new Error(code), { status
 // It deliberately uses the same authenticated mission-access path as the existing procedure workspace.
 // It does not write to Drive, Supabase or the Working File, so it must not be blocked by the preview-only
 // write-isolation guard used by destructive/test-run operations.
+// Preview runtime refreshed after internal-colleague mail sandbox configuration update.
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
