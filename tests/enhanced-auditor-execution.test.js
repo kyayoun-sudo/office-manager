@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { readWorkpaperInstructions, mergeExecutionQuestions, questionKey } from '../lib/enhanced-auditor-execution.js';
+import { readWorkpaperInstructions, mergeExecutionQuestions, questionKey, isLockedWork } from '../lib/enhanced-auditor-execution.js';
 
 test('Enhanced Auditor reads concrete actions and questions from the actual Working Paper before the sample table', async () => {
   const wb = new ExcelJS.Workbook();
@@ -36,4 +36,11 @@ test('SOP and Working Paper questions are merged, deduplicated and existing answ
   assert.equal(merged.filter(x => !x.answered).length, 2);
   assert.equal(merged.find(x => /chèque/.test(x.text)).reference, 'CASH-01!B9');
   assert.equal(questionKey('  Obtenir   le rapprochement bancaire '), questionKey('Obtenir le rapprochement bancaire'));
+});
+
+test('submitted and reviewed audit work is read-only for the background Enhanced Auditor', () => {
+  assert.equal(isLockedWork({ status: 'submitted' }), true);
+  assert.equal(isLockedWork({ status: 'reviewed' }), true);
+  assert.equal(isLockedWork({ status: 'in_progress' }), false);
+  assert.equal(isLockedWork({ status: 'returned' }), false);
 });
