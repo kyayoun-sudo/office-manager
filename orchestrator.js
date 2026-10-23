@@ -179,6 +179,17 @@ async function runSdkAgent(agent, message) {
   };
 }
 
+function attachLabConsultations(result, runtime) {
+  const consultations = Array.isArray(runtime.eynowaLabConsultations)
+    ? runtime.eynowaLabConsultations
+    : [];
+  return {
+    ...result,
+    eynowaLabConsultations: consultations,
+    validationCards: consultations.map((row) => row?.validation_card).filter(Boolean)
+  };
+}
+
 export async function runOfficeManager({
   message,
   requestedAgent = "auto",
@@ -191,7 +202,7 @@ export async function runOfficeManager({
 }) {
   const normalizedProvider = String(provider || "auto").toLowerCase();
   const normalizedRisk = String(risk || "normal").toLowerCase();
-  const runtime = { orgId, runId, professionalId };
+  const runtime = { orgId, runId, professionalId, eynowaLabConsultations: [] };
 
   if (normalizedProvider === "anthropic") {
     const agentKey =
@@ -215,7 +226,9 @@ export async function runOfficeManager({
     return {
       ...result,
       specialistsUsed: [agentKey],
-      toolsUsed: []
+      toolsUsed: [],
+      eynowaLabConsultations: [],
+      validationCards: []
     };
   }
 
@@ -237,6 +250,8 @@ export async function runOfficeManager({
   } else {
     primary = await runSdkAgent(makeManager(contexts, runtime), message);
   }
+
+  primary = attachLabConsultations(primary, runtime);
 
   const claudeReady =
     Boolean(process.env.ANTHROPIC_API_KEY) &&
@@ -284,6 +299,8 @@ ${primary.text}`
     lastAgent: primary.lastAgent,
     reviewed: true,
     specialistsUsed: primary.specialistsUsed || [],
-    toolsUsed: primary.toolsUsed || []
+    toolsUsed: primary.toolsUsed || [],
+    eynowaLabConsultations: primary.eynowaLabConsultations || [],
+    validationCards: primary.validationCards || []
   };
 }
