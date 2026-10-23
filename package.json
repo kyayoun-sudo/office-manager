@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test:lab": "node --test eynowa-lab/professional/*.test.js",
+    "test:lab": "node --check eynowa-lab-client.js && node --check api/agent.js && node --check api/lab-validation.js && node --check api/lab-metrics.js && node --check eynowa-lab/professional/handler.js && node --check eynowa-lab/professional/gateway-dispatcher.js && node --test eynowa-lab/professional/*.test.js",
     "lab:eval": "node eynowa-lab/professional/run-evals.js",
     "lab:eval:live": "node eynowa-lab/professional/run-evals.js --live",
     "lab:import": "node eynowa-lab/professional/import-knowledge.js",
