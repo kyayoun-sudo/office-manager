@@ -91,3 +91,28 @@ test('removing an uploaded source persists across context reload',async()=>{
  await deleteAnalyticalFile('org',M,'client',account,d);
  assert(trashed);assert.deepEqual((await analyticalReviewContext('org',M,account,d)).documents.map(x=>x.id),['review']);
 });
+
+test('generated review keeps expectation, corroborating evidence, risks and actions in the Excel output',async()=>{
+ const {d,files}=world();files.set('OFFICE_MANAGER_ENHANCED_AUDITOR.json',{reviews:{[M]:{status:'running',stage:'analytical',focus:'[REVUE_ANALYTIQUE_PRELIMINAIRE]',mission:{id:M,name:'Audit'},evidence_files:['client'],log:[]}}});
+ d.fileForAI=async()=>({name:'export_01.xlsx',text:'Ventes N 125 / N-1 100'});
+ const analysis={zone:'Ventes',current:125,prior:100,variation:'+25 %',expectation:'Activité stable',explanation:'Deux points de vente',evidence:'export_01.xlsx ; contrats manquants',conclusion:'Explication à corroborer',risk:'Cut-off à évaluer',assertion:'Séparation des exercices',audit_action:'Examiner les ventes de clôture'};
+ d.multiModel=async()=>[{provider:'mistral',text:JSON.stringify({usable:true,summary:'Variation à expliquer, pas une anomalie automatiquement.',analyses:[analysis],priority_actions:[analysis.audit_action],missing_documents:['Contrats des points de vente']})}];
+ let sheets;d.saveWorkbook=async(kind,title,data)=>{sheets=data;return{id:'excel',url:'https://drive.google.com/file/d/excel/view'};};
+ const r=await auditorStep('org',{}, {mission_id:M},d);assert.equal(r.status,'done');assert.equal(r.analyses[0].expectation,analysis.expectation);assert.deepEqual(sheets[0].rows[0],['Zone','N','N-1','Variation','Attente','Explication','Preuve','Conclusion','Risque','Assertion','Action audit']);assert.equal(sheets[0].rows[1][6],analysis.evidence);assert.equal(r.matrix.id,'excel');
+});
+test('insufficient data requests specific documents and does not finalize the review',async()=>{
+ const {d,files}=world();files.set('OFFICE_MANAGER_ENHANCED_AUDITOR.json',{reviews:{[M]:{status:'running',stage:'analytical',focus:'[REVUE_ANALYTIQUE_PRELIMINAIRE]',mission:{id:M,name:'Audit'},evidence_files:['client'],log:[]}}});
+ d.fileForAI=async()=>({name:'empty.xlsx',text:'Instructions seules'});d.multiModel=async()=>[{provider:'mistral',text:JSON.stringify({usable:false,summary:'Aucune donnée comptable dans ce fichier.',missing_documents:['Balance N','Balance N-1']})}];
+ const r=await auditorStep('org',{}, {mission_id:M},d);assert.equal(r.status,'needs_documents');assert.deepEqual(r.missing_documents,['Balance N','Balance N-1']);await assert.rejects(finalizeAnalyticalReview('org',M,account,d),/NOT_FINISHED/);
+});
+
+test('compact Excel rows remain importable when quotes use spaces instead of worksheet tabs',async()=>{
+ const {d}=world(false);d.fileForAI=async()=>({text:'Ventes\t125\t100\nConclusion\tÉcart à justifier',url:'https://drive.google.com/file/d/review/view'});
+ d.multiModel=async()=>[{text:JSON.stringify({usable:true,summary:'Revue des ventes avec conclusion.',quotes:['Ventes 125 100','Conclusion Écart à justifier'],priority_actions:['Justifier les ventes']})}];
+ assert.equal((await importAnalyticalReview('org',M,'review',account,d)).imported,true);
+});
+test('an unreadable uploaded review remains a working file instead of becoming source evidence',async()=>{
+ const {d,docs}=world();docs[1].deposit='analytical_review_pending';docs[1].path='PIECES_RECUES/Revue.xlsx';
+ d.fileForAI=async()=>{throw Error('UNREADABLE_FILE');};await assert.rejects(importAnalyticalReview('org',M,'review',account,d),/UNREADABLE_FILE/);
+ assert.equal(docs[1].deposit,'analytical_review_template');let payload;d.startAuditorReview=async(o,r,b)=>{payload=b;};await startAnalyticalReview('org',{},M,account,d);assert.deepEqual(payload.evidence_files,['client']);
+});
