@@ -9,6 +9,13 @@ function first(values = []) {
   return Array.isArray(values) ? values.find(Boolean) : null;
 }
 
+function uniqueDomains(body = {}) {
+  const values = Array.isArray(body.domains) && body.domains.length
+    ? body.domains
+    : [body.domain || first(body.domains)];
+  return [...new Set(values.map((value) => clean(value, 40).toLowerCase()).filter((value) => ['accounting','audit','advisory'].includes(value)))];
+}
+
 export function buildValidationCard(result = {}, request = {}) {
   if (!result?.requires_validation) return null;
 
@@ -40,33 +47,42 @@ export async function acceptProfessionalValidation(body = {}) {
   if (body.confirmed !== true) throw new Error('EXPLICIT_HUMAN_CONFIRMATION_REQUIRED');
   if (!clean(body.validation_id, 200)) throw new Error('VALIDATION_ID_REQUIRED');
 
-  const domain = clean(body.domain || first(body.domains), 40).toLowerCase();
+  const domains = uniqueDomains(body);
+  if (!domains.length) throw new Error('VALIDATED_DOMAIN_REQUIRED');
+
   const decision = clean(body.decision || body.corrected_decision || body.proposed_conclusion, 12000);
   if (!decision) throw new Error('VALIDATED_DECISION_REQUIRED');
 
-  const memory = await rememberProfessionalMemory({
-    professionalId: body.professional_id || body.professionalId || 'default',
-    domain,
-    client: body.client,
-    topic: body.topic || first(body.topics),
-    decision,
-    reason: body.reason || body.validation_reason || 'Human professional validation',
-    framework: body.framework,
-    source: 'HUMAN_VALIDATED',
-    metadata: {
-      validation_id: body.validation_id,
-      validated_by: clean(body.validated_by || body.validatedBy, 255),
-      originating_application: clean(body.application, 120),
-      original_proposal: clean(body.proposed_conclusion, 12000),
-      action: clean(body.action || 'accept', 80),
-      ...(body.metadata && typeof body.metadata === 'object' ? body.metadata : {}),
-    },
-  });
+  const sharedMetadata = {
+    validation_id: body.validation_id,
+    validated_by: clean(body.validated_by || body.validatedBy, 255),
+    originating_application: clean(body.application, 120),
+    original_proposal: clean(body.proposed_conclusion, 12000),
+    action: clean(body.action || 'accept', 80),
+    validated_domains: domains,
+    ...(body.metadata && typeof body.metadata === 'object' ? body.metadata : {}),
+  };
+
+  const memories = [];
+  for (const domain of domains) {
+    memories.push(await rememberProfessionalMemory({
+      professionalId: body.professional_id || body.professionalId || 'default',
+      domain,
+      client: body.client,
+      topic: body.topic || first(body.topics),
+      decision,
+      reason: body.reason || body.validation_reason || 'Human professional validation',
+      framework: body.framework,
+      source: 'HUMAN_VALIDATED',
+      metadata: sharedMetadata,
+    }));
+  }
 
   return {
     ok: true,
     status: 'HUMAN_VALIDATED',
     validation_id: body.validation_id,
-    memory,
+    memory: memories[0] || null,
+    memories,
   };
 }
