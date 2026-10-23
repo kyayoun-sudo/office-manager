@@ -1,6 +1,9 @@
 import {
   createProfessionalHandler,
   handleProfessionalMemory,
+  handleProfessionalValidation,
+  handleProfessionalFeedback,
+  handleProfessionalMetrics,
   handleProfessionalKnowledgeImport,
   handleProfessionalHealth,
   handleProfessionalDiagnostics,
@@ -28,6 +31,15 @@ export function createProfessionalGatewayDispatcher(options = {}) {
       }
       if (verb === 'POST' && pathname === '/v1/professional/memory/remember') {
         return { handled: true, status: 200, body: await handleProfessionalMemory(body || {}) };
+      }
+      if (verb === 'POST' && pathname === '/v1/professional/validation/accept') {
+        return { handled: true, status: 200, body: await handleProfessionalValidation(body || {}) };
+      }
+      if (verb === 'POST' && pathname === '/v1/professional/feedback') {
+        return { handled: true, status: 200, body: await handleProfessionalFeedback(body || {}) };
+      }
+      if ((verb === 'GET' || verb === 'POST') && pathname === '/v1/professional/metrics') {
+        return { handled: true, status: 200, body: await handleProfessionalMetrics() };
       }
       if (verb === 'POST' && pathname === '/v1/professional/knowledge/import') {
         return { handled: true, status: 200, body: { imported: await handleProfessionalKnowledgeImport(body || {}) } };
