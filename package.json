@@ -6,6 +6,8 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "test:lab": "node --test eynowa-lab/professional/*.test.js",
+    "lab:eval": "node eynowa-lab/professional/run-evals.js",
+    "lab:eval:live": "node eynowa-lab/professional/run-evals.js --live",
     "lab:import": "node eynowa-lab/professional/import-knowledge.js",
     "lab:import:ohada": "node eynowa-lab/professional/packs/ohada/import-ohada.js",
     "lab:import:ohada:starter": "node eynowa-lab/professional/packs/ohada/import-ohada.js eynowa-lab/professional/packs/ohada/public-starter-pack.json",
