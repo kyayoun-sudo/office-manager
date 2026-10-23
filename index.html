@@ -12,22 +12,36 @@ main{max-width:1050px;margin:0 auto;padding:42px 22px 80px}
 .hero{margin-bottom:26px}
 .kicker{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#5b6a82}
 h1{font-size:42px;margin:8px 0 12px}
-.sub{max-width:760px;color:#647087;line-height:1.6}
+.sub{max-width:820px;color:#647087;line-height:1.6}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:25px 0}
 .card{background:#fff;border:1px solid #dfe5ef;border-radius:15px;padding:18px}
 .card h2{font-size:17px;margin:0 0 8px}
 .card p{margin:0;color:#687389;font-size:14px;line-height:1.5}
 .panel{background:#fff;border:1px solid #dfe5ef;border-radius:18px;padding:22px}
 .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.row.secondary-row{margin-top:12px;grid-template-columns:1fr 1fr 1fr}
 label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}
 input,select,textarea{width:100%;border:1px solid #ccd5e2;border-radius:10px;padding:11px;font:inherit;background:#fff}
 textarea{min-height:150px;resize:vertical}
 button{border:0;border-radius:10px;background:#132a4d;color:#fff;padding:12px 18px;font-weight:750;cursor:pointer}
 button:disabled{opacity:.55;cursor:not-allowed}
+button.secondary{background:#e9eef6;color:#22324c}
+button.danger{background:#8e2c2c}
+button.ghost{background:#fff;color:#33455f;border:1px solid #ccd5e2}
 .answer{margin-top:18px;padding:16px;border-radius:12px;background:#f7f9fc;white-space:pre-wrap;line-height:1.6;min-height:70px}
 .small{font-size:12px;color:#758198}
-.actions{display:flex;gap:10px;align-items:center;margin-top:12px}
-@media(max-width:760px){.grid,.row{grid-template-columns:1fr}h1{font-size:34px}}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.lab-note{margin-top:12px;padding:12px 14px;border-radius:12px;background:#f3f6fb;color:#526178;font-size:13px;line-height:1.5}
+.validation-list{display:grid;gap:12px;margin-top:16px}
+.validation-card{border:1px solid #e0c37a;background:#fffaf0;border-radius:14px;padding:16px}
+.validation-card h3{font-size:16px;margin:0 0 8px}
+.validation-card .reason{font-size:13px;color:#6f5b2b;line-height:1.5;margin:8px 0}
+.validation-card .proposal{white-space:pre-wrap;background:#fff;border:1px solid #eadbaa;border-radius:10px;padding:12px;font-size:13px;line-height:1.5;margin:10px 0}
+.validation-card .status{font-size:12px;font-weight:700;margin-top:10px}
+.validation-card .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.validation-card .card-actions button{padding:9px 12px;font-size:12px}
+.metrics{display:none;margin-top:14px;padding:14px;border-radius:12px;background:#111a2b;color:#e9eef8;white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:330px;overflow:auto}
+@media(max-width:760px){.grid,.row,.row.secondary-row{grid-template-columns:1fr}h1{font-size:34px}}
 </style>
 </head>
 <body>
@@ -35,7 +49,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
   <section class="hero">
     <div class="kicker">Personal pilot</div>
     <h1>Office Manager AI</h1>
-    <div class="sub">Un agent principal qui orchestre Grand Contrôleur, Orpailleur et Sika. Supabase garde les données et l’historique; OpenAI et Claude sont appelés uniquement côté serveur.</div>
+    <div class="sub">Les agents gardent leurs rôles propres. EYNOWA Lab intervient seulement comme spécialiste métier en comptabilité, audit et advisory lorsque son expertise est utile; il ne remplace ni l’agent, ni le professionnel humain.</div>
   </section>
 
   <section class="grid">
@@ -70,6 +84,27 @@ button:disabled{opacity:.55;cursor:not-allowed}
       </div>
     </div>
 
+    <div class="row secondary-row">
+      <div>
+        <label for="professionalId">Profil professionnel</label>
+        <input id="professionalId" type="text" placeholder="default" value="default">
+      </div>
+      <div>
+        <label for="labMode">EYNOWA Lab</label>
+        <select id="labMode">
+          <option value="auto">Auto — seulement si métier</option>
+          <option value="on">Forcer la consultation</option>
+          <option value="off">Ne pas consulter</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="labMetrics" class="secondary" type="button">Voir les métriques Lab</button>
+      </div>
+    </div>
+
+    <div class="lab-note">EYNOWA Lab est un helper métier. Sa réponse peut enrichir celle de l’agent sélectionné. Si une conclusion nécessite un jugement professionnel, une carte de validation apparaît ci-dessous et rien n’entre en mémoire tant qu’un humain ne valide pas.</div>
+
     <div style="margin-top:14px">
       <label for="message">Demande</label>
       <textarea id="message" placeholder="Exemple : Vérifie les missions en cours et donne-moi les risques qui nécessitent mon attention."></textarea>
@@ -81,6 +116,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
     </div>
 
     <div id="answer" class="answer">L’agent est prêt dès que les variables Vercel sont configurées et que les agents sont activés dans Supabase.</div>
+    <div id="validations" class="validation-list"></div>
+    <pre id="metrics" class="metrics"></pre>
   </section>
 </main>
 
@@ -88,16 +125,151 @@ button:disabled{opacity:.55;cursor:not-allowed}
 const tokenEl = document.getElementById("token");
 const agentEl = document.getElementById("agent");
 const providerEl = document.getElementById("provider");
+const professionalIdEl = document.getElementById("professionalId");
+const labModeEl = document.getElementById("labMode");
 const messageEl = document.getElementById("message");
 const sendEl = document.getElementById("send");
+const metricsButtonEl = document.getElementById("labMetrics");
 const answerEl = document.getElementById("answer");
 const metaEl = document.getElementById("meta");
+const validationsEl = document.getElementById("validations");
+const metricsEl = document.getElementById("metrics");
 
 tokenEl.value = sessionStorage.getItem("officeManagerToken") || "";
+professionalIdEl.value = sessionStorage.getItem("officeManagerProfessionalId") || "default";
+labModeEl.value = sessionStorage.getItem("officeManagerLabMode") || "auto";
+
+function pilotHeaders(token) {
+  return {
+    "Content-Type": "application/json",
+    "x-office-manager-token": token
+  };
+}
+
+async function submitValidation(card, action, extra = {}) {
+  const token = tokenEl.value.trim();
+  if (!token) throw new Error("Access token manquant");
+
+  const response = await fetch("/api/lab-validation", {
+    method: "POST",
+    headers: pilotHeaders(token),
+    body: JSON.stringify({ action, card, ...extra })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Validation failed");
+  return data;
+}
+
+function renderValidationCards(cards = []) {
+  validationsEl.replaceChildren();
+
+  for (const card of cards) {
+    const wrapper = document.createElement("section");
+    wrapper.className = "validation-card";
+
+    const title = document.createElement("h3");
+    title.textContent = card.title || "Validation professionnelle requise";
+    wrapper.appendChild(title);
+
+    const scope = document.createElement("div");
+    scope.className = "small";
+    scope.textContent = [...(card.domains || []), ...(card.topics || [])].join(" · ");
+    wrapper.appendChild(scope);
+
+    if (card.reason) {
+      const reason = document.createElement("div");
+      reason.className = "reason";
+      reason.textContent = card.reason;
+      wrapper.appendChild(reason);
+    }
+
+    const proposal = document.createElement("div");
+    proposal.className = "proposal";
+    proposal.textContent = card.proposed_conclusion || "";
+    wrapper.appendChild(proposal);
+
+    if (card.question) {
+      const question = document.createElement("div");
+      question.className = "small";
+      question.textContent = `Question : ${card.question}`;
+      wrapper.appendChild(question);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    const status = document.createElement("div");
+    status.className = "status";
+
+    const makeButton = (label, className, handler) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      if (className) button.className = className;
+      button.addEventListener("click", async () => {
+        const buttons = [...actions.querySelectorAll("button")];
+        buttons.forEach((item) => item.disabled = true);
+        status.textContent = "Enregistrement…";
+        try {
+          const result = await handler();
+          status.textContent = result.status || "Enregistré";
+        } catch (error) {
+          status.textContent = `Erreur : ${error.message}`;
+          buttons.forEach((item) => item.disabled = false);
+        }
+      });
+      actions.appendChild(button);
+    };
+
+    makeButton("Valider", "", () => submitValidation(card, "accept"));
+    makeButton("Corriger puis valider", "secondary", async () => {
+      const corrected = window.prompt("Conclusion corrigée à mémoriser :", card.proposed_conclusion || "");
+      if (corrected === null || !corrected.trim()) throw new Error("Correction annulée");
+      return submitValidation(card, "correct", { corrected_decision: corrected.trim() });
+    });
+    makeButton("Demander des éléments", "ghost", async () => {
+      const note = window.prompt("Quels éléments supplémentaires faut-il demander ?", card.question || "");
+      if (note === null) throw new Error("Demande annulée");
+      return submitValidation(card, "request_evidence", { note });
+    });
+    makeButton("Rejeter", "danger", async () => {
+      const note = window.prompt("Motif du rejet (optionnel) :", "");
+      if (note === null) throw new Error("Rejet annulé");
+      return submitValidation(card, "reject", { note });
+    });
+
+    wrapper.appendChild(actions);
+    wrapper.appendChild(status);
+    validationsEl.appendChild(wrapper);
+  }
+}
+
+metricsButtonEl.addEventListener("click", async () => {
+  const token = tokenEl.value.trim();
+  if (!token) {
+    metricsEl.style.display = "block";
+    metricsEl.textContent = "Entre le token pilote.";
+    return;
+  }
+
+  metricsButtonEl.disabled = true;
+  metricsEl.style.display = "block";
+  metricsEl.textContent = "Chargement…";
+  try {
+    const response = await fetch("/api/lab-metrics", { headers: { "x-office-manager-token": token } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Metrics failed");
+    metricsEl.textContent = JSON.stringify(data, null, 2);
+  } catch (error) {
+    metricsEl.textContent = `Erreur : ${error.message}`;
+  } finally {
+    metricsButtonEl.disabled = false;
+  }
+});
 
 sendEl.addEventListener("click", async () => {
   const token = tokenEl.value.trim();
   const message = messageEl.value.trim();
+  const professionalId = professionalIdEl.value.trim() || "default";
 
   if (!token || !message) {
     answerEl.textContent = "Entre le token pilote et une demande.";
@@ -105,22 +277,24 @@ sendEl.addEventListener("click", async () => {
   }
 
   sessionStorage.setItem("officeManagerToken", token);
+  sessionStorage.setItem("officeManagerProfessionalId", professionalId);
+  sessionStorage.setItem("officeManagerLabMode", labModeEl.value);
   sendEl.disabled = true;
   answerEl.textContent = "Analyse en cours…";
   metaEl.textContent = "";
+  validationsEl.replaceChildren();
 
   try {
     const response = await fetch("/api/agent", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-office-manager-token": token
-      },
+      headers: pilotHeaders(token),
       body: JSON.stringify({
         message,
         agent: agentEl.value,
         provider: providerEl.value,
-        risk: "normal"
+        risk: "normal",
+        professional_id: professionalId,
+        eynowa_lab: labModeEl.value
       })
     });
 
@@ -133,7 +307,9 @@ sendEl.addEventListener("click", async () => {
     answerEl.textContent = data.answer;
     metaEl.textContent =
       `${data.agentName} · ${data.provider}` +
-      (data.reviewed ? " · reviewed" : "");
+      (data.reviewed ? " · reviewed" : "") +
+      (data.eynowaLabHelperUsed ? " · Lab métier consulté" : "");
+    renderValidationCards(data.validationCards || []);
   } catch (error) {
     answerEl.textContent = `Erreur : ${error.message}`;
   } finally {

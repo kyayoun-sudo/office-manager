@@ -1,4 +1,5 @@
 import { requirePilotAccess } from "../lib/auth.js";
+import { eynowaLabConfigured } from "../eynowa-lab-client.js";
 import {
   getAgentSetting,
   getPermissions
@@ -31,6 +32,10 @@ export default async function handler(req, res) {
         "grand-controleur": grand,
         "orpailleur": orpailleur,
         "sika": sika
+      },
+      eynowaLab: {
+        role: "professional_helper",
+        configured: eynowaLabConfigured()
       }
     });
   } catch (error) {
