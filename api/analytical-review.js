@@ -4,8 +4,11 @@ import {
   analyticalReviewContext,
   chooseAnalyticalManager,
   organizeAnalyticalFile,
+  stageAnalyticalFiles,
   deleteAnalyticalFile,
-  startAnalyticalReview
+  startAnalyticalReview,
+  refreshEynowaKnowledge,
+  finalizeAnalyticalReview
 } from '../lib/analytical-review.js';
 
 export default async function handler(req, res) {
@@ -22,8 +25,11 @@ export default async function handler(req, res) {
     let result;
     if (action === 'choose-manager') result = await chooseAnalyticalManager(orgId, missionId, String(body.assignment_id || ''), account);
     else if (action === 'organize-file') result = await organizeAnalyticalFile(orgId, missionId, String(body.file_id || ''), body.kind === 'review' ? 'review' : 'source', account);
+    else if (action === 'stage-files') result = await stageAnalyticalFiles(orgId, missionId, Array.isArray(body.file_ids) ? body.file_ids : [], account);
     else if (action === 'delete-file') result = await deleteAnalyticalFile(orgId, missionId, String(body.file_id || ''), account);
+    else if (action === 'refresh-lab') result = await refreshEynowaKnowledge(orgId, missionId);
     else if (action === 'start') result = await startAnalyticalReview(orgId, req, missionId, account);
+    else if (action === 'finalize') result = await finalizeAnalyticalReview(orgId, missionId, account);
     else return res.status(400).json({ error: 'UNKNOWN_ACTION' });
     return res.status(200).json(result);
   } catch (error) {
