@@ -10,7 +10,23 @@ function gatewayUrl() {
   return String(process.env.EYNOWA_LAB_URL || 'http://127.0.0.1:8787').replace(/\/$/, '');
 }
 
-async function runLive(input) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientLiveError(error) {
+  const message = String(error?.message || error || '');
+  return [
+    'OLLAMA_EMBED_TIMEOUT',
+    'OLLAMA_TIMEOUT',
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'fetch failed',
+  ].some((needle) => message.includes(needle));
+}
+
+async function runLiveOnce(input) {
   const key = process.env.EYNOWA_LAB_API_KEY;
   if (!key) throw new Error('EYNOWA_LAB_API_KEY_MISSING_FOR_LIVE_EVAL');
   const response = await fetch(`${gatewayUrl()}/v1/professional/query`, {
@@ -23,11 +39,27 @@ async function runLive(input) {
   return body;
 }
 
+async function runLive(input, { maxAttempts = 2 } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await runLiveOnce(input);
+      return { result, attempts: attempt };
+    } catch (error) {
+      lastError = error;
+      if (!isTransientLiveError(error) || attempt >= maxAttempts) throw error;
+      console.error(`[retry ${attempt}/${maxAttempts - 1}] transient live error: ${String(error?.message || error)}`);
+      await sleep(1200);
+    }
+  }
+  throw lastError;
+}
+
 function progress(index, total, row, elapsedMs) {
   const status = row.pass ? 'PASS' : 'FAIL';
   const details = row.error
     ? `error=${row.error}`
-    : `topics=${(row.topics || []).join(',')} knowledge_hits=${row.knowledge_hits ?? 'n/a'}`;
+    : `topics=${(row.topics || []).join(',')} knowledge_hits=${row.knowledge_hits ?? 'n/a'}${row.attempts > 1 ? ` attempts=${row.attempts}` : ''}`;
   console.error(`[${index}/${total}] ${status} ${row.id} ${elapsedMs}ms ${details}`);
 }
 
@@ -54,7 +86,10 @@ async function main() {
     let row;
 
     try {
-      const result = live ? await runLive(testCase.input) : buildProfessionalRequest(testCase.input);
+      const execution = live
+        ? await runLive(testCase.input)
+        : { result: buildProfessionalRequest(testCase.input), attempts: 1 };
+      const result = execution.result;
       const domains = result.domains || [];
       const topics = result.topics || [];
       const domainPass = includesAll(domains, testCase.expected_domains);
@@ -66,6 +101,7 @@ async function main() {
         domains,
         topics,
         knowledge_hits: result.knowledge_hits ?? null,
+        attempts: execution.attempts,
       };
     } catch (error) {
       row = { id: testCase.id, pass: false, error: String(error?.message || error) };
