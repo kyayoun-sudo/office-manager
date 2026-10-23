@@ -23,11 +23,24 @@ async function runLive(input) {
   return body;
 }
 
+function progress(index, total, row, elapsedMs) {
+  const status = row.pass ? 'PASS' : 'FAIL';
+  const details = row.error
+    ? `error=${row.error}`
+    : `topics=${(row.topics || []).join(',')} knowledge_hits=${row.knowledge_hits ?? 'n/a'}`;
+  console.error(`[${index}/${total}] ${status} ${row.id} ${elapsedMs}ms ${details}`);
+}
+
 async function main() {
   const live = process.argv.includes('--live');
   const results = [];
+  const totalCases = EVALUATION_CASES.length;
 
-  for (const testCase of EVALUATION_CASES) {
+  for (let index = 0; index < totalCases; index += 1) {
+    const testCase = EVALUATION_CASES[index];
+    const started = Date.now();
+    let row;
+
     try {
       const result = live ? await runLive(testCase.input) : buildProfessionalRequest(testCase.input);
       const domains = result.domains || [];
@@ -35,10 +48,19 @@ async function main() {
       const domainPass = includesAll(domains, testCase.expected_domains);
       const topicPass = includesAll(topics, testCase.expected_topics);
       const livePass = !live || (Number(result.knowledge_hits || 0) > 0 && typeof result.answer === 'string');
-      results.push({ id: testCase.id, pass: domainPass && topicPass && livePass, domains, topics, knowledge_hits: result.knowledge_hits ?? null });
+      row = {
+        id: testCase.id,
+        pass: domainPass && topicPass && livePass,
+        domains,
+        topics,
+        knowledge_hits: result.knowledge_hits ?? null,
+      };
     } catch (error) {
-      results.push({ id: testCase.id, pass: false, error: String(error?.message || error) });
+      row = { id: testCase.id, pass: false, error: String(error?.message || error) };
     }
+
+    results.push(row);
+    progress(index + 1, totalCases, row, Date.now() - started);
   }
 
   const passed = results.filter((row) => row.pass).length;
