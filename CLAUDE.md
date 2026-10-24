@@ -647,6 +647,26 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.
 
+## La carte du working file (Paul, 2026-10-24 : « l'interface et le travail se mettent en place en fonction du working file ; même si on change le working file demain, il garde la même logique »)
+- Maquette validée par Paul (Claude Design, « Ma procédure — agent guidé par le Working File ») : chaque feuille devient l'écran de ce
+  qu'elle demande (dépôt, contrôles, formulaire de test colonne par colonne, lead, pièces + envoi par message, signatures), pastilles de
+  l'agent sous la conversation, zones de dépôt partout, reconnaissance des pièces, agrandissement des tableaux, même moteur pour tout modèle.
+- ÉTAPE 1 FAITE (lecture seule, sans IA) : `lib/workfile-map.js` `mapWorkingFile(workbook)` → identité (AUDIT_META, sinon empreinte de la
+  forme `shape:<hash>`), rôle des feuilles, tableaux (en-têtes foncés ou gras), rôle de chaque colonne par couleur + formule + liste :
+  `calc`, `result` (formule à issues PASS/OK/ÉCART… ou en-tête résultat), `judgment` (saisie lue DIRECTEMENT par le résultat avec une liste,
+  ou en-tête « retenu / accepté / conforme ? »), `key` (valeur du modèle lue par la ligne, ex. N° → MATCH), `fact`, `fixed` ; dépendances vers
+  d'autres feuilles, capacités, lignes d'exemple du modèle (`prefilled_rows`), programme lu par ses colonnes (« Activé ? »), risques et
+  matrice, PBC et matrice test ↔ PBC, ordre du guide, questions quand une chose ne se déduit pas. `mayWrite(map, feuille, cellule)` refuse
+  jugement / clé / calcul / hors tableau. `mapSummary` = vue courte sans valeurs. `lib/workfile-map-view.js` + action `workfile-map` de la
+  route `procedure` (mêmes droits que « Ma procédure », rien d'écrit). Vérifié sur le vrai NL-T01 (14 tests, PRJ-01 activé, 6 risques,
+  PRJ-05 : L/M/N jugement, A clé, P résultat, 3 PBC requis) ; le fichier réel n'est PAS dans le dépôt (public) : test optionnel
+  `WORKFILE_MAP_SAMPLE`. Test : `tests/workfile-map.test.js` (forme NL-T01 + modèle d'un autre cabinet sans AUDIT_META).
+- SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
+  écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
+  `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
+  un au lieu d'en tirer un second) ; 4) écrans construits depuis la carte + pastilles ; 5) rattachement d'une pièce à la ligne du test ;
+  6) agrandissement des tableaux (ExcelJS ne met pas à jour les formules des autres feuilles : réécriture contrôlée, recontrôle des totaux).
+
 ## Règles de travail
 
 - **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans
