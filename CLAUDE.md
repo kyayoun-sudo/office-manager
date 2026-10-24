@@ -720,6 +720,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   table, VÉRIFIE la correspondance du code — « Vérifié par l'IA : correct » ou « L'IA signale un problème » —, rattache les colonnes
   restantes ; puis cases cochées selon les années de la mission). « Comment importer et remplir » en tête du panneau ; « Choisir les
   colonnes moi-même » ouvre l'import manuel sur la bonne feuille ; options des listes lisibles (clair / sombre).
+- LE CODE FAIT LE TRAVAIL, L'IA ADAPTE ET VÉRIFIE (Paul, 2026-10-25 : « je veux un bouton supprimer ; l'IA n'a pas compris que ce n'était
+  pas le budget demandé ; dans programme, les justifications ne sont pas pré-remplies ; c'est le code qui devrait le faire ») :
+  `lib/workfile-undo.js` (`workfile-import-undo`, « Annuler cet import » : seules les cases écrites par l'import, si inchangées, trace
+  gardée « ANNULÉ », audit `WORKFILE_IMPORT_UNDONE`) ; `proposeProgramme` (`lib/workfile-assist.js`) : les décisions du programme VALIDÉ
+  de l'application (« Activé ? » — valeurs de la liste du modèle lues dans LISTS —, justification du Manager ou motif CORE / non retenue)
+  proposées dans 02_PROGRAMME, avec « remplace « À décider » », écrites sur « Oui, remplis » ; feuille de données : son PROFIL (titre,
+  consignes, colonnes attendues) envoyé à l'IA, qui dit si la pièce convient à CETTE feuille ; non cochée si l'IA signale un problème,
+  si elle dit « ne convient pas », ou si la pièce remplit moins de 40 % des colonnes. Qui fait quoi : `claude/CARTE_WORKING_FILE_ET_ECRAN.md`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

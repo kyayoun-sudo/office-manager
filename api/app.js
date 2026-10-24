@@ -277,6 +277,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'workfile-import-candidates') return (await import('../lib/workfile-import-assist.js')).importCandidates(orgId, m, c, b, a);
       if (b.action === 'workfile-import-inspect') return (await import('../lib/workfile-import-assist.js')).inspectImportFile(orgId, m, c, b, a);
       if (b.action === 'workfile-import-finish') return (await import('../lib/workfile-import-assist.js')).finishImport(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);
       if (b.action === 'workfile-review-pieces') return (await import('../lib/workfile-assist.js')).reviewPieces(orgId, req, m, c, a);

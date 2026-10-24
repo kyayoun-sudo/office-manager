@@ -110,3 +110,25 @@ test('received pieces: understood ones are renamed from what was read, the other
   assert.equal(r.renamed.length, 1);
   assert.equal(r.to_read, 1);
 });
+
+test('the validated programme’s decisions are proposed in the programme sheet (Activé ?, justification), written on « Oui »', async () => {
+  const { proposeProgramme } = await import('../lib/workfile-assist.js');
+  const wb = workbook(), lists = wb.addWorksheet('LISTS'); ['Oui', 'Non', 'À décider'].forEach((v, i) => { lists.getCell(i + 1, 1).value = v; });
+  const pg = wb.addWorksheet('02_PROGRAMME'); pg.getCell('A1').value = 'Programme de travail';
+  ['Test ID', 'Nom du test', 'Type SOP', 'Activé ?', 'Justification (activation / non-exécution)', 'Résultat'].forEach((h, i) => { const c = pg.getCell(4, i + 1); c.value = h; c.fill = DARK; c.font = { bold: true }; });
+  [['PRJ-01', 'Compréhension', 'CORE', 'Oui'], ['PRJ-06', 'Procurement', 'RISK-DEPENDENT', 'À décider'], ['PRJ-13', 'Restitution', 'OPTIONAL', 'Oui']].forEach((row, i) => {
+    row.forEach((v, j) => { pg.getCell(5 + i, j + 1).value = v; }); pg.getCell(5 + i, 4).fill = YELLOW; pg.getCell(5 + i, 5).fill = YELLOW;
+    pg.getCell(5 + i, 4).dataValidation = { type: 'list', allowBlank: true, formulae: ['LISTS!$A$1:$A$3'] };
+    pg.getCell(5 + i, 6).value = { formula: `IF(D${5 + i}="Oui","EN COURS","")` };
+  });
+  const map = mapWorkingFile(wb);
+  const prog = { version: 2, validated_by: 'manager@x.ci', cycles: [{ procedures: [{ code: 'PRJ-01', type: 'CORE', active: true }, { code: 'PRJ-06', type: 'RISK_DEPENDENT', active: true, justification: 'Marchés au-dessus du seuil du bailleur.' }, { code: 'PRJ-13', type: 'OPTIONAL', active: false }] }] };
+  const props = proposeProgramme(map, wb, prog);
+  const at = a => props.find(p => p.address === a);
+  assert.equal(at('D5'), undefined);                     // already « Oui » as decided
+  assert.deepEqual([at('D6').value, at('D6').replaces], ['Oui', 'À décider']);
+  assert.equal(at('E6').value, 'Marchés au-dessus du seuil du bailleur.');
+  assert.deepEqual([at('D7').value, at('D7').replaces], ['Non', 'Oui']);
+  assert.match(at('E5').value, /obligatoire/);
+  assert.match(at('D6').source, /validé v2 par manager@x\.ci/);
+});

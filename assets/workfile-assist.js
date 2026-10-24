@@ -29,8 +29,8 @@
   function known(d) {
     if (!d.known.length) return '';
     if (st.declined) return '<div class="wf-assist-block"><h3>Ce que je sais déjà</h3><p class="meta">Pas maintenant. <button type="button" class="link" data-a="undo">Me le reproposer</button></p></div>';
-    return '<div class="wf-assist-block"><h3>Ce que je sais déjà</h3><p>Je peux remplir ' + d.known.length + ' case(s) sans rien inventer — elles sont en pointillés dans la feuille, à droite :</p><ul class="wf-agent-list">' +
-      d.known.map(function (k) { return '<li><b>' + esc(k.label) + '</b> (' + esc(k.sheet) + ' ' + esc(k.address) + ') : ' + esc(k.value) + ' <span class="meta">— ' + esc(k.source) + '</span></li>'; }).join('') + '</ul>' +
+    return '<div class="wf-assist-block"><h3>Ce que je sais déjà</h3><p>Je peux remplir ' + d.known.length + ' case(s) sans rien inventer — ce que l’application sait (préparateur, mission) et les décisions du programme de travail validé ; elles sont en pointillés dans la feuille, à droite :</p><ul class="wf-agent-list">' +
+      d.known.map(function (k) { return '<li><b>' + esc(k.label) + '</b> (' + esc(k.sheet) + ' ' + esc(k.address) + ') : ' + esc(k.value) + (k.replaces ? ' <span class="meta">(remplace « ' + esc(k.replaces) + ' »)</span>' : '') + ' <span class="meta">— ' + esc(k.source) + '</span></li>'; }).join('') + '</ul>' +
       (d.editable ? '<div class="row"><button type="button" class="btn" data-a="fill">Oui, remplis</button><button type="button" class="btn ghost" data-a="no">Pas maintenant</button></div>' : '<p class="meta">Seul le préparateur peut l’accepter.</p>') +
       (d.never.length ? '<p class="meta">Je ne remplis jamais : ' + esc(d.never.filter(function (x, i, a) { return a.map(function (y) { return y.label; }).indexOf(x.label) === i; }).map(function (x) { return x.label; }).join(', ')) + '.</p>' : '') + '</div>';
   }
@@ -39,6 +39,15 @@
   function fmt(n) { return Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 }); }
   // Every piece that may fill the sheet, each with its years, rows and balance; the ones of the mission's years are ticked; the person
   // ticks or unticks; what the AI understood is marked « selon l'IA ».
+  // The imports made on this procedure, each with « Annuler cet import » (only the cells it wrote, if nobody changed them since).
+  function done(d) {
+    var list = (d.imports_done || []).filter(function (x) { return x.status !== 'undone'; }); if (!list.length) return '';
+    return '<div class="wf-assist-block"><h3>Imports faits</h3><ul class="wf-agent-list">' + list.map(function (x) {
+      return '<li><b>' + esc(x.sheet || '') + '</b> ← ' + esc(x.source || 'pièce') + ' — ' + fmt(x.rows) + ' ligne(s)' + (x.at ? ' <span class="meta">(' + esc(String(x.at).slice(0, 16).replace('T', ' ')) + ')</span>' : '') +
+        (d.editable ? (st.undoAsk === x.plan_id ? ' <button type="button" class="btn" data-a="undo-yes" data-plan="' + esc(x.plan_id) + '">Confirmer : vider ces lignes</button> <button type="button" class="btn ghost" data-a="undo-no">Garder</button>'
+          : ' <button type="button" class="btn ghost" data-a="undo-ask" data-plan="' + esc(x.plan_id) + '">Annuler cet import</button>') : '') + '</li>';
+    }).join('') + '</ul><p class="meta">Annuler vide seulement les cases écrites par l’import, si personne ne les a modifiées depuis ; le reste du fichier ne change pas.</p></div>';
+  }
   function imports(d) {
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
@@ -60,6 +69,7 @@
             (it.set_aside && it.set_aside.count ? ' · ' + it.set_aside.count + ' ligne(s) de total mises de côté' : '') + '</p>' +
             (it.check ? '<p class="' + (it.check.ok ? 'meta' : 'wf-assist-err') + '">' + (it.check.ok ? 'Vérifié par l’IA : correct' : 'L’IA signale un problème') + (it.check.remarks ? ' — ' + esc(it.check.remarks) : '') + '</p>' : '') +
             (it.understood ? '<p class="meta">Selon l’IA : ' + esc(it.understood.what) + (it.understood.period ? ' (' + esc(it.understood.period) + ')' : '') + (it.understood.why ? ' — ' + esc(it.understood.why) : '') + '</p>' : '') +
+            (it.coverage != null && it.coverage < 40 ? '<p class="wf-assist-err">Cette pièce ne remplit que ' + it.coverage + ' % des colonnes de la feuille : probablement pas le bon genre de document.</p>' : '') +
             (it.same_period_as ? '<p class="meta">Même période que « ' + esc(it.same_period_as) + ' » : décochée pour ne pas importer deux fois.</p>' : '') +
             (it.error ? '<p class="wf-assist-err">Lecture impossible : ' + esc(ERR[it.error] || it.error) + '</p>' :
             '<details><summary>Colonnes : ' + it.mapping.length + ' rattachée(s)' + (it.unmatched.length ? ', ' + it.unmatched.length + ' laissée(s) vide(s)' : '') + '</summary><ul class="wf-agent-list">' +
@@ -92,7 +102,8 @@
       return next();
     }).then(function () {
       st.scan[sheet].current = 'l’IA vérifie ce que l’application a trouvé…'; render();
-      return api('workfile-import-finish', { sheet: sheet, items: items });
+      var ds = (st.data && st.data.data_sheets || []).filter(function (x) { return x.sheet === sheet; })[0];
+      return api('workfile-import-finish', { sheet: sheet, items: items, profile: ds ? ds.profile : null });
     }).then(function (p) {
       st.imports[sheet] = p; (p.items || []).forEach(function (it, i) { st.pick[sheet + '|' + i] = !!it.recommended; }); render();
     }).catch(function (e) { var m = String(e && e.message || e); st.imports[sheet] = { error: 'proposition impossible — ' + (ERR[m] || m) }; render(); });
@@ -121,7 +132,7 @@
   }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + imports(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -170,6 +181,17 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
+    if (b.dataset.a === 'undo-ask') { st.undoAsk = b.dataset.plan; render(); }
+    if (b.dataset.a === 'undo-no') { st.undoAsk = null; render(); }
+    if (b.dataset.a === 'undo-yes') {
+      b.disabled = true; st.say = 'J’annule l’import…'; render();
+      api('workfile-import-undo', { plan_id: b.dataset.plan }).then(function (r) {
+        st.undoAsk = null; st.asked = {}; st.imports = {};
+        st.say = 'Import annulé : ' + r.cleared + ' case(s) vidée(s)' + (r.kept_changed ? ', ' + r.kept_changed + ' modifiée(s) depuis, gardée(s)' : '') + '.';
+        try { document.dispatchEvent(new CustomEvent('wf-written', { detail: {} })); } catch (_) {}
+        return refresh();
+      }).catch(function (e) { var m = String(e && e.message || e); st.say = 'Annulation refusée : ' + (ERR[m] || m) + '.'; render(); });
+    }
     if (b.dataset.a === 'import-detail') { var sel = document.getElementById('audit-sheet'); if (sel && b.dataset.sheet) { sel.value = b.dataset.sheet; sel.dispatchEvent(new Event('change')); } var ib = Array.prototype.find.call(document.querySelectorAll('button'), function (x) { return /^Importer les données/.test(x.textContent); }); if (ib) { ib.scrollIntoView({ behavior: 'smooth' }); setTimeout(function () { ib.click(); }, sel && b.dataset.sheet ? 1800 : 0); } }
     if (b.dataset.a === 'import') {
       var sh = b.dataset.sheet, p = st.imports[sh]; if (!p || !p.items) return;

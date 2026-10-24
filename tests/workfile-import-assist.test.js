@@ -79,3 +79,24 @@ test('a piece changed since the proposal is not written', async () => {
   const p = await proposeImport('O', 'M', 'PRJ-04', { sheet: 'D1_GL_PROJET' }, paul, f.d);
   await assert.rejects(acceptImport('O', 'M', 'PRJ-04', { sheet: 'D1_GL_PROJET', items: [{ ...p.items[0], rows: 99 }] }, paul, f.d), /WORK_CHANGED_PREPARE_AGAIN/);
 });
+
+test('« Annuler cet import » empties only the cells the import wrote, keeps a cell changed since, and is traced', async () => {
+  const { undoImport, importsDone } = await import('../lib/workfile-undo.js');
+  const f = await fixture();
+  const p = await proposeImport('O', 'M', 'PRJ-04', { sheet: 'D1_GL_PROJET' }, paul, f.d);
+  await acceptImport('O', 'M', 'PRJ-04', { sheet: 'D1_GL_PROJET', items: [{ file_id: 'G23', sheet: p.items[0].sheet, rows: p.items[0].rows, mapping: p.items[0].mapping }] }, paul, f.d);
+  const view = await f.d.view();
+  const imp = importsDone(view)[0];
+  assert.equal(imp.rows, 2);
+  // Someone corrects one imported cell by hand: it is kept.
+  const w = new ExcelJS.Workbook(); await w.xlsx.load(f.wp()); w.getWorksheet('D1_GL_PROJET').getCell('C5').value = 'corrigé à la main';
+  await f.d.drive.updateBinary('WP', { buffer: Buffer.from(await w.xlsx.writeBuffer()), expectedModifiedTime: (await f.d.drive.getMeta('WP')).modifiedTime });
+  const r = await undoImport('O', 'M', 'PRJ-04', { plan_id: imp.plan_id }, paul, { ...f.d, audit: async () => null });
+  assert.equal(r.kept_changed, 1);
+  const back = new ExcelJS.Workbook(); await back.xlsx.load(f.wp()); const s = back.getWorksheet('D1_GL_PROJET');
+  assert.equal(s.getCell('D5').value, null);
+  assert.equal(s.getCell('C5').value, 'corrigé à la main');
+  assert.equal(s.getCell('F5').formula, 'D5*1');
+  assert.equal(importsDone(view)[0].status, 'undone');
+  await assert.rejects(undoImport('O', 'M', 'PRJ-04', { plan_id: imp.plan_id }, paul, f.d), /IMPORT_ALREADY_UNDONE/);
+});
