@@ -736,6 +736,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `workfile-long-paths` / `workfile-shorten-paths`) liste les fichiers trop longs de la mission et les dossiers à nom long qui les
   allongent, propose des noms plus courts, renomme seulement sur « Oui, raccourcis » (même id, jamais par-dessus un autre nom, vérifié,
   audit `PATHS_SHORTENED`). Panneau de l'agent : bloc « Chemins trop longs pour Excel ». Test : `tests/path-budget.test.js`.
+- L'ENHANCED AUDITOR APPREND EN REGARDANT (Paul, 2026-10-25 : « l'IA doit apprendre à utiliser l'Excel pour cette mission ; on travaille
+  dans le working file, l'Enhanced Auditor comprend la logique ; il saisit bien le PTBA mais ne place pas dans les bonnes colonnes ») :
+  `lib/workfile-learn.js` — « Regarde-moi » (Ma procédure ou complément Excel) note par colonne à remplir les lignes remplies + une
+  empreinte (aucune valeur) ; la personne remplit dans Excel ; « J'ai fini — apprends » : le code trouve les cases ajoutées, retrouve
+  chaque valeur dans les tableaux des pièces (`norm` : nombres, dates, texte) → colonne source par colonne, lignes prises ; l'IA écrit la
+  logique (règles, lignes prises / laissées, questions ; sans valeur) ; leçon « à confirmer » dans OFFICE_MANAGER_WORKFILE_LESSONS.json
+  (par modèle `map.key` et feuille, en-têtes et règles seulement) ; « Oui, retiens » / règle corrigée par la personne / « Non ». Une leçon
+  VALIDÉE : ses colonnes passent avant celles devinées dans l'import (`by: 'appris'`), sa règle est donnée à l'IA (import et préparation
+  des étapes du SOP : `map.learned_from_the_auditor`). Actions `workfile-learn-start|-cancel|-learn|-confirm` (route `procedure`),
+  `learn-procedures` (route `workfile`). Bloc « Chemins trop longs » retiré de l'écran (Paul : renommer intelligemment, pas un bouton) :
+  les noms créés restent courts (`path-budget`). Test : `tests/workfile-learn.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

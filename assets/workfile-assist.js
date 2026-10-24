@@ -48,15 +48,30 @@
           : ' <button type="button" class="btn ghost" data-a="undo-ask" data-plan="' + esc(x.plan_id) + '">Annuler cet import</button>') : '') + '</li>';
     }).join('') + '</ul><p class="meta">Annuler vide seulement les cases écrites par l’import, si personne ne les a modifiées depuis ; le reste du fichier ne change pas.</p></div>';
   }
-  // Files of the mission that Excel cannot open on Windows (path > 259 characters): a shorter name proposed, renamed on « Oui ».
-  function paths() {
-    var lp = st.paths; if (!lp || (!lp.files.length && !lp.folders.length)) return '';
-    var items = lp.folders.filter(function (x) { return x.proposed; }).map(function (x) { return { k: 'Dossier', name: x.name, to: x.proposed, len: x.length }; }).concat(lp.files.filter(function (x) { return x.proposed; }).map(function (x) { return { k: 'Fichier', name: x.name, to: x.proposed, len: x.length }; }));
-    return '<div class="wf-assist-block"><h3>Chemins trop longs pour Excel</h3><p>Sous Windows, Excel n’ouvre pas un fichier dont le chemin dépasse 259 caractères. ' + lp.files.length + ' fichier(s) de la mission sont dans ce cas' + (lp.folders.length ? ', dont certains dans des dossiers trop profonds' : '') + '. Je propose des noms plus courts (même fichier, rien supprimé) :</p><ul class="wf-agent-list">' +
-      items.slice(0, 12).map(function (x) { return '<li>' + x.k + ' « ' + esc(x.name) + ' » → « ' + esc(x.to) + ' » <span class="meta">(chemin : ' + x.len + ' caractères)</span></li>'; }).join('') + '</ul>' +
-      (items.length > 12 ? '<p class="meta">… et ' + (items.length - 12) + ' autre(s).</p>' : '') +
-      (st.data && st.data.editable ? '<div class="row"><button type="button" class="btn" data-a="shorten">Oui, raccourcis</button></div>' : '') + '</div>';
+  // « L'IA doit apprendre à utiliser l'Excel pour cette mission » (Paul, 2026-10-25): the person fills in Excel, the agent compares
+  // before / after, finds where each value comes from, writes the logic; the person confirms or corrects; then the agent does the same.
+  function learning(d) {
+    var L = d.learning; if (!L) return '';
+    var html = '<div class="wf-assist-block"><h3>Apprendre en vous regardant</h3>';
+    if (L.watch) html += '<p>Je regarde depuis ' + esc(String(L.watch.at).slice(11, 16)) + '. Remplissez le working file directement dans Excel' + (d.workbook_url ? ' (<a href="' + esc(d.workbook_url) + '" target="_blank" rel="noopener">ouvrir le fichier</a>)' : '') + ', enregistrez, puis :</p>' +
+      '<div class="row"><button type="button" class="btn" data-a="learn">J’ai fini — apprends</button><button type="button" class="btn ghost" data-a="learn-cancel">Annuler</button></div>';
+    else html += '<p>Faites-le une fois vous-même dans le fichier Excel : je compare avant / après, je cherche d’où vient chaque valeur dans les pièces, j’écris la logique (quelle colonne de quelle pièce va où, quelles lignes sont prises) et, une fois que vous l’avez validée, je la refais seul pour ce modèle.</p>' +
+      (d.editable ? '<div class="row"><button type="button" class="btn ghost" data-a="learn-start">Je remplis dans Excel — regarde-moi</button></div>' : '');
+    (st.learned || L.lessons.filter(function (x) { return x.status === 'to_confirm'; })).forEach(function (x) {
+      html += '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (x.filled || 0) + ' case(s) remplie(s) par vous. Voici ce que j’ai compris :</p>' +
+        (x.logic && x.logic.summary ? '<p>' + esc(x.logic.summary) + '</p>' : '') +
+        '<ul class="wf-agent-list">' + (x.mappings || []).map(function (m) { return '<li>' + esc(m.dest_header) + ' ← « ' + esc(m.source_header || '?') + ' » de ' + esc(m.source_name || 'la pièce') + ' <span class="meta">(' + esc(m.support) + ' valeurs retrouvées' + (m.sure ? '' : ', à confirmer') + ')</span></li>'; }).join('') +
+        ((x.logic && x.logic.rules) || []).filter(function (r) { return r.rows; }).map(function (r) { return '<li>' + esc(r.column) + ' : ' + esc(r.rows) + (r.note ? ' — ' + esc(r.note) : '') + '</li>'; }).join('') + '</ul>' +
+        ((x.unmatched || []).length ? '<p class="meta">Je n’ai pas retrouvé d’où viennent : ' + esc(x.unmatched.join(', ')) + '.</p>' : '') +
+        ((x.logic && x.logic.questions) || []).map(function (q) { return '<p class="meta">Question : ' + esc(q) + '</p>'; }).join('') +
+        (d.editable ? '<textarea class="wf-learn-note" data-sheet="' + esc(x.sheet) + '" rows="2" placeholder="Si c’est faux : la bonne règle, en une phrase (facultatif)">' + esc((st.notes || {})[x.sheet] || '') + '</textarea>' +
+          '<div class="row"><button type="button" class="btn" data-a="lesson-ok" data-sheet="' + esc(x.sheet) + '">Oui, c’est ça — retiens</button><button type="button" class="btn ghost" data-a="lesson-no" data-sheet="' + esc(x.sheet) + '">Non, oublie</button></div>' : '') + '</div>';
+    });
+    var kept = L.lessons.filter(function (x) { return x.status === 'validated'; });
+    if (kept.length) html += '<p class="meta">Déjà appris pour ce modèle : ' + esc(kept.map(function (x) { return x.sheet; }).join(', ')) + '.</p>';
+    return html + '</div>';
   }
+
   function imports(d) {
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
@@ -141,7 +156,7 @@
   }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? paths() + known(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + learning(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -160,7 +175,6 @@
         // The step of the SOP is prepared again with what was just read (facts proposed in the sheet, permission asked before writing).
         var agent = OM.workingFileAgent; if (agent && agent.prepareCurrent && !(agent.state && agent.state.busy)) agent.prepareCurrent();
       }
-      if (!st.pathsAsked) { st.pathsAsked = true; api('workfile-long-paths').then(function (lp) { st.paths = lp; render(); }).catch(function () {}); }
       (d.data_sheets || []).forEach(function (x) { if (!st.asked[x.sheet]) { st.asked[x.sheet] = true; propose(x.sheet); } });
       // Once per opening: the pieces nobody read yet are read, identified and renamed without waiting for a click.
       if (d.editable && !st.autoRead && d.pieces.to_read > 0 && !d.pieces.reading) { st.autoRead = true; review(); }
@@ -177,6 +191,7 @@
   }
 
   box.addEventListener('toggle', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('wf-howto')) st.howtoOpen = ev.target.open; }, true);
+  box.addEventListener('input', function (ev) { var t = ev.target; if (t && t.classList && t.classList.contains('wf-learn-note')) { st.notes = st.notes || {}; st.notes[t.dataset.sheet] = t.value; } });
   box.addEventListener('change', function (ev) { var c = ev.target; if (c && c.dataset && c.dataset.pick) { st.pick[c.dataset.pick] = c.checked; render(); } });
   box.addEventListener('click', function (ev) {
     var b = ev.target.closest('button'); if (!b || b.disabled) return;
@@ -191,12 +206,23 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
-    if (b.dataset.a === 'shorten') {
-      b.disabled = true; st.say = 'Je raccourcis les noms…'; render();
-      api('workfile-shorten-paths', {}).then(function (r) {
-        st.say = (r.done || []).length + ' nom(s) raccourci(s) et vérifié(s) dans le Drive' + ((r.skipped || []).length ? ', ' + r.skipped.length + ' laissé(s) (modifié entre-temps ou refusé)' : '') + '.';
-        return api('workfile-long-paths').then(function (lp) { st.paths = lp; render(); });
-      }).catch(function (e) { st.say = 'Raccourcissement refusé : ' + (e && e.message || e) + '.'; render(); });
+    if (b.dataset.a === 'learn-start') { b.disabled = true; api('workfile-learn-start').then(function (r) { st.learned = null; st.say = 'Je regarde. Remplissez dans Excel, enregistrez, puis « J’ai fini — apprends ».'; if (r.url) window.open(r.url, '_blank', 'noopener'); return refresh(); }).catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); }); }
+    if (b.dataset.a === 'learn-cancel') { api('workfile-learn-cancel').then(refresh); }
+    if (b.dataset.a === 'learn') {
+      b.disabled = true; st.say = 'Je compare avant / après et je cherche d’où viennent les valeurs…'; render();
+      api('workfile-learn').then(function (r) {
+        st.learned = r.learned || []; st.learnTemplate = r.template;
+        st.say = r.nothing_changed ? r.note : (st.learned.length + ' feuille(s) comprise(s) : vérifiez ce que j’ai compris.');
+        return refresh();
+      }).catch(function (e) { st.say = 'Apprentissage impossible : ' + (e && e.message || e); render(); });
+    }
+    if (b.dataset.a === 'lesson-ok' || b.dataset.a === 'lesson-no') {
+      var note = box.querySelector('.wf-learn-note[data-sheet="' + b.dataset.sheet + '"]');
+      api('workfile-learn-confirm', { template: st.learnTemplate || (st.data.learning && st.data.learning.template), sheet: b.dataset.sheet, decision: b.dataset.a === 'lesson-ok' ? 'validated' : 'rejected', note: note && note.value ? note.value : null }).then(function () {
+        st.learned = (st.learned || []).filter(function (x) { return x.sheet !== b.dataset.sheet; });
+        st.say = b.dataset.a === 'lesson-ok' ? 'Retenu : je ferai ' + b.dataset.sheet + ' de cette façon pour ce modèle.' : 'Oublié.';
+        return refresh();
+      }).catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); });
     }
     if (b.dataset.a === 'undo-ask') { st.undoAsk = b.dataset.plan; render(); }
     if (b.dataset.a === 'undo-no') { st.undoAsk = null; render(); }

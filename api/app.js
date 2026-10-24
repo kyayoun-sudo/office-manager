@@ -280,6 +280,11 @@ export const ROUTES = Object.freeze({
       // Paths too long for Excel on Windows (2026-10-25): listed with a shorter name proposed, renamed only on « Oui, raccourcis ».
       if (b.action === 'workfile-long-paths') return (await import('../lib/path-repair.js')).missionLongPaths(orgId, m, c, a);
       if (b.action === 'workfile-shorten-paths') return (await import('../lib/path-repair.js')).shortenMissionPaths(orgId, m, c, a, b);
+      // The Enhanced Auditor learns by watching the auditor fill the working file in Excel (2026-10-25).
+      if (b.action === 'workfile-learn-start') return (await import('../lib/workfile-learn.js')).startWatch(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn-cancel') return (await import('../lib/workfile-learn.js')).cancelWatch(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn') return (await import('../lib/workfile-learn.js')).learnFromPerson(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn-confirm') return (await import('../lib/workfile-learn.js')).confirmLesson(orgId, m, c, b, a);
       if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);
@@ -728,6 +733,8 @@ export const ROUTES = Object.freeze({
       if (a === 'review') return reviewWorkbook(orgId, req.account, b);
       if (a === 'remark') return updateRemark(orgId, req.account, b);
       if (a === 'decide') return decideWorkfileAction(orgId, req.account, b);
+      // Learning from the auditor, from inside Excel: the procedures that work in this file (2026-10-25).
+      if (a === 'learn-procedures') return import('../lib/workfile-learn.js').then(m => m.proceduresForFile(orgId, b, req.account));
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'WORKFILE_UNAVAILABLE'

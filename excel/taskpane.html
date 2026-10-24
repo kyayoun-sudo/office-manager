@@ -53,6 +53,18 @@ body{background:var(--ground)}
     <div id="remarks" class="stack"></div>
   </section>
 
+  <section class="card" id="learn-card" hidden>
+    <h2>Apprendre en me regardant</h2>
+    <p class="muted">Remplissez vous-même ce fichier : l'Enhanced Auditor compare avant / après, retrouve d'où vient chaque valeur dans les pièces et écrit la logique. Validée, il la refait seul sur ce modèle.</p>
+    <select id="learn-proc" aria-label="Procédure"></select>
+    <div class="acts" style="margin-top:8px">
+      <button class="btn" id="learn-start" type="button">Regarde-moi</button>
+      <button class="btn" id="learn-done" type="button" hidden>J'ai fini — apprends</button>
+    </div>
+    <div id="learn-out" class="reply" hidden></div>
+    <p class="status" id="learn-say" role="status" aria-live="polite"></p>
+  </section>
+
   <section class="card" id="ask-card" hidden>
     <h2 style="margin:0">Demander aux agents</h2>
     <textarea id="question" placeholder="Ex. Ce calcul de dépréciation est-il cohérent avec le risque identifié ?"></textarea>
@@ -112,7 +124,50 @@ body{background:var(--ground)}
       (r.missions || []).forEach(function (m) { sel.appendChild(new Option(m.name, m.id)); });
       if (r.mission_id) sel.value = r.mission_id;
       loadRemarks();
+      loadLearn();
     }).catch(function (e) { say('review-say', ERR[e.message] || e.message, true); });
+  }
+
+  // ---- Learning from the auditor (2026-10-25): « l'IA doit apprendre à utiliser l'Excel pour cette mission » ----
+  var learn = { learned: null, template: null };
+  var proc = function (body) { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ mission_id: ctx.missionId, code: $('learn-proc').value }, body)) }); };
+  function loadLearn() {
+    if (!ctx.fileId || !ctx.missionId) return;
+    post({ action: 'learn-procedures', mission_id: ctx.missionId, file_id: ctx.fileId }).then(function (r) {
+      var list = r.procedures || []; if (!list.length) return;
+      var sel = $('learn-proc'); sel.textContent = '';
+      list.forEach(function (p) { sel.appendChild(new Option(p.code + ' — ' + p.title, p.code)); });
+      $('learn-card').hidden = false;
+    }).catch(function () {});
+  }
+  function showLearned() {
+    var out = $('learn-out'); out.textContent = ''; out.hidden = !(learn.learned && learn.learned.length);
+    (learn.learned || []).forEach(function (x) {
+      var b = el('div'); b.appendChild(el('strong', x.sheet + ' — ' + x.filled + ' case(s)'));
+      if (x.logic && x.logic.summary) b.appendChild(el('p', x.logic.summary));
+      (x.mappings || []).forEach(function (m) { b.appendChild(el('p', m.dest_header + ' ← « ' + (m.source_header || '?') + ' » (' + m.support + ')', 'muted')); });
+      var note = document.createElement('textarea'); note.placeholder = 'Si c’est faux : la bonne règle (facultatif)'; b.appendChild(note);
+      var acts = el('div', null, 'acts'), ok = el('button', 'Oui, retiens'), no = el('button', 'Non, oublie'); ok.type = no.type = 'button';
+      var decide = function (decision) { proc({ action: 'workfile-learn-confirm', template: learn.template, sheet: x.sheet, decision: decision, note: note.value || null }).then(function () {
+        learn.learned = learn.learned.filter(function (y) { return y.sheet !== x.sheet; }); showLearned(); say('learn-say', decision === 'validated' ? 'Retenu pour ce modèle.' : 'Oublié.'); }).catch(function (e) { say('learn-say', e.message, true); }); };
+      ok.addEventListener('click', function () { decide('validated'); }); no.addEventListener('click', function () { decide('rejected'); });
+      acts.appendChild(ok); acts.appendChild(no); b.appendChild(acts); out.appendChild(b);
+    });
+  }
+  function startLearn() {
+    say('learn-say', 'Je note l’état du fichier…');
+    proc({ action: 'workfile-learn-start' }).then(function () { $('learn-done').hidden = false; say('learn-say', 'Je regarde. Remplissez, enregistrez (Ctrl+S), puis « J’ai fini ».'); }).catch(function (e) { say('learn-say', e.message, true); });
+  }
+  function doneLearn() {
+    say('learn-say', 'J’enregistre le fichier, puis je compare…');
+    Excel.run(function (c) { try { c.workbook.save(Excel.SaveBehavior.save); } catch (e) {} return c.sync(); }).catch(function () {}).then(function () {
+      // the Drive copy follows the save after a few seconds
+      return new Promise(function (res) { setTimeout(res, 8000); });
+    }).then(function () { return proc({ action: 'workfile-learn' }); }).then(function (r) {
+      learn.learned = r.learned || []; learn.template = r.template;
+      $('learn-done').hidden = !!learn.learned.length; showLearned();
+      say('learn-say', r.nothing_changed ? r.note : 'Voici ce que j’ai compris : vérifiez.');
+    }).catch(function (e) { say('learn-say', e.message, true); });
   }
 
   // ---- Activity and heartbeat (active time, files left open, save and close on request) ----
@@ -278,10 +333,11 @@ body{background:var(--ground)}
       Office.context.document.settings.saveAsync(function () {});
     });
     $('login-btn').addEventListener('click', login);
-    $('mission').addEventListener('change', function () { if (!this.value) return; ctx.missionId = this.value; post({ action: 'beat', session: ctx.session, active: true, mission_id: ctx.missionId }).catch(function () {}); });
+    $('mission').addEventListener('change', function () { if (!this.value) return; ctx.missionId = this.value; post({ action: 'beat', session: ctx.session, active: true, mission_id: ctx.missionId }).catch(function () {}); loadLearn(); });
     $('review-sheet').addEventListener('click', function () { review(false); });
     $('review-book').addEventListener('click', function () { review(true); });
     $('ask').addEventListener('click', ask);
+    $('learn-start').addEventListener('click', startLearn); $('learn-done').addEventListener('click', doneLearn);
     start();
   });
 })();
