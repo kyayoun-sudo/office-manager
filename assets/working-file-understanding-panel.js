@@ -81,8 +81,32 @@
     body.innerHTML = html;
   }
 
+  // 2026-10-24 : d'abord l'écran construit depuis le working file (carte lue par le code, route procedure — même porte
+  // que le reste de la page). L'ancienne lecture ci-dessous ne sert plus que si la carte ne peut pas être lue.
+  function loadGuide() {
+    return new Promise(function (resolve, reject) {
+      if (window.OfficeManager.workfileGuide) return resolve(window.OfficeManager.workfileGuide);
+      var s = document.createElement('script'); s.src = '/assets/workfile-guide.js'; s.dataset.workfileGuide = '1';
+      s.onload = function () { window.OfficeManager.workfileGuide ? resolve(window.OfficeManager.workfileGuide) : reject(new Error('WORKFILE_GUIDE_NOT_LOADED')); };
+      s.onerror = function () { reject(new Error('WORKFILE_GUIDE_NOT_LOADED')); };
+      document.head.appendChild(s);
+    });
+  }
+
   async function understand() {
     var message = document.getElementById('wf-understanding-message');
+    var before = board.innerHTML;
+    try {
+      var guide = await loadGuide();
+      board.setAttribute('aria-label', 'Le working file, feuille par feuille');
+      await guide.mount(board, { missionId: missionId, code: code, sheet: code });
+      loadAgentPanel();
+      return true;
+    } catch (e) {
+      // The earlier reading below stays available: give it back its frame.
+      board.innerHTML = before; board.setAttribute('aria-label', 'Compréhension globale du Working File');
+      message = document.getElementById('wf-understanding-message');
+    }
     try {
       var data = await window.OfficeManager.api('/api/working-file-understanding', {
         method: 'POST',

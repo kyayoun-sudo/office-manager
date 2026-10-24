@@ -244,3 +244,41 @@ test('the procedure view returns the map of its own working file, read in the Dr
   assert.deepEqual(writes, [], 'nothing is written');
   await assert.rejects(workfileMapView('org', 'm1', 'XX-02', {}, { view: async () => ({ workpaper: null }), drive }), /NO_WORKPAPER_FOR_CYCLE/);
 });
+
+test('the screen of a sheet: values of its table by column, and how full it is', async () => {
+  const { workfileMapView } = await import('../lib/workfile-map-view.js');
+  const wb = nlLike(); wb.getWorksheet('D1_GL').getCell('A11').value = 'L1'; wb.getWorksheet('D1_GL').getCell('C11').value = 1000;
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const drive = { getMeta: async () => ({ name: 'WP.xlsx', size: buf.length, modifiedTime: 't1' }), downloadBuffer: async () => buf };
+  const r = await workfileMapView('org', 'm1', 'XX-02', {}, { view: async () => ({ workpaper: { file_id: 'f1' } }), drive, sheet: 'D1_GL' });
+  assert.equal(r.sheet_view.name, 'D1_GL'); assert.equal(r.sheet_view.role, 'data');
+  assert.equal(r.sheet_view.rows[0].cells.A, 'L1');
+  assert.equal(r.sheet_view.rows[0].cells.E, null, 'a formula without a saved result = calculated by Excel, never invented');
+  assert.equal(r.filled.D1_GL, 1); assert.equal(r.filled['XX-02'], 0);
+  const t = await workfileMapView('org', 'm1', 'XX-02', {}, { view: async () => ({ workpaper: { file_id: 'f1' } }), drive });
+  assert.equal(t.sheet_view.name, 'XX-02', 'by default, the sheet of the procedure');
+});
+
+test('a person fills the form: facts and her own decisions written in empty cells, everything else refused, read back', async () => {
+  const { writeWorkfileCells } = await import('../lib/workfile-map-view.js');
+  let buf = Buffer.from(await nlLike().xlsx.writeBuffer()), modified = 't1';
+  const calls = [];
+  const drive = { getMeta: async () => ({ name: 'WP.xlsx', size: buf.length, modifiedTime: modified }), downloadBuffer: async () => buf,
+    updateBinary: async (id, o) => { calls.push(o.expectedModifiedTime); buf = o.buffer; modified = 't2'; } };
+  const view = async () => ({ workpaper: { file_id: 'f1' }, editable: true, work: { status: 'in_progress' } });
+  const r = await writeWorkfileCells('org', 'm1', 'XX-02', { email: 'a@b.c' }, { cells: [
+    { sheet: 'XX-02', address: 'D11', value: '1 250 000' },   // fact
+    { sheet: 'XX-02', address: 'F11', value: 'Oui' },         // her decision
+    { sheet: 'XX-02', address: 'G11', value: 'Peut-être' },   // not in the list
+    { sheet: 'XX-02', address: 'A11', value: '99' },          // key
+    { sheet: 'XX-02', address: 'I11', value: 'PASS' }         // calculated
+  ] }, { view, drive });
+  assert.deepEqual(r.written.map(w => [w.address, w.value]), [['D11', 1250000], ['F11', 'Oui']]);
+  assert.deepEqual(r.refused.map(x => [x.address, x.reason]), [['G11', 'NOT_IN_LIST'], ['A11', 'KEY_COLUMN'], ['I11', 'CALCULATED']]);
+  assert.equal(r.verified, true); assert.deepEqual(calls, ['t1'], 'written on the version that was read');
+  // A cell filled by someone else is never overwritten.
+  const again = await writeWorkfileCells('org', 'm1', 'XX-02', {}, { cells: [{ sheet: 'XX-02', address: 'D11', value: '5' }] }, { view, drive });
+  assert.equal(again.refused[0].reason, 'FILLED_BY_SOMEONE_ELSE');
+  // A reviewer (not editable) writes nothing.
+  await assert.rejects(writeWorkfileCells('org', 'm1', 'XX-02', {}, { cells: [{ sheet: 'XX-02', address: 'H11', value: 'x' }] }, { view: async () => ({ workpaper: { file_id: 'f1' }, editable: false }), drive }), /NOT_PREPARER/);
+});

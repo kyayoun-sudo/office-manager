@@ -661,6 +661,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   route `procedure` (mêmes droits que « Ma procédure », rien d'écrit). Vérifié sur le vrai NL-T01 (14 tests, PRJ-01 activé, 6 risques,
   PRJ-05 : L/M/N jugement, A clé, P résultat, 3 PBC requis) ; le fichier réel n'est PAS dans le dépôt (public) : test optionnel
   `WORKFILE_MAP_SAMPLE`. Test : `tests/workfile-map.test.js` (forme NL-T01 + modèle d'un autre cabinet sans AUDIT_META).
+- ÉTAPE VISIBLE FAITE (Paul, 2026-10-24 : « regarde comment ça se présente, ça n'a rien à voir » — l'étape 1 n'avait rien changé à
+  l'écran, et le cadre « Compréhension du Working File » appelait `api/working-file-understanding.js`, qui renvoyait
+  `WORKING_FILE_UNDERSTANDING_UNAVAILABLE`) : ce cadre de `procedure.html` monte d'abord `assets/workfile-guide.js` (+ `.css`) via la route
+  `procedure` (actions `workfile-map` avec `sheet` / `offset`, et `workfile-cells`) ; l'ancienne lecture ne sert plus qu'en secours. Écran :
+  feuilles du fichier en pastilles dans l'ordre du guide ; chaque feuille = son écran (test = un formulaire par élément construit colonne par
+  colonne : calculé affiché ou « calculé par le fichier », fait = champ, décision = Oui / Non / N/A de la liste du modèle ; autres feuilles =
+  tableau éditable des colonnes à remplir, lignes d'exemple du modèle signalées) ; pastilles calculées sans IA (« d'abord remplir D1 », pièces
+  du test → carte « Ce que demande ce test », importer les données, tableau plein, voir dans Mon fichier Excel, feuille suivante) ; la feuille
+  choisie s'ouvre aussi dans « Mon fichier Excel ». Écriture (`writeWorkfileCells`) : seulement ce que la PERSONNE saisit, préparateur
+  seulement, pas en revue, cases du modèle vides ou inchangées, jamais formule / clé, valeur de liste contrôlée, version lue
+  (`expectedModifiedTime`), relu, audit `WORKFILE_CELLS_WRITTEN`. L'agent ne propose pas encore dans ces champs (étape suivante).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
