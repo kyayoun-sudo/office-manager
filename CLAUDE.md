@@ -643,6 +643,25 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `tests/step-runner.test.js`. RESTE : étapes d'un modèle dont les numéros ne sont pas en colonne A/B (lecture par l'IA), opérations
   supplémentaires (recalcul, comparaison N/N-1, tirage depuis le résultat), report automatique dans les colonnes du test.
 
+## Plusieurs cabinets dans une installation (Paul, 2026-10-24 : « à la première connexion on doit pouvoir connaître l'entreprise ; si on n'a pas de cabinet on doit pouvoir créer des cabinets »)
+**Décision qui REMPLACE « un cabinet = une installation » (§52 Private Tenant, essai à 4 cabinets) — EN CONCEPTION, rien n'est encore codé.**
+- Une installation (Supabase + Vercel) sert plusieurs cabinets, séparés par `org_id`. Le cabinet d'une requête vient de la
+  session (cabinet choisi, appartenance vérifiée côté serveur à CHAQUE requête), jamais d'un identifiant envoyé par le navigateur
+  seul, ni de `DEFAULT_ORG_ID` (18 fichiers, 34 endroits à reprendre).
+- Première connexion : la personne rejoint son cabinet par **invitation** (lien e-mail : une adresse, usage unique, expire ;
+  ou code à partager : expire, révocable ; le rôle est fixé par celui qui invite) ou **crée un cabinet** (toute personne
+  inscrite peut le faire, elle en devient propriétaire). Création = nom du cabinet + fuseau horaire, puis les étapes existantes de
+  `demarrer.html` (Google, Drive, agents) ; logo / couleurs plus tard dans Paramètres. Pas de recherche de cabinet par nom.
+- Une personne peut appartenir à plusieurs cabinets (consultant, spécialiste, associé de deux cabinets) : sélecteur de cabinet à la
+  connexion et dans l'en-tête ; les données ne se mélangent jamais (`office_app_users` est déjà par cabinet).
+- **TATY devient le premier cabinet** de la plateforme commune : son installation et ses données restent sous son identifiant
+  actuel ; les cabinets d'essai seront recréés dedans plus tard.
+- Ordre de construction (une branche par étape, `npm test` vert) : 1) cabinet de la requête = session, et tout l'état gardé en
+  mémoire du serveur séparé par cabinet — d'abord `lib/google-connection.js` (jeton Google, Drive choisi : un seul cabinet par
+  processus aujourd'hui, Vercel sert plusieurs requêtes par instance → fuite possible), puis les autres caches (`agent-memory`,
+  `agent-persona`, `memory-files`, `notifications`, `orpailleur-ask`, `shadow`, `google-drive`) ; 2) créer un cabinet, inviter,
+  choisir son cabinet ; 3) le planificateur passe sur chaque cabinet (aujourd'hui `DEFAULT_ORG_ID` seul) ; 4) TATY comme 1er cabinet.
+
 ## Première connexion (Paul, 2026-10-17)
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.
