@@ -193,5 +193,75 @@
       if (!OM.getToken()) { if (login) login.hidden = false; } else { start(); }
     }
   };
+
+  // Planning order (2026-10-23): mission -> analytical review -> work programme.
+  // This is injected from the shared screen helper so the existing mission/programme files stay intact.
+  function planningOrderEnhancements() {
+    var path = location.pathname;
+    var params = new URLSearchParams(location.search);
+    if (path === '/mission.html') {
+      var missionId = params.get('id');
+      var programme = document.getElementById('sec-programme');
+      if (!missionId || !programme || document.getElementById('sec-analytical-review')) return;
+      var review = UI.el('section', null, 'card'); review.id = 'sec-analytical-review'; review.setAttribute('aria-labelledby', 'h-analytical-review');
+      var head = UI.el('div', null, 'card-head'), h = UI.el('h2', 'Revue analytique'); h.id = 'h-analytical-review';
+      var open = UI.el('a', 'Commencer', 'btn'); open.href = '/revue-analytique.html?mission_id=' + encodeURIComponent(missionId);
+      head.appendChild(h); head.appendChild(open); review.appendChild(head);
+      review.appendChild(UI.el('p', 'Étape 1 de la planification. Faites la revue directement dans Firm Manager ou déposez votre Excel. Les documents nécessaires peuvent être déposés dans cet espace et ceux déjà présents dans la mission sont réutilisés.', 'meta'));
+      programme.parentNode.insertBefore(review, programme);
+      var meta = programme.querySelector('.meta');
+      if (meta) meta.textContent = 'Étape 2, après la revue analytique : cycles, contrôles, matérialité, responsables et revues. Vous pouvez construire le programme ici ou déposer/importer votre fichier Excel.';
+      var pl = document.getElementById('prog-link'); if (pl) pl.textContent = 'Étape 2 · Ouvrir';
+      return;
+    }
+    if (path !== '/programme.html') return;
+    var mid = params.get('mission_id') || params.get('mission') || params.get('id');
+    var card = document.getElementById('import-card');
+    if (!mid || !card || document.getElementById('programme-direct-upload')) return;
+
+    var reviewBar = UI.el('div', null, 'note');
+    reviewBar.appendChild(document.createTextNode('Étape précédente : '));
+    var reviewLink = UI.el('a', 'Revue analytique'); reviewLink.href = '/revue-analytique.html?mission_id=' + encodeURIComponent(mid); reviewBar.appendChild(reviewLink);
+    card.insertBefore(reviewBar, card.firstChild.nextSibling || card.firstChild);
+
+    var direct = UI.el('div', null, 'field'); direct.id = 'programme-direct-upload';
+    direct.appendChild(UI.el('label', 'Déposer directement un programme de travail (Excel, Word ou PDF)'));
+    var row = UI.el('div', null, 'row'), input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls,.xlsm,.csv,.doc,.docx,.pdf'; input.setAttribute('aria-label', 'Fichier du programme de travail');
+    var button = UI.el('button', 'Déposer et importer', 'btn ghost'); button.type = 'button'; var status = UI.el('span', '', 'status');
+    row.appendChild(input); row.appendChild(button); direct.appendChild(row); direct.appendChild(status);
+    var found = document.getElementById('found-progs'); card.insertBefore(direct, found ? found.nextSibling : card.children[2] || null);
+
+    function readB64(file) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = rej; r.readAsDataURL(file); }); }
+    function upload(file) {
+      var name = 'PROGRAMME_DE_TRAVAIL_' + file.name.replace(/^PROGRAMME[_\s-]*DE[_\s-]*TRAVAIL[_\s-]*/i, '');
+      var mime = file.type || 'application/octet-stream';
+      if (file.size <= 3 * 1024 * 1024) return readB64(file).then(function (data) {
+        return OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'piece', mission_id: mid, name: name, mime: mime, base64: data }) });
+      });
+      return OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'piece-start', mission_id: mid, name: name, mime: mime, size: file.size }) })
+        .then(function (s) { return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) { if (!r.ok) throw new Error('Envoi vers Google refusé (' + r.status + ')'); return r.json(); }).then(function (g) { return { file_id: g.id, name: g.name || s.name }; }); });
+    }
+    button.addEventListener('click', function () {
+      var file = input.files && input.files[0]; if (!file) { status.textContent = 'Choisissez un fichier.'; return; }
+      button.disabled = true; status.textContent = 'Dépôt dans la mission…';
+      upload(file).then(function (r) {
+        return OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'pieces-done', mission_id: mid, note: 'Programme de travail déposé directement depuis l’étape Programme. Le reconnaître comme programme de travail et le conserver comme source de planification.', files: [{ id: r.file_id }] }) }).then(function () { return r; });
+      }).then(function (r) {
+        var link = document.getElementById('imp-file'); if (link) link.value = 'https://drive.google.com/file/d/' + r.file_id;
+        status.textContent = 'Programme déposé. Lecture des procédures…';
+        var imp = document.getElementById('imp'); if (imp) imp.click();
+      }).catch(function (e) { status.textContent = 'Impossible : ' + e.message; }).then(function () { button.disabled = false; });
+    });
+
+    // Reuse an imported analytical review as a planning source when it is already attached to the mission.
+    OM.api('/api/app?route=mission-view&mission_id=' + encodeURIComponent(mid)).then(function (d) {
+      var src = document.getElementById('planning-sources'); if (!src) return;
+      var reviews = (d.documents || []).filter(function (x) { return /REVUE[_\s-]*ANALYTIQUE|analytical\s*review/i.test([x.name, x.document_type].filter(Boolean).join(' ')); });
+      var urls = reviews.map(function (x) { return x.web_url; }).filter(Boolean).slice(0, 2);
+      if (urls.length && !src.value.trim()) src.value = urls.join('\n');
+    }).catch(function () {});
+  }
+
   window.OMScreens = UI;
+  setTimeout(planningOrderEnhancements, 0);
 })();
