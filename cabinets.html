@@ -76,7 +76,7 @@ td,th{padding:6px 4px;border-bottom:1px solid var(--surface-2);text-align:left}
   var ROLES = { partner: 'Associé', quality_reviewer: 'Revue qualité (EQR)', bdm: 'Business Development Manager', manager: 'Manager', supervisor: 'Superviseur', senior: 'Senior', auditor: 'Auditeur', secretary: 'Secrétariat / administration', it_admin: 'Responsable informatique', owner: 'Propriétaire du cabinet' };
   var MESSAGES = { INVITATION_NOT_FOUND: 'Ce code ou ce lien n’existe pas.', INVITATION_EXPIRED: 'Cette invitation a expiré : demandez-en une nouvelle.', INVITATION_REVOKED: 'Cette invitation a été annulée.',
     INVITATION_ALREADY_USED: 'Cette invitation a déjà servi.', INVITATION_FOR_ANOTHER_ADDRESS: 'Ce lien a été envoyé à une autre adresse e-mail que la vôtre.', EMAIL_ALREADY_IN_CABINET: 'Cette adresse a déjà un compte dans ce cabinet.',
-    CABINET_NAME_REQUIRED: 'Indiquez le nom du cabinet.', ROLE_NOT_GRANTABLE: 'Vous ne pouvez pas donner ce rôle.', CABINETS_NOT_ENABLED: 'La gestion de plusieurs cabinets n’est pas activée sur cette installation.' };
+    CABINET_NAME_REQUIRED: 'Indiquez le nom du cabinet.', ROLE_NOT_GRANTABLE: 'Vous ne pouvez pas donner ce rôle.', EMAIL_NOT_VERIFIED: 'Confirmez d’abord votre adresse e-mail (lien reçu à l’inscription), puis reconnectez-vous.', CABINETS_NOT_ENABLED: 'La gestion de plusieurs cabinets n’est pas activée sur cette installation.' };
   function say(text, bad) { $('status').textContent = text || ''; $('status').classList.toggle('error', Boolean(bad)); }
   function fail(e) { say(MESSAGES[e.message] || ('Erreur : ' + e.message), true); }
   var session = OM.getSession();

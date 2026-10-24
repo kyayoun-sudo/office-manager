@@ -48,8 +48,9 @@ test('two firms in the same process never see each other\'s Drive', async () => 
   });
 });
 
-test('server credentials and pilot settings serve the pilot firm only', async () => {
+test('server credentials and pilot settings serve the pilot firm only; outside a request, no firm at all', async () => {
   await withEnv(env, async () => {
+    assert.equal(serverCredentialsAllowed(), false, 'fail closed outside a request context');
     assert.equal(await runInFirm(PILOT, async () => serverCredentialsAllowed()), true);
     assert.equal(await runInFirm(OTHER, async () => serverCredentialsAllowed()), false);
     const { masterSheetId } = await import('../lib/google-drive.js');
@@ -76,7 +77,7 @@ test('login with several firms: the session names its firm and lists them; no fi
     const both = await login(OTHER, { email: 'p@x.test', password: 'x' }, { authCall, fetchRows: member([PILOT, OTHER]) });
     assert.equal(both.org_id, OTHER); assert.equal(both.cabinets.length, 2);
     const none = await login(PILOT, { email: 'p@x.test', password: 'x' }, { authCall, fetchRows: member([]) });
-    assert.equal(none.needs_cabinet, true); assert.equal(none.org_id, null); assert.equal(none.user.role, null);
+    assert.equal(none.needs_cabinet, true); assert.equal(none.org_id, null); assert.equal(none.user.role, null); assert.equal(none.pilot_token, null, 'no shared token without a firm');
   });
 });
 

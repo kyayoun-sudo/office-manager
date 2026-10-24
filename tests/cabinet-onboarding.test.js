@@ -32,22 +32,22 @@ function world() {
 test('creating a firm uses the verified identity and a valid time zone, never a body-supplied user', async () => {
   let sent;
   const d = { audit, fetchRows: async (path, o) => { sent = JSON.parse(o.body); return [{ org_id: ORG, created: true }]; } };
-  const out = await createCabinet({ id: 'u1', email: 'Owner@Cabinet.test' }, { firm_name: 'Cabinet Alpha', timezone: 'Africa/Abidjan', auth_user_id: 'attacker' }, d);
+  const out = await createCabinet({ id: 'u1', email: 'Owner@Cabinet.test', email_confirmed_at: '2026-10-24' }, { firm_name: 'Cabinet Alpha', timezone: 'Africa/Abidjan', auth_user_id: 'attacker' }, d);
   assert.equal(out.org_id, ORG); assert.equal(sent.p_auth_user_id, 'u1'); assert.equal(sent.p_email, 'owner@cabinet.test');
-  await assert.rejects(createCabinet({ id: 'u1', email: 'o@c.test' }, { firm_name: 'X', timezone: 'Mars/Base' }, d), /INVALID_TIMEZONE/);
-  await assert.rejects(createCabinet({ id: 'u1', email: 'o@c.test' }, { firm_name: ' ' }, d), /CABINET_NAME_REQUIRED/);
+  await assert.rejects(createCabinet({ id: 'u1', email: 'o@c.test', email_confirmed_at: '2026-10-24' }, { firm_name: 'X', timezone: 'Mars/Base' }, d), /INVALID_TIMEZONE/);
+  await assert.rejects(createCabinet({ id: 'u1', email: 'o@c.test', email_confirmed_at: '2026-10-24' }, { firm_name: ' ' }, d), /CABINET_NAME_REQUIRED/);
 });
 
 test('a link invitation works once, only for its own address; only the hash is stored', async () => {
   const { inv, users, d } = world();
   const made = await createInvitation(ORG, owner, { kind: 'link', email: 'Awa@Cabinet.test', role: 'auditor' }, d);
   assert.ok(made.token && !JSON.stringify(inv).includes(made.token), 'the secret is never stored');
-  await assert.rejects(acceptInvitation({ id: 'x', email: 'intrus@other.test' }, { token: made.token }, d), /INVITATION_FOR_ANOTHER_ADDRESS/);
-  const ok = await acceptInvitation({ id: 'awa', email: 'awa@cabinet.test' }, { token: made.token, display_name: 'Awa' }, d);
+  await assert.rejects(acceptInvitation({ id: 'x', email: 'intrus@other.test', email_confirmed_at: '2026-10-24' }, { token: made.token }, d), /INVITATION_FOR_ANOTHER_ADDRESS/);
+  const ok = await acceptInvitation({ id: 'awa', email: 'awa@cabinet.test', email_confirmed_at: '2026-10-24' }, { token: made.token, display_name: 'Awa' }, d);
   assert.deepEqual([ok.org_id, ok.role], [ORG, 'auditor']);
   assert.deepEqual(users.map(u => [u.org_id, u.auth_user_id, u.role, u.active]), [[ORG, 'awa', 'auditor', true]]);
-  assert.equal((await acceptInvitation({ id: 'awa', email: 'awa@cabinet.test' }, { token: made.token }, d)).already, true, 'a second click is harmless');
-  await assert.rejects(acceptInvitation({ id: 'bob', email: 'awa@cabinet.test' }, { token: made.token }, d), /INVITATION_ALREADY_USED/);
+  assert.equal((await acceptInvitation({ id: 'awa', email: 'awa@cabinet.test', email_confirmed_at: '2026-10-24' }, { token: made.token }, d)).already, true, 'a second click is harmless');
+  await assert.rejects(acceptInvitation({ id: 'bob', email: 'awa@cabinet.test', email_confirmed_at: '2026-10-24' }, { token: made.token }, d), /INVITATION_ALREADY_USED/);
 });
 
 test('a code invitation expires, can be revoked, and nobody grants more than they hold', async () => {
@@ -58,10 +58,16 @@ test('a code invitation expires, can be revoked, and nobody grants more than the
   const code = await createInvitation(ORG, it, { kind: 'code', role: 'senior' }, d);
   assert.match(code.code, /^[A-Z2-9]{5}-[A-Z2-9]{5}$/);
   await revokeInvitation(ORG, it, code.id, d);
-  await assert.rejects(acceptInvitation({ id: 'u', email: 'u@c.test' }, { code: code.code }, d), /INVITATION_REVOKED/);
+  await assert.rejects(acceptInvitation({ id: 'u', email: 'u@c.test', email_confirmed_at: '2026-10-24' }, { code: code.code }, d), /INVITATION_REVOKED/);
   const late = await createInvitation(ORG, it, { kind: 'code', role: 'senior' }, { ...d, now: () => Date.now() - 8 * 24 * 3600 * 1000 });
-  await assert.rejects(acceptInvitation({ id: 'u', email: 'u@c.test' }, { code: late.code.toLowerCase() }, d), /INVITATION_EXPIRED/);
+  await assert.rejects(acceptInvitation({ id: 'u', email: 'u@c.test', email_confirmed_at: '2026-10-24' }, { code: late.code.toLowerCase() }, d), /INVITATION_EXPIRED/);
   assert.deepEqual((await listInvitations(ORG, it, d)).map(i => i.state), ['expired', 'revoked']);
+});
+
+test('joining or creating a firm needs a confirmed address', async () => {
+  const { d } = world();
+  await assert.rejects(createCabinet({ id: 'u', email: 'u@c.test' }, { firm_name: 'X' }, d), /EMAIL_NOT_VERIFIED/);
+  await assert.rejects(acceptInvitation({ id: 'u', email: 'u@c.test', email_confirmed_at: '2026-10-24', is_anonymous: true }, { code: 'ABCDE-FGHJK' }, d), /EMAIL_NOT_VERIFIED/);
 });
 
 test('my firms: the active memberships of the person, with their names', async () => {

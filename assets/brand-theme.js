@@ -16,7 +16,8 @@
   function safeRemove(store, key) { try { store.removeItem(key); } catch (e) { /* storage unavailable */ } }
 
   function readSession() {
-    try { var s = JSON.parse(safeGet(window.localStorage, SESSION_KEY) || 'null'); return s && s.pilot_token ? s : null; }
+    // A person without a firm yet has a personal session but no pilot token (several firms, « Mes cabinets »).
+    try { var s = JSON.parse(safeGet(window.localStorage, SESSION_KEY) || 'null'); return s && (s.pilot_token || (s.needs_cabinet && s.access_token)) ? s : null; }
     catch (e) { return null; }
   }
   // The setup page (Démarrer) is open without a session, like the login page.
@@ -30,7 +31,7 @@
   var OM = {
     getSession: readSession,
     saveSession: function (s) {
-      if (!s || !s.pilot_token) return;
+      if (!s || !(s.pilot_token || (s.needs_cabinet && s.access_token))) return;
       var before = readSession() || {};
       // Several firms: the firm this session works on, the person's firms (selector), or none yet.
       var org = s.org_id !== undefined ? s.org_id : (before.org_id || null);

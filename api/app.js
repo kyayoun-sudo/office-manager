@@ -382,14 +382,13 @@ export const ROUTES = Object.freeze({
   // Signed-in identity only (a newcomer belongs to no firm yet); inviting needs an administrator of the firm.
   cabinets: {
     GET: open(async (orgId, req) => {
-      requirePilotAccess(req);
+      // The personal session only (a person without a firm never holds the shared pilot token).
       if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
       const c = await import('../lib/cabinet-onboarding.js'), u = await import('../lib/user-auth.js');
       if (req.query?.view === 'invitations') return { invitations: await c.listInvitations(orgId, await u.currentAccount(req, { orgId })) };
       return { cabinets: await c.myCabinets(await u.sessionUser(req)), current: orgId };
     }),
     POST: open(async (orgId, req) => {
-      requirePilotAccess(req);
       if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
       const c = await import('../lib/cabinet-onboarding.js'), u = await import('../lib/user-auth.js');
       const b = req.body || {}, action = String(b.action || '');
