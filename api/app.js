@@ -351,6 +351,32 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'TENDERS_UNAVAILABLE'
   },
+  // Analytical review before the programme (moved from api/analytical-review.js to stay within 12 functions).
+  'analytical-review': {
+    GET: users([...EVERYONE], async (orgId, req) => (await import('../lib/analytical-review.js')).analyticalReviewContext(orgId, String(req.query?.mission_id || ''), req.account)),
+    POST: users([...EVERYONE], async (orgId, req) => {
+      const a = await import('../lib/analytical-review.js'); const body = req.body || {}, action = String(body.action || ''), missionId = String(body.mission_id || ''), account = req.account;
+      if (action === 'choose-manager') return a.chooseAnalyticalManager(orgId, missionId, String(body.candidate_id || body.assignment_id || ''), account, {}, { planned_start: body.planned_start, planned_end: body.planned_end });
+      if (action === 'organize-file') return a.organizeAnalyticalFile(orgId, missionId, String(body.file_id || ''), body.kind === 'review' ? 'review' : 'source', account);
+      if (action === 'import-review') return a.importAnalyticalReview(orgId, missionId, String(body.file_id || ''), account);
+      if (action === 'stage-files') return a.stageAnalyticalFiles(orgId, missionId, Array.isArray(body.file_ids) ? body.file_ids : [], account);
+      if (action === 'delete-file') return a.deleteAnalyticalFile(orgId, missionId, String(body.file_id || ''), account);
+      if (action === 'refresh-lab') return a.refreshEynowaKnowledge(orgId, missionId, account);
+      if (action === 'start') return a.startAnalyticalReview(orgId, req, missionId, account);
+      if (action === 'finalize') return a.finalizeAnalyticalReview(orgId, missionId, account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'ANALYTICAL_REVIEW_UNAVAILABLE'
+  },
+  // Tool gateway diagnostic (moved from api/tool-gateway.js): never returns service URLs or credentials.
+  'tool-gateway': {
+    GET: async () => {
+      const t = await import('../lib/tool-gateway.js');
+      const health = await t.toolGatewayHealth(), config = t.toolGatewayConfig();
+      return { ...health, configured: { ollama: Boolean(config.ollama), doctr: Boolean(config.doctr), gotenberg: Boolean(config.gotenberg), chroma: Boolean(config.chroma), meilisearch: Boolean(config.meilisearch), n8n: Boolean(config.n8n) }, note: 'Diagnostic endpoint only. Existing agents are not wired to the gateway yet.' };
+    },
+    unavailable: 'TOOL_GATEWAY_UNAVAILABLE'
+  },
   'tender-step': { POST: async (orgId, req) => (await import('../lib/tender-watch.js')).tenderStep(orgId, req, req.body || {}), unavailable: 'TENDERS_UNAVAILABLE' },
   'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   // Shadow's background investigations and exams (2026-10-11).

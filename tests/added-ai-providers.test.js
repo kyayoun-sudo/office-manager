@@ -34,7 +34,8 @@ test('added environment keys are detected without exposing credentials; aliases 
   assert.equal(sdkProviderConfig('dual', env, () => .2).provider, 'openai');
 });
 
-test('runtime selection is provider-neutral and shares do not remove configured providers', () => {
+// Deterministic order (Paul, 2026-10-24, d6ffa11): the caller's order first, then the shared catalog; never random.
+test('runtime selection is deterministic and shares do not remove configured providers', () => {
   const support = ['openrouter', 'mistral', 'huggingface', 'groq', 'xai'];
   assert.equal(selectedSupport(env, () => 0), 'openrouter');
   assert.equal(selectedSupport(env, () => .99), 'xai');
@@ -43,7 +44,7 @@ test('runtime selection is provider-neutral and shares do not remove configured 
   const order0 = providerOrder(['openai'], env, () => 0);
   assert.deepEqual(order0, ['openai', 'openrouter', 'mistral', 'huggingface', 'groq', 'xai']);
   const orderLast = providerOrder(['openai'], env, () => .99);
-  assert.deepEqual(orderLast, ['xai', 'openai', 'openrouter', 'mistral', 'huggingface', 'groq']);
+  assert.deepEqual(orderLast, order0, 'the same order whatever the random draw');
   assert.deepEqual(order0.filter(p => support.includes(p)).sort(), support.slice().sort());
   assert.equal(providerOrder(['openai'], {}, () => 0).length, 0);
 });
@@ -66,13 +67,14 @@ test('each chat adapter uses its fixed endpoint and own key, refuses PDFs/web an
     assert.equal(seen.init.headers.Authorization, 'Bearer ' + env[COMPATIBLE_PROVIDERS[p].key]);
     assert.match(seen.body.messages[0].content, /DONNÉE/);
     await assert.rejects(callModel({ provider: p, files: [{ mimeType: 'application/pdf', base64: 'fake' }] }, d), /UNSUPPORTED_CAPABILITY/);
-    await assert.rejects(callModel({ provider: p, webSearch: true }, d), /UNSUPPORTED_CAPABILITY/);
+    // xAI searches the web natively (34a3f4b); the other chat providers do not.
+    if (p !== 'xai') await assert.rejects(callModel({ provider: p, webSearch: true }, d), /UNSUPPORTED_CAPABILITY/);
     await assert.rejects(callModel({ provider: p, input: 'x' }, { env, fetchImpl: async () => Response.json({ choices: [{ finish_reason: 'length', message: { content: 'partial' } }] }) }), /TRUNCATED/);
     await assert.rejects(callModel({ provider: p, input: 'x' }, { env, fetchImpl: async () => Response.json({ error: { message: 'must not disclose' } }, { status: 401 }) }), new RegExp(p.toUpperCase() + '_401$'));
   }
 });
 
-test('text fallback can start at any configured provider and continues until one answers', async () => {
+test('text fallback follows the deterministic order and continues until one answers', async () => {
   const calls = [];
   const run = async ({ provider }) => {
     calls.push(provider);
@@ -81,7 +83,9 @@ test('text fallback can start at any configured provider and continues until one
   };
   const out = await firstAvailable(['openai'], { input: 'x' }, { env, random: () => .99, callModel: run });
   assert.equal(out.provider, 'mistral');
-  assert.deepEqual(calls, ['xai', 'openai', 'openrouter', 'mistral']);
+  // Batches of two are raced (18cb0d9): openai+openrouter fail, then mistral answers.
+  assert.deepEqual(calls.slice(0, 2), ['openai', 'openrouter']);
+  assert.ok(calls.includes('mistral'));
 
   calls.length = 0;
   const research = await deepResearch({ question: 'q' }, { env: { MISTRAL_API_KEY: 'm' }, callModel: run });
@@ -91,7 +95,8 @@ test('text fallback can start at any configured provider and continues until one
   assert.deepEqual(providerOrder(['mistral'], env, () => .2, { files: [{}] }), ['openai', 'openrouter']);
 });
 
-test('legacy agent entry respects explicit choice, falls back and keeps independent high-risk review', async () => {
+// Since ea65577 (Paul, 2026-10-22) every automatic call, high-risk included, goes through the shared pool.
+test('legacy agent entry respects explicit choice and sends automatic calls to the shared pool', async () => {
   const calls = [];
   const d = {
     env,
@@ -105,7 +110,7 @@ test('legacy agent entry respects explicit choice, falls back and keeps independ
   assert.deepEqual(calls, ['mistral']);
   calls.length = 0;
   await runAI({ risk: 'critical', random: () => .2 }, { ...d, env: { ...env, ANTHROPIC_API_KEY: 'a', ANTHROPIC_MODEL: 'claude' } });
-  assert.deepEqual(calls, ['direct']);
+  assert.ok(!calls.includes('direct') && calls.length >= 1);
 });
 
 test('operational SDK preserves server tool execution with every added provider, including xAI', async () => {

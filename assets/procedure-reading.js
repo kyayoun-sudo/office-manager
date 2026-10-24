@@ -15,7 +15,7 @@
   // risks, PBC, populations, reconciliations and tests). Only then load the existing
   // step-by-step Enhanced Auditor workboard. If understanding fails, that script still loads
   // the existing workboard so this layer cannot remove an acquired capability.
-  if (document.getElementById('procedure-workspace')) {
+  if (typeof document !== 'undefined' && document.getElementById('procedure-workspace')) {
     var css = document.createElement('link');
     css.rel = 'stylesheet';
     css.href = '/assets/working-file-agent-panel.css';

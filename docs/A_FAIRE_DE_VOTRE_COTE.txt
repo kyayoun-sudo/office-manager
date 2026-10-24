@@ -4,7 +4,7 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 19 octobre 2026
+Dernière mise à jour : 24 octobre 2026
 Branche concernée : feature/white-label-desktop
 
 
@@ -171,6 +171,23 @@ Ensuite, pour une mission (programme de travail validé, période renseignée da
   Mission → carte « Documents et PBC » → « 1. Préparer les besoins » → « 2. Chercher les pièces déjà reçues »
   → vérifier le destinataire → « 3. Demander les pièces manquantes » → un manager valide l'e-mail dans « À valider ».
   Les besoins viennent du tableau « PBC principale » de chaque SOP : un SOP sans ce tableau est signalé.
+
+
+-----------------------------------------------------------------------------------------------------------------
+9. [ ] REMETTRE À JOUR L'EFFACEMENT DU CABINET DANS SUPABASE                     (2026-10-24, « Repartir de zéro »)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le journal des changements des missions (table office_mission_change_log, fichier db/mission-shared-memory.sql)
+s'écrit tout seul à chaque modification d'une mission. Pendant un « Repartir de zéro » / « fermer et effacer », supprimer
+les missions y écrivait de nouvelles lignes APRÈS que le journal avait été vidé : il restait donc des données du cabinet.
+La fonction d'effacement les supprime maintenant en dernier (vérifié par un test sur une vraie base Postgres).
+
+Comment faire : comme au point 1, avec le fichier  db/purge.sql  (ou relancer  db/INSTALL_TOUT.sql , qui contient aussi
+maintenant  db/mission-shared-memory.sql ). Sans danger si on le relance.
+Vérification :
+    select count(*) from information_schema.tables where table_name = 'office_mission_change_log';   → 1
+    (si 0 : exécuter aussi  db/mission-shared-memory.sql )
+
+À faire pour CHAQUE cabinet installé.
 
 
 -----------------------------------------------------------------------------------------------------------------
