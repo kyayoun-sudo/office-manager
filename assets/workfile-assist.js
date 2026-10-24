@@ -48,6 +48,15 @@
           : ' <button type="button" class="btn ghost" data-a="undo-ask" data-plan="' + esc(x.plan_id) + '">Annuler cet import</button>') : '') + '</li>';
     }).join('') + '</ul><p class="meta">Annuler vide seulement les cases écrites par l’import, si personne ne les a modifiées depuis ; le reste du fichier ne change pas.</p></div>';
   }
+  // Files of the mission that Excel cannot open on Windows (path > 259 characters): a shorter name proposed, renamed on « Oui ».
+  function paths() {
+    var lp = st.paths; if (!lp || (!lp.files.length && !lp.folders.length)) return '';
+    var items = lp.folders.filter(function (x) { return x.proposed; }).map(function (x) { return { k: 'Dossier', name: x.name, to: x.proposed, len: x.length }; }).concat(lp.files.filter(function (x) { return x.proposed; }).map(function (x) { return { k: 'Fichier', name: x.name, to: x.proposed, len: x.length }; }));
+    return '<div class="wf-assist-block"><h3>Chemins trop longs pour Excel</h3><p>Sous Windows, Excel n’ouvre pas un fichier dont le chemin dépasse 259 caractères. ' + lp.files.length + ' fichier(s) de la mission sont dans ce cas' + (lp.folders.length ? ', dont certains dans des dossiers trop profonds' : '') + '. Je propose des noms plus courts (même fichier, rien supprimé) :</p><ul class="wf-agent-list">' +
+      items.slice(0, 12).map(function (x) { return '<li>' + x.k + ' « ' + esc(x.name) + ' » → « ' + esc(x.to) + ' » <span class="meta">(chemin : ' + x.len + ' caractères)</span></li>'; }).join('') + '</ul>' +
+      (items.length > 12 ? '<p class="meta">… et ' + (items.length - 12) + ' autre(s).</p>' : '') +
+      (st.data && st.data.editable ? '<div class="row"><button type="button" class="btn" data-a="shorten">Oui, raccourcis</button></div>' : '') + '</div>';
+  }
   function imports(d) {
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
@@ -132,7 +141,7 @@
   }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? paths() + known(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -151,6 +160,7 @@
         // The step of the SOP is prepared again with what was just read (facts proposed in the sheet, permission asked before writing).
         var agent = OM.workingFileAgent; if (agent && agent.prepareCurrent && !(agent.state && agent.state.busy)) agent.prepareCurrent();
       }
+      if (!st.pathsAsked) { st.pathsAsked = true; api('workfile-long-paths').then(function (lp) { st.paths = lp; render(); }).catch(function () {}); }
       (d.data_sheets || []).forEach(function (x) { if (!st.asked[x.sheet]) { st.asked[x.sheet] = true; propose(x.sheet); } });
       // Once per opening: the pieces nobody read yet are read, identified and renamed without waiting for a click.
       if (d.editable && !st.autoRead && d.pieces.to_read > 0 && !d.pieces.reading) { st.autoRead = true; review(); }
@@ -181,6 +191,13 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
+    if (b.dataset.a === 'shorten') {
+      b.disabled = true; st.say = 'Je raccourcis les noms…'; render();
+      api('workfile-shorten-paths', {}).then(function (r) {
+        st.say = (r.done || []).length + ' nom(s) raccourci(s) et vérifié(s) dans le Drive' + ((r.skipped || []).length ? ', ' + r.skipped.length + ' laissé(s) (modifié entre-temps ou refusé)' : '') + '.';
+        return api('workfile-long-paths').then(function (lp) { st.paths = lp; render(); });
+      }).catch(function (e) { st.say = 'Raccourcissement refusé : ' + (e && e.message || e) + '.'; render(); });
+    }
     if (b.dataset.a === 'undo-ask') { st.undoAsk = b.dataset.plan; render(); }
     if (b.dataset.a === 'undo-no') { st.undoAsk = null; render(); }
     if (b.dataset.a === 'undo-yes') {

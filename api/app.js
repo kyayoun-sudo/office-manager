@@ -277,6 +277,9 @@ export const ROUTES = Object.freeze({
       if (b.action === 'workfile-import-candidates') return (await import('../lib/workfile-import-assist.js')).importCandidates(orgId, m, c, b, a);
       if (b.action === 'workfile-import-inspect') return (await import('../lib/workfile-import-assist.js')).inspectImportFile(orgId, m, c, b, a);
       if (b.action === 'workfile-import-finish') return (await import('../lib/workfile-import-assist.js')).finishImport(orgId, m, c, b, a);
+      // Paths too long for Excel on Windows (2026-10-25): listed with a shorter name proposed, renamed only on « Oui, raccourcis ».
+      if (b.action === 'workfile-long-paths') return (await import('../lib/path-repair.js')).missionLongPaths(orgId, m, c, a);
+      if (b.action === 'workfile-shorten-paths') return (await import('../lib/path-repair.js')).shortenMissionPaths(orgId, m, c, a, b);
       if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);

@@ -728,6 +728,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   proposées dans 02_PROGRAMME, avec « remplace « À décider » », écrites sur « Oui, remplis » ; feuille de données : son PROFIL (titre,
   consignes, colonnes attendues) envoyé à l'IA, qui dit si la pièce convient à CETTE feuille ; non cochée si l'IA signale un problème,
   si elle dit « ne convient pas », ou si la pièce remplit moins de 40 % des colonnes. Qui fait quoi : `claude/CARTE_WORKING_FILE_ET_ECRAN.md`.
+- CHEMINS QU'EXCEL PEUT OUVRIR (Paul, 2026-10-25 : « impossible d'ouvrir le fichier, chemin > 259 caractères ; le rangement n'est donc
+  pas intelligent ») : `lib/path-budget.js` — tout nom créé par l'application est ajusté pour que le chemin complet sous Google Drive pour
+  ordinateur (« G:\Drive partagés\<Drive>\…\fichier ») reste ≤ 240 caractères (`fitName` : code, années, version et extension gardés) :
+  working papers copiés d'un modèle (`cycle-workpapers`), pièces renommées (`renamePieces`), rangement de l'Orpailleur (`action-executor`,
+  nom raccourci signalé), dossier de mission ≤ 60 caractères (`missionFolderName`, avant 160). Existant : `lib/path-repair.js` (actions
+  `workfile-long-paths` / `workfile-shorten-paths`) liste les fichiers trop longs de la mission et les dossiers à nom long qui les
+  allongent, propose des noms plus courts, renomme seulement sur « Oui, raccourcis » (même id, jamais par-dessus un autre nom, vérifié,
+  audit `PATHS_SHORTENED`). Panneau de l'agent : bloc « Chemins trop longs pour Excel ». Test : `tests/path-budget.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
