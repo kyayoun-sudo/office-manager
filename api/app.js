@@ -271,6 +271,10 @@ export const ROUTES = Object.freeze({
       // The map of the working file (2026-10-24): roles of sheets and columns read by code, never guessed; read only.
       if (b.action === 'workfile-map') return (await import('../lib/workfile-map-view.js')).workfileMapView(orgId, m, c, a, { sheet: b.sheet ? String(b.sheet) : null, offset: b.offset });
       if (b.action === 'workfile-cells') return (await import('../lib/workfile-map-view.js')).writeWorkfileCells(orgId, m, c, a, b);
+      // The agent that helps fill (2026-10-24): what the application knows (proposed, written on « Oui »), the received pieces (reviewed, renamed).
+      if (b.action === 'workfile-assist') return (await import('../lib/workfile-assist.js')).workfileAssist(orgId, m, c, a);
+      if (b.action === 'workfile-fill-known') return (await import('../lib/workfile-assist.js')).fillKnown(orgId, m, c, a, b);
+      if (b.action === 'workfile-review-pieces') return (await import('../lib/workfile-assist.js')).reviewPieces(orgId, req, m, c, a);
       if (b.action === 'steps') return (await import('../lib/step-runner.js')).stepsView(orgId, m, c, a);
       if (b.action === 'step-plan') return (await import('../lib/step-runner.js')).planStep(orgId, m, c, b, a);
       if (b.action === 'step-run') return (await import('../lib/step-runner.js')).runStep(orgId, m, c, b, a);

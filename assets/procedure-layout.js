@@ -9,6 +9,10 @@
   'use strict';
   var main = document.querySelector('main.main');
   if (!main || !document.getElementById('procedure-workspace')) return;
+  // Proposals sent before the working-file screen is ready are kept, so none is lost (the screen reads them when it starts).
+  window.__wfProposals = window.__wfProposals || {};
+  document.addEventListener('wf-proposals', function (e) { var d = e.detail || {}; window.__wfProposals[d.channel || 'step'] = d.cells || []; });
+  document.addEventListener('wf-written', function () { window.__wfProposals = {}; });
   var link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/assets/procedure-layout.css'; document.head.appendChild(link);
 
   var layout = document.createElement('section'); layout.id = 'wf-layout'; layout.setAttribute('aria-label', 'Procédure avec l’agent et le working file');
@@ -48,6 +52,8 @@
   }
 
   arrange();
+  // The agent that helps (what it already knows, the received pieces): at the top of the left column.
+  var assist = document.createElement('script'); assist.src = '/assets/workfile-assist.js'; assist.defer = true; document.head.appendChild(assist);
   // The agent's board and the working-file board are added by their own scripts a moment later: place them when they appear.
   var obs = new MutationObserver(function () { arrange(); });
   obs.observe(main, { childList: true, subtree: true });

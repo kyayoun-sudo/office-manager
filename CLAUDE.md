@@ -680,6 +680,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   une ligne de compte seulement. « Valider et écrire » = écrit, relu, confirmé (`review-workpaper`), puis étape suivante. L'agent ne vise que
   les cases que la carte permet (`mayWrite` dans `prepareDocumentWork` : jamais jugement / clé / calcul). Les feuilles écrites par
   l'application (`<CODE>_D…`, `<CODE>_E…`) = rôle `agent`, montrées à part (« Préparations de l'agent »), plus en doublon dans le parcours.
+- L'AGENT QUI AIDE (Paul, 2026-10-24 : « il sait qui prépare, pourquoi il ne remplit pas ? j'ai déposé les pièces, il devait les
+  comprendre, les renommer ; il doit demander la permission avant de remplir ») : la carte lit les CASES D'IDENTITÉ au-dessus des
+  tableaux (`headerFields` : « Préparé par / date », « Mission / Engagement ID », « Entité auditée », « Cabinet », « Exercice » ;
+  « Revu par » et « Conclusion de l'auditeur » jamais à l'agent, `mayWrite` les refuse). `lib/workfile-assist.js` (actions
+  `workfile-assist`, `workfile-fill-known`, `workfile-review-pieces` de la route `procedure`) : ce que l'application SAIT (préparateur
+  + date, mission, client, période, cabinet) proposé avec sa source, en pointillés dans la feuille, écrit seulement sur « Oui, remplis »
+  (valeurs recalculées par le serveur, cases vides seulement, relu, audit `WORKFILE_KNOWN_FACTS_WRITTEN`) ; les pièces de PIECES_RECUES
+  avec ce que les agents en ont compris ; celles non lues sont lues dès l'ouverture (une fois), identifiées et renommées, puis l'étape
+  du SOP est préparée de nouveau avec elles. Panneau `assets/workfile-assist.js` en haut à gauche. Le renommage des pièces d'après leur
+  contenu (`renamePieces`) n'était plus appelé depuis le classement par l'Orpailleur : rétabli dans le dépôt `pieces` (avant les
+  propositions de classement). Test : `tests/workfile-assist.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

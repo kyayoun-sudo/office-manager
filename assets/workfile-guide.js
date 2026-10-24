@@ -22,14 +22,19 @@
   function mount(board, opts) {
     css();
     document.documentElement.dataset.workfileGuide = 'on'; // the agent panel then shows its proposals here, not twice
-    var st = { map: null, view: null, filled: {}, editable: false, sheet: null, offset: 0, busy: false, say: '', proposals: {} };
-    // (2026-10-24) What the agent proposes to write is shown in the sheet itself, before anything is written.
+    var st = { map: null, view: null, filled: {}, editable: false, sheet: null, offset: 0, busy: false, say: '', proposals: {}, propBy: {} };
+    // (2026-10-24) What the agent proposes to write is shown in the sheet itself, before anything is written. Two sources: the step
+    // of the SOP (facts read in the pieces) and what the application already knows (who prepares, the mission…): kept apart, shown together.
     document.addEventListener('wf-proposals', function (e) {
-      st.proposals = {}; ((e.detail && e.detail.cells) || []).forEach(function (c) { st.proposals[c.sheet + '!' + c.address] = c; });
-      var first = (e.detail && e.detail.cells || [])[0];
+      var ch = (e.detail && e.detail.channel) || 'step', cells = (e.detail && e.detail.cells) || [];
+      st.propBy[ch] = {}; cells.forEach(function (c) { st.propBy[ch][c.sheet + '!' + c.address] = c; });
+      st.proposals = {}; Object.keys(st.propBy).forEach(function (k) { Object.assign(st.proposals, st.propBy[k]); });
+      var first = ch === 'step' ? cells[0] : null;
       if (first && first.sheet !== st.sheet) load(first.sheet, 0); else render();
     });
-    document.addEventListener('wf-written', function () { st.proposals = {}; if (st.sheet) load(st.sheet, st.offset); });
+    document.addEventListener('wf-written', function () { st.propBy = {}; st.proposals = {}; if (st.sheet) load(st.sheet, st.offset); });
+    var early = window.__wfProposals || {};
+    Object.keys(early).forEach(function (ch) { st.propBy[ch] = {}; (early[ch] || []).forEach(function (c) { st.propBy[ch][c.sheet + '!' + c.address] = c; Object.assign(st.proposals, st.propBy[ch]); }); });
     function proposal(addr) { return st.proposals[st.sheet + '!' + addr] || null; }
     function api(action, extra) {
       return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -76,6 +81,20 @@
       }
       return '<label class="wfg-f' + (col.role === 'judgment' ? ' wfg-judg' : ' wfg-fact') + '"><span class="wfg-h">' + esc(col.header) + ' <em>' + esc(COLROLE[col.role]) + '</em></span>' +
         '<input type="text" data-cell="' + esc(addr) + '" data-expected="' + esc(v) + '" value="' + esc(v) + '"' + dis + '></label>';
+    }
+
+    // The identity fields of the sheet (« Préparé par / date », « Mission »…): proposed by the agent, typed by the person, or never
+    // the agent's (« Revu par » = the reviewer signs in the review; the auditor's conclusion = the person's).
+    function fieldsBlock(v) {
+      var fs = v.fields || []; if (!fs.length) return '';
+      return '<div class="wfg-fields">' + fs.map(function (f) {
+        var p = !f.value ? proposal(f.address) : null;
+        if (f.value) return '<div class="wfg-f wfg-ro"><span class="wfg-h">' + esc(f.label) + '</span><span class="wfg-v">' + esc(f.value) + '</span></div>';
+        if (p) return '<div class="wfg-f wfg-prop"><span class="wfg-h">' + esc(f.label) + ' <em>proposé par l’agent</em></span><span class="wfg-v">' + esc(p.value) + '</span><span class="wfg-src">' + esc(p.source || '') + '</span></div>';
+        if (f.kind === 'reviewer') return '<div class="wfg-f wfg-ro"><span class="wfg-h">' + esc(f.label) + ' <em>signé par le réviseur, dans la revue</em></span><span class="wfg-v">—</span></div>';
+        return '<label class="wfg-f ' + (f.kind === 'conclusion' ? 'wfg-judg' : 'wfg-fact') + '"><span class="wfg-h">' + esc(f.label) + ' <em>' + (f.kind === 'conclusion' ? 'votre conclusion' : 'à remplir') + '</em></span>' +
+          '<input type="text" data-cell="' + esc(f.address) + '" data-expected="" value=""' + (st.editable ? '' : ' disabled') + '></label>';
+      }).join('') + (st.editable && fs.some(function (f) { return !f.value && f.kind !== 'reviewer' && !proposal(f.address); }) ? '<div class="wfg-row"><button type="button" class="btn ghost" data-save="fields">Enregistrer ces cases</button></div>' : '') + '</div>';
     }
 
     function testScreen(v) {
@@ -149,6 +168,7 @@
       if (ins.length) html += '<p class="wfg-instr">« ' + esc(ins[0].text) + ' »</p>';
       if (ins.length > 1) html += '<details class="wfg-more"><summary>Consignes de la feuille</summary>' + ins.slice(1).map(function (i) { return '<p class="wfg-instr">« ' + esc(i.text) + ' »</p>'; }).join('') + '</details>';
       html += '<p class="wfg-built">' + esc(built) + '</p>';
+      html += fieldsBlock(v);
       if (v.role === 'guide') html += '<ol class="wfg-order">' + sheetsInOrder().map(function (s) { return '<li><button type="button" class="wfg-link" data-go="' + esc(s.name) + '">' + esc(s.name) + '</button> <span class="wfg-meta">' + esc(ROLE[s.role] || s.role) + '</span></li>'; }).join('') + '</ol>';
       else if (t && v.role === 'test') html += testScreen(v);
       else if (t) html += tableScreen(v);
@@ -198,7 +218,7 @@
         b.parentNode.querySelectorAll('.wfg-opt').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); o.dataset.picked = ''; });
         b.setAttribute('aria-pressed', 'true'); b.dataset.picked = '1'; return;
       }
-      if (b.dataset.save) return void save(b.dataset.save === 'table' ? board : b.closest('.wfg-item'));
+      if (b.dataset.save) return void save(b.dataset.save === 'table' ? board : (b.dataset.save === 'fields' ? b.closest('.wfg-fields') : b.closest('.wfg-item')));
       if (b.dataset.chip != null) {
         var c = chips(st.view)[Number(b.dataset.chip)]; if (!c) return;
         if (c.go) return void load(c.go, 0);

@@ -15,3 +15,9 @@
 #wf-older>summary{cursor:pointer}
 #wf-older>.card{margin-top:12px}
 @media(max-width:1100px){#wf-layout{grid-template-columns:1fr}}
+.wf-assist h2{margin:0 0 6px}
+.wf-assist-block{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.wf-assist-block h3{margin:0 0 6px;font-size:15px}
+.wf-assist-block .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.wf-assist-busy{font-weight:600}
+.wf-assist .link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer}
