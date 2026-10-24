@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mes cabinets</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+.cab-wrap{min-height:100vh;display:flex;justify-content:center;padding:32px 16px;box-sizing:border-box;background:var(--nav)}
+.cab-card{width:100%;max-width:560px;background:var(--surface);border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;gap:20px;align-self:flex-start}
+.cab-card h1{font-size:22px;margin:0}
+.cab-card h2{font-size:16px;margin:0 0 8px}
+.cab-card section{display:flex;flex-direction:column;gap:10px}
+.cab-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.cab-list button{width:100%;text-align:left;display:flex;justify-content:space-between;gap:12px}
+.cab-list small{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row > *{flex:1;min-width:140px}
+.secret{font-family:ui-monospace,monospace;word-break:break-all;background:var(--surface-2);padding:10px;border-radius:8px}
+.status:empty{display:none}
+.muted{color:var(--muted);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--surface-2);text-align:left}
+</style>
+</head>
+<body>
+<div class="cab-wrap">
+  <main class="cab-card">
+    <h1>Mes cabinets</h1>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <section id="mine-box" hidden>
+      <h2>Choisir mon cabinet</h2>
+      <ul class="cab-list" id="mine"></ul>
+    </section>
+
+    <section id="join-box">
+      <h2>Rejoindre un cabinet</h2>
+      <p class="muted">Avec le code donné par votre cabinet, ou le lien reçu par e-mail.</p>
+      <div class="row"><input id="code" placeholder="Code (ex. ABCDE-FGHJK)" autocomplete="off" aria-label="Code d'invitation"><button type="button" id="join">Rejoindre</button></div>
+    </section>
+
+    <section>
+      <h2>Créer un cabinet</h2>
+      <p class="muted">Vous en devenez le propriétaire. Ensuite : Google, le Drive du cabinet, les agents (« Démarrer »).</p>
+      <input id="firm" placeholder="Nom du cabinet" maxlength="120" aria-label="Nom du cabinet">
+      <div class="row"><select id="tz" aria-label="Fuseau horaire"></select><button type="button" id="create">Créer le cabinet</button></div>
+    </section>
+
+    <section id="invite-box" hidden>
+      <h2>Inviter dans <span id="current-name">ce cabinet</span></h2>
+      <div class="row">
+        <select id="kind" aria-label="Type d'invitation"><option value="link">Lien pour une adresse e-mail</option><option value="code">Code à partager</option></select>
+        <select id="role" aria-label="Rôle"></select>
+      </div>
+      <input id="email" type="email" placeholder="Adresse e-mail de la personne" aria-label="Adresse e-mail">
+      <button type="button" id="invite">Créer l'invitation</button>
+      <div id="made" hidden>
+        <p class="muted" id="made-help"></p>
+        <div class="secret" id="made-secret"></div>
+        <div class="row"><button type="button" id="copy">Copier</button><a id="mail" class="btn" hidden>Envoyer par e-mail</a></div>
+      </div>
+      <table id="invites" hidden><thead><tr><th>Invitation</th><th>Rôle</th><th>État</th><th></th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <div class="row"><a href="/accueil.html" id="home" hidden>Aller à l'accueil</a><button type="button" class="link-btn" id="logout">Se déconnecter</button></div>
+  </main>
+</div>
+<script src="/assets/brand-theme.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var OM = window.OfficeManager;
+  var ROLES = { partner: 'Associé', quality_reviewer: 'Revue qualité (EQR)', bdm: 'Business Development Manager', manager: 'Manager', supervisor: 'Superviseur', senior: 'Senior', auditor: 'Auditeur', secretary: 'Secrétariat / administration', it_admin: 'Responsable informatique', owner: 'Propriétaire du cabinet' };
+  var MESSAGES = { INVITATION_NOT_FOUND: 'Ce code ou ce lien n’existe pas.', INVITATION_EXPIRED: 'Cette invitation a expiré : demandez-en une nouvelle.', INVITATION_REVOKED: 'Cette invitation a été annulée.',
+    INVITATION_ALREADY_USED: 'Cette invitation a déjà servi.', INVITATION_FOR_ANOTHER_ADDRESS: 'Ce lien a été envoyé à une autre adresse e-mail que la vôtre.', EMAIL_ALREADY_IN_CABINET: 'Cette adresse a déjà un compte dans ce cabinet.',
+    CABINET_NAME_REQUIRED: 'Indiquez le nom du cabinet.', ROLE_NOT_GRANTABLE: 'Vous ne pouvez pas donner ce rôle.', CABINETS_NOT_ENABLED: 'La gestion de plusieurs cabinets n’est pas activée sur cette installation.' };
+  function say(text, bad) { $('status').textContent = text || ''; $('status').classList.toggle('error', Boolean(bad)); }
+  function fail(e) { say(MESSAGES[e.message] || ('Erreur : ' + e.message), true); }
+  var session = OM.getSession();
+  if (!session) { location.replace('/login.html?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+
+  var zones = ['Africa/Abidjan', 'Africa/Dakar', 'Africa/Lagos', 'Africa/Douala', 'Africa/Kinshasa', 'Africa/Casablanca', 'Africa/Tunis', 'Europe/Paris', 'Europe/London', 'America/Montreal', 'UTC'];
+  var mineTz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
+  if (zones.indexOf(mineTz) < 0) zones.unshift(mineTz);
+  zones.forEach(function (z) { var o = document.createElement('option'); o.value = z; o.textContent = z.replace('_', ' '); if (z === mineTz) o.selected = true; $('tz').appendChild(o); });
+
+  function enterFirm(orgId) { return OM.switchCabinet(orgId); }
+  function load() {
+    return OM.api('/api/app?route=cabinets').then(function (d) {
+      var list = d.cabinets || [], cur = (OM.getSession() || {}).org_id;
+      $('mine').textContent = ''; $('mine-box').hidden = !list.length;
+      list.forEach(function (c) {
+        var li = document.createElement('li'), b = document.createElement('button');
+        b.type = 'button'; b.className = c.org_id === cur ? 'primary' : '';
+        var n = document.createElement('span'); n.textContent = c.name; var r = document.createElement('small'); r.textContent = (ROLES[c.role] || c.role) + (c.org_id === cur ? ' · en cours' : '');
+        b.appendChild(n); b.appendChild(r); b.addEventListener('click', function () { enterFirm(c.org_id); });
+        li.appendChild(b); $('mine').appendChild(li);
+      });
+      var here = list.filter(function (c) { return c.org_id === cur; })[0];
+      $('home').hidden = !here;
+      var admin = here && ['owner', 'partner', 'it_admin'].indexOf(here.role) >= 0;
+      $('invite-box').hidden = !admin;
+      if (admin) { $('current-name').textContent = here.name; fillRoles(here.role); loadInvites(); }
+    }).catch(fail);
+  }
+  function fillRoles(myRole) {
+    $('role').textContent = '';
+    Object.keys(ROLES).forEach(function (k) {
+      if (k === 'owner' && myRole !== 'owner') return;
+      if (myRole === 'it_admin' && (k === 'partner' || k === 'owner')) return;
+      var o = document.createElement('option'); o.value = k; o.textContent = ROLES[k]; if (k === 'auditor') o.selected = true; $('role').appendChild(o);
+    });
+  }
+  var STATES = { open: 'En attente', used: 'Utilisée', revoked: 'Annulée', expired: 'Expirée' };
+  function loadInvites() {
+    OM.api('/api/app?route=cabinets&view=invitations').then(function (d) {
+      var rows = d.invitations || [], tb = $('invites').querySelector('tbody'); tb.textContent = ''; $('invites').hidden = !rows.length;
+      rows.forEach(function (r) {
+        var tr = document.createElement('tr');
+        [r.kind === 'link' ? r.email : 'Code', ROLES[r.role] || r.role, STATES[r.state] || r.state].forEach(function (t) { var td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+        var td = document.createElement('td');
+        if (r.state === 'open') { var x = document.createElement('button'); x.type = 'button'; x.className = 'link-btn'; x.textContent = 'Annuler'; x.addEventListener('click', function () { OM.api('/api/app?route=cabinets', { method: 'POST', body: JSON.stringify({ action: 'revoke', id: r.id }) }).then(loadInvites).catch(fail); }); td.appendChild(x); }
+        tr.appendChild(td); tb.appendChild(tr);
+      });
+    }).catch(function () { /* list unavailable: invitations still work */ });
+  }
+
+  $('kind').addEventListener('change', function () { $('email').hidden = $('kind').value !== 'link'; });
+  $('create').addEventListener('click', function () {
+    var name = $('firm').value.trim(); if (!name) { say(MESSAGES.CABINET_NAME_REQUIRED, true); return; }
+    $('create').disabled = true; say('Création du cabinet…');
+    OM.api('/api/app?route=cabinets', { method: 'POST', body: JSON.stringify({ action: 'create', firm_name: name, timezone: $('tz').value, display_name: (session.user && session.user.display_name) || '' }) })
+      .then(function (r) { say('Cabinet « ' + r.name + ' » prêt. Passons à sa mise en route.'); return OM.switchCabinet(r.org_id, '/demarrer.html'); })
+      .catch(function (e) { $('create').disabled = false; fail(e); });
+  });
+  function join(body) {
+    say('Vérification de l’invitation…');
+    return OM.api('/api/app?route=cabinets', { method: 'POST', body: JSON.stringify(Object.assign({ action: 'join', display_name: (session.user && session.user.display_name) || '' }, body)) })
+      .then(function (r) { say('Bienvenue dans le cabinet.'); return enterFirm(r.org_id); }).catch(fail);
+  }
+  $('join').addEventListener('click', function () { var c = $('code').value.trim(); if (c) join({ code: c }); });
+  $('invite').addEventListener('click', function () {
+    var kind = $('kind').value, email = $('email').value.trim();
+    if (kind === 'link' && !email) { say('Indiquez l’adresse e-mail de la personne.', true); return; }
+    OM.api('/api/app?route=cabinets', { method: 'POST', body: JSON.stringify({ action: 'invite', kind: kind, email: email, role: $('role').value }) }).then(function (r) {
+      var firm = $('current-name').textContent, until = new Date(r.expires_at).toLocaleDateString('fr-FR');
+      var link = r.token ? location.origin + '/cabinets.html?invitation=' + encodeURIComponent(r.token) : null;
+      $('made').hidden = false;
+      $('made-secret').textContent = link || r.code;
+      $('made-help').textContent = (link ? 'Lien personnel pour ' + r.email : 'Code à donner à la personne') + ', valable une fois, jusqu’au ' + until + '. Il ne sera plus affiché ensuite.';
+      var m = $('mail'); m.hidden = !link;
+      if (link) m.href = 'mailto:' + encodeURIComponent(r.email) + '?subject=' + encodeURIComponent('Invitation : ' + firm) + '&body=' + encodeURIComponent('Bonjour,\n\nVous êtes invité(e) à rejoindre « ' + firm + ' » sur Office Manager.\nCréez votre compte ou connectez-vous avec cette adresse, puis ouvrez ce lien :\n' + link + '\n\nValable jusqu’au ' + until + '.');
+      loadInvites();
+    }).catch(fail);
+  });
+  $('copy').addEventListener('click', function () { try { navigator.clipboard.writeText($('made-secret').textContent); say('Copié.'); } catch (e) { say('Sélectionnez le texte pour le copier.'); } });
+  $('logout').addEventListener('click', function () { OM.logout(); });
+
+  var invitation = new URLSearchParams(location.search).get('invitation');
+  if (invitation) { history.replaceState(null, '', '/cabinets.html'); join({ token: invitation }); } else load();
+})();
+</script>
+</body>
+</html>

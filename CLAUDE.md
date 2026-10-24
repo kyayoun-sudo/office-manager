@@ -644,7 +644,25 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   supplémentaires (recalcul, comparaison N/N-1, tirage depuis le résultat), report automatique dans les colonnes du test.
 
 ## Plusieurs cabinets dans une installation (Paul, 2026-10-24 : « à la première connexion on doit pouvoir connaître l'entreprise ; si on n'a pas de cabinet on doit pouvoir créer des cabinets »)
-**Décision qui REMPLACE « un cabinet = une installation » (§52 Private Tenant, essai à 4 cabinets) — EN CONCEPTION, rien n'est encore codé.**
+**Décision qui REMPLACE « un cabinet = une installation » (§52 Private Tenant, essai à 4 cabinets). CONSTRUIT le 2026-10-24 (branche
+`feature/multi-cabinet`), derrière l'interrupteur `OFFICE_MANAGER_MULTI_CABINET=on` : sans lui, tout marche exactement comme avant.**
+- **Comment c'est fait (rien changé à la logique métier)** : `lib/firm-context.js` fixe le cabinet d'une requête UNE fois
+  (`resolveRequestOrg` : en-tête `x-office-manager-org` accepté seulement pour un membre actif du cabinet ou un appel interne signé
+  HMAC — `internalHeaders`, ajouté par `fireInternal` ; sans en-tête = `DEFAULT_ORG_ID`, membre exigé aussi : le jeton pilote partagé
+  n'ouvre plus rien seul) et le garde dans un `AsyncLocalStorage` (`runInFirm`, `currentOrgId`). Les fonctions métier gardent leur
+  signature : `firmDriveId()`, `connectedGoogle()`… lisent l'état DU cabinet courant (`lib/google-connection.js` : connexion, jeton
+  Google et Drive rangés par cabinet ; leçons de Shadow et dossier de revue de l'Orpailleur aussi). `serverCredentialsAllowed()` :
+  compte de service, pont Google, `TATY_*`, `MASTER_SHEET_ID`, boîte `AGENT_MAIL_*`, `PBC_INBOX_FOLDER_ID`, `OFFICE_MANAGER_SCAN_ROOT_ID`,
+  ancien passage = cabinet pilote SEULEMENT. Code propriétaire, `bootstrap-owner`, `claim-owner`, `firm-restart`, `api/owner.js` = pilote
+  seulement (`PILOT_FIRM_ONLY`). Retour de Google : le cabinet de l'état signé. Planificateur : un appel passe sur chaque cabinet.
+  Session : `currentAccount` par (jeton, cabinet) ; connexion = cabinet demandé, sinon le premier de la personne, sinon `needs_cabinet`.
+- **Écrans** : `cabinets.html` (choisir, créer — nom + fuseau → `demarrer.html` —, rejoindre par code / lien, inviter et annuler pour
+  propriétaire / associé / informatique) ; sélecteur dans le menu ⚙ ; inscription = adresse confirmée par l'e-mail de Supabase, aucun
+  cabinet (jamais le pilote). Route `cabinets` de `api/app.js` ; `lib/cabinet-onboarding.js` ; `db/cabinet-onboarding.sql` (dans
+  `INSTALL_TOUT.sql` : `office_create_cabinet` idempotente par personne + nom, `office_invitations` hachées, usage unique, 7 jours).
+  Tests : `tests/firm-context.test.js`, `tests/cabinet-onboarding*.test.js`.
+- **Reste** : envoi automatique du lien d'invitation par e-mail (aujourd'hui : copier ou « Envoyer par e-mail » = messagerie de la
+  personne) ; plafonds d'IA par cabinet (clés d'IA communes) ; application bureau (`OFFICE_LOCAL_ORG_ID`, un cabinet).
 - Une installation (Supabase + Vercel) sert plusieurs cabinets, séparés par `org_id`. Le cabinet d'une requête vient de la
   session (cabinet choisi, appartenance vérifiée côté serveur à CHAQUE requête), jamais d'un identifiant envoyé par le navigateur
   seul, ni de `DEFAULT_ORG_ID` (18 fichiers, 34 endroits à reprendre).

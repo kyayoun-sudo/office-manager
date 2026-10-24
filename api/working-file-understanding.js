@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { requirePilotAccess } from '../lib/auth.js';
+import { resolveRequestOrg } from '../lib/firm-context.js';
 import { currentAccount, logAccess } from '../lib/user-auth.js';
 import { requireMissionAccess } from '../lib/mission-access.js';
 import { procedureView } from '../lib/procedure-work.js';
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
   try {
     requirePilotAccess(req);
     if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-    const orgId = process.env.DEFAULT_ORG_ID;
+    const orgId = await resolveRequestOrg(req);
     if (!orgId) throw fail('DEFAULT_ORG_ID_MISSING', 500);
     const account = await currentAccount(req);
     const input = req.method === 'GET' ? req.query : (req.body || {});

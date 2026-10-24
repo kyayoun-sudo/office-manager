@@ -235,7 +235,10 @@
     e.preventDefault();
     say('signup-status', 'Création…');
     post('signup', { display_name: $('s-name').value.trim(), email: $('s-email').value.trim(), password: $('s-pw').value })
-      .then(function () {
+      .then(function (r) {
+        // Several firms (2026-10-24): an identity first; then create a firm or join one by invitation (Mes cabinets).
+        if (r && r.session && r.session.needs_cabinet) { enter(r.session); return; }
+        if (r && r.confirmation_required) { say('signup-status', 'Compte créé. Ouvrez l’e-mail de confirmation envoyé à ' + r.email + ', puis connectez-vous : vous pourrez créer votre cabinet ou rejoindre celui qui vous a invité.'); return; }
         say('signup-status', 'Compte créé. Il sera actif dès que le propriétaire vous aura donné un rôle. Vous êtes le propriétaire ? Cliquez sur « Je suis le propriétaire du cabinet ».');
         $('o-email').value = $('s-email').value.trim();
       })
