@@ -672,6 +672,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   choisie s'ouvre aussi dans « Mon fichier Excel ». Écriture (`writeWorkfileCells`) : seulement ce que la PERSONNE saisit, préparateur
   seulement, pas en revue, cases du modèle vides ou inchangées, jamais formule / clé, valeur de liste contrôlée, version lue
   (`expectedModifiedTime`), relu, audit `WORKFILE_CELLS_WRITTEN`. L'agent ne propose pas encore dans ces champs (étape suivante).
+- DEUX COLONNES (Paul, 2026-10-24 : « à gauche ce que le SOP dit, à droite le working file par feuille ; je veux pas 2 fois les mêmes
+  choses ; l'agent pose la question, je réponds ou il propose et remplit tout ») : `assets/procedure-layout.js` + `.css` DÉPLACENT les blocs
+  existants (rien supprimé) — gauche : SOP, travail de l'agent, pièces (« Ce que demande ce test »), chat ; droite : le working file
+  (`workfile-guide.js`) et ses boutons (actualiser, importer, modèle) ; étapes / population / échantillon / éléments / walkthrough repliés dans
+  « Vues détaillées ». Les propositions de l'agent (`wf-proposals`) s'affichent en pointillés DANS la feuille avec leur source ; à gauche,
+  une ligne de compte seulement. « Valider et écrire » = écrit, relu, confirmé (`review-workpaper`), puis étape suivante. L'agent ne vise que
+  les cases que la carte permet (`mayWrite` dans `prepareDocumentWork` : jamais jugement / clé / calcul). Les feuilles écrites par
+  l'application (`<CODE>_D…`, `<CODE>_E…`) = rôle `agent`, montrées à part (« Préparations de l'agent »), plus en doublon dans le parcours.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

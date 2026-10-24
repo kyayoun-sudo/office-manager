@@ -8,7 +8,7 @@
   'use strict';
   var OM = window.OfficeManager;
   var ROLE = { guide: 'Parcours', synthesis: 'Synthèse', programme: 'Programme', risks: 'Risques', lead: 'Lead', data: 'Données à déposer',
-    reconciliation: 'Contrôles', test: 'Test', anomalies: 'Anomalies', pbc: 'Pièces', review: 'Revue', signoff: 'Signatures', other: 'Feuille' };
+    reconciliation: 'Contrôles', test: 'Test', anomalies: 'Anomalies', pbc: 'Pièces', review: 'Revue', signoff: 'Signatures', agent: 'Préparation de l’agent', other: 'Feuille' };
   var COLROLE = { calc: 'calculé', result: 'résultat', fixed: 'du modèle', key: 'clé', fact: 'à remplir', free: 'à remplir', judgment: 'votre décision' };
 
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
@@ -21,7 +21,16 @@
 
   function mount(board, opts) {
     css();
-    var st = { map: null, view: null, filled: {}, editable: false, sheet: null, offset: 0, busy: false, say: '' };
+    document.documentElement.dataset.workfileGuide = 'on'; // the agent panel then shows its proposals here, not twice
+    var st = { map: null, view: null, filled: {}, editable: false, sheet: null, offset: 0, busy: false, say: '', proposals: {} };
+    // (2026-10-24) What the agent proposes to write is shown in the sheet itself, before anything is written.
+    document.addEventListener('wf-proposals', function (e) {
+      st.proposals = {}; ((e.detail && e.detail.cells) || []).forEach(function (c) { st.proposals[c.sheet + '!' + c.address] = c; });
+      var first = (e.detail && e.detail.cells || [])[0];
+      if (first && first.sheet !== st.sheet) load(first.sheet, 0); else render();
+    });
+    document.addEventListener('wf-written', function () { st.proposals = {}; if (st.sheet) load(st.sheet, st.offset); });
+    function proposal(addr) { return st.proposals[st.sheet + '!' + addr] || null; }
     function api(action, extra) {
       return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(Object.assign({ mission_id: opts.missionId, code: opts.code, action: action }, extra || {})) });
@@ -58,7 +67,9 @@
         var shown = value == null ? 'calculé dans Excel' : (v === '' ? '—' : v);
         return '<div class="wfg-f wfg-ro"><span class="wfg-h">' + esc(col.header) + ' <em>' + esc(COLROLE[col.role]) + '</em></span><span class="wfg-v' + (value == null ? ' wfg-calc' : '') + '">' + esc(shown) + '</span></div>';
       }
-      var dis = st.editable ? '' : ' disabled';
+      var dis = st.editable ? '' : ' disabled', p = !v ? proposal(addr) : null;
+      if (p) return '<div class="wfg-f wfg-prop"><span class="wfg-h">' + esc(col.header) + ' <em>proposé par l’agent</em></span><span class="wfg-v">' + esc(p.value) + '</span>' +
+        (p.source || p.quote ? '<span class="wfg-src">' + esc(p.source || '') + (p.quote ? ' — « ' + esc(String(p.quote).slice(0, 160)) + ' »' : '') + '</span>' : '') + '</div>';
       if (col.role === 'judgment' && col.list && col.list.length) {
         return '<div class="wfg-f wfg-judg"><span class="wfg-h">' + esc(col.header) + ' <em>votre décision</em></span><div class="wfg-opts" role="group" aria-label="' + esc(col.header) + '">' +
           col.list.map(function (o) { return '<button type="button" class="wfg-opt" data-cell="' + esc(addr) + '" data-expected="' + esc(v) + '" data-value="' + esc(o) + '" aria-pressed="' + (o === v ? 'true' : 'false') + '"' + dis + '>' + esc(o) + '</button>'; }).join('') + '</div></div>';
@@ -99,7 +110,8 @@
         '<div class="wfg-wrap"><table class="wfg-table"><thead><tr>' + t.columns.map(function (c) { return '<th scope="col">' + esc(c.header) + '<small>' + esc(COLROLE[c.role] || '') + '</small></th>'; }).join('') + '</tr></thead><tbody>' +
         show.map(function (r) {
           return '<tr data-row="' + r.row + '">' + t.columns.map(function (c) {
-            var val = r.cells[c.col], editable = st.editable && v.role !== 'data' && ['fact', 'free', 'judgment'].indexOf(c.role) >= 0;
+            var val = r.cells[c.col], editable = st.editable && v.role !== 'data' && ['fact', 'free', 'judgment'].indexOf(c.role) >= 0, pr = !val ? proposal(c.col + r.row) : null;
+            if (pr) return '<td class="wfg-r-prop" title="' + esc((pr.source || '') + (pr.quote ? ' — ' + pr.quote : '')) + '">' + esc(pr.value) + '</td>';
             if (!editable) return '<td class="wfg-r-' + c.role + '">' + esc(val == null ? 'ƒ' : val) + '</td>';
             if (c.role === 'judgment' && c.list && c.list.length) return '<td class="wfg-r-judgment"><select data-cell="' + c.col + r.row + '" data-expected="' + esc(val || '') + '"><option value=""></option>' + c.list.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></td>';
             return '<td class="wfg-r-' + c.role + '"><input type="text" data-cell="' + c.col + r.row + '" data-expected="' + esc(val || '') + '" value="' + esc(val || '') + '"></td>';
@@ -124,7 +136,6 @@
         out.push({ kind: 'Pièce', label: 'Déposer la pièce qui remplit cette feuille', scroll: 'needs-card' });
       }
       if (t && v.filled >= t.capacity && t.capacity > 0) out.push({ kind: 'Attention', label: 'Tableau plein (' + t.capacity + ' lignes) : il faudra l’agrandir' });
-      out.push({ kind: 'Voir', label: 'Voir ' + v.name + ' dans Mon fichier Excel', excel: v.name });
       if (next) out.push({ kind: 'Suite', label: 'Feuille suivante : ' + next.name, go: next.name });
       return out;
     }
@@ -157,7 +168,8 @@
         (sheets.length ? '<nav class="wfg-nav" aria-label="Feuilles du working file">' + sheets.map(function (s, i) {
           var done = (st.filled[s.name] || 0) > 0;
           return '<button type="button" class="wfg-sheet" data-go="' + esc(s.name) + '"' + (s.name === st.sheet ? ' aria-current="page"' : '') + '><span>' + (done ? '✓' : (i + 1)) + '</span>' + esc(s.name) + '<small>' + esc(ROLE[s.role] || s.role) + '</small></button>';
-        }).join('') + '</nav>' : '') +
+        }).join('') + ((m && m.agent_sheets || []).length ? '<span class="wfg-sep">Préparations de l’agent</span>' + m.agent_sheets.map(function (n) {
+          return '<button type="button" class="wfg-sheet wfg-agent" data-go="' + esc(n) + '"' + (n === st.sheet ? ' aria-current="page"' : '') + '>' + esc(n) + '</button>'; }).join('') : '') + '</nav>' : '') +
         (m && st.view ? screen() : '') + '<p class="status wfg-say" role="status" aria-live="polite">' + esc(st.say) + '</p>';
     }
 

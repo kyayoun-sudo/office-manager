@@ -5,7 +5,8 @@
   var missionId = qs.get('mission_id') || '';
   var code = qs.get('code') || '';
   var workspace = document.getElementById('procedure-workspace');
-  var dialogue = workspace && workspace.querySelector('.audit-dialogue');
+  // The two-column layout (procedure-layout.js) may already have moved the dialogue next to the workspace.
+  var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-left .audit-dialogue'));
   if (!missionId || !code || !workspace || !dialogue || !window.OfficeManager) return;
 
   var state = { view: null, current: null, plan: null, busy: false };
@@ -191,6 +192,15 @@
   function renderFindings(plan) {
     var findings = plan.findings || [];
     if (!findings.length) return;
+    // (2026-10-24, « je veux pas 2 fois les mêmes choses ») When the sheet is shown on the right, a fact that has its cell there
+    // is shown THERE (dashed, with its source); here only a one-line count, plus the facts that have no cell.
+    if (document.documentElement.dataset.workfileGuide === 'on') {
+      var placed = findings.filter(function (f) { return f.target && f.value; });
+      var sheets = placed.map(function (f) { return f.target.slice(0, f.target.lastIndexOf('!')); }).filter(function (s, i, a) { return a.indexOf(s) === i; });
+      findings = findings.filter(function (f) { return !(f.target && f.value); });
+      if (placed.length) block('Propositions', '<p>' + placed.length + ' proposition(s) affichée(s) en pointillés dans ' + (sheets.length === 1 ? 'la feuille ' + esc(sheets[0]) : 'les feuilles ' + esc(sheets.join(', '))) + ', à droite, avec leur source.</p>');
+      if (!findings.length) return;
+    }
     var shown = findings.slice(0, 12).map(function (f) {
       var target = f.target ? '<div><code>' + esc(f.target) + '</code></div>' : '';
       var ref = [f.source, f.reference].filter(Boolean).join(' · ');
@@ -251,6 +261,8 @@
 
     if (plan.operation === 'document-review') {
       var writes = (plan.findings || []).filter(function (f) { return f.target && f.value; });
+      // (2026-10-24) The proposals are shown on the sheet itself, on the right, before anything is written.
+      try { document.dispatchEvent(new CustomEvent('wf-proposals', { detail: { cells: writes.map(function (f) { var at = f.target.lastIndexOf('!'); return { sheet: f.target.slice(0, at), address: f.target.slice(at + 1), value: f.value, source: f.source, quote: f.quote }; }) } })); } catch (_) {}
       if (plan.ready) {
         if (writes.length) {
           setStatus('Validation auditeur', 'action');
@@ -322,6 +334,13 @@
         payload = plan;
       }
       var result = await post({ action: 'step-run', plan: payload }, false);
+      // (2026-10-24, Paul : « l'agent pose la question, je réponds, il remplit tout ») — the person approved these exact cells
+      // BEFORE the write ; once they are written and read back, that same approval closes the receipt, and the agent goes on.
+      var approved = plan.operation === 'document-review' && confirm === true && result && result.verified !== false && !result.unchanged;
+      if (approved) {
+        try { await post({ action: 'review-workpaper', plan_id: plan.plan_id, decision: 'confirm', note: 'Approuvé avant écriture depuis Ma procédure' }, false); } catch (_) { approved = false; }
+      }
+      try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: result && result.sheet } })); } catch (_) {}
       $('wf-agent-body').textContent = '';
       $('wf-agent-actions').textContent = '';
       setStatus(result && result.verified === false ? 'À vérifier' : 'Étape exécutée', result && result.verified === false ? 'action' : 'done');
@@ -337,6 +356,7 @@
       }, true);
       addAction('Passer à la suite', function () { load(true); }, false);
       await refreshStepsOnly();
+      if (approved) { state.busy = false; message('Écrit, relu et validé. L’agent passe à l’étape suivante…'); return await load(true); }
     } catch (e) {
       setStatus('Action requise', 'blocked');
       message(apiError(e));

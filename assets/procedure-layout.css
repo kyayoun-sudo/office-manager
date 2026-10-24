@@ -1,0 +1,17 @@
+/* « Ma procédure » en deux colonnes (2026-10-24) : l'agent à gauche, le working file à droite. */
+#wf-layout{display:grid;grid-template-columns:minmax(320px,440px) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
+#wf-layout[hidden]{display:none}
+#wf-left,#wf-right{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+#wf-left>*,#wf-right>*{min-width:0;max-width:100%}
+#wf-left>.card,#wf-right>.card,#wf-right>.wf-agent-board{margin:0}
+#wf-right>.wf-understanding-board{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.wf-sop #card{max-height:280px;overflow:auto;font-size:13.5px}
+.wf-sop summary{cursor:pointer}
+/* the old grid is not shown twice: only the file's buttons (refresh, import client data, firm model) stay */
+.wf-buttons-only{padding:10px 14px}
+.wf-buttons-only>h2,.wf-buttons-only #audit-grid,.wf-buttons-only .audit-pagination,.wf-buttons-only #audit-selection,.wf-buttons-only>p.meta,.wf-buttons-only #audit-sheet{display:none}
+.wf-buttons-only .row{gap:8px;flex-wrap:wrap}
+#wf-older{margin-top:8px}
+#wf-older>summary{cursor:pointer}
+#wf-older>.card{margin-top:12px}
+@media(max-width:1100px){#wf-layout{grid-template-columns:1fr}}
