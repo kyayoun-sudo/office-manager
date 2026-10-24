@@ -701,6 +701,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   gauche = SOP, l'agent, le travail de l'étape ; droite = working file, « Ce que demande ce test » (cartes côte à côte), chat. Bug
   corrigé : les boutons de l'agent créés pendant qu'il travaillait restaient désactivés (« Préparer cette étape » gris) ; l'étape est
   désormais préparée à chaque ouverture. Test : `tests/workfile-import-assist.test.js`.
+- PLUSIEURS GRANDS LIVRES, L'IA EN RENFORT, TABLEAU AGRANDI (Paul, 2026-10-25 : « il n'a pas importé ; c'était 2 ans donc 2 GL, il en a
+  choisi un seul sans me donner le choix ; on a pris l'IA en plus du code pour comprendre ») : `proposeImport` regarde TOUTES les pièces
+  (20 fichiers max) ; par pièce : années lues dans la colonne des dates (`yearOf`), lignes, équilibre, lignes de total mises de côté
+  (`rowIssue` : « Total… » sans date, montant illisible — comptées, jamais importées) ; cochées = années de la mission (`period_label`),
+  même période en double = une seule cochée ; l'IA (une demande, `firstAvailable`) dit ce qu'est chaque feuille non reconnue (grand
+  livre général / auxiliaire / balance…) et rattache les colonnes restantes, vérifiées et marquées « selon l'IA » ; sans IA, le code seul.
+  `acceptImport` : pièces cochées importées À LA SUITE (`load` : écriture après les lignes déjà utilisées, colonnes lues sur la 1re ligne
+  du tableau — le test de « titre » sur les données bloquait l'import : cause probable du premier échec), dates texte → vraies dates,
+  « jamais une partie seulement » vérifié avant d'écrire. `lib/workfile-extend.js` : tableau agrandi seulement sur « Oui, agrandis le
+  tableau et importe » — formats, listes et formules de la dernière ligne recopiés, plages du tableau prolongées dans tout le classeur
+  et dans les noms (vérifié sur le vrai NL-T01 : 612 + 659 lignes, D1 porté à 1 281 lignes, 3 564 formules prolongées). Tests :
+  `tests/workfile-import-assist.test.js`, `tests/workfile-extend.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

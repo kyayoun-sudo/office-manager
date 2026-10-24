@@ -16,7 +16,7 @@
   var box = document.createElement('section');
   box.id = 'wf-assist'; box.className = 'card wf-assist'; box.setAttribute('aria-label', 'Ce que l’agent fait pour vous');
   box.innerHTML = '<h2>L’agent</h2><p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>';
-  var st = { data: null, say: '', busy: false, autoRead: false, polls: 0, declined: false, imports: {}, asked: {} };
+  var st = { data: null, say: '', busy: false, autoRead: false, polls: 0, declined: false, imports: {}, asked: {}, pick: {} };
 
   function place() {
     var left = document.getElementById('wf-left');
@@ -37,33 +37,43 @@
 
   var KIND = { gl: 'le grand livre', budget: 'le budget' };
   function fmt(n) { return Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 }); }
+  // Every piece that may fill the sheet, each with its years, rows and balance; the ones of the mission's years are ticked; the person
+  // ticks or unticks; what the AI understood is marked « selon l'IA ».
   function imports(d) {
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
       var p = st.imports[x.sheet], what = KIND[x.kind] || 'la pièce';
-      if (!p) return '<p class="wf-assist-busy">' + esc(x.sheet) + ' : je cherche ' + esc(what) + ' parmi les pièces de la mission (par ses colonnes, pas par son nom)…</p>';
-      if (p.error) return '<p>' + esc(x.sheet) + ' : ' + esc(p.error) + '</p>';
-      if (p.status === 'READY') {
-        var g = p.gl_summary;
-        return '<div class="wf-assist-prop"><p>J’ai identifié <b>' + esc(what) + '</b> : <b>' + esc(p.source.name) + '</b>' + (p.source.sheet ? ' (feuille « ' + esc(p.source.sheet) + ' »)' : '') + ' — ' + fmt(p.rows) + ' ligne(s)' +
-          (g ? ' ; débit ' + fmt(g.debit) + ', crédit ' + fmt(g.credit) + (g.difference ? ', <b>écart ' + fmt(g.difference) + '</b>' : ', équilibré') : '') + '.</p>' +
-          '<p>Je propose de le mettre dans <b>' + esc(p.sheet) + '</b> à partir de la ligne ' + esc(p.start_row) + ' :</p><ul class="wf-agent-list">' +
-          p.mapping.map(function (m) { return '<li>' + esc(m.label) + ' ← « ' + esc(m.source_label) + ' »</li>'; }).join('') + '</ul>' +
-          (p.unmatched.length ? '<p class="meta">Sans correspondance sûre, laissées vides : ' + esc(p.unmatched.join(', ')) + '.</p>' : '') +
-          (x.capacity && p.rows > x.capacity ? '<p><b>Attention :</b> le tableau de ' + esc(p.sheet) + ' a ' + fmt(x.capacity) + ' lignes et la pièce en a ' + fmt(p.rows) + '. Je n’importe pas une partie seulement : il faut d’abord agrandir le tableau dans le modèle.</p>' : '') +
-          (d.editable && !(x.capacity && p.rows > x.capacity) ? '<div class="row"><button type="button" class="btn" data-a="import" data-sheet="' + esc(p.sheet) + '">Oui, importe</button><button type="button" class="btn ghost" data-a="import-detail">Changer la correspondance</button></div>' : '') + '</div>';
-      }
-      if (p.status === 'SEVERAL_SOURCES' || p.status === 'SOURCE_SHEET_TO_CHOOSE') return '<div class="wf-assist-prop"><p>' + esc(x.sheet) + ' : plusieurs pièces ressemblent à ' + esc(what) + '. Laquelle ?</p><div class="row">' +
-        (p.candidates || []).map(function (c) { return '<button type="button" class="btn ghost" data-a="import-pick" data-sheet="' + esc(x.sheet) + '" data-file="' + esc(c.file_id) + '">' + esc(c.name) + '</button>'; }).join('') + '</div></div>';
-      if (p.status === 'NO_SOURCE_FOUND') return '<p>' + esc(x.sheet) + ' : je n’ai trouvé ' + esc(what) + ' dans aucune pièce Excel ou CSV de la mission (' + (x.kind === 'gl' ? 'colonnes débit, crédit, compte ou date' : 'colonnes de budget') + '). Déposez-le plus bas, ou je prépare la demande au client.</p>';
-      if (p.status === 'NO_COLUMN_MATCH') return '<p>' + esc(x.sheet) + ' : j’ai trouvé ' + esc(p.source && p.source.name) + ', mais aucune colonne ne correspond sûrement. Utilisez « Importer les données client » pour choisir les colonnes.</p>';
-      return '<p>' + esc(x.sheet) + ' : ' + esc(p.status) + '</p>';
+      if (!p) return '<p class="wf-assist-busy">' + esc(x.sheet) + ' : je regarde toutes les pièces de la mission pour trouver ' + esc(what) + ' (par leurs colonnes et leurs dates, pas par leur nom)…</p>';
+      if (p.error) return '<p class="wf-assist-err">' + esc(x.sheet) + ' : ' + esc(p.error) + '</p>';
+      if (p.status === 'NO_SOURCE_FOUND') return '<p>' + esc(x.sheet) + ' : je n’ai trouvé ' + esc(what) + ' dans aucune pièce Excel ou CSV de la mission' + (p.ai === 'unavailable' ? ' (l’IA n’a pas répondu : je n’ai regardé que les colonnes reconnues par le code)' : '') + '. Déposez-le plus bas, ou je prépare la demande au client.</p>';
+      if (p.status !== 'READY') return '<p>' + esc(x.sheet) + ' : ' + esc(p.status) + '</p>';
+      var picked = p.items.filter(function (it, i) { return st.pick[x.sheet + '|' + i]; });
+      var total = picked.reduce(function (n, it) { return n + (it.rows || 0); }, 0), tooBig = x.capacity && total > x.capacity;
+      var yrs = (p.mission_years || []).join(', ');
+      return '<div class="wf-assist-prop"><p>Pour <b>' + esc(x.sheet) + '</b>, j’ai trouvé ' + p.items.length + ' pièce(s) qui ressemblent à ' + esc(what) + (yrs ? ' ; la mission porte sur <b>' + esc(yrs) + '</b>' : '') + '. Cochez celles à importer :</p>' +
+        p.items.map(function (it, i) {
+          var key = x.sheet + '|' + i, g = it.gl_summary, ys = Object.keys(it.years || {});
+          return '<div class="wf-assist-src"><label><input type="checkbox" data-pick="' + esc(key) + '"' + (st.pick[key] ? ' checked' : '') + (it.error || !it.mapping.length ? ' disabled' : '') + '> <b>' + esc(it.name) + '</b>' + (it.sheet ? ' — feuille « ' + esc(it.sheet) + ' »' : '') + '</label>' +
+            '<p class="meta">' + (ys.length ? 'Années : <b>' + esc(ys.join(', ')) + '</b>' : 'Années non lues') + (it.in_mission_period === false ? ' (hors période de la mission)' : '') + ' · ' + fmt(it.rows) + ' ligne(s)' +
+            (g ? ' · débit ' + fmt(g.debit) + ', crédit ' + fmt(g.credit) + (g.difference ? ', <b>écart ' + fmt(g.difference) + '</b>' : ', équilibré') : '') +
+            (it.set_aside && it.set_aside.count ? ' · ' + it.set_aside.count + ' ligne(s) de total mises de côté' : '') + '</p>' +
+            (it.understood ? '<p class="meta">Selon l’IA : ' + esc(it.understood.what) + (it.understood.period ? ' (' + esc(it.understood.period) + ')' : '') + (it.understood.why ? ' — ' + esc(it.understood.why) : '') + '</p>' : '') +
+            (it.same_period_as ? '<p class="meta">Même période que « ' + esc(it.same_period_as) + ' » : décochée pour ne pas importer deux fois.</p>' : '') +
+            (it.error ? '<p class="wf-assist-err">Lecture impossible : ' + esc(ERR[it.error] || it.error) + '</p>' :
+            '<details><summary>Colonnes : ' + it.mapping.length + ' rattachée(s)' + (it.unmatched.length ? ', ' + it.unmatched.length + ' laissée(s) vide(s)' : '') + '</summary><ul class="wf-agent-list">' +
+              it.mapping.map(function (m) { return '<li>' + esc(m.label) + ' ← « ' + esc(m.source_label) + ' »' + (m.by === 'ia' ? ' <em>selon l’IA' + (m.why ? ' : ' + esc(m.why) : '') + '</em>' : '') + '</li>'; }).join('') + '</ul>' +
+              (it.unmatched.length ? '<p class="meta">Laissées vides : ' + esc(it.unmatched.join(', ')) + '.</p>' : '') + '</details>') + '</div>';
+        }).join('') +
+        (p.ai === 'unavailable' ? '<p class="meta">L’IA n’a pas répondu : seules les colonnes reconnues par le code sont rattachées.</p>' : '') +
+        (tooBig ? '<p class="wf-assist-warn">Le tableau de ' + esc(x.sheet) + ' a ' + fmt(x.capacity) + ' lignes ; les pièces cochées en ont ' + fmt(total) + '. Je peux d’abord l’agrandir de ' + fmt(total - x.capacity) + ' lignes, comme dans Excel : mêmes formats, listes et formules recopiées, et les totaux des autres feuilles prolongés. Je n’importe jamais une partie seulement.</p>' : '') +
+        (p.run_error ? '<p class="wf-assist-err">Import arrêté : ' + esc(p.run_error) + '</p>' : '') +
+        (d.editable ? '<div class="row"><button type="button" class="btn" data-a="import" data-sheet="' + esc(x.sheet) + '"' + (tooBig ? ' data-extend="1"' : '') + (!picked.length ? ' disabled' : '') + '>' + (tooBig ? 'Oui, agrandis le tableau et importe ' : 'Oui, importe ') + (picked.length > 1 ? 'les ' + picked.length + ' pièces cochées (à la suite)' : 'la pièce cochée') + '</button><button type="button" class="btn ghost" data-a="import-detail">Choisir les colonnes moi-même</button></div>' : '') + '</div>';
     }).join('') + '</div>';
   }
-  var ERR = { HUMAN_CONFIRMATION_REQUIRED: 'une écriture précédente attend votre confirmation (voir le travail de l’agent)', DOCUMENT_INVENTORY_UNAVAILABLE: 'la liste des pièces de la mission n’est pas lisible pour l’instant', IN_REVIEW_OR_NOT_EDITABLE: 'le test est en revue ou vous n’en êtes pas le préparateur', TABLE_CAPACITY_OR_OCCUPIED_CELL: 'le tableau du modèle est trop petit ou des cases sont déjà remplies', SOURCE_TYPE_MISMATCH: 'la pièce ne ressemble pas au contenu attendu par cette feuille', WORK_CHANGED_PREPARE_AGAIN: 'le fichier ou la pièce a changé, je refais la proposition' };
+  var ERR = { HUMAN_CONFIRMATION_REQUIRED: 'une écriture précédente attend votre confirmation (voir le travail de l’agent)', DOCUMENT_INVENTORY_UNAVAILABLE: 'la liste des pièces de la mission n’est pas lisible pour l’instant', IN_REVIEW_OR_NOT_EDITABLE: 'le test est en revue ou vous n’en êtes pas le préparateur', TABLE_CAPACITY_OR_OCCUPIED_CELL: 'des cases du tableau sont déjà remplies', TABLE_TOO_SMALL: 'le tableau du modèle est trop petit', ROWS_BELOW_TABLE_NOT_EMPTY: 'il y a déjà quelque chose sous le tableau : je ne l’agrandis pas par-dessus', SOURCE_TYPE_MISMATCH: 'la pièce ne ressemble pas au contenu attendu par cette feuille', WORK_CHANGED_PREPARE_AGAIN: 'le fichier ou la pièce a changé, je refais la proposition' };
   function propose(sheet, fileId) {
     st.imports[sheet] = null; render();
-    return api('workfile-import-propose', { sheet: sheet, source_file_id: fileId || null }).then(function (p) { st.imports[sheet] = p; render(); })
+    return api('workfile-import-propose', { sheet: sheet }).then(function (p) { st.imports[sheet] = p; (p.items || []).forEach(function (it, i) { st.pick[sheet + '|' + i] = !!it.recommended; }); render(); })
       .catch(function (e) { var m = String(e && e.message || e); st.imports[sheet] = { error: 'proposition impossible — ' + (ERR[m] || m) }; render(); });
   }
 
@@ -117,6 +127,7 @@
     }).catch(function (e) { st.say = 'Lecture des pièces impossible : ' + (e && e.message || e); render(); });
   }
 
+  box.addEventListener('change', function (ev) { var c = ev.target; if (c && c.dataset && c.dataset.pick) { st.pick[c.dataset.pick] = c.checked; render(); } });
   box.addEventListener('click', function (ev) {
     var b = ev.target.closest('button'); if (!b || b.disabled) return;
     if (b.dataset.a === 'fill') {
@@ -130,17 +141,17 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
-    if (b.dataset.a === 'import-pick') propose(b.dataset.sheet, b.dataset.file);
     if (b.dataset.a === 'import-detail') { var ib = Array.prototype.find.call(document.querySelectorAll('button'), function (x) { return /^Importer les données/.test(x.textContent); }); if (ib) { ib.scrollIntoView({ behavior: 'smooth' }); ib.click(); } }
     if (b.dataset.a === 'import') {
-      var p = st.imports[b.dataset.sheet]; if (!p) return;
-      b.disabled = true; st.say = 'J’importe ' + (KIND[p.kind] || 'la pièce') + ' dans ' + p.sheet + '…'; render();
-      api('workfile-import-accept', { sheet: p.sheet, step: p.step, source_file_id: p.source.file_id, revision: p.revision }).then(function (r) {
-        st.say = fmt(r.rows) + ' ligne(s) importée(s) dans ' + r.sheet + ', écrites et relues' + (r.confirmed ? '.' : ' — confirmez-les dans le travail de l’agent.');
-        delete st.imports[p.sheet];
-        try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: r.sheet } })); } catch (_) {}
+      var sh = b.dataset.sheet, p = st.imports[sh]; if (!p || !p.items) return;
+      var items = p.items.filter(function (it, i) { return st.pick[sh + '|' + i]; }).map(function (it) { return { file_id: it.file_id, sheet: it.sheet, rows: it.rows, mapping: it.mapping }; });
+      b.disabled = true; p.run_error = null; st.say = 'J’importe ' + items.length + ' pièce(s) dans ' + sh + ', l’une après l’autre…'; render();
+      api('workfile-import-accept', { sheet: sh, step: p.step, items: items, extend: b.dataset.extend === '1' }).then(function (r) {
+        st.say = (r.done || []).map(function (x) { return (x.extended ? 'tableau agrandi de ' + fmt(x.extended.added) + ' lignes, ' : '') + fmt(x.rows) + ' ligne(s) de ' + x.name + ' (à partir de la ligne ' + x.start_row + ')' + (x.set_aside ? ', ' + x.set_aside + ' ligne(s) de total écartée(s)' : ''); }).join(' ; ') + ' — écrites et relues dans ' + sh + '.';
+        delete st.imports[sh];
+        try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: sh } })); } catch (_) {}
         return refresh();
-      }).catch(function (e) { var m = String(e && e.message || e); st.say = 'Import refusé : ' + (ERR[m] || m) + '. Rien n’a été forcé.'; render(); });
+      }).catch(function (e) { var m = String(e && e.message || e); p.run_error = (ERR[m] || m) + '. Rien n’a été forcé.'; st.say = ''; render(); });
     }
   });
 
