@@ -8,6 +8,7 @@ import {
   normalizeRequestedAgent
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
+import { resolveRequestOrg } from "../lib/firm-context.js";
 import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
@@ -143,7 +144,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "UNKNOWN_AGENT" });
     }
 
-    const orgId = process.env.DEFAULT_ORG_ID;
+    const orgId = await resolveRequestOrg(req);
     if (!orgId) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }

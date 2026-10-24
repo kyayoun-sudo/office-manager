@@ -1,4 +1,5 @@
 import { requirePilotAccess } from '../lib/auth.js';
+import { resolveRequestOrg } from '../lib/firm-context.js';
 import { rest } from '../lib/supabase.js';
 import { presentRun } from '../lib/run-status.js';
 import { assertIsolatedOrg } from '../lib/test-mode.js';
@@ -8,7 +9,7 @@ export default async function handler(req, res) {
   try {
     requirePilotAccess(req);
     if (req.method !== 'GET') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-    const orgId = process.env.DEFAULT_ORG_ID;
+    const orgId = await resolveRequestOrg(req);
     if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
     assertIsolatedOrg(orgId);
     // Ignore any client-supplied organisation. Do not expose error details or metrics.

@@ -1,5 +1,6 @@
 import { requirePilotAccess } from "../lib/auth.js";
 import { bridgeForbiddenHere } from "../lib/google-drive.js";
+import { resolveRequestOrg, multiCabinet, pilotOrgId } from "../lib/firm-context.js";
 
 function workerUrl() {
   const base = process.env.SUPABASE_URL;
@@ -11,6 +12,10 @@ function workerUrl() {
 export default async function handler(req, res) {
   try {
     requirePilotAccess(req);
+    if (multiCabinet()) {
+      const orgId = await resolveRequestOrg(req);
+      if (orgId !== pilotOrgId()) return res.status(403).json({ error: "PILOT_FIRM_ONLY" });
+    }
     // The durable worker is bound to the REAL firm Drive: not reachable from a preview (test run).
     if (bridgeForbiddenHere()) {
       return res.status(409).json({ error: "PREVIEW_BRIDGE_FORBIDDEN" });

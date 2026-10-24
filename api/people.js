@@ -1,4 +1,5 @@
 import { requirePilotAccess } from '../lib/auth.js';
+import { resolveRequestOrg } from '../lib/firm-context.js';
 import { getAgentSetting } from '../lib/supabase.js';
 import { getPeopleIntelligence } from '../lib/people-intelligence.js';
 import { assertIsolatedOrg } from '../lib/test-mode.js';
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
   try {
     requirePilotAccess(req);
     if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
-    const orgId = process.env.DEFAULT_ORG_ID;
+    const orgId = await resolveRequestOrg(req);
     if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
     assertIsolatedOrg(orgId);
     const missionId = req.body?.mission_id;

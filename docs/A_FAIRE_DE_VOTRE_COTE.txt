@@ -191,6 +191,29 @@ Vérification :
 
 
 -----------------------------------------------------------------------------------------------------------------
+10. [ ] ACTIVER PLUSIEURS CABINETS DANS UNE INSTALLATION                       (2026-10-24, branche feature/multi-cabinet)
+-----------------------------------------------------------------------------------------------------------------
+Tant que l'interrupteur n'est pas mis, RIEN ne change : TATY fonctionne exactement comme aujourd'hui.
+Le faire d'abord sur un aperçu (Preview), jamais directement en production.
+
+  1. Supabase → SQL Editor : exécuter  db/cabinet-onboarding.sql  (ou relancer  db/INSTALL_TOUT.sql ). Sans danger si relancé.
+     Vérifier :  select count(*) from information_schema.tables where table_name in ('office_invitations','office_cabinet_creations');  → 2
+  2. Supabase → Authentication → Sign In / Providers → Email : « Confirm email » ACTIVÉ (une inscription n'entre dans aucun
+     cabinet tant que l'adresse n'est pas confirmée). Authentication → URL Configuration : « Site URL » = l'adresse de l'application.
+  3. Vercel → Settings → Environment Variables (Preview d'abord) :
+       OFFICE_MANAGER_MULTI_CABINET = on
+       OFFICE_MANAGER_INTERNAL_SECRET = une longue phrase aléatoire (signe les appels internes des agents ; sinon le secret du
+                                        planificateur sert)
+     DEFAULT_ORG_ID reste celui de TATY : TATY est le premier cabinet, ses données ne bougent pas.
+     Puis redéployer.
+  4. Essai : se connecter avec un compte TATY → menu ⚙ → « Mes cabinets… » → créer « Cabinet essai » → « Démarrer » s'ouvre
+     (Google, Drive). Inviter une autre adresse (lien ou code), l'ouvrir avec cette adresse : elle n'entre QUE dans « Cabinet essai ».
+     Repasser à TATY par le menu ⚙ : rien du cabinet d'essai n'y apparaît (missions, Drive, agents).
+  5. À savoir : avec l'interrupteur, le jeton pilote seul ne suffit plus (il faut une session) ; le code propriétaire ne sert que
+     pour TATY ; un nouveau cabinet n'utilise jamais le compte Google, le Drive ni la boîte mail de TATY réglés dans Vercel.
+
+
+-----------------------------------------------------------------------------------------------------------------
 « CE QUE DEMANDE CE TEST » DANS MA PROCÉDURE (2026-10-19)
 -----------------------------------------------------------------------------------------------------------------
 [ ] Le SQL db/pbc-requests.sql doit être installé (voir plus haut) : sans lui, la carte affiche « À installer une fois ».

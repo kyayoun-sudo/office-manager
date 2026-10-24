@@ -16,11 +16,14 @@
   function safeRemove(store, key) { try { store.removeItem(key); } catch (e) { /* storage unavailable */ } }
 
   function readSession() {
-    try { var s = JSON.parse(safeGet(window.localStorage, SESSION_KEY) || 'null'); return s && s.pilot_token ? s : null; }
+    // A person without a firm yet has a personal session but no pilot token (several firms, « Mes cabinets »).
+    try { var s = JSON.parse(safeGet(window.localStorage, SESSION_KEY) || 'null'); return s && (s.pilot_token || (s.needs_cabinet && s.access_token)) ? s : null; }
     catch (e) { return null; }
   }
   // The setup page (Démarrer) is open without a session, like the login page.
-  function onLoginPage() { return location.pathname === LOGIN_PAGE || location.pathname === '/demarrer.html'; }
+  // « Mes cabinets » (several firms, 2026-10-24): open with a session that has no firm yet.
+  var CABINETS_PAGE = '/cabinets.html';
+  function onLoginPage() { return location.pathname === LOGIN_PAGE || location.pathname === '/demarrer.html' || location.pathname === CABINETS_PAGE; }
   // The Office Manager panel inside Excel (/excel/…): no redirect to the login page, no menu —
   // the panel signs in through a small Office window.
   function inExcel() { return location.pathname.indexOf('/excel/') === 0; }
@@ -28,15 +31,27 @@
   var OM = {
     getSession: readSession,
     saveSession: function (s) {
-      if (!s || !s.pilot_token) return;
+      if (!s || !(s.pilot_token || (s.needs_cabinet && s.access_token))) return;
+      var before = readSession() || {};
+      // Several firms: the firm this session works on, the person's firms (selector), or none yet.
+      var org = s.org_id !== undefined ? s.org_id : (before.org_id || null);
       safeSet(window.localStorage, SESSION_KEY, JSON.stringify({
         user: s.user, refresh_token: s.refresh_token, access_token: s.access_token || null,
-        pilot_token: s.pilot_token, owner_token: s.owner_token || null
+        pilot_token: s.pilot_token, owner_token: s.owner_token || null,
+        org_id: org, cabinets: s.cabinets || before.cabinets || null, needs_cabinet: Boolean(s.needs_cabinet && !org)
       }));
       // Lets the original console (index.html) reuse the same login.
       safeSet(window.sessionStorage, LEGACY_TOKEN_KEY, s.pilot_token);
     },
     getToken: function () { var s = readSession(); return s ? s.pilot_token : ''; },
+    // Work on another of my firms: the session names it, the cached rights are dropped, the page starts again.
+    switchCabinet: function (orgId, target) {
+      var s = readSession(); if (!s) return;
+      s.org_id = orgId; s.needs_cabinet = false;
+      safeSet(window.localStorage, SESSION_KEY, JSON.stringify(s));
+      try { window.sessionStorage.removeItem('officeManagerMyRights'); } catch (e) { /* no storage */ }
+      return OM.checkSession().then(function () { location.replace(target || '/accueil.html'); });
+    },
     // This person's screens and levels (cached for the session; refreshed at login).
     myRights: function () {
       var KEY = 'officeManagerMyRights', role = OM.getRole();
@@ -105,6 +120,7 @@
       options = options || {};
       var s = readSession();
       var base = { 'x-office-manager-token': OM.getToken() };
+      if (s && s.org_id) base['x-office-manager-org'] = s.org_id;
       if (OM.getLang && OM.getLang() === 'en') base['x-om-lang'] = 'en';
       // Personal token: lets the server check who you are on sensitive routes.
       if (s && s.access_token) base.Authorization = 'Bearer ' + s.access_token;
@@ -156,7 +172,8 @@
     checkSession: function () {
       var s = readSession();
       if (!s || !s.refresh_token) return Promise.resolve(null);
-      return fetch('/api/app?route=session', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      var sh = { 'Content-Type': 'application/json' }; if (s.org_id) sh['x-office-manager-org'] = s.org_id;
+      return fetch('/api/app?route=session', { method: 'POST', headers: sh,
         body: JSON.stringify({ refresh_token: s.refresh_token }) })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
         .then(function (x) {
@@ -270,6 +287,18 @@
         l.addEventListener('click', function () { OM.setLang(x[0]); }); seg.appendChild(l);
       });
       lang.appendChild(seg); menu.appendChild(lang);
+      // Several firms: switch firm, or « Mes cabinets » (create one, join one, invite).
+      var sess = readSession();
+      if (sess && sess.cabinets) {
+        var cg = node('div', null, 'gm-group');
+        sess.cabinets.forEach(function (c) {
+          if (c.org_id === sess.org_id) { cg.appendChild(node('span', 'Cabinet : ' + c.name, 'gm-label')); return; }
+          var sw = node('button', 'Passer à ' + c.name, 'gm-link'); sw.type = 'button';
+          sw.addEventListener('click', function () { OM.switchCabinet(c.org_id); }); cg.appendChild(sw);
+        });
+        var mine = node('a', 'Mes cabinets…', 'gm-link'); mine.href = CABINETS_PAGE; cg.appendChild(mine);
+        menu.appendChild(cg);
+      }
       var acc = node('div', null, 'gm-group');
       var close = node('button', 'Fermer mon compte…', 'gm-link gm-danger'); close.type = 'button'; close.addEventListener('click', function () { toggle(false); openClose(); });
       var out = node('button', 'Se déconnecter', 'gm-link'); out.type = 'button'; out.id = 'logout-btn'; out.addEventListener('click', OM.logout);
@@ -838,6 +867,7 @@
   }
   if (!onLoginPage() && !inExcel()) {
     if (!readSession()) { OM.forget(true); return; }
+    if (readSession().needs_cabinet) { location.replace(CABINETS_PAGE); return; }
     var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
