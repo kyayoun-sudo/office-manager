@@ -442,7 +442,8 @@ test(">1000 siblings with MAP after the first page: no new MAP is created", asyn
   await memory.saveMemory(driveAdapter, reopened);
   assert.ok(!world.actions.includes("create_binary_file"), "no new MAP / REGISTER");
   assert.equal(memoryFiles(world.g).length, 2);
-  assert.ok(world.actions.includes("find_exact_file"));
+  // Found by exact name, or straight by the remembered id (lib/memory-files.js, 39b4485): never by a partial listing.
+  assert.ok(world.actions.includes("find_exact_file") || world.actions.includes("file_metadata"));
 });
 
 test("a memory file just over 8,000,000 bytes (< 10 MiB) can be written AND read back", async () => {

@@ -80,9 +80,13 @@ test('classification files only the source set actually used',async()=>{
 
 test('Lab timeout preserves minimum N/N-1 requirements and never hides uploaded documents',async()=>{
  const {d}=world();d.labTimeoutMs=5;d.firmKnowledge=()=>new Promise(()=>{});d.env={};
- const r=await refreshEynowaKnowledge('org',M,d);assert.equal(r.lab.status,'timeout');
+ const r=await refreshEynowaKnowledge('org',M,account,d);assert.equal(r.lab.status,'timeout');
  assert(r.requirements.some(x=>x.key==='trial_balance_prior'));
  assert.equal((await analyticalReviewContext('org',M,account,d)).documents.length,2);
+});
+test('refreshing the Lab is refused to someone outside the mission',async()=>{
+ const {d}=world();
+ await assert.rejects(refreshEynowaKnowledge('org',M,{email:'outsider@example.com',role:'auditor'},d),/NOT_ON_THIS_MISSION/);
 });
 test('removing an uploaded source persists across context reload',async()=>{
  const {d,docs}=world();let trashed=false;

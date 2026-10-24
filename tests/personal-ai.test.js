@@ -49,10 +49,12 @@ test('Mon IA: a person\'s request tries their AI first, then the firm\'s AI exac
   assert.equal(a.via, 'personal'); assert.deepEqual(calls[0], ['openai', 'sk-mine', 'firm']);
   calls.length = 0; fail = true;
   const b = await runAs('o', me, () => firstAvailable(['anthropic', 'openai'], { input: 'x' }, d));
-  assert.equal(b.via, undefined); assert.deepEqual(calls.map(c => c[0]), ['openai', 'anthropic'], 'quota reached: the firm\'s AI answers');
+  // The firm's providers are raced two at a time (18cb0d9): the first in the firm's order answers.
+  assert.equal(b.via, undefined); assert.equal(b.provider, 'anthropic', 'quota reached: the firm AI answers');
+  assert.deepEqual(calls.slice(0, 2).map(c => c[0]), ['openai', 'anthropic']);
   calls.length = 0;
   const c = await firstAvailable(['anthropic'], { input: 'x' }, d);
-  assert.equal(c.provider, 'anthropic'); assert.deepEqual(calls, [['anthropic', 'firm-oa', 'firm']], 'background work: firm only');
+  assert.equal(c.provider, 'anthropic'); assert.deepEqual(calls[0], ['anthropic', 'firm-oa', 'firm']); assert.ok(calls.every(c => c[1] === 'firm-oa'), 'background work: firm only');
   assert.equal(await tryPersonal(['openai'], {}, callModel, d), null);
   assert.equal(personalEnv({ provider: 'gemini', key: 'g', model: 'gm' }, {}).GEMINI_API_KEY, 'g');
 });

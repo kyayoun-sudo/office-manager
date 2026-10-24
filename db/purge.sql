@@ -57,6 +57,11 @@ begin
     exit when next_pending = pending;
     pending := next_pending;
   end loop;
+  -- The mission change log is fed by triggers: deleting the missions above wrote new lines into it after it was
+  -- emptied. Erase them last, so nothing of the firm remains (db/mission-shared-memory.sql, 2026-10-24).
+  if to_regclass('public.office_mission_change_log') is not null then
+    delete from public.office_mission_change_log where org_id = p_org;
+  end if;
   return jsonb_build_object('dry_run', false, 'rows', counts, 'passes', pass, 'not_erased', to_jsonb(pending));
 end;
 $$;

@@ -67,7 +67,7 @@ function page({hasManager=false,docs=[],missionDates=true}={}) {
  const UI={el:(tag,text,cls)=>{const n=element(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;},safeLink:(url,text)=>{const n=element('a');n.href=url;n.textContent=text;return n;},table:()=>element('table'),requireLogin:fn=>{ready=fn();}};
  const OM={api:async(url,o={})=>{
   calls.push({url,body:o.body?JSON.parse(o.body):null});
-  if(url.startsWith('/api/analytical-review?'))return structuredClone(ctx);
+  if(url.startsWith('/api/app?route=analytical-review&'))return structuredClone(ctx);
   if(url.includes('route=auditor'))return structuredClone(review);
   const b=JSON.parse(o.body||'{}');
   if(b.action==='refresh-lab')return{};
