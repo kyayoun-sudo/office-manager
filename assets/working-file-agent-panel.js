@@ -6,7 +6,7 @@
   var code = qs.get('code') || '';
   var workspace = document.getElementById('procedure-workspace');
   // The two-column layout (procedure-layout.js) may already have moved the dialogue next to the workspace.
-  var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-left .audit-dialogue'));
+  var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-layout .audit-dialogue'));
   if (!missionId || !code || !workspace || !dialogue || !window.OfficeManager) return;
 
   var state = { view: null, current: null, plan: null, busy: false };
@@ -131,6 +131,10 @@
     if (index) setStatus('Analyse de l’étape', 'working');
     renderProgress();
   }
+
+  // (2026-10-25) A button added while the agent was busy stayed disabled for good (« Préparer cette étape » grey, nothing happened):
+  // when the work ends, the buttons on screen are usable again.
+  function enableActions() { var a = $('wf-agent-actions'); if (a) a.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
 
   function addAction(label, fn, primary) {
     var b = document.createElement('button');
@@ -317,6 +321,7 @@
       addAction('Voir / demander les pièces', scrollNeeds, false);
     } finally {
       state.busy = false;
+      enableActions();
     }
   }
 
@@ -365,6 +370,7 @@
       addAction('Apporter une information', focusChat, false);
     } finally {
       state.busy = false;
+      enableActions();
     }
   }
 
@@ -398,13 +404,9 @@
         block('Travail', '<p>Toutes les étapes identifiées ont un résultat enregistré. L’auditeur peut maintenant revoir les travaux et les points ouverts.</p>');
         return;
       }
-      var shouldPrepare = forcePrepare;
-      try {
-        if (!sessionStorage.getItem(autoKey(state.current))) {
-          sessionStorage.setItem(autoKey(state.current), '1');
-          shouldPrepare = true;
-        }
-      } catch (_) { shouldPrepare = true; }
+      // (2026-10-25, Paul : « il peut remplir les lignes, c'est dans la documentation, mais rien ») The agent prepares the current step
+      // every time the page opens (the reading of an unchanged piece is reused, not paid twice); it never writes without « Valider ».
+      var shouldPrepare = true;
       if (shouldPrepare) {
         state.busy = false;
         await prepare(state.current, false);
@@ -420,6 +422,7 @@
       addAction('Réessayer', function () { load(true); }, true);
     } finally {
       state.busy = false;
+      enableActions();
     }
   }
 

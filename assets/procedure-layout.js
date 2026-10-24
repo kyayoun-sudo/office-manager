@@ -28,26 +28,29 @@
 
   function move(node, into, before) { if (node && into && node.parentNode !== into) { if (before) into.insertBefore(node, before); else into.appendChild(node); } }
 
+  // (2026-10-25, Paul : « à gauche un gros déséquilibre ; ils pouvaient être en dessous, à droite, de manière horizontale »)
+  //   Gauche : le SOP, l'agent (ce qu'il sait, les pièces, les imports proposés), le travail de l'étape.
+  //   Droite : le working file, puis « Ce que demande ce test » (pièces en cartes côte à côte), puis le chat.
   function arrange() {
-    // Left: the SOP first.
     var sop = document.getElementById('card-box');
     var sopCard = sop && sop.closest('section.card');
     if (sopCard && sopCard.parentNode !== left) { move(sopCard, left, left.firstChild); sop.open = true; sopCard.classList.add('wf-sop'); }
-    var dialogue = workspace.querySelector('.audit-dialogue') || document.querySelector('.audit-dialogue');
-    if (dialogue && dialogue.parentNode !== left) move(dialogue, left);
-    // The working-file board goes right; the agent's board stays in the dialogue (left).
+    var assistBox = document.getElementById('wf-assist');
+    if (assistBox && assistBox.parentNode !== left) move(assistBox, left);
+    // The agent's step board leaves the chat box: it is the agent's work, on the left.
+    var agentBoard = document.querySelector('.wf-agent-board:not(.wf-understanding-board)');
+    if (agentBoard && agentBoard.parentNode !== left) { move(agentBoard, left); agentBoard.classList.add('card'); }
     var guide = document.querySelector('.wf-understanding-board');
     if (guide && guide.parentNode !== right) move(guide, right, right.firstChild);
-    // The file's own buttons (refresh, import client data, firm model) follow the working file; the old grid is not shown twice.
     var wb = document.querySelector('.audit-workbook');
     if (wb && wb.parentNode !== right) { move(wb, right); wb.classList.add('wf-buttons-only'); }
-    // Pieces (deposit + mail) under the agent, then the chat stays at the bottom of the dialogue.
     var needs = document.getElementById('needs-card');
-    if (needs && dialogue && needs.parentNode !== left) left.insertBefore(needs, dialogue.nextSibling);
-    // Views that repeat what the agent and the sheet now show: folded at the bottom, still there.
+    if (needs && needs.parentNode !== right) { move(needs, right); needs.classList.add('wf-needs-wide'); }
+    var dialogue = workspace.querySelector('.audit-dialogue') || document.querySelector('.audit-dialogue');
+    if (dialogue && dialogue.parentNode !== right) move(dialogue, right);
+    if (dialogue && needs && dialogue.previousElementSibling !== needs) right.insertBefore(dialogue, needs.nextSibling);
     ['steps-card', 'pop-card', 'sample-card', 'items-card', 'wt-card'].forEach(function (id) { var n = document.getElementById(id); if (n && n.parentNode !== details) details.appendChild(n); });
     if (details.parentNode !== main) main.appendChild(details);
-    // The agent's chat title becomes « Chat », at the bottom.
     var h = document.getElementById('h-dialogue'); if (h && h.textContent !== 'Chat avec l’agent') h.textContent = 'Chat avec l’agent';
   }
 

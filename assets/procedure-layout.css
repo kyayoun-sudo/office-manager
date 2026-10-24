@@ -21,3 +21,7 @@
 .wf-assist-block .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .wf-assist-busy{font-weight:600}
 .wf-assist .link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer}
+/* the documents of the test side by side under the working file */
+.wf-needs-wide #needs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-items:stretch}
+.wf-needs-wide #needs-list>*{margin:0;min-width:0}
+#wf-left>.wf-agent-board.card{padding:16px}

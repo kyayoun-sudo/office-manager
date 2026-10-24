@@ -691,6 +691,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   du SOP est préparée de nouveau avec elles. Panneau `assets/workfile-assist.js` en haut à gauche. Le renommage des pièces d'après leur
   contenu (`renamePieces`) n'était plus appelé depuis le classement par l'Orpailleur : rétabli dans le dépôt `pieces` (avant les
   propositions de classement). Test : `tests/workfile-assist.test.js`.
+- GRAND LIVRE ET ÉQUILIBRE (Paul, 2026-10-25 : « il devait identifier et mettre le GL en me proposant avant ; à gauche un gros
+  déséquilibre ») : `lib/workfile-import-assist.js` (actions `workfile-import-propose` / `workfile-import-accept`) — pour chaque feuille de
+  données vide (grand livre, budget), l'agent trouve la pièce par ses COLONNES (débit, crédit, compte, date…, jamais par son nom ; un
+  fichier nommé « grand livre » qui est un budget est écarté), propose la correspondance des colonnes (« Montant » = Débit − Crédit,
+  dit ; colonnes sans correspondance sûre laissées vides et nommées), les lignes et l'équilibre débit / crédit ; rien n'est écrit sans
+  « Oui, importe » (import existant `runTableImport`, option `minus`, revision vérifiée), puis l'accord donné avant ferme le reçu.
+  Pièce plus grande que le tableau du modèle = pas d'import partiel, dit. Plusieurs candidates = la personne choisit. Disposition :
+  gauche = SOP, l'agent, le travail de l'étape ; droite = working file, « Ce que demande ce test » (cartes côte à côte), chat. Bug
+  corrigé : les boutons de l'agent créés pendant qu'il travaillait restaient désactivés (« Préparer cette étape » gris) ; l'étape est
+  désormais préparée à chaque ouverture. Test : `tests/workfile-import-assist.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

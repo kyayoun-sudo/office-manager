@@ -6,7 +6,7 @@
   var code = qs.get('code') || '';
   var workspace = document.getElementById('procedure-workspace');
   // The two-column layout (procedure-layout.js) may already have moved the dialogue next to the workspace.
-  var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-left .audit-dialogue'));
+  var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-layout .audit-dialogue'));
   if (!missionId || !code || !workspace || !dialogue || !window.OfficeManager) return loadAgentPanel();
 
   var board = document.createElement('section');
