@@ -25,6 +25,7 @@ async function fixture({ ai } = {}) {
     save: async (o, wk, c) => Object.assign(view.work, c),
     review: async (o, m, c, b) => { const rec = view.work.walkthrough.find(x => x.id === b.plan_id); if (rec) rec.confirmation = { status: 'confirmed' }; return {}; },
     ai: ai || (async (order, args) => { aiCalls++; const inp = JSON.parse(args.input); return { provider: 'test-ai', text: JSON.stringify({ sources: inp.pieces.map(p => ({ id: p.id, fits: true, what: 'grand livre général', period: '', why: 'débit, crédit, compte' })),
+      checks: inp.pieces.map(p => ({ id: p.id, ok: p.code_mapping.length >= 4, remarks: 'Débit − Crédit correct' })),
       mappings: inp.pieces.map(p => ({ id: p.id, column: 5, source: p.headers.indexOf('Source fin.'), why: 'source de financement = bailleur' })) }) }; }),
     drive: {
       getMeta: async id => id === 'WP' ? { name: 'Working.xlsx', size: wp.length, modifiedTime: 'v' + modified } : { name: files[id].name, size: files[id].bytes.length, modifiedTime: 'x' },
@@ -49,6 +50,7 @@ test('both grand livres are found by their columns, each with its year, both tic
   const m = p.items[0].mapping.map(x => [x.label, x.source_label, x.by]);
   assert.deepEqual(m, [['Date', 'Date', 'code'], ['Compte', 'Compte', 'code'], ['Libellé', 'Libellé écriture', 'code'], ['Montant', 'Débit − Crédit', 'code'], ['Bailleur', 'Source fin.', 'ia']]);
   assert.equal(p.ai, 'test-ai');
+  assert.deepEqual(p.items[0].check, { ok: true, remarks: 'Débit − Crédit correct' });
   assert.equal(f.aiCalls(), 1);
 });
 

@@ -713,6 +713,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   tableau et importe » — formats, listes et formules de la dernière ligne recopiés, plages du tableau prolongées dans tout le classeur
   et dans les noms (vérifié sur le vrai NL-T01 : 612 + 659 lignes, D1 porté à 1 281 lignes, 3 564 formules prolongées). Tests :
   `tests/workfile-import-assist.test.js`, `tests/workfile-extend.test.js`.
+- L'APPLICATION IMPORTE, L'IA VÉRIFIE (Paul, 2026-10-25 : « l'import, le côté application peut le faire sans l'IA ; l'IA vérifie que c'est
+  bon ; comment j'importe, comment je remplis ? » ; recherche bloquée sur 91 pièces) : trois appels au lieu d'un — `workfile-import-candidates`
+  (liste rapide, pièces LUES comme grand livre / budget d'abord, 60 max), `workfile-import-inspect` (UNE pièce par appel, par le code :
+  feuilles, colonnes, années, équilibre ; l'écran montre « 12 / 40, 2 trouvée(s) »), `workfile-import-finish` (l'IA dit ce qu'est chaque
+  table, VÉRIFIE la correspondance du code — « Vérifié par l'IA : correct » ou « L'IA signale un problème » —, rattache les colonnes
+  restantes ; puis cases cochées selon les années de la mission). « Comment importer et remplir » en tête du panneau ; « Choisir les
+  colonnes moi-même » ouvre l'import manuel sur la bonne feuille ; options des listes lisibles (clair / sombre).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

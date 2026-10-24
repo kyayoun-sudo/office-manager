@@ -31,3 +31,7 @@
 .wf-assist-err{color:#b42318;font-weight:600}
 @media (prefers-color-scheme:dark){.wf-assist-err{color:#ff8a80}}
 .wf-assist-warn{font-weight:600}
+/* the import choices: the options of a list are always readable (light or dark) */
+#wf-layout select option{color:var(--ink);background:var(--surface)}
+.wf-howto ol{margin:4px 0 0 18px;padding:0}
+.wf-howto li{margin:3px 0}

@@ -274,6 +274,9 @@ export const ROUTES = Object.freeze({
       // The agent that helps fill (2026-10-24): what the application knows (proposed, written on « Oui »), the received pieces (reviewed, renamed).
       if (b.action === 'workfile-assist') return (await import('../lib/workfile-assist.js')).workfileAssist(orgId, m, c, a);
       if (b.action === 'workfile-fill-known') return (await import('../lib/workfile-assist.js')).fillKnown(orgId, m, c, a, b);
+      if (b.action === 'workfile-import-candidates') return (await import('../lib/workfile-import-assist.js')).importCandidates(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-inspect') return (await import('../lib/workfile-import-assist.js')).inspectImportFile(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-finish') return (await import('../lib/workfile-import-assist.js')).finishImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);
       if (b.action === 'workfile-review-pieces') return (await import('../lib/workfile-assist.js')).reviewPieces(orgId, req, m, c, a);

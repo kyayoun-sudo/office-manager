@@ -43,7 +43,8 @@
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
       var p = st.imports[x.sheet], what = KIND[x.kind] || 'la pièce';
-      if (!p) return '<p class="wf-assist-busy">' + esc(x.sheet) + ' : je regarde toutes les pièces de la mission pour trouver ' + esc(what) + ' (par leurs colonnes et leurs dates, pas par leur nom)…</p>';
+      if (!p) { var sc = st.scan[x.sheet] || {}; return '<p class="wf-assist-busy">' + esc(x.sheet) + ' : l’application ouvre les pièces Excel / CSV une par une pour trouver ' + esc(what) + ' (par leurs colonnes et leurs dates, pas par leur nom)' +
+        (sc.total ? ' — ' + sc.done + ' / ' + sc.total + (sc.found ? ', ' + sc.found + ' trouvée(s)' : '') : '') + '…</p>' + (sc.current ? '<p class="meta">' + esc(sc.current) + '</p>' : ''); }
       if (p.error) return '<p class="wf-assist-err">' + esc(x.sheet) + ' : ' + esc(p.error) + '</p>';
       if (p.status === 'NO_SOURCE_FOUND') return '<p>' + esc(x.sheet) + ' : je n’ai trouvé ' + esc(what) + ' dans aucune pièce Excel ou CSV de la mission' + (p.ai === 'unavailable' ? ' (l’IA n’a pas répondu : je n’ai regardé que les colonnes reconnues par le code)' : '') + '. Déposez-le plus bas, ou je prépare la demande au client.</p>';
       if (p.status !== 'READY') return '<p>' + esc(x.sheet) + ' : ' + esc(p.status) + '</p>';
@@ -57,6 +58,7 @@
             '<p class="meta">' + (ys.length ? 'Années : <b>' + esc(ys.join(', ')) + '</b>' : 'Années non lues') + (it.in_mission_period === false ? ' (hors période de la mission)' : '') + ' · ' + fmt(it.rows) + ' ligne(s)' +
             (g ? ' · débit ' + fmt(g.debit) + ', crédit ' + fmt(g.credit) + (g.difference ? ', <b>écart ' + fmt(g.difference) + '</b>' : ', équilibré') : '') +
             (it.set_aside && it.set_aside.count ? ' · ' + it.set_aside.count + ' ligne(s) de total mises de côté' : '') + '</p>' +
+            (it.check ? '<p class="' + (it.check.ok ? 'meta' : 'wf-assist-err') + '">' + (it.check.ok ? 'Vérifié par l’IA : correct' : 'L’IA signale un problème') + (it.check.remarks ? ' — ' + esc(it.check.remarks) : '') + '</p>' : '') +
             (it.understood ? '<p class="meta">Selon l’IA : ' + esc(it.understood.what) + (it.understood.period ? ' (' + esc(it.understood.period) + ')' : '') + (it.understood.why ? ' — ' + esc(it.understood.why) : '') + '</p>' : '') +
             (it.same_period_as ? '<p class="meta">Même période que « ' + esc(it.same_period_as) + ' » : décochée pour ne pas importer deux fois.</p>' : '') +
             (it.error ? '<p class="wf-assist-err">Lecture impossible : ' + esc(ERR[it.error] || it.error) + '</p>' :
@@ -67,14 +69,33 @@
         (p.ai === 'unavailable' ? '<p class="meta">L’IA n’a pas répondu : seules les colonnes reconnues par le code sont rattachées.</p>' : '') +
         (tooBig ? '<p class="wf-assist-warn">Le tableau de ' + esc(x.sheet) + ' a ' + fmt(x.capacity) + ' lignes ; les pièces cochées en ont ' + fmt(total) + '. Je peux d’abord l’agrandir de ' + fmt(total - x.capacity) + ' lignes, comme dans Excel : mêmes formats, listes et formules recopiées, et les totaux des autres feuilles prolongés. Je n’importe jamais une partie seulement.</p>' : '') +
         (p.run_error ? '<p class="wf-assist-err">Import arrêté : ' + esc(p.run_error) + '</p>' : '') +
-        (d.editable ? '<div class="row"><button type="button" class="btn" data-a="import" data-sheet="' + esc(x.sheet) + '"' + (tooBig ? ' data-extend="1"' : '') + (!picked.length ? ' disabled' : '') + '>' + (tooBig ? 'Oui, agrandis le tableau et importe ' : 'Oui, importe ') + (picked.length > 1 ? 'les ' + picked.length + ' pièces cochées (à la suite)' : 'la pièce cochée') + '</button><button type="button" class="btn ghost" data-a="import-detail">Choisir les colonnes moi-même</button></div>' : '') + '</div>';
+        (d.editable ? '<div class="row"><button type="button" class="btn" data-a="import" data-sheet="' + esc(x.sheet) + '"' + (tooBig ? ' data-extend="1"' : '') + (!picked.length ? ' disabled' : '') + '>' + (tooBig ? 'Oui, agrandis le tableau et importe ' : 'Oui, importe ') + (picked.length > 1 ? 'les ' + picked.length + ' pièces cochées (à la suite)' : 'la pièce cochée') + '</button><button type="button" class="btn ghost" data-a="import-detail" data-sheet="' + esc(x.sheet) + '">Choisir les colonnes moi-même</button></div>' : '') + '</div>';
     }).join('') + '</div>';
   }
   var ERR = { HUMAN_CONFIRMATION_REQUIRED: 'une écriture précédente attend votre confirmation (voir le travail de l’agent)', DOCUMENT_INVENTORY_UNAVAILABLE: 'la liste des pièces de la mission n’est pas lisible pour l’instant', IN_REVIEW_OR_NOT_EDITABLE: 'le test est en revue ou vous n’en êtes pas le préparateur', TABLE_CAPACITY_OR_OCCUPIED_CELL: 'des cases du tableau sont déjà remplies', TABLE_TOO_SMALL: 'le tableau du modèle est trop petit', ROWS_BELOW_TABLE_NOT_EMPTY: 'il y a déjà quelque chose sous le tableau : je ne l’agrandis pas par-dessus', SOURCE_TYPE_MISMATCH: 'la pièce ne ressemble pas au contenu attendu par cette feuille', WORK_CHANGED_PREPARE_AGAIN: 'le fichier ou la pièce a changé, je refais la proposition' };
-  function propose(sheet, fileId) {
-    st.imports[sheet] = null; render();
-    return api('workfile-import-propose', { sheet: sheet }).then(function (p) { st.imports[sheet] = p; (p.items || []).forEach(function (it, i) { st.pick[sheet + '|' + i] = !!it.recommended; }); render(); })
-      .catch(function (e) { var m = String(e && e.message || e); st.imports[sheet] = { error: 'proposition impossible — ' + (ERR[m] || m) }; render(); });
+  // (2026-10-25, Paul : « l'application peut importer sans que ce soit l'IA ; l'IA vérifie que c'est bon ») The CODE opens the pieces one
+  // by one (progress shown, no request too long for 90 pieces), then the AI checks what the code found and fills what it could not.
+  st.scan = {};
+  function propose(sheet) {
+    st.imports[sheet] = null; st.scan[sheet] = { done: 0, total: 0, found: 0, current: '' }; render();
+    var items = [];
+    return api('workfile-import-candidates', { sheet: sheet }).then(function (c) {
+      var files = c.files || []; st.scan[sheet].total = files.length; render();
+      var i = 0;
+      function next() {
+        if (i >= files.length) return null;
+        var f = files[i++]; st.scan[sheet].current = f.name; render();
+        return api('workfile-import-inspect', { sheet: sheet, file_id: f.file_id, name: f.name }).then(function (r) {
+          (r.items || []).forEach(function (it) { items.push(it); if (it.by) st.scan[sheet].found++; });
+        }).catch(function () {}).then(function () { st.scan[sheet].done = i; render(); return next(); });
+      }
+      return next();
+    }).then(function () {
+      st.scan[sheet].current = 'l’IA vérifie ce que l’application a trouvé…'; render();
+      return api('workfile-import-finish', { sheet: sheet, items: items });
+    }).then(function (p) {
+      st.imports[sheet] = p; (p.items || []).forEach(function (it, i) { st.pick[sheet + '|' + i] = !!it.recommended; }); render();
+    }).catch(function (e) { var m = String(e && e.message || e); st.imports[sheet] = { error: 'proposition impossible — ' + (ERR[m] || m) }; render(); });
   }
 
   function pieces(d) {
@@ -91,9 +112,16 @@
     return html + '</div>';
   }
 
+  // « Comment j'importe, comment je remplis ? » (Paul, 2026-10-25): the path, in three lines, always at hand.
+  function howto() {
+    return '<details class="wf-howto"' + (st.howtoOpen ? ' open' : '') + '><summary>Comment importer et remplir</summary><ol>' +
+      '<li><b>Les feuilles de données</b> (D1 grand livre, D2 budget…) : l’application trouve les pièces ci-dessous ; cochez-les, puis « Oui, importe ». À la main : « Choisir les colonnes moi-même » ouvre « Importer les données client » sur la bonne feuille (fichier, feuille du fichier, étape, « Examiner », colonnes, confirmer).</li>' +
+      '<li><b>Le test</b> (PRJ-01…) : dans « Travail de l’agent », l’agent lit les pièces et propose les cases en pointillés dans la feuille à droite ; « Valider et écrire ».</li>' +
+      '<li><b>Vos décisions</b> (Conforme ? Oui / Non / N/A, votre conclusion) : directement dans la feuille à droite, puis « Enregistrer dans le fichier ». L’agent ne les remplit jamais.</li></ol></details>';
+  }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + (d ? known(d) + imports(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + imports(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -127,6 +155,7 @@
     }).catch(function (e) { st.say = 'Lecture des pièces impossible : ' + (e && e.message || e); render(); });
   }
 
+  box.addEventListener('toggle', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('wf-howto')) st.howtoOpen = ev.target.open; }, true);
   box.addEventListener('change', function (ev) { var c = ev.target; if (c && c.dataset && c.dataset.pick) { st.pick[c.dataset.pick] = c.checked; render(); } });
   box.addEventListener('click', function (ev) {
     var b = ev.target.closest('button'); if (!b || b.disabled) return;
@@ -141,7 +170,7 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
-    if (b.dataset.a === 'import-detail') { var ib = Array.prototype.find.call(document.querySelectorAll('button'), function (x) { return /^Importer les données/.test(x.textContent); }); if (ib) { ib.scrollIntoView({ behavior: 'smooth' }); ib.click(); } }
+    if (b.dataset.a === 'import-detail') { var sel = document.getElementById('audit-sheet'); if (sel && b.dataset.sheet) { sel.value = b.dataset.sheet; sel.dispatchEvent(new Event('change')); } var ib = Array.prototype.find.call(document.querySelectorAll('button'), function (x) { return /^Importer les données/.test(x.textContent); }); if (ib) { ib.scrollIntoView({ behavior: 'smooth' }); setTimeout(function () { ib.click(); }, sel && b.dataset.sheet ? 1800 : 0); } }
     if (b.dataset.a === 'import') {
       var sh = b.dataset.sheet, p = st.imports[sh]; if (!p || !p.items) return;
       var items = p.items.filter(function (it, i) { return st.pick[sh + '|' + i]; }).map(function (it) { return { file_id: it.file_id, sheet: it.sheet, rows: it.rows, mapping: it.mapping }; });
