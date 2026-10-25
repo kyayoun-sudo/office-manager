@@ -302,6 +302,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'steps') return (await import('../lib/step-runner.js')).stepsView(orgId, m, c, a);
       if (b.action === 'step-plan') return (await import('../lib/step-runner.js')).planStep(orgId, m, c, b, a);
       if (b.action === 'step-run') return (await import('../lib/step-runner.js')).runStep(orgId, m, c, b, a);
+      if (b.action === 'pipeline-plan') return (await import('../lib/audit-pipeline.js')).planPipeline(orgId, m, c, b, a);
+      if (b.action === 'pipeline-write') return (await import('../lib/audit-pipeline.js')).writePipeline(orgId, m, c, b, a);
       if (['needs', 'need-piece', 'need-request'].includes(b.action)) await requireMissionAccess(orgId, m, a);
       if (b.action === 'needs') return (await import('../lib/procedure-needs.js')).procedureNeeds(orgId, m, c, a);
       if (b.action === 'need-piece') return (await import('../lib/procedure-needs.js')).depositForNeed(orgId, m, c, b, a, req);

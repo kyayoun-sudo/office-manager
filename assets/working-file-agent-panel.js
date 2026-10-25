@@ -22,6 +22,7 @@
     '<div id="wf-agent-step" class="wf-agent-step"><strong>Lecture du Working File…</strong><p>L’agent identifie la prochaine étape et les sources de cette mission.</p></div>' +
     '<div id="wf-agent-body" class="wf-agent-body"></div>' +
     '<div id="wf-agent-actions" class="wf-agent-actions"></div>' +
+    '<div id="wf-agent-test" class="wf-agent-test"></div>' +
     '<p id="wf-agent-message" class="status" role="status" aria-live="polite"></p>';
   dialogue.insertBefore(board, dialogue.firstChild);
 
@@ -300,6 +301,52 @@
     addAction('Voir / demander les pièces', scrollNeeds, false);
   }
 
+  // (2026-10-25, Paul : « l'auditeur écrit ce qu'il faut faire et la machine le fait ; intelligent, il le donne dès qu'il le voit »)
+  // The step (or the auditor's own sentence) becomes a test of code operations, run on the mission's population as soon as the step
+  // opens: results shown here, nothing written until « Écrire dans le Working File ». Asked to the AI once per step, then kept.
+  var testSeq = 0;
+  function testBox() { return $('wf-agent-test'); }
+  function askBox(prefill) {
+    return '<form class="wf-test-ask"><label>Dites ce qu’il faut faire<input type="text" maxlength="1200" placeholder="ex. doublons de factures fournisseurs au-dessus de 500 000, puis 25 lignes au hasard" value="' + esc(prefill || '') + '"></label><button class="btn ghost" type="submit">Faire ce test</button></form>';
+  }
+  function bindAsk(step) {
+    var f = testBox().querySelector('.wf-test-ask');
+    if (f) f.addEventListener('submit', function (e) { e.preventDefault(); var v = f.querySelector('input').value.trim(); if (v) testFor(step, v); });
+  }
+  async function testFor(step, text, extra) {
+    var box = testBox(), seq = ++testSeq;
+    if (!box || !step) return;
+    box.innerHTML = '<p class="meta">L’agent transforme ' + (text ? 'votre consigne' : 'l’étape') + ' en test et l’exécute sur les pièces…</p>';
+    var r;
+    try { r = await post(Object.assign({ action: 'pipeline-plan', step: text ? null : step.n, text: text || undefined }, extra || {}), false); }
+    catch (e) { if (seq === testSeq) { box.innerHTML = '<p class="meta">Test non préparé : ' + esc(apiError(e)) + '</p>' + askBox(text); bindAsk(step); } return; }
+    if (seq !== testSeq) return;
+    if (r.calculation === false) { box.innerHTML = askBox(''); bindAsk(step); return; }   // a reading step: the preparation above handles it
+    if (r.ai === 'AGENTS_NOT_AUTHORIZED' || r.ai === 'AI_UNAVAILABLE') { box.innerHTML = '<p class="meta">' + (r.ai === 'AI_UNAVAILABLE' ? 'L’IA ne répond pas : le test n’a pas pu être compris.' : 'Les agents ne sont pas autorisés pour ce cabinet.') + '</p>' + askBox(text); bindAsk(step); return; }
+    var h = '<h3>Test exécuté par le code</h3>';
+    if (r.understood) h += '<p>' + esc(r.understood) + (r.source ? ' — <em>' + esc(r.source.name) + '</em>' : '') + '</p>';
+    if (!r.ready) h += '<p class="wf-test-problem">' + (r.problems || []).map(esc).join(' · ') + '</p>';
+    else {
+      h += '<p class="wf-test-trace">' + (r.trace || []).map(function (t) { return esc(t.op) + ' ' + esc(t.in) + '→' + esc(t.out); }).join(' · ') + '</p>';
+      h += '<p><strong>' + esc(r.count) + '</strong> ligne(s)' + (r.totals && r.totals.net != null ? ' · net ' + esc(Number(r.totals.net).toLocaleString('fr-FR')) : '') + '</p>';
+      if ((r.flags || []).length) h += '<ul class="wf-agent-list">' + r.flags.slice(0, 5).map(function (f) { return '<li>' + esc(f.text) + '</li>'; }).join('') + (r.flags.length > 5 ? '<li>… ' + (r.flags.length - 5) + ' autre(s)</li>' : '') + '</ul>';
+      if ((r.rows || []).length) h += '<details><summary>Voir les lignes</summary><div class="wf-test-table"><table><thead><tr>' + r.columns.map(function (c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        r.rows.slice(0, 30).map(function (row) { return '<tr>' + r.columns.map(function (c) { return '<td>' + esc(row[c.key]) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div></details>';
+    }
+    (r.questions || []).forEach(function (q) { h += '<p class="meta">? ' + esc(q) + '</p>'; });
+    h += '<div class="wf-agent-actions wf-test-actions"></div>' + askBox(r.ai === 'cached' || !text ? '' : text);
+    box.innerHTML = h;
+    var acts = box.querySelector('.wf-test-actions');
+    function act(label, fn, primary) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (primary ? '' : ' ghost'); b.textContent = label; b.addEventListener('click', fn); acts.appendChild(b); return b; }
+    if (r.ready && r.editable !== false) act('Écrire dans le Working File', async function () {
+      this.disabled = true;
+      try { var w = await post({ action: 'pipeline-write', key: r.key }, false); message(w.verified ? 'Écrit et relu : feuille ' + w.sheet + '.' : 'Écrit, relecture à vérifier : feuille ' + w.sheet + '.'); try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: w.sheet } })); } catch (_) {} }
+      catch (e) { message(apiError(e)); this.disabled = false; }
+    }, true);
+    act('Refaire le test', function () { testFor(step, text, { refresh: true }); }, false);
+    bindAsk(step);
+  }
+
   async function prepare(step, explicit, overrides) {
     if (!step || state.busy) return;
     state.busy = true;
@@ -308,6 +355,7 @@
     setStatus('Recherche et lecture', 'working');
     message('L’agent prépare l’étape à partir du SOP, du Working File et des pièces de cette mission…');
     try {
+      if (state.testStep !== step.n || explicit) { state.testStep = step.n; testFor(step, null); }
       var body = Object.assign({ action: 'step-plan', step: step.n }, overrides || {});
       var plan = await post(body, true);
       renderPlan(plan || {});

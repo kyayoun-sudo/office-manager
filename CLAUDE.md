@@ -935,6 +935,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   lignes (ce qui est préparé, ce qui manque), « Oui, remplis », et une phrase pour dire ce qui ne va pas (`hint`, donnée à l'IA qui refait).
   Le tableau colonne par colonne et les listes de choix sont retirés ; « Pièces que demande ce working file » est replié.
   Test : `tests/sheet-understanding.test.js`.
+- LE TEST ÉCRIT EN MOTS, EXÉCUTÉ PAR LA MACHINE (Paul, 2026-10-25 : « si le cabinet n'a pas de workbook, l'auditeur écrit ce qu'il faut faire
+  et la machine le fait ; intelligent, il le donne dès qu'il le voit ») : `lib/audit-pipeline.js`. L'IA traduit l'étape du SOP (ou la phrase
+  de l'auditeur, champ « Dites ce qu'il faut faire ») en une SUITE d'opérations d'une liste FERMÉE (`PIPELINE_OPS` : filter, duplicates,
+  round_amounts, weekend, out_of_period, cutoff, top, group, compare, sample, benford, checklist — jamais du code écrit par l'IA) avec la
+  population choisie par son contenu ; le CODE valide (`cleanPipeline` : opération connue, pièce de la mission, paramètres bornés, 8 étapes
+  max) et exécute (`runPipeline`, grand livre par sections aplati via `clientTable`, numéro de ligne du fichier client gardé, tirage
+  reproductible par graine, trace entrée → sortie par étape). Dès l'ouverture de l'étape, le résultat s'affiche dans « Travail de l'agent »
+  (bloc « Test exécuté par le code », lignes repliées) ; l'IA n'est appelée qu'une fois par étape / consigne (plan gardé dans
+  `walkthrough`, `kind: 'audit-pipeline'`) ; une étape de lecture répond `calculation:false` (la préparation documentaire s'en charge).
+  « Écrire dans le Working File » (`pipeline-write`) = feuille à part `<CODE>_T<n>` marquée `PIPELINE_MARK`, recalculée côté serveur depuis le
+  plan gardé (jamais ce que le navigateur envoie), jamais par-dessus une feuille d'une personne, version vérifiée, relue, audit
+  `WORKPAPER_TEST_RUN`. Actions `pipeline-plan` / `pipeline-write` de la route `procedure`. Test : `tests/audit-pipeline.test.js`.
+  Non essayé : vraie IA, vraie mission. Reste : sans IA, saisir le test à la main dans l'écran (le serveur l'accepte déjà : `pipeline` +
+  `source_file_id`) ; working file généré depuis la fiche du SOP quand le cabinet n'a aucun modèle (cas 1) ; premier écran « cabinet
+  d'audit / entreprise (audit interne) » (décidé plus tard par Paul, pas codé).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
