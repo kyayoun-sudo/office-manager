@@ -747,6 +747,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   des étapes du SOP : `map.learned_from_the_auditor`). Actions `workfile-learn-start|-cancel|-learn|-confirm` (route `procedure`),
   `learn-procedures` (route `workfile`). Bloc « Chemins trop longs » retiré de l'écran (Paul : renommer intelligemment, pas un bouton) :
   les noms créés restent courts (`path-budget`). Test : `tests/workfile-learn.test.js`.
+- TOUT RANGEMENT NOMME D'APRÈS LE CONTENU, POUR TOUS LES AGENTS (Paul, 2026-10-25 : « l'Enhanced Auditor ne range pas selon ce qui est,
+  ou c'est l'Orpailleur ; tout rangement doit comprendre le fichier, savoir ce qu'il est et le renommer ; le tableau budgétaire a été appelé
+  « tableau » ») : `lib/document-naming.js` = une seule règle — titre PRÉCIS lu (titre, type, rôle, puis début du résumé), jamais un mot
+  générique seul (`isGeneric` : Tableau, Document, Fichier, Pièce, Scan, Export, Feuil1…) ; rien de précis = nom d'origine GARDÉ et pièce
+  « à identifier » ; forme TITRE_CLIENT_PÉRIODE.ext ; `NAMING_RULE` donnée à chaque IA qui lit (dépôt, Orpailleur). Appliquée : pièces reçues
+  (`pieceName`), Orpailleur (`resolveName` : nom de l'IA s'il est précis, sinon construit par le code d'après ce qu'elle a lu ; un nom
+  « vide de sens » — IMG_…, scan, Document… — est remplacé même quand l'IA a seulement déplacé le fichier ; fichiers placés par un agent :
+  renommage permis, jamais déplacés), Mission Controller (`mission-filing`), pièces PBC confirmées (`filedName` : référence + titre lu +
+  période), pièces des tests de l'Enhanced Auditor (titre précis demandé à l'IA qui lit la pièce, renommées `<CODE>_<S01>_<TITRE>`, même
+  fichier). Objectifs des agents complétés (`lib/agent-goals.js`) pour que Shadow le surveille. Test : `tests/document-naming.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
