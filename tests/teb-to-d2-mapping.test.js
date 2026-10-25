@@ -14,8 +14,8 @@ test('code alone reads the meaning of each column, like a person', () => {
   assert.equal(TEB[at('Catégorie budgétaire').source], 'Libellé');
   assert.equal(TEB[at('Budget final approuvé (document)').source], "Budget de l'exercice");
   assert.equal(at('Budget final approuvé (document)').sure, true);
-  assert.equal(TEB[at('Budget initial').source], "Budget de l'exercice");
-  assert.equal(at('Budget initial').sure, false);                          // only one budget in the TEB: said, to confirm
+  assert.equal(at('Budget initial').source, null);                          // never the final budget copied as initial (PRJ-03 would pass by construction)
+  assert.match(at('Budget initial').why, /convention/);
   assert.equal(at('Amendements / réallocations (net)').source, null);       // nothing in the TEB: left empty, with the reason
   assert.match(at('Amendements / réallocations (net)').why, /amendements/);
   assert.equal(TEB[at('Engagements au 31/12').source], 'Engagement');
@@ -42,7 +42,7 @@ test('D2 as in NL-T01: « Budget final approuvé (document) » is the document a
     drive: { getMeta: async id => (id === 'WP' ? { name: 'NL.xlsx', size: wp.length, modifiedTime: 'v' } : { name: 'TEB_TABLEAU_EXTRAIT.xlsx', size: sb.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wp : sb) } };
   const p = await previewTableImport('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', step: 1, source_file_id: 'S', source_sheet: 'TABLEAU' }, { email: 'p' }, d);
   const got = Object.fromEntries(p.columns.map(c => [c.label, c.suggested_source == null ? null : TEB[c.suggested_source]]));
-  assert.deepEqual(got, { 'Catégorie budgétaire': 'Libellé', 'Budget initial': "Budget de l'exercice", 'Amendements / réallocations (net)': null,
+  assert.deepEqual(got, { 'Catégorie budgétaire': 'Libellé', 'Budget initial': null, 'Amendements / réallocations (net)': null,
     'Budget final approuvé (document)': "Budget de l'exercice", 'Engagements au 31/12': 'Engagement' });
   assert.ok(p.columns.every(c => c.suggested_why));
 });

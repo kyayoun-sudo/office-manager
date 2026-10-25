@@ -867,8 +867,8 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (`lib/sop-document-work.js`) — titre de montant (budget, montant, coût…) ou marqué « (document) », sans « ? », = fait ; l'import exclut ce que
   la carte dit jugement / clé / calcul / résultat ; 2) la pièce — `proposeColumn` (`lib/client-table-understanding.js`, CODE) lit le SENS de
   chaque titre (libellé, code, budget initial / final / sans précision, amendements, engagé, décaissé, réalisé, disponible, taux) et le genre des
-  valeurs (montants pour un montant) : Catégorie ← Libellé, Budget final ← Budget de l'exercice (sûr), Budget initial ← Budget de l'exercice
-  (« seul budget du document : à confirmer »), Amendements ← rien (« le document n'a pas de colonne pour… »), Engagements ← Engagement. Chaque
+  valeurs (montants pour un montant) : Catégorie ← Libellé, Budget final ← Budget de l'exercice (sûr), Budget initial ← RIEN (il vient de la convention / du premier budget :
+  le recopier rendrait juste d'office le recalcul initial + amendements = final de PRJ-03), Amendements ← rien (« le document n'a pas de colonne pour… »), Engagements ← Engagement. Chaque
   proposition porte sa raison, affichée dans l'import manuel et le panneau de l'agent (colonnes dépliées) ; l'IA vérifie et ne rattache que les
   colonnes restantes, par leur sens. Test : `tests/teb-to-d2-mapping.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
