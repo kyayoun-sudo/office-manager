@@ -17,7 +17,7 @@ test('a call to OpenRouter sends the key, the instructions and a picture, and re
   const r = await callModel({ provider: 'openrouter', instructions: 'Consigne', input: 'Question', files: [{ mimeType: 'image/png', base64: 'AAA' }], webSearch: true }, { env: { OPENROUTER_API_KEY: 'k' }, fetchImpl });
   assert.equal(seen.url, 'https://openrouter.ai/api/v1/chat/completions'); assert.equal(seen.auth, 'Bearer k');
   assert.match(seen.body.messages[0].content, /Consigne/); assert.equal(seen.body.messages[1].content[1].type, 'image_url');
-  assert.deepEqual(seen.body.plugins, [{ id: 'web' }]);
+  assert.deepEqual(seen.body.tools, [{ type: 'openrouter:web_search' }]); assert.equal(seen.body.plugins, undefined); // the « web » plugin is deprecated
   assert.equal(r.text, 'Réponse'); assert.equal(r.model, 'some/model'); assert.deepEqual(r.sources, [{ url: 'https://a.b', title: 'A' }]);
   await assert.rejects(callModel({ provider: 'openrouter', instructions: '', input: 'x' }, { env: {}, fetchImpl }), /OPENROUTER_NOT_CONFIGURED/);
 });
