@@ -32,11 +32,10 @@
 @media (prefers-color-scheme:dark){.wf-assist-err{color:#ff8a80}}
 .wf-assist-warn{font-weight:600}
 /* the import choices: the options of a list are always readable (light or dark) */
-#wf-layout select option{color:var(--ink);background:var(--surface)}
 /* every list of the page, wherever a panel puts it: the closed field and its open list are always readable (Paul, 2026-10-25) */
 .wf-import-panel{display:grid;gap:8px;margin-top:10px}
 .wf-import-panel select,#wf-layout select{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line,#d0d5dd);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#1b1f24);max-width:100%;min-width:0}
-select option,select optgroup{color:var(--ink,#1b1f24);background-color:var(--surface,#fff)}
+select option,select optgroup{color:#1b1f24;background-color:#fff}   /* fixed colours, never inherited from the page */
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) select option{color:#e8eaed;background-color:#1f2329}}
 :root[data-theme="dark"] select option{color:#e8eaed;background-color:#1f2329}
 .wf-howto ol{margin:4px 0 0 18px;padding:0}
@@ -45,3 +44,12 @@ select option,select optgroup{color:var(--ink,#1b1f24);background-color:var(--su
 .wf-mem li{margin:6px 0}
 .wf-need-linked{color:#1e7a46;font-weight:600}.wf-need-probable{font-weight:600}.wf-need-missing{color:#b42318;font-weight:600}
 @media (prefers-color-scheme:dark){.wf-need-linked{color:#7ad3a0}.wf-need-missing{color:#ff8a80}}
+
+/* visible choices in place of open lists (import panel) */
+.wf-choices{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.wf-choices-title{margin:4px 0 0;font-weight:600;color:var(--ink,#1b1f24)}
+.wf-choice{all:unset;box-sizing:border-box;display:block;width:100%;padding:8px 12px;border:1px solid var(--line,#d0d5dd);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#1b1f24);cursor:pointer;overflow-wrap:anywhere;font-size:14px;line-height:1.35}
+.wf-choice:hover{border-color:var(--brand,#2f6f5e)}
+.wf-choice.on{border-color:var(--brand,#2f6f5e);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand,#2f6f5e) 25%,transparent);font-weight:600}
+.wf-choice.on::before{content:'✓ ';color:var(--brand,#2f6f5e)}
+.wf-choice:disabled{opacity:.55;cursor:default}
