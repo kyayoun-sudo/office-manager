@@ -213,6 +213,20 @@ Le faire d'abord sur un aperçu (Preview), jamais directement en production.
      pour TATY ; un nouveau cabinet n'utilise jamais le compte Google, le Drive ni la boîte mail de TATY réglés dans Vercel.
 
 
+11. [ ] VÉRIFIER LES MODÈLES D'IA RÉGLÉS DANS VERCEL                         (2026-10-25, branche fix/ia-configuration)
+------------------------------------------------------------------------------------------
+Vérifié contre la documentation officielle de chaque fournisseur le 25 octobre 2026. Les secrets ne sont jamais lus par
+Claude : seules les VALEURS des modèles sont à regarder (pas les clés).
+Vercel → Settings → Environment Variables (Production ET Preview) :
+  1. ANTHROPIC_MODEL : s'il vaut claude-sonnet-4-5 (ou claude-sonnet-4-5-20250929), le remplacer par  claude-sonnet-5-5
+     → Anthropic arrête claude-sonnet-4-5 le 30 novembre 2026 ; après cette date, Claude ne répondrait plus.
+  2. GEMINI_MODEL : s'il vaut gemini-2.5-pro, ou s'il est vide, le régler à  gemini-3.8-flash
+     → Google refuse gemini-2.5-pro aux nouveaux projets (réservé à ceux qui l'utilisaient déjà).
+  3. OPENAI_MODEL : s'il vaut gpt-4.1, le remplacer par  gpt-6-luna  (gpt-4.1 s'arrête le 14 janvier 2027).
+  4. Redéployer. Puis Pilotage → Modèles d'IA : chaque pastille doit être verte.
+À savoir : sans modèle réglé, le code prend maintenant gemini-3.8-flash et gpt-6-luna (les agents comme les réponses).
+La recherche web d'OpenRouter utilise le nouvel outil (l'ancien « plugin web » est abandonné par OpenRouter).
+Une réponse de Claude coupée par sa limite de longueur est refusée et l'IA suivante prend le relais.
 -----------------------------------------------------------------------------------------------------------------
 « CE QUE DEMANDE CE TEST » DANS MA PROCÉDURE (2026-10-19)
 -----------------------------------------------------------------------------------------------------------------
