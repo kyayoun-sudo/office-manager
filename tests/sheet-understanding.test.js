@@ -269,3 +269,33 @@ test('fonds reçus: credits collected from every bank statement, and one row per
   const R = await sheetPlan('O', 'M', 'PRJ-07', { sheet: 'D3_FONDS_RECUS' }, { email: 'p' }, d3b);
   assert.equal(R.collect.rows, 0); assert.match(R.collect.to_check[0], /non retrouvé/);
 });
+
+test('Paul’s screenshot: a PTBA with merged titles never puts a title in an amount column; its categories become the lines of D2', async () => {
+  const w = await workingFile();
+  const wp = Buffer.from(await w.xlsx.writeBuffer());
+  const b = new ExcelJS.Workbook(), s = b.addWorksheet('PTBA');
+  s.getCell('A1').value = 'PLAN DE TRAVAIL ET BUDGET DU PROJET ANNUEL 2023'; s.mergeCells('A1:E1');
+  s.getCell('A2').value = "BUDGET (en CFA '000)"; s.mergeCells('A2:E2');
+  s.getRow(3).values = ['Code', 'Activité', 'Unité', 'Quantité', 'Total'];
+  s.getCell('A4').value = 'COMPOSANTE I : APPUI A LA STRUCTURATION DE LA FILIERE'; s.mergeCells('A4:E4');
+  s.getRow(5).values = ['B', 'B . SERVICE', null, null, 254800];
+  s.getRow(6).values = ['B.1.1', 'Assistance technique', 'h/j', 12, 117600];
+  s.getRow(7).values = ['B.1.2', 'Etudes', 'u', 1, 137200];
+  s.getRow(8).values = ['C', 'C . FONCTIONNEMENT', null, null, 50000];
+  s.getRow(9).values = ['C.1', 'Carburant', 'l', 100, 30000];
+  s.getRow(10).values = ['C.2', 'Fournitures', 'u', 10, 20000];
+  const ptba = Buffer.from(await b.xlsx.writeBuffer());
+  const memory = [{ id: 'PTBA', name: 'PTBA_2023.xlsx', title: 'PTBA 2023', read: true, uses: [] }];
+  const view = { editable: true, card: { steps: [{ text: 'x' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] }, line: { code: 'PRJ-03' } };
+  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })),
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'NL.xlsx', size: wp.length } : { name: 'PTBA_2023.xlsx', size: ptba.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wp : ptba) },
+    // the AI makes the screenshot's mistake: every line of the PTBA, its « Total » column into « Budget final approuvé »
+    ai: async (p, o) => (/vérifies le plan/.test(o.instructions) ? { text: '{}' } : { text: JSON.stringify({ rows_from: { document_id: 'PTBA', which: 'lines' }, columns: [{ col: 'D', document_id: 'PTBA', heading: 'Total' }] }) }) };
+  const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET' }, { email: 'p' }, d);
+  const D = P.cells.filter(c => c.address.startsWith('D'));
+  assert.ok(D.every(c => typeof c.value === 'number'), JSON.stringify(D.map(c => c.value)));
+  assert.deepEqual(D.map(c => c.value), [254800, 50000]);
+  assert.deepEqual(P.cells.filter(c => c.address.startsWith('A')).map(c => c.value), ['B . SERVICE', 'C . FONCTIONNEMENT']);
+  assert.equal(P.preview.categories.by_method, true);
+  assert.deepEqual(P.recognised.budgets_with_categories, ['PTBA_2023.xlsx']);
+});

@@ -962,6 +962,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   crédit, années, comptes) ; l'IA reçoit ces mesures (consigne ASSIGN) ; lignes de D2 = catégories prouvées, sinon le mot, sinon « aucune
   ligne de catégorie trouvée » dit ; GL de correspondance trouvé par sa forme ; l'écran dit ce qui a été reconnu (grand livre, budget par
   catégorie). Test : `tests/table-structure.test.js`. Non essayé sur le vrai PTBA ni le vrai GL de Paul (pas dans ce Drive).
+- TITRES DU PTBA DANS LA COLONNE DES MONTANTS (Paul, 2026-10-25, capture : « Budget final approuvé » rempli avec « PLAN DE TRAVAIL… »,
+  « COMPOSANTE I… », « B. SERVICE ») — causes prouvées : 1) ExcelJS donne le texte d'une cellule FUSIONNÉE à chaque case de la fusion :
+  un titre fusionné sur toute la ligne arrivait dans toutes les colonnes, montants compris ; désormais `ownCell` (`lib/procedure-work.js`)
+  ne garde que la première case (`clientTable`, `readTable`, `peekDocument`) ; 2) l'expression « Sous-total » ne reconnaissait jamais
+  « Sous-total » (`totaux?` exige « totau… ») — corrigée dans `sheet-understanding`, `table-structure`, `ledger-shape` ; 3) garde-fous du
+  remplissage (`buildCombined`) : une colonne de montants ne reçoit jamais un texte (compté, dit), une ligne sans aucun montant (titre,
+  section) n'est pas une ligne de la feuille ; une feuille par catégorie prend les catégories prouvées par leurs sommes même si l'IA ne
+  l'a pas dit (méthode du cabinet), la colonne Catégorie reçoit le n° de compte trouvé dans le GL, sinon le libellé de la catégorie ; une
+  ligne « Sous-total » d'une seule dépense est acceptée. Test : « Paul's screenshot » (`tests/sheet-understanding.test.js`).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
