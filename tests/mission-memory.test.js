@@ -19,3 +19,21 @@ test('every agent writes to ONE mission memory: what the file is, where it is fi
   const view = await missionMemory('m', { ...d, drive: { findFilesByExactName: async () => [{ id: 'MEM' }], downloadBuffer: async () => Buffer.from(JSON.stringify(state)), getMeta: async () => ({ modifiedTime: 't' }) }, folder: 'F' });
   assert.equal(view[0].location, 'PAGFIC/03_BUDGET');
 });
+
+test('the mission memory is kept in the mission folder (_OFFICE_MANAGER) and read together with the central index', async () => {
+  const { recordMissionDocuments, missionDocuments, mergeDocuments, MISSION_MEMORY_FILE } = await import('../lib/mission-files.js');
+  const { isAgentOwnFile } = await import('../lib/agent-files.js');
+  const files = {};
+  const updateJsonFile = async (name, mutate, o) => { const k = o.folder + '/' + name; files[k] = await mutate(files[k] || null); return { fileId: k, state: files[k], written: true }; };
+  const drive = { findFiles: async () => [], downloadText: async () => '{}' };
+  const d = { updateJsonFile, drive, folder: 'MEM', missionHome: 'MISSION_HOME', fetchRows: async () => [{ id: 'm1' }], audit: async () => ({ db: true }) };
+  await recordMissionDocuments({ id: 'm1', name: 'Projet', org_id: 'o' }, [{ id: 'f1', name: 'BUDGET.xlsx', title: 'Budget approuvé', event: { agent: 'enhanced-auditor', what: 'lu' } }], d);
+  assert.equal(files['MISSION_HOME/' + MISSION_MEMORY_FILE].documents[0].title, 'Budget approuvé');
+  assert.equal(files['MEM/OFFICE_MANAGER_MISSION_FILES.json'].missions.m1.documents[0].id, 'f1');
+  // central index lost: the mission's own file still answers; newest entry wins when both exist
+  const merged = mergeDocuments([{ id: 'f1', title: 'ancien', at: '2026-01-01' }], [{ id: 'f1', title: 'récent', at: '2026-02-01', uses: [{ what: 'pbc', where: 'PBC-1' }] }, { id: 'f2', at: '2026-01-05' }]);
+  assert.deepEqual(merged.map(x => [x.id, x.title || null]), [['f1', 'récent'], ['f2', null]]);
+  assert.equal(isAgentOwnFile({ name: 'x.json', path: 'AUDIT/2025/PROJET/_OFFICE_MANAGER/x.json' }), true);
+  const read = await missionDocuments('m1', { drive: { findFiles: async () => [] }, missionHome: null }).catch(e => e);
+  assert.ok(Array.isArray(read) || read instanceof Error);
+});

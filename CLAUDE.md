@@ -780,6 +780,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   travail de cette feuille » (`workfile-clear-sheet`, deux clics) : toutes les cases à remplir des tableaux (saisies, imports, écrits de
   l'agent), formules et en-têtes gardés, version vérifiée, relu, reçus de la feuille marqués annulés, audit `WORKFILE_SHEET_CLEARED`.
   Test : `tests/workfile-needs.test.js`.
+- VALIDER N'EST PAS CRÉER UNE TÂCHE, LISTES LISIBLES, MÉMOIRE DANS LE DOSSIER DE LA MISSION (Paul, 2026-10-25 : « pourquoi quand on valide
+  ça devient une tâche active pour l'équipe ? dans ces 3 cases impossible de voir les propositions ; la mémoire de la mission devrait être
+  un fichier ou un dossier caché dans le dossier de la mission ») : chaque pièce justificative / état financier / facture déposée créait
+  une proposition `MISSION_DOCUMENT_REVIEW` (« contrôler ce document et mettre à jour la liste PBC ») qui, validée, tombait dans le cas
+  général de `executeDecision` → tâche de l'équipe confiée au manager. Plus créée (`applyMissionUpdates` : la pièce est lue, renommée,
+  rangée et gardée dans la mémoire de la mission ; facture = note pour Sika dans cette mémoire) ; les anciennes sont retirées de
+  « À valider », des points de revue du cockpit et des tâches des personnes (`kpi.js`), et une validée = « pris en compte », sans tâche.
+  Import manuel (`assets/procedure-workspace.js`) : un seul panneau à la fois, la source proposée et l'étape du SOP qui parle de la
+  feuille présélectionnées, listes ouvertes lisibles en clair / sombre. Mémoire : `<dossier mission>/_OFFICE_MANAGER/
+  OFFICE_MANAGER_MISSION_MEMORY.json` (zone §24, créée une fois ; Drive n'a pas de vrai fichier caché), écrite à chaque événement avec
+  l'index central `OFFICE_MANAGER_MISSION_FILES.json` gardé ; lecture = union des deux (`mergeDocuments`, l'entrée la plus récente
+  gagne) ; `_OFFICE_MANAGER` est un dossier des agents (`agent-files.js`), jamais rangé par l'Orpailleur. Test : `tests/mission-memory.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

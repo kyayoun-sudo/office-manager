@@ -195,7 +195,7 @@ test('a document for a mission in progress updates it: facts directly, changes p
     ai: async () => ({ text: JSON.stringify({ team: [{ person: 'Awa Koné', role: 'Chef de mission' }, { person: 'Inconnu', role: 'x' }] }) }) });
   assert.equal(out.attached, 4);
   const types = rows.filter(x => x.path.startsWith('office_action_queue')).map(x => x.row.action_type + ':' + x.row.agent_key);
-  assert.deepEqual(types, ['MISSION_UPDATE:grand-controleur', 'MISSION_DOCUMENT_REVIEW:grand-controleur', 'MISSION_DOCUMENT_REVIEW:sika']);
+  assert.deepEqual(types, ['MISSION_UPDATE:grand-controleur']);   // documents to control are the agents' work, never a proposal that turns into a team task
   const upd = rows.find(x => x.row.action_type === 'MISSION_UPDATE').row;
   assert.equal(upd.payload.planned_start, '2026-11-10'); assert.equal(upd.status, 'proposed');
   const team = rows.filter(x => x.path === 'office_mission_assignments');
