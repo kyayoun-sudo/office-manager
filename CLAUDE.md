@@ -861,6 +861,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   EST (Code, Libellé, Budget de l'exercice, Décaissement, Engagement, Réalisation, Crédit disponible, % — codes en texte, montants en
   nombres, chaque valeur vérifiée dans le PDF) ; la correspondance avec les colonnes de la feuille se fait ensuite à l'import, à la vue de
   la personne. Un ancien extrait (méthode précédente) n'est jamais réutilisé (`method: 'document_columns'`).
+- LE SENS DES COLONNES, DES DEUX CÔTÉS (Paul, 2026-10-25 : « il n'a ni compris la pièce ni compris le workfile, à vue d'œil on sait où
+  mettre chacun ») : 1) le working file — « Budget final approuvé (document) » était lu comme une DÉCISION (mot « approuvé ») alors que c'est le
+  montant du document du bailleur que le TOTAL de D2 additionne : `DOCUMENT_FACT` (`lib/workfile-map.js`) et `writableCell`
+  (`lib/sop-document-work.js`) — titre de montant (budget, montant, coût…) ou marqué « (document) », sans « ? », = fait ; l'import exclut ce que
+  la carte dit jugement / clé / calcul / résultat ; 2) la pièce — `proposeColumn` (`lib/client-table-understanding.js`, CODE) lit le SENS de
+  chaque titre (libellé, code, budget initial / final / sans précision, amendements, engagé, décaissé, réalisé, disponible, taux) et le genre des
+  valeurs (montants pour un montant) : Catégorie ← Libellé, Budget final ← Budget de l'exercice (sûr), Budget initial ← Budget de l'exercice
+  (« seul budget du document : à confirmer »), Amendements ← rien (« le document n'a pas de colonne pour… »), Engagements ← Engagement. Chaque
+  proposition porte sa raison, affichée dans l'import manuel et le panneau de l'agent (colonnes dépliées) ; l'IA vérifie et ne rattache que les
+  colonnes restantes, par leur sens. Test : `tests/teb-to-d2-mapping.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

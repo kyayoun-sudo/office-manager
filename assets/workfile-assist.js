@@ -153,8 +153,8 @@
             (it.coverage != null && it.coverage < 40 ? '<p class="wf-assist-err">Cette pièce ne remplit que ' + it.coverage + ' % des colonnes de la feuille : probablement pas le bon genre de document.</p>' : '') +
             (it.same_period_as ? '<p class="meta">Même période que « ' + esc(it.same_period_as) + ' » : décochée pour ne pas importer deux fois.</p>' : '') +
             (it.error ? '<p class="wf-assist-err">Lecture impossible : ' + esc(ERR[it.error] || it.error) + '</p>' :
-            '<details><summary>Colonnes : ' + it.mapping.length + ' rattachée(s)' + (it.unmatched.length ? ', ' + it.unmatched.length + ' laissée(s) vide(s)' : '') + '</summary><ul class="wf-agent-list">' +
-              it.mapping.map(function (m) { return '<li>' + esc(m.label) + ' ← « ' + esc(m.source_label) + ' »' + (m.by === 'ia' ? ' <em>selon l’IA' + (m.why ? ' : ' + esc(m.why) : '') + '</em>' : '') + '</li>'; }).join('') + '</ul>' +
+            '<details' + (it.recommended ? ' open' : '') + '><summary>Colonnes : ' + it.mapping.length + ' rattachée(s)' + (it.unmatched.length ? ', ' + it.unmatched.length + ' laissée(s) vide(s)' : '') + '</summary><ul class="wf-agent-list">' +
+              it.mapping.map(function (m) { return '<li>' + esc(m.label) + ' ← « ' + esc(m.source_label) + ' »' + (m.by === 'ia' ? ' <em>selon l’IA' + (m.why ? ' : ' + esc(m.why) : '') + '</em>' : m.why ? ' <span class="meta">' + (m.to_confirm ? '<b>à confirmer</b> — ' : '') + esc(m.why) + '</span>' : '') + '</li>'; }).join('') + '</ul>' +
               (it.unmatched.length ? '<p class="meta">Laissées vides : ' + esc(it.unmatched.join(', ')) + '.</p>' : '') + '</details>') + '</div>';
         }).join('') +
         (p.ai === 'unavailable' ? '<p class="meta">L’IA n’a pas répondu : seules les colonnes reconnues par le code sont rattachées.</p>' : '') +
