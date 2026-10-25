@@ -289,6 +289,9 @@ export const ROUTES = Object.freeze({
       // The pieces the working file needs and where they are in the mission's memory (2026-10-25).
       if (b.action === 'workfile-needs') return (await import('../lib/workfile-needs.js')).workfileNeeds(orgId, m, c, a);
       if (b.action === 'workfile-need-link') return (await import('../lib/workfile-needs.js')).linkNeed(orgId, m, c, b, a);
+      // The person's choice of piece for a sheet, and a PDF turned into a verified table (2026-10-25).
+      if (b.action === 'workfile-designate') return (await import('../lib/workfile-sources.js')).designateSource(orgId, m, c, b, a);
+      if (b.action === 'workfile-pdf-extract') return (await import('../lib/workfile-sources.js')).extractPdfTable(orgId, m, c, b, a);
       if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);

@@ -792,6 +792,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   OFFICE_MANAGER_MISSION_MEMORY.json` (zone §24, créée une fois ; Drive n'a pas de vrai fichier caché), écrite à chaque événement avec
   l'index central `OFFICE_MANAGER_MISSION_FILES.json` gardé ; lecture = union des deux (`mergeDocuments`, l'entrée la plus récente
   gagne) ; `_OFFICE_MANAGER` est un dossier des agents (`agent-files.js`), jamais rangé par l'Orpailleur. Test : `tests/mission-memory.test.js`.
+- LA PIÈCE CHOISIE PAR LA PERSONNE, LES PDF TRANSFORMÉS EN TABLEAU (Paul, 2026-10-25 : « les TEB sont là, je les ai déposés pour remplir D2,
+  l'IA continue de me dire que c'est le PTBA ; apparemment il ne peut pas importer les PDF dans l'Excel ») : `lib/workfile-sources.js`.
+  « C'est cette pièce qui remplit D2 » (`workfile-designate`, retirable) = usage `feuille` dans la mémoire de la mission ; passe AVANT le code
+  et l'IA : proposée en premier, seule cochée, jamais décochée par l'avis de l'IA (`finishImport`, `importCandidates`), affichée « ✓ vous avez
+  choisi » dans les pièces du working file (`workfile-needs`). PDF (`workfile-pdf-extract`) : lu (`readSopPdf`, scans transcrits), l'IA
+  recopie le tableau dans les colonnes de la feuille, le CODE vérifie chaque montant et texte dans le PDF (`digitStream` / `amountFound`) ;
+  NOUVEAU fichier à côté du PDF `<PDF>_TABLEAU_EXTRAIT.xlsx` (TABLEAU = lignes vérifiées, A_VERIFIER = jamais importées, SOURCE = origine,
+  pages, empreinte) ; mêmes octets = même extrait rendu (`extrait_de` + empreinte) ; l'extrait est choisi pour la feuille puis passe par
+  l'import habituel. PDF jamais modifié, audit `PDF_TABLE_EXTRACTED`. Test : `tests/workfile-sources.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
