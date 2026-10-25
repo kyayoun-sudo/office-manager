@@ -971,6 +971,20 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   section) n'est pas une ligne de la feuille ; une feuille par catégorie prend les catégories prouvées par leurs sommes même si l'IA ne
   l'a pas dit (méthode du cabinet), la colonne Catégorie reçoit le n° de compte trouvé dans le GL, sinon le libellé de la catégorie ; une
   ligne « Sous-total » d'une seule dépense est acceptée. Test : « Paul's screenshot » (`tests/sheet-understanding.test.js`).
+- BANC D'ESSAI DES PIÈCES (Paul, 2026-10-25 : « je ne codais pas pour ces fichiers mais en général » ; « vas-y, fais-le ») : `tests/corpus/`
+  (`pieces.js` = pièces de formes RÉELLES, données inventées : export Sage 100 par comptes avec pages répétées / « A nouveau » / « Total
+  compte » / montants en texte ; Odoo avec ligne de compte portant ses totaux et « 601100 Achats » dans une case ; CSV point-virgule ; GL
+  fait main à montant signé ; PTBA façon Hydromet 2025 (structure relevée sur le document publié) ; PTBA à titres fusionnés et rubriques à
+  une seule activité ; budget à en-tête sur deux lignes ; plan de formation qui n'est PAS un budget) + `working-file.js` (classeur de forme
+  NL-T01). `tests/corpus.test.js` : lecture, forme, catégories, puis D1 et D2 remplis, l'IA répondant ET en panne ; sur le vrai NL-T01 si
+  `WORKFILE_MAP_SAMPLE` (22/22 passés le 2026-10-25). Corrections générales trouvées par ce banc : catégories = sous-totaux les plus proches des
+  lignes (`leaf`), une seule activité acceptée si son code descend du parent (« B.2 » → « B.2.1 ») ; somme vérifiée dans TOUTES les colonnes
+  additives (coïncidence refusée) ; colonne principale = la plus grosse somme (Total, pas T1 ni un bailleur) ; en-tête sur deux lignes
+  combiné (`combineHeaderRows`) ; « 601100 Intitulé » séparé (`flattenLedger`, `split`) ; rôles `jnl`, tiers / partenaire ; catégorie d'une
+  pièce comptable = numéro de compte (`proposeColumn`) et catégorie d'un budget remplacée par son compte trouvé dans le GL, sinon signalée
+  (`without_account`) ; « ID ligne » qui définit les lignes = identifiant généré `<année>-L<ligne>` ; montants texte → nombres, dates →
+  dates ; SANS IA, le code propose la pièce dont la forme convient (GL pour une feuille d'écritures, budget à catégories prouvées pour une
+  feuille par catégorie), tout « à confirmer » et la panne dite ; « Oui, remplis » ferme le reçu (D2 n'est plus refusé après D1).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
