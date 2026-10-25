@@ -106,10 +106,10 @@
   }
 
   // The mission's PDFs for this sheet: a PDF cannot be imported as it is; « Extraire le tableau » makes a checked Excel next to it.
-  function pdfBlock(x, d) {
+  function pdfBlock(x, d, force) {
     var list = st.pdfs[x.sheet] || []; if (!list.length) return '';
     var ex = st.extract[x.sheet] || {};
-    return '<details class="wf-assist-pdfs"' + (ex.open ? ' open' : '') + ' data-sheet="' + esc(x.sheet) + '"><summary>Les PDF de la mission (' + list.length + ') — pour remplir ' + esc(x.sheet) + ' avec un PDF</summary>' +
+    return '<details class="wf-assist-pdfs"' + (ex.open || force ? ' open' : '') + ' data-sheet="' + esc(x.sheet) + '"><summary>Les PDF de la mission (' + list.length + ') — pour remplir ' + esc(x.sheet) + ' avec un PDF</summary>' +
       '<p class="meta">Un PDF ne s’importe pas tel quel : je lis le tableau du PDF, je le recopie dans les colonnes de ' + esc(x.sheet) + ' et je vérifie que chaque montant se retrouve dans le PDF. Le résultat est un fichier Excel rangé à côté du PDF, que vous pouvez ouvrir avant d’importer ; les lignes douteuses n’y sont pas importées.</p>' +
       '<ul class="wf-agent-list">' + list.map(function (f) {
         var r = ex[f.file_id];
@@ -137,6 +137,10 @@
       var picked = p.items.filter(function (it, i) { return st.pick[x.sheet + '|' + i]; });
       var total = picked.reduce(function (n, it) { return n + (it.rows || 0); }, 0), tooBig = x.capacity && total > x.capacity;
       var yrs = (p.mission_years || []).join(', ');
+      // Nothing in Excel really fills the sheet (Paul, 2026-10-25: « il choisit la même pièce » — a PTBA filling 0 % of D2): the PDFs come first.
+      var noneFits = !p.items.some(function (it) { return it.recommended; });
+      if (noneFits && (st.pdfs[x.sheet] || []).length) return '<div class="wf-assist-prop"><p>Aucune pièce Excel ne remplit vraiment <b>' + esc(x.sheet) + '</b> (' + esc(p.items.map(function (it) { return it.name + ' : ' + (it.coverage || 0) + ' % des colonnes'; }).join(' ; ')) + '). La bonne pièce est sans doute un PDF : choisissez-le, j’extrais et je vérifie son tableau.</p>' + pdfBlock(x, d, true) +
+        '<details><summary>Voir quand même les pièces Excel</summary>' + p.items.map(function (it) { return '<p class="meta">' + esc(it.name) + chooseBtn(x, it, d) + '</p>'; }).join('') + '</details></div>';
       return '<div class="wf-assist-prop"><p>Pour <b>' + esc(x.sheet) + '</b>, j’ai trouvé ' + p.items.length + ' pièce(s) qui ressemblent à ' + esc(what) + (yrs ? ' ; la mission porte sur <b>' + esc(yrs) + '</b>' : '') + '. Cochez celles à importer :</p>' +
         p.items.map(function (it, i) {
           var key = x.sheet + '|' + i, g = it.gl_summary, ys = Object.keys(it.years || {});

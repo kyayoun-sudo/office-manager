@@ -110,6 +110,7 @@
         if (r.brief) brief(r);
         if (r.work) window.dispatchEvent(new CustomEvent('procedure-assistant-updated', { detail: r }));
         if ((r.outcomes || []).length) refresh(book && book.sheet, book && book.start_row);
+        if ((r.outcomes || []).some(function (o) { return (o.action === 'choose-source' || o.action === 'extract-pdf') && o.status === 'done'; })) { try { document.dispatchEvent(new CustomEvent('wf-sheet-cleared', { detail: { reason: 'source-chosen' } })); } catch (_) {} }
         if ($('audit-question').value.trim() === message) $('audit-question').value = '';
         $('audit-message').textContent = '';
         var pending=(r.outcomes||[]).find(function(o){return o.pending_sop;});if(pending)return completeSopReading(pending);

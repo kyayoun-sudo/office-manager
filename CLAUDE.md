@@ -804,6 +804,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Import manuel (« Importer les données client dans cette feuille ») : les PDF de la mission sont dans la même liste (`tableImportOptions`
   renvoie `pdfs`) ; choisir un PDF lance l'extraction, puis le tableau extrait est sélectionné (feuille TABLEAU). Plus de présélection d'un
   xls par le code dans cette liste (Paul : « les xls qu'il me propose n'ont rien à voir »).
+  Paul, 2026-10-25 (« il choisit la même pièce ; j'ai mis la véritable pièce, je le lui ai dit dans le chat, il ne comprend pas ») : le chat de
+  la procédure a deux actions de plus (`executeProcedureActions`) : `choose-source` et `extract-pdf` (feuille + pièce de la mission) —
+  acceptées SEULEMENT si un mot du nom de la pièce est dans le message de l'auditeur (`PIECE_NOT_NAMED_BY_AUDITOR` sinon), pas bloquées par une
+  confirmation en attente (aucune écriture dans le working file) ; le panneau de l'agent se rafraîchit. Panneau : si aucune pièce Excel ne
+  remplit la feuille (aucune cochée, ex. PTBA à 0 % des colonnes), les PDF passent en premier, ouverts, classés par nom / pièce attendue
+  (« exécution », « TEB »…), les Excel repliés.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

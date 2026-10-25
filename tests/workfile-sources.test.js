@@ -78,3 +78,15 @@ test('choosing a piece writes it in the mission memory; only a piece of the miss
   assert.deepEqual(chosenIn([{ id: note[0], uses: note[1].uses }], 'D2_BUDGET'), []);
   await assert.rejects(designateSource('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', file_id: 'AUTRE' }, { email: 'p' }, d), /DOCUMENT_SOURCE_CHANGED/);
 });
+
+test('in the chat, the auditor names the PDF for D2: chosen and extracted; a piece the auditor did not name is refused', async () => {
+  const { executeProcedureActions } = await import('../lib/procedure-workspace.js');
+  const calls = [];
+  const d = { view: async () => ({ editable: true, work: { status: 'in_progress', walkthrough: [] } }), sources: async () => [{ file_id: 'TEB', name: 'TEB 2023.pdf' }, { file_id: 'PTBA', name: 'PTBA_2023_VF.xlsx' }],
+    extractPdfTable: async (o, m, c, b) => { calls.push(['extract', b]); return { name: 'TEB 2023_TABLEAU_EXTRAIT.xlsx', rows: 12, to_check: 1 }; },
+    designateSource: async (o, m, c, b) => { calls.push(['choose', b]); return {}; } };
+  const r = await executeProcedureActions('O', 'M', 'PRJ-03', [{ type: 'extract-pdf', sheet: 'D2_BUDGET', source_file_id: 'TEB' }], 'Non, la bonne pièce pour D2 c’est le TEB 2023, pas le PTBA', { email: 'p' }, d);
+  assert.equal(r[0].status, 'done'); assert.equal(calls[0][1].file_id, 'TEB');
+  const refused = await executeProcedureActions('O', 'M', 'PRJ-03', [{ type: 'choose-source', sheet: 'D2_BUDGET', source_file_id: 'PTBA' }], 'Non, la bonne pièce pour D2 c’est le TEB 2023', { email: 'p' }, d);
+  assert.equal(refused[0].reason, 'PIECE_NOT_NAMED_BY_AUDITOR');
+});
