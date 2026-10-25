@@ -1,0 +1,46 @@
+/* « Ma procédure » en deux colonnes (2026-10-24) : l'agent à gauche, le working file à droite. */
+#wf-layout{display:grid;grid-template-columns:minmax(320px,440px) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
+#wf-layout[hidden]{display:none}
+#wf-left,#wf-right{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+#wf-left>*,#wf-right>*{min-width:0;max-width:100%}
+#wf-left>.card,#wf-right>.card,#wf-right>.wf-agent-board{margin:0}
+#wf-right>.wf-understanding-board{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.wf-sop #card{max-height:280px;overflow:auto;font-size:13.5px}
+.wf-sop summary{cursor:pointer}
+/* the old grid is not shown twice: only the file's buttons (refresh, import client data, firm model) stay */
+.wf-buttons-only{padding:10px 14px}
+.wf-buttons-only>h2,.wf-buttons-only #audit-grid,.wf-buttons-only .audit-pagination,.wf-buttons-only #audit-selection,.wf-buttons-only>p.meta,.wf-buttons-only #audit-sheet{display:none}
+.wf-buttons-only .row{gap:8px;flex-wrap:wrap}
+#wf-older{margin-top:8px}
+#wf-older>summary{cursor:pointer}
+#wf-older>.card{margin-top:12px}
+@media(max-width:1100px){#wf-layout{grid-template-columns:1fr}}
+.wf-assist h2{margin:0 0 6px}
+.wf-assist-block{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.wf-assist-block h3{margin:0 0 6px;font-size:15px}
+.wf-assist-block .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.wf-assist-busy{font-weight:600}
+.wf-assist .link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer}
+/* the documents of the test side by side under the working file */
+.wf-needs-wide #needs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-items:stretch}
+.wf-needs-wide #needs-list>*{margin:0;min-width:0}
+#wf-left>.wf-agent-board.card{padding:16px}
+.wf-assist-src{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:8px 0}
+.wf-assist-src label{display:flex;gap:6px;align-items:flex-start;cursor:pointer}
+.wf-assist-src p{margin:4px 0}
+.wf-assist-err{color:#b42318;font-weight:600}
+@media (prefers-color-scheme:dark){.wf-assist-err{color:#ff8a80}}
+.wf-assist-warn{font-weight:600}
+/* the import choices: the options of a list are always readable (light or dark) */
+/* every list of the page, wherever a panel puts it: the closed field and its open list are always readable (Paul, 2026-10-25) */
+.wf-import-panel{display:grid;gap:8px;margin-top:10px}
+.wf-import-panel select,#wf-layout select{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line,#d0d5dd);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#1b1f24);max-width:100%;min-width:0}
+select option,select optgroup{color:#1b1f24 !important;background-color:#fff !important}   /* fixed colours, never inherited from the page */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) select option{color:#e8eaed !important;background-color:#1f2329 !important}}
+:root[data-theme="dark"] select option{color:#e8eaed !important;background-color:#1f2329 !important}
+.wf-howto ol{margin:4px 0 0 18px;padding:0}
+.wf-howto li{margin:3px 0}
+.wf-mem-q{margin:6px 0}
+.wf-mem li{margin:6px 0}
+.wf-need-linked{color:#1e7a46;font-weight:600}.wf-need-probable{font-weight:600}.wf-need-missing{color:#b42318;font-weight:600}
+@media (prefers-color-scheme:dark){.wf-need-linked{color:#7ad3a0}.wf-need-missing{color:#ff8a80}}

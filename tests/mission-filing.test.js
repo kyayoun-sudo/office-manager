@@ -14,7 +14,7 @@ function filing() {
   const text='Convention de financement du projet. Le bailleur est la Banque.';
   const d={recordMissionDocuments:async()=>{},drive:{getMeta:async id=>items.get(id),listChildren:async id=>[...items.values()].filter(x=>x.parents.includes(id))},
     fetchRows:async p=>p.startsWith('office_missions')?[{id:'m',name:'Mission',drive_folder_id:'root'}]:[],
-    agentPermissions:async()=>({granted:allowed}),agentSettings:async()=>({auto_filing:enabled}),
+    agentPermissions:async()=>({granted:allowed}),agentSettings:async()=>({auto_filing:enabled,...(enabled?{}:{mission_auto_filing:false})}),
     readForTidy:async()=>({text,method:'native',inspection:{status}}),
     runAI:async()=>({text:JSON.stringify({decisions:[{file_id:'file',action:'move_rename',to_folder_id:target,new_name:'Convention.pdf',confidence:'haute',content_read:true,evidence_quote:'Convention de financement du projet.'}]})}),
     queueFilingProposal:async(o,row)=>{queued.push(row);return [{id:'action'}];},recordDecision:async(o,row)=>{auto.push(row);return {executed:true,verified:true};},audit:async()=>({db:true})};
@@ -24,6 +24,8 @@ test('controller uses Orpailleur brain, exact source passage, this mission only,
   const w=filing();const r=await prepareMissionFiling('o','m',['file'],w.d);
   assert.equal(r.files[0].status,'filed_verified');assert.equal(w.queued[0].office_mission_id,'m');assert.equal(w.queued[0].payload.mission_root_id,'root');assert.equal(w.auto.length,1);
   const z=filing();z.set({enabled:false});assert.equal((await prepareMissionFiling('o','m',['file'],z.d)).files[0].status,'filing_pending');assert.equal(z.auto.length,0);
+  // (2026-10-25) Pieces deposited in a mission are filed once read with certainty, even without the cabinet-wide automatic filing.
+  const y=filing();y.d.agentSettings=async()=>({auto_filing:false});assert.equal((await prepareMissionFiling('o','m',['file'],y.d)).files[0].status,'filed_verified');
 });
 test('partial/unread documents are not auto-filed; invented/outside destinations, memory folders and unread permissions cannot pass',async()=>{
   const w=filing();w.set({status:'PARTIAL'});assert.equal((await prepareMissionFiling('o','m',['file'],w.d)).files[0].status,'filing_pending');assert.equal(w.auto.length,0);

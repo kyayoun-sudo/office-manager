@@ -322,3 +322,10 @@ aux cellules jaunes disponibles. Pas de remplacement silencieux des saisies.
 Le laboratoire EYNOWA utilise ses variables existantes URL/API_KEY, sans lecture des secrets.
 Diagnostic admin sur /diagnostic-ia.html : court message fictif, jamais de piece client.
 La conversation Firm Manager a un delai navigateur et n est pas rejouee automatiquement.
+
+CARTE DU WORKING FILE — 24 octobre 2026
+Rien a installer : pas de SQL, pas de variable. Nouveau module en lecture seule (lib/workfile-map.js).
+Pour verifier sur votre vrai modele sans le mettre dans le depot (le depot est public) :
+  WORKFILE_MAP_SAMPLE=/chemin/vers/NL-T01_PRJ.xlsx node --test tests/workfile-map.test.js
+A noter : 11 tests echouaient deja sur la branche avant ce travail (dont « 12 fonctions Vercel Hobby »,
+fournisseurs d'IA, INSTALL_TOUT.sql) ; ils sont inchanges. A regarder separement.

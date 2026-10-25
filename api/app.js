@@ -269,6 +269,34 @@ export const ROUTES = Object.freeze({
       if (b.action === 'ask-procedure') return (await import('../lib/procedure-workspace.js')).askProcedure(orgId, m, c, b, a);
       // What this test needs, the zones to deposit each document, and the e-mail for the missing ones (2026-10-19).
       // The living working file (2026-10-19): the steps of the test, « J'ai compris », run by code, result in a separate sheet.
+      // The map of the working file (2026-10-24): roles of sheets and columns read by code, never guessed; read only.
+      if (b.action === 'workfile-map') return (await import('../lib/workfile-map-view.js')).workfileMapView(orgId, m, c, a, { sheet: b.sheet ? String(b.sheet) : null, offset: b.offset });
+      if (b.action === 'workfile-cells') return (await import('../lib/workfile-map-view.js')).writeWorkfileCells(orgId, m, c, a, b);
+      // The agent that helps fill (2026-10-24): what the application knows (proposed, written on « Oui »), the received pieces (reviewed, renamed).
+      if (b.action === 'workfile-assist') return (await import('../lib/workfile-assist.js')).workfileAssist(orgId, m, c, a);
+      if (b.action === 'workfile-fill-known') return (await import('../lib/workfile-assist.js')).fillKnown(orgId, m, c, a, b);
+      if (b.action === 'workfile-import-candidates') return (await import('../lib/workfile-import-assist.js')).importCandidates(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-inspect') return (await import('../lib/workfile-import-assist.js')).inspectImportFile(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-finish') return (await import('../lib/workfile-import-assist.js')).finishImport(orgId, m, c, b, a);
+      // Paths too long for Excel on Windows (2026-10-25): listed with a shorter name proposed, renamed only on « Oui, raccourcis ».
+      if (b.action === 'workfile-long-paths') return (await import('../lib/path-repair.js')).missionLongPaths(orgId, m, c, a);
+      if (b.action === 'workfile-shorten-paths') return (await import('../lib/path-repair.js')).shortenMissionPaths(orgId, m, c, a, b);
+      // The Enhanced Auditor learns by watching the auditor fill the working file in Excel (2026-10-25).
+      if (b.action === 'workfile-learn-start') return (await import('../lib/workfile-learn.js')).startWatch(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn-cancel') return (await import('../lib/workfile-learn.js')).cancelWatch(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn') return (await import('../lib/workfile-learn.js')).learnFromPerson(orgId, m, c, b, a);
+      if (b.action === 'workfile-learn-confirm') return (await import('../lib/workfile-learn.js')).confirmLesson(orgId, m, c, b, a);
+      if (b.action === 'workfile-clear-sheet') return (await import('../lib/workfile-map-view.js')).clearSheetWork(orgId, m, c, a, b);
+      // The pieces the working file needs and where they are in the mission's memory (2026-10-25).
+      if (b.action === 'workfile-needs') return (await import('../lib/workfile-needs.js')).workfileNeeds(orgId, m, c, a);
+      if (b.action === 'workfile-need-link') return (await import('../lib/workfile-needs.js')).linkNeed(orgId, m, c, b, a);
+      // The person's choice of piece for a sheet, and a PDF turned into a verified table (2026-10-25).
+      if (b.action === 'workfile-designate') return (await import('../lib/workfile-sources.js')).designateSource(orgId, m, c, b, a);
+      if (b.action === 'workfile-pdf-extract') return (await import('../lib/workfile-sources.js')).extractPdfTable(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
+      if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);
+      if (b.action === 'workfile-review-pieces') return (await import('../lib/workfile-assist.js')).reviewPieces(orgId, req, m, c, a);
       if (b.action === 'steps') return (await import('../lib/step-runner.js')).stepsView(orgId, m, c, a);
       if (b.action === 'step-plan') return (await import('../lib/step-runner.js')).planStep(orgId, m, c, b, a);
       if (b.action === 'step-run') return (await import('../lib/step-runner.js')).runStep(orgId, m, c, b, a);
@@ -746,6 +774,8 @@ export const ROUTES = Object.freeze({
       if (a === 'review') return reviewWorkbook(orgId, req.account, b);
       if (a === 'remark') return updateRemark(orgId, req.account, b);
       if (a === 'decide') return decideWorkfileAction(orgId, req.account, b);
+      // Learning from the auditor, from inside Excel: the procedures that work in this file (2026-10-25).
+      if (a === 'learn-procedures') return import('../lib/workfile-learn.js').then(m => m.proceduresForFile(orgId, b, req.account));
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'WORKFILE_UNAVAILABLE'

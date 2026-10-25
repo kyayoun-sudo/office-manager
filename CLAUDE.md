@@ -684,6 +684,177 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - `demarrer.html` étape 4 « Les agents se présentent » (`lib/agent-intro.js`, route `agent-intro`) : chaque agent se présente et demande où est son fichier ; l'humain donne le lien, l'agent vérifie dans le Drive (« trouvé » seulement après vérification, contenu non lu) ; étape à franchir : terminée (ne revient plus) ou passée (à revoir) ; case « personne informatique » = seulement les emplacements techniques. État : `office_firm_settings.settings.onboarding.intro`.
 - Par personne : `bienvenue.html` (« Faire connaissance », rappelée par le pop-up `my-questions`, id `intro|…`) = questions des agents adaptées au poste (`PERSON_QUESTIONS`), la préférence de travail d'abord ; mini-présentation de chaque écran selon le poste (`SCREEN_INTROS`, bandeau dans `assets/brand-theme.js`, « Ne plus afficher »). État : `settings.onboarding.people[email]`. Limite : ces réponses ne s'écrivent pas encore dans la Management Card.
 
+## La carte du working file (Paul, 2026-10-24 : « l'interface et le travail se mettent en place en fonction du working file ; même si on change le working file demain, il garde la même logique »)
+- Maquette validée par Paul (Claude Design, « Ma procédure — agent guidé par le Working File ») : chaque feuille devient l'écran de ce
+  qu'elle demande (dépôt, contrôles, formulaire de test colonne par colonne, lead, pièces + envoi par message, signatures), pastilles de
+  l'agent sous la conversation, zones de dépôt partout, reconnaissance des pièces, agrandissement des tableaux, même moteur pour tout modèle.
+- ÉTAPE 1 FAITE (lecture seule, sans IA) : `lib/workfile-map.js` `mapWorkingFile(workbook)` → identité (AUDIT_META, sinon empreinte de la
+  forme `shape:<hash>`), rôle des feuilles, tableaux (en-têtes foncés ou gras), rôle de chaque colonne par couleur + formule + liste :
+  `calc`, `result` (formule à issues PASS/OK/ÉCART… ou en-tête résultat), `judgment` (saisie lue DIRECTEMENT par le résultat avec une liste,
+  ou en-tête « retenu / accepté / conforme ? »), `key` (valeur du modèle lue par la ligne, ex. N° → MATCH), `fact`, `fixed` ; dépendances vers
+  d'autres feuilles, capacités, lignes d'exemple du modèle (`prefilled_rows`), programme lu par ses colonnes (« Activé ? »), risques et
+  matrice, PBC et matrice test ↔ PBC, ordre du guide, questions quand une chose ne se déduit pas. `mayWrite(map, feuille, cellule)` refuse
+  jugement / clé / calcul / hors tableau. `mapSummary` = vue courte sans valeurs. `lib/workfile-map-view.js` + action `workfile-map` de la
+  route `procedure` (mêmes droits que « Ma procédure », rien d'écrit). Vérifié sur le vrai NL-T01 (14 tests, PRJ-01 activé, 6 risques,
+  PRJ-05 : L/M/N jugement, A clé, P résultat, 3 PBC requis) ; le fichier réel n'est PAS dans le dépôt (public) : test optionnel
+  `WORKFILE_MAP_SAMPLE`. Test : `tests/workfile-map.test.js` (forme NL-T01 + modèle d'un autre cabinet sans AUDIT_META).
+- ÉTAPE VISIBLE FAITE (Paul, 2026-10-24 : « regarde comment ça se présente, ça n'a rien à voir » — l'étape 1 n'avait rien changé à
+  l'écran, et le cadre « Compréhension du Working File » appelait `api/working-file-understanding.js`, qui renvoyait
+  `WORKING_FILE_UNDERSTANDING_UNAVAILABLE`) : ce cadre de `procedure.html` monte d'abord `assets/workfile-guide.js` (+ `.css`) via la route
+  `procedure` (actions `workfile-map` avec `sheet` / `offset`, et `workfile-cells`) ; l'ancienne lecture ne sert plus qu'en secours. Écran :
+  feuilles du fichier en pastilles dans l'ordre du guide ; chaque feuille = son écran (test = un formulaire par élément construit colonne par
+  colonne : calculé affiché ou « calculé par le fichier », fait = champ, décision = Oui / Non / N/A de la liste du modèle ; autres feuilles =
+  tableau éditable des colonnes à remplir, lignes d'exemple du modèle signalées) ; pastilles calculées sans IA (« d'abord remplir D1 », pièces
+  du test → carte « Ce que demande ce test », importer les données, tableau plein, voir dans Mon fichier Excel, feuille suivante) ; la feuille
+  choisie s'ouvre aussi dans « Mon fichier Excel ». Écriture (`writeWorkfileCells`) : seulement ce que la PERSONNE saisit, préparateur
+  seulement, pas en revue, cases du modèle vides ou inchangées, jamais formule / clé, valeur de liste contrôlée, version lue
+  (`expectedModifiedTime`), relu, audit `WORKFILE_CELLS_WRITTEN`. L'agent ne propose pas encore dans ces champs (étape suivante).
+- DEUX COLONNES (Paul, 2026-10-24 : « à gauche ce que le SOP dit, à droite le working file par feuille ; je veux pas 2 fois les mêmes
+  choses ; l'agent pose la question, je réponds ou il propose et remplit tout ») : `assets/procedure-layout.js` + `.css` DÉPLACENT les blocs
+  existants (rien supprimé) — gauche : SOP, travail de l'agent, pièces (« Ce que demande ce test »), chat ; droite : le working file
+  (`workfile-guide.js`) et ses boutons (actualiser, importer, modèle) ; étapes / population / échantillon / éléments / walkthrough repliés dans
+  « Vues détaillées ». Les propositions de l'agent (`wf-proposals`) s'affichent en pointillés DANS la feuille avec leur source ; à gauche,
+  une ligne de compte seulement. « Valider et écrire » = écrit, relu, confirmé (`review-workpaper`), puis étape suivante. L'agent ne vise que
+  les cases que la carte permet (`mayWrite` dans `prepareDocumentWork` : jamais jugement / clé / calcul). Les feuilles écrites par
+  l'application (`<CODE>_D…`, `<CODE>_E…`) = rôle `agent`, montrées à part (« Préparations de l'agent »), plus en doublon dans le parcours.
+- L'AGENT QUI AIDE (Paul, 2026-10-24 : « il sait qui prépare, pourquoi il ne remplit pas ? j'ai déposé les pièces, il devait les
+  comprendre, les renommer ; il doit demander la permission avant de remplir ») : la carte lit les CASES D'IDENTITÉ au-dessus des
+  tableaux (`headerFields` : « Préparé par / date », « Mission / Engagement ID », « Entité auditée », « Cabinet », « Exercice » ;
+  « Revu par » et « Conclusion de l'auditeur » jamais à l'agent, `mayWrite` les refuse). `lib/workfile-assist.js` (actions
+  `workfile-assist`, `workfile-fill-known`, `workfile-review-pieces` de la route `procedure`) : ce que l'application SAIT (préparateur
+  + date, mission, client, période, cabinet) proposé avec sa source, en pointillés dans la feuille, écrit seulement sur « Oui, remplis »
+  (valeurs recalculées par le serveur, cases vides seulement, relu, audit `WORKFILE_KNOWN_FACTS_WRITTEN`) ; les pièces de PIECES_RECUES
+  avec ce que les agents en ont compris ; celles non lues sont lues dès l'ouverture (une fois), identifiées et renommées, puis l'étape
+  du SOP est préparée de nouveau avec elles. Panneau `assets/workfile-assist.js` en haut à gauche. Le renommage des pièces d'après leur
+  contenu (`renamePieces`) n'était plus appelé depuis le classement par l'Orpailleur : rétabli dans le dépôt `pieces` (avant les
+  propositions de classement). Test : `tests/workfile-assist.test.js`.
+- GRAND LIVRE ET ÉQUILIBRE (Paul, 2026-10-25 : « il devait identifier et mettre le GL en me proposant avant ; à gauche un gros
+  déséquilibre ») : `lib/workfile-import-assist.js` (actions `workfile-import-propose` / `workfile-import-accept`) — pour chaque feuille de
+  données vide (grand livre, budget), l'agent trouve la pièce par ses COLONNES (débit, crédit, compte, date…, jamais par son nom ; un
+  fichier nommé « grand livre » qui est un budget est écarté), propose la correspondance des colonnes (« Montant » = Débit − Crédit,
+  dit ; colonnes sans correspondance sûre laissées vides et nommées), les lignes et l'équilibre débit / crédit ; rien n'est écrit sans
+  « Oui, importe » (import existant `runTableImport`, option `minus`, revision vérifiée), puis l'accord donné avant ferme le reçu.
+  Pièce plus grande que le tableau du modèle = pas d'import partiel, dit. Plusieurs candidates = la personne choisit. Disposition :
+  gauche = SOP, l'agent, le travail de l'étape ; droite = working file, « Ce que demande ce test » (cartes côte à côte), chat. Bug
+  corrigé : les boutons de l'agent créés pendant qu'il travaillait restaient désactivés (« Préparer cette étape » gris) ; l'étape est
+  désormais préparée à chaque ouverture. Test : `tests/workfile-import-assist.test.js`.
+- PLUSIEURS GRANDS LIVRES, L'IA EN RENFORT, TABLEAU AGRANDI (Paul, 2026-10-25 : « il n'a pas importé ; c'était 2 ans donc 2 GL, il en a
+  choisi un seul sans me donner le choix ; on a pris l'IA en plus du code pour comprendre ») : `proposeImport` regarde TOUTES les pièces
+  (20 fichiers max) ; par pièce : années lues dans la colonne des dates (`yearOf`), lignes, équilibre, lignes de total mises de côté
+  (`rowIssue` : « Total… » sans date, montant illisible — comptées, jamais importées) ; cochées = années de la mission (`period_label`),
+  même période en double = une seule cochée ; l'IA (une demande, `firstAvailable`) dit ce qu'est chaque feuille non reconnue (grand
+  livre général / auxiliaire / balance…) et rattache les colonnes restantes, vérifiées et marquées « selon l'IA » ; sans IA, le code seul.
+  `acceptImport` : pièces cochées importées À LA SUITE (`load` : écriture après les lignes déjà utilisées, colonnes lues sur la 1re ligne
+  du tableau — le test de « titre » sur les données bloquait l'import : cause probable du premier échec), dates texte → vraies dates,
+  « jamais une partie seulement » vérifié avant d'écrire. `lib/workfile-extend.js` : tableau agrandi seulement sur « Oui, agrandis le
+  tableau et importe » — formats, listes et formules de la dernière ligne recopiés, plages du tableau prolongées dans tout le classeur
+  et dans les noms (vérifié sur le vrai NL-T01 : 612 + 659 lignes, D1 porté à 1 281 lignes, 3 564 formules prolongées). Tests :
+  `tests/workfile-import-assist.test.js`, `tests/workfile-extend.test.js`.
+- L'APPLICATION IMPORTE, L'IA VÉRIFIE (Paul, 2026-10-25 : « l'import, le côté application peut le faire sans l'IA ; l'IA vérifie que c'est
+  bon ; comment j'importe, comment je remplis ? » ; recherche bloquée sur 91 pièces) : trois appels au lieu d'un — `workfile-import-candidates`
+  (liste rapide, pièces LUES comme grand livre / budget d'abord, 60 max), `workfile-import-inspect` (UNE pièce par appel, par le code :
+  feuilles, colonnes, années, équilibre ; l'écran montre « 12 / 40, 2 trouvée(s) »), `workfile-import-finish` (l'IA dit ce qu'est chaque
+  table, VÉRIFIE la correspondance du code — « Vérifié par l'IA : correct » ou « L'IA signale un problème » —, rattache les colonnes
+  restantes ; puis cases cochées selon les années de la mission). « Comment importer et remplir » en tête du panneau ; « Choisir les
+  colonnes moi-même » ouvre l'import manuel sur la bonne feuille ; options des listes lisibles (clair / sombre).
+- LE CODE FAIT LE TRAVAIL, L'IA ADAPTE ET VÉRIFIE (Paul, 2026-10-25 : « je veux un bouton supprimer ; l'IA n'a pas compris que ce n'était
+  pas le budget demandé ; dans programme, les justifications ne sont pas pré-remplies ; c'est le code qui devrait le faire ») :
+  `lib/workfile-undo.js` (`workfile-import-undo`, « Annuler cet import » : seules les cases écrites par l'import, si inchangées, trace
+  gardée « ANNULÉ », audit `WORKFILE_IMPORT_UNDONE`) ; `proposeProgramme` (`lib/workfile-assist.js`) : les décisions du programme VALIDÉ
+  de l'application (« Activé ? » — valeurs de la liste du modèle lues dans LISTS —, justification du Manager ou motif CORE / non retenue)
+  proposées dans 02_PROGRAMME, avec « remplace « À décider » », écrites sur « Oui, remplis » ; feuille de données : son PROFIL (titre,
+  consignes, colonnes attendues) envoyé à l'IA, qui dit si la pièce convient à CETTE feuille ; non cochée si l'IA signale un problème,
+  si elle dit « ne convient pas », ou si la pièce remplit moins de 40 % des colonnes. Qui fait quoi : `claude/CARTE_WORKING_FILE_ET_ECRAN.md`.
+- CHEMINS QU'EXCEL PEUT OUVRIR (Paul, 2026-10-25 : « impossible d'ouvrir le fichier, chemin > 259 caractères ; le rangement n'est donc
+  pas intelligent ») : `lib/path-budget.js` — tout nom créé par l'application est ajusté pour que le chemin complet sous Google Drive pour
+  ordinateur (« G:\Drive partagés\<Drive>\…\fichier ») reste ≤ 240 caractères (`fitName` : code, années, version et extension gardés) :
+  working papers copiés d'un modèle (`cycle-workpapers`), pièces renommées (`renamePieces`), rangement de l'Orpailleur (`action-executor`,
+  nom raccourci signalé), dossier de mission ≤ 60 caractères (`missionFolderName`, avant 160). Existant : `lib/path-repair.js` (actions
+  `workfile-long-paths` / `workfile-shorten-paths`) liste les fichiers trop longs de la mission et les dossiers à nom long qui les
+  allongent, propose des noms plus courts, renomme seulement sur « Oui, raccourcis » (même id, jamais par-dessus un autre nom, vérifié,
+  audit `PATHS_SHORTENED`). Panneau de l'agent : bloc « Chemins trop longs pour Excel ». Test : `tests/path-budget.test.js`.
+- L'ENHANCED AUDITOR APPREND EN REGARDANT (Paul, 2026-10-25 : « l'IA doit apprendre à utiliser l'Excel pour cette mission ; on travaille
+  dans le working file, l'Enhanced Auditor comprend la logique ; il saisit bien le PTBA mais ne place pas dans les bonnes colonnes ») :
+  `lib/workfile-learn.js` — « Regarde-moi » (Ma procédure ou complément Excel) note par colonne à remplir les lignes remplies + une
+  empreinte (aucune valeur) ; la personne remplit dans Excel ; « J'ai fini — apprends » : le code trouve les cases ajoutées, retrouve
+  chaque valeur dans les tableaux des pièces (`norm` : nombres, dates, texte) → colonne source par colonne, lignes prises ; l'IA écrit la
+  logique (règles, lignes prises / laissées, questions ; sans valeur) ; leçon « à confirmer » dans OFFICE_MANAGER_WORKFILE_LESSONS.json
+  (par modèle `map.key` et feuille, en-têtes et règles seulement) ; « Oui, retiens » / règle corrigée par la personne / « Non ». Une leçon
+  VALIDÉE : ses colonnes passent avant celles devinées dans l'import (`by: 'appris'`), sa règle est donnée à l'IA (import et préparation
+  des étapes du SOP : `map.learned_from_the_auditor`). Actions `workfile-learn-start|-cancel|-learn|-confirm` (route `procedure`),
+  `learn-procedures` (route `workfile`). Bloc « Chemins trop longs » retiré de l'écran (Paul : renommer intelligemment, pas un bouton) :
+  les noms créés restent courts (`path-budget`). Test : `tests/workfile-learn.test.js`.
+- TOUT RANGEMENT NOMME D'APRÈS LE CONTENU, POUR TOUS LES AGENTS (Paul, 2026-10-25 : « l'Enhanced Auditor ne range pas selon ce qui est,
+  ou c'est l'Orpailleur ; tout rangement doit comprendre le fichier, savoir ce qu'il est et le renommer ; le tableau budgétaire a été appelé
+  « tableau » ») : `lib/document-naming.js` = une seule règle — titre PRÉCIS lu (titre, type, rôle, puis début du résumé), jamais un mot
+  générique seul (`isGeneric` : Tableau, Document, Fichier, Pièce, Scan, Export, Feuil1…) ; rien de précis = nom d'origine GARDÉ et pièce
+  « à identifier » ; forme TITRE_CLIENT_PÉRIODE.ext ; `NAMING_RULE` donnée à chaque IA qui lit (dépôt, Orpailleur). Appliquée : pièces reçues
+  (`pieceName`), Orpailleur (`resolveName` : nom de l'IA s'il est précis, sinon construit par le code d'après ce qu'elle a lu ; un nom
+  « vide de sens » — IMG_…, scan, Document… — est remplacé même quand l'IA a seulement déplacé le fichier ; fichiers placés par un agent :
+  renommage permis, jamais déplacés), Mission Controller (`mission-filing`), pièces PBC confirmées (`filedName` : référence + titre lu +
+  période), pièces des tests de l'Enhanced Auditor (titre précis demandé à l'IA qui lit la pièce, renommées `<CODE>_<S01>_<TITRE>`, même
+  fichier). Objectifs des agents complétés (`lib/agent-goals.js`) pour que Shadow le surveille. Test : `tests/document-naming.test.js`.
+- UNE MÉMOIRE DE LA MISSION, LES PIÈCES DÉPOSÉES SONT RANGÉES (Paul, 2026-10-25 : « le rangement est fou ; l'Enhanced Auditor ne connaît
+  pas les fichiers ; quand on met les pièces, il doit lire chaque pièce, la comprendre et la ranger ; une mémoire unique dans la mission que
+  tous les agents remplissent ; si j'ai écrit manuellement dans budget je ne peux pas supprimer ») : le registre existant
+  `OFFICE_MANAGER_MISSION_FILES.json` devient LA mémoire de la mission (une seule vérité) — par document : titre précis, emplacement
+  (`location`, `folder_id`), utilisations (`uses` : pbc, preuve, import…), historique (`history` : qui, quoi, quand, 30 derniers).
+  `noteMissionEvent` / `missionMemory` (`lib/mission-files.js`) ; écrit par : dépôt (lu, compris, renommé), exécution des rangements
+  (`action-executor`, toute action liée à une mission), pièce PBC confirmée, pièces des tests de l'Enhanced Auditor, imports et annulations.
+  Lue par : panneau de l'agent (« Mémoire de la mission », recherche), chat de la procédure (`mission_memory`), sources des étapes.
+  Pièces déposées DANS une mission : rangées dans la mission dès qu'elles sont lues avec certitude (lecture complète, confiance haute,
+  passage cité retrouvé), sans attendre le rangement automatique général (`settings.mission_auto_filing !== false` ; `false` = « À valider »).
+  « Revoir, renommer et ranger » envoie toutes les pièces encore dans PIECES_RECUES par ce chemin. Feuilles de données modifiables dans
+  l'écran, avec « × » pour vider une ligne (écrit sur « Enregistrer », case par case, version vérifiée). Test : `tests/mission-memory.test.js`.
+- LES PIÈCES DONT LE WORKING FILE A BESOIN, ET OÙ ELLES SONT (Paul, 2026-10-25 : « l'agent n'arrive pas à travailler parce qu'il ne sait
+  pas où sont les pièces ; le SOP nous donne déjà les pièces ; je veux pouvoir supprimer tout un travail fait sur une feuille ») :
+  `lib/workfile-needs.js` (actions `workfile-needs` / `workfile-need-link`) — attendu lu par le CODE dans le working file lui-même (liste
+  PBC + matrice test ↔ pièce ; une feuille de données a besoin des pièces des tests qui la lisent : D2_BUDGET ← PRJ-03 ← PBC-PRJ-01 ; à
+  défaut, « Ce qu'il faut demander » du SOP) ; trouvé dans la mémoire de la mission (lien confirmé d'abord, sinon mots communs entre la
+  pièce attendue et ce qu'EST le document — GL = grand livre, PTBA = budget) ; l'IA ne peut qu'écarter un rapprochement, jamais en
+  ajouter ; « C'est bien ça » / « Ce n'est pas ça » écrit dans la mémoire de la mission (un refus n'est plus reproposé). Panneau de
+  l'agent : ✓ trouvée / ? à confirmer / ✗ manquante, et l'import propose d'abord les pièces trouvées pour la feuille. « Vider tout le
+  travail de cette feuille » (`workfile-clear-sheet`, deux clics) : toutes les cases à remplir des tableaux (saisies, imports, écrits de
+  l'agent), formules et en-têtes gardés, version vérifiée, relu, reçus de la feuille marqués annulés, audit `WORKFILE_SHEET_CLEARED`.
+  Test : `tests/workfile-needs.test.js`.
+- VALIDER N'EST PAS CRÉER UNE TÂCHE, LISTES LISIBLES, MÉMOIRE DANS LE DOSSIER DE LA MISSION (Paul, 2026-10-25 : « pourquoi quand on valide
+  ça devient une tâche active pour l'équipe ? dans ces 3 cases impossible de voir les propositions ; la mémoire de la mission devrait être
+  un fichier ou un dossier caché dans le dossier de la mission ») : chaque pièce justificative / état financier / facture déposée créait
+  une proposition `MISSION_DOCUMENT_REVIEW` (« contrôler ce document et mettre à jour la liste PBC ») qui, validée, tombait dans le cas
+  général de `executeDecision` → tâche de l'équipe confiée au manager. Plus créée (`applyMissionUpdates` : la pièce est lue, renommée,
+  rangée et gardée dans la mémoire de la mission ; facture = note pour Sika dans cette mémoire) ; les anciennes sont retirées de
+  « À valider », des points de revue du cockpit et des tâches des personnes (`kpi.js`), et une validée = « pris en compte », sans tâche.
+  Import manuel (`assets/procedure-workspace.js`) : un seul panneau à la fois, la source proposée et l'étape du SOP qui parle de la
+  feuille présélectionnées, listes ouvertes lisibles en clair / sombre. Mémoire : `<dossier mission>/_OFFICE_MANAGER/
+  OFFICE_MANAGER_MISSION_MEMORY.json` (zone §24, créée une fois ; Drive n'a pas de vrai fichier caché), écrite à chaque événement avec
+  l'index central `OFFICE_MANAGER_MISSION_FILES.json` gardé ; lecture = union des deux (`mergeDocuments`, l'entrée la plus récente
+  gagne) ; `_OFFICE_MANAGER` est un dossier des agents (`agent-files.js`), jamais rangé par l'Orpailleur. Test : `tests/mission-memory.test.js`.
+- LA PIÈCE CHOISIE PAR LA PERSONNE, LES PDF TRANSFORMÉS EN TABLEAU (Paul, 2026-10-25 : « les TEB sont là, je les ai déposés pour remplir D2,
+  l'IA continue de me dire que c'est le PTBA ; apparemment il ne peut pas importer les PDF dans l'Excel ») : `lib/workfile-sources.js`.
+  « C'est cette pièce qui remplit D2 » (`workfile-designate`, retirable) = usage `feuille` dans la mémoire de la mission ; passe AVANT le code
+  et l'IA : proposée en premier, seule cochée, jamais décochée par l'avis de l'IA (`finishImport`, `importCandidates`), affichée « ✓ vous avez
+  choisi » dans les pièces du working file (`workfile-needs`). PDF (`workfile-pdf-extract`) : lu (`readSopPdf`, scans transcrits), l'IA
+  recopie le tableau dans les colonnes de la feuille, le CODE vérifie chaque montant et texte dans le PDF (`digitStream` / `amountFound`) ;
+  NOUVEAU fichier à côté du PDF `<PDF>_TABLEAU_EXTRAIT.xlsx` (TABLEAU = lignes vérifiées, A_VERIFIER = jamais importées, SOURCE = origine,
+  pages, empreinte) ; mêmes octets = même extrait rendu (`extrait_de` + empreinte) ; l'extrait est choisi pour la feuille puis passe par
+  l'import habituel. PDF jamais modifié, audit `PDF_TABLE_EXTRACTED`. Test : `tests/workfile-sources.test.js`.
+  Import manuel (« Importer les données client dans cette feuille ») : les PDF de la mission sont dans la même liste (`tableImportOptions`
+  renvoie `pdfs`) ; choisir un PDF lance l'extraction, puis le tableau extrait est sélectionné (feuille TABLEAU). Plus de présélection d'un
+  xls par le code dans cette liste (Paul : « les xls qu'il me propose n'ont rien à voir »).
+  Paul, 2026-10-25 (« il choisit la même pièce ; j'ai mis la véritable pièce, je le lui ai dit dans le chat, il ne comprend pas ») : le chat de
+  la procédure a deux actions de plus (`executeProcedureActions`) : `choose-source` et `extract-pdf` (feuille + pièce de la mission) —
+  acceptées SEULEMENT si un mot du nom de la pièce est dans le message de l'auditeur (`PIECE_NOT_NAMED_BY_AUDITOR` sinon), pas bloquées par une
+  confirmation en attente (aucune écriture dans le working file) ; le panneau de l'agent se rafraîchit. Panneau : si aucune pièce Excel ne
+  remplit la feuille (aucune cochée, ex. PTBA à 0 % des colonnes), les PDF passent en premier, ouverts, classés par nom / pièce attendue
+  (« exécution », « TEB »…), les Excel repliés.
+  Import manuel : `TABLE_TOO_SMALL` (pièce plus longue que le tableau du modèle) n'est plus une impasse — message clair et « Oui, agrandis le
+  tableau et importe » (même import avec `extend: true`, `extendTable`).
+- SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
+  écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
+  `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
+  un au lieu d'en tirer un second) ; 4) écrans construits depuis la carte + pastilles ; 5) rattachement d'une pièce à la ligne du test ;
+  6) agrandissement des tableaux (ExcelJS ne met pas à jour les formules des autres feuilles : réécriture contrôlée, recontrôle des totaux).
+
 ## Règles de travail
 
 - **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans
