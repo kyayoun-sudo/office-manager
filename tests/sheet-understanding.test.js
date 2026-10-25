@@ -162,18 +162,25 @@ test('any data sheet, any piece: a grand livre fills D1 with Montant = Débit �
   assert.deepEqual([1, 3, 4, 5].map(c => back.getWorksheet('D1_GL_PROJET').getCell(12, c).value), ['E2', 'Avoir loyer', -40, 'Loyers']);
 });
 
-test('a PDF named for a column is not read in the same call: the plan says « extraire », then reads the verified extract', async () => {
+test('the AI chooses from what each document CONTAINS (table rows, PDF text), and a PDF it chooses is turned into a table by the agent itself', async () => {
   const w = await workingFile(); const wp = Buffer.from(await w.xlsx.writeBuffer());
-  const memory = [{ id: 'TEB', name: 'TEB_2024.pdf', title: "Tableau d'exécution budgétaire", read: true, uses: [] }];
+  const b = new ExcelJS.Workbook(); b.addWorksheet('PTBA').addRow(['Activité', 'Budget']); b.getWorksheet('PTBA').addRow(['Atelier', 50]);
+  const ptba = Buffer.from(await b.xlsx.writeBuffer());
+  const memory = [{ id: 'TEB', name: 'TEB_2024.pdf', title: 'Pièce à confirmer', read: true, uses: [] }, { id: 'LET', name: 'LETTRE_AVIS_NON_OBJECTION.pdf', title: 'Lettre de non-objection sur le PTBA', read: true, uses: [] }, { id: 'PTBA', name: 'PLAN_2024.xlsx', title: 'PTBA', read: true, uses: [] }];
   const view = { editable: true, card: { steps: [{ text: 'x' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] } };
-  let extracted = 0;
-  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => [{ file_id: 'TEB', name: 'TEB_2024.pdf' }],
-    drive: { getMeta: async () => ({ name: 'NL.xlsx', size: wp.length }), downloadBuffer: async () => wp },
-    ai: async () => ({ text: JSON.stringify({ columns: [{ col: 'D', document_id: 'TEB', heading: "Budget de l'exercice" }] }) }),
-    extractPdf: async () => { extracted++; throw new Error('should not run without a request'); } };
+  let input = null, extracted = [];
+  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })),
+    drive: { getMeta: async id => ({ name: id === 'WP' ? 'NL.xlsx' : memory.find(m => m.id === id).name, size: 10 }), downloadBuffer: async id => (id === 'WP' ? wp : id === 'PTBA' ? ptba : Buffer.from(id)) },
+    pdfText: async bytes => ({ text: String(bytes) === 'TEB' ? 'TABLEAU D EXECUTION BUDGETAIRE 2024 Code Libellé Budget de l exercice Décaissement Engagement Réalisation 601 Salaires 1 000 000 200 000 300 000 500 000 ' + 'x'.repeat(60) : 'Nous avons l honneur de vous informer de notre non-objection sur le PTBA 2024 et le PPM. ' + 'y'.repeat(60) }),
+    ai: async (p, o) => { if (!input) input = JSON.parse(o.input); return { text: JSON.stringify({ columns: [{ col: 'D', document_id: 'TEB', heading: "Budget de l'exercice" }] }) }; },
+    extractPdf: async (o, m, c, body) => { extracted.push(body.file_id); throw new Error('PDF_UNREADABLE'); } };
   const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET' }, { email: 'p' }, d);
-  const D = P.plan.find(p => p.col === 'D');
-  assert.equal(D.status, 'needs_extraction'); assert.equal(D.pdf, 'TEB'); assert.equal(extracted, 0);
+  const doc = id => input.documents.find(x => x.id === id);
+  assert.match(doc('TEB').content.text, /Budget de l exercice/);
+  assert.match(doc('LET').content.text, /non-objection/);
+  assert.deepEqual(doc('PTBA').content.sheets[0].rows[0], ['Activité', 'Budget']);
+  assert.deepEqual(extracted, ['TEB']);                                            // the agent extracts the PDF it chose, without a click
+  assert.equal(P.plan.find(p => p.col === 'D').status, 'unreadable');              // and says when it could not
 });
 
 test('the AI checks the plan on the real tables: corrects a heading, empties a column, an invented heading is ignored, hard rules stay', async () => {

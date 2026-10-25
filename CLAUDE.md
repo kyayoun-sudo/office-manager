@@ -904,6 +904,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Vérifié sur le vrai NL-T01 (45 lignes du TEB : tableau agrandi, formules de PRJ-03 prolongées). Puis (Paul : « l'IA est centrale ») une
   2e demande à l'IA VOIT les tableaux ouverts (titres + premières lignes) et vérifie tout le plan colonne par colonne (`verifyWithAi` : ok avec
   raison / autre colonne du même document / vider en nommant la pièce / question à l'auditeur) ; titre inventé ignoré ; règles dures réappliquées.
+  Puis (Paul, 2026-10-25, capture : l'IA avait pris le PLAN / PTBA et la lettre de non-objection pour le budget, et un grand tableau de plus
+  dans l'écran : « je ne veux pas d'autre panneaux ; l'IA sert à comprendre et remplir ») : l'IA voit le CONTENU de chaque pièce avant de
+  choisir (`peekDocument` : tableur = feuilles et premières lignes ; PDF = début du texte, sans OCR ; consigne : juger par le contenu, une
+  lettre qui approuve un budget ne contient pas ses montants) ; le PDF qu'elle choisit est extrait par l'agent lui-même (un par appel, puis
+  il repart) ; le travail s'affiche DANS la feuille (cases en pointillés avec leur source, canal `plan` de `wf-proposals`) ; à gauche deux
+  lignes (ce qui est préparé, ce qui manque), « Oui, remplis », et une phrase pour dire ce qui ne va pas (`hint`, donnée à l'IA qui refait).
+  Le tableau colonne par colonne et les listes de choix sont retirés ; « Pièces que demande ce working file » est replié.
   Test : `tests/sheet-understanding.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;

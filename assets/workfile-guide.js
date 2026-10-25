@@ -29,7 +29,7 @@
       var ch = (e.detail && e.detail.channel) || 'step', cells = (e.detail && e.detail.cells) || [];
       st.propBy[ch] = {}; cells.forEach(function (c) { st.propBy[ch][c.sheet + '!' + c.address] = c; });
       st.proposals = {}; Object.keys(st.propBy).forEach(function (k) { Object.assign(st.proposals, st.propBy[k]); });
-      var first = ch === 'step' ? cells[0] : null;
+      var first = (ch === 'step' || ch === 'plan') ? cells[0] : null;
       if (first && first.sheet !== st.sheet) load(first.sheet, 0); else render();
     });
     document.addEventListener('wf-written', function () { st.propBy = {}; st.proposals = {}; if (st.sheet) load(st.sheet, st.offset); });
