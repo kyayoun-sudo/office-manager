@@ -69,3 +69,16 @@ for (const p of pieces.filter(x => x.kind === 'ptba')) for (const down of [false
   assert.ok(P.cells.every(c => !/^Budget|^Amendement/.test(c.label) || typeof c.value === 'number'), 'aucun texte dans une colonne de montants');
   assert.match(P.problem || '', /sans numéro de compte/, 'les catégories que le GL ne connaît pas sont signalées');
 });
+
+test('l’IA ne répond pas au premier appel : elle est redemandée (entrée allégée) et c’est SA réponse qui remplit', async () => {
+  const p = pieces.find(x => /SAGE/.test(x.name)), calls = [];
+  const files = { F0: p }, memory = [{ id: 'F0', name: p.name, read: true, uses: [] }];
+  const view = { editable: true, card: { steps: [{ text: 'x' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] }, line: { code: 'PRJ-03' } };
+  const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D1_GL_PROJET' }, { email: 'p' }, { view: async () => view, missionMemory: async () => memory, sources: async () => [{ file_id: 'F0', name: p.name }], save: async () => null,
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'WF.xlsx', size: wpBuf.length } : { name: p.name, size: p.buffer.length }), downloadBuffer: async id => (id === 'WP' ? wpBuf : files[id].buffer) },
+    ai: async (pr, o) => { if (/vérifies le plan/.test(o.instructions)) return { text: '{}' }; calls.push(o.input.length); if (calls.length === 1) throw new Error('AI_TIMEOUT');
+      return { provider: 'ia', text: JSON.stringify({ rows_from: { document_id: 'F0', which: 'lines' }, columns: JSON.parse(o.input).columns.map(c => ({ col: c.col, document_id: 'F0', heading: null })) }) }; } });
+  assert.equal(calls.length, 2); assert.ok(calls[1] <= calls[0]);
+  assert.equal(P.ai_error, null); assert.equal(P.ai_retried, 'AI_TIMEOUT'); assert.equal(P.ai, 'ia');
+  assert.ok(P.cells.length > 0);
+});

@@ -985,6 +985,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (`without_account`) ; « ID ligne » qui définit les lignes = identifiant généré `<année>-L<ligne>` ; montants texte → nombres, dates →
   dates ; SANS IA, le code propose la pièce dont la forme convient (GL pour une feuille d'écritures, budget à catégories prouvées pour une
   feuille par catégorie), tout « à confirmer » et la panne dite ; « Oui, remplis » ferme le reçu (D2 n'est plus refusé après D1).
+- L'IA D'ABORD, TOUJOURS (Paul, 2026-10-25 : « pourquoi sans IA ? l'IA dedans, c'est ce qui permet d'être sûr ») : l'IA reste celle qui
+  interprète et choisit ; si elle ne répond pas, elle est REDEMANDÉE une fois avec une entrée allégée (`ai_retried`) ; seulement si elle
+  échoue encore, l'écran le dit, propose « Relancer l'IA » en premier, et la proposition du code seul n'est qu'un secours (« Remplir quand
+  même, sans l'IA », bouton secondaire). Test : `tests/corpus.test.js` (« redemandée »).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
