@@ -801,6 +801,9 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   NOUVEAU fichier à côté du PDF `<PDF>_TABLEAU_EXTRAIT.xlsx` (TABLEAU = lignes vérifiées, A_VERIFIER = jamais importées, SOURCE = origine,
   pages, empreinte) ; mêmes octets = même extrait rendu (`extrait_de` + empreinte) ; l'extrait est choisi pour la feuille puis passe par
   l'import habituel. PDF jamais modifié, audit `PDF_TABLE_EXTRACTED`. Test : `tests/workfile-sources.test.js`.
+  Import manuel (« Importer les données client dans cette feuille ») : les PDF de la mission sont dans la même liste (`tableImportOptions`
+  renvoie `pdfs`) ; choisir un PDF lance l'extraction, puis le tableau extrait est sélectionné (feuille TABLEAU). Plus de présélection d'un
+  xls par le code dans cette liste (Paul : « les xls qu'il me propose n'ont rien à voir »).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
