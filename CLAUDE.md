@@ -871,6 +871,27 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   le recopier rendrait juste d'office le recalcul initial + amendements = final de PRJ-03), Amendements ← rien (« le document n'a pas de colonne pour… »), Engagements ← Engagement. Chaque
   proposition porte sa raison, affichée dans l'import manuel et le panneau de l'agent (colonnes dépliées) ; l'IA vérifie et ne rattache que les
   colonnes restantes, par leur sens. Test : `tests/teb-to-d2-mapping.test.js`.
+- COMPRENDRE LA FEUILLE PAR SES FORMULES, LA REMPLIR COLONNE PAR COLONNE (Paul, 2026-10-25 : « tu as fait une solution temporaire, pas une
+  compréhension pour tous les files ; l'agent reste convaincu que le PTBA remplit D2 ; peu importe la mission et les pièces, il doit comprendre,
+  analyser et remplir parfaitement ») : `lib/sheet-understanding.js`. 1) COMPRENDRE, code sans IA, tout modèle : chaque formule du classeur qui
+  lit la feuille est suivie (fonction autour de la référence : INDEX = recopiée, SUMIFS/SUM = additionnée, plage de critère, LEN = définit les
+  lignes, MATCH) ; dans chaque test, l'arithmétique seule (jamais les conditions IF) donne les recalculs et les comparaisons (PRJ-03 : B + C =
+  « Budget final recalculé » comparé à D) ; SUMIFS(autre!montant, autre!colonne, <copie de notre colonne>) = les valeurs doivent être écrites
+  pareil dans l'autre feuille (D2!A ↔ D1!K, dans les deux sens) ; phrases lisibles par colonne ; pièces de la liste PBC des tests lecteurs.
+  2) ANALYSER, une demande à l'IA par feuille (ce que les tests font de chaque colonne + ce qu'est chaque document de la mission) : document et
+  titre de colonne PAR COLONNE, pièce manquante nommée. Règles du CODE quoi que dise l'IA : document hors mission écarté ; même colonne du même
+  document des deux côtés d'un recalcul = refusé (le côté recalculé est vidé, raison dite ; aussi refusé à « Oui, remplis » :
+  `SAME_SOURCE_ON_BOTH_SIDES`) ; montant depuis du texte refusé ; sens / niveau de détail (`meaningDoubt` : « Activité » ≠ « Catégorie
+  budgétaire », « T1 » ≠ « Engagements ») = à confirmer, et toutes les colonnes de cette pièce aussi ; clé vérifiée contre l'autre feuille quand
+  elle est remplie (code ou libellé : celui qui s'y retrouve) ; ce que la personne a confirmé (mémoire de la mission, usage `colonne`
+  FEUILLE!COL + titre) passe avant et évite l'appel à l'IA. Un PDF n'est extrait qu'à la demande (« Extraire le tableau de ce PDF »), puis son
+  extrait vérifié est lu. 3) REMPLIR : lignes du document de la colonne qui définit les lignes, autres documents alignés par code puis libellé
+  (lignes de total écartées, lignes sans correspondance dites), Montant = Débit − Crédit si besoin, tableau combiné écrit par l'import existant
+  (`d.combined`, cases de saisie vides, agrandissement, relu, reçu, annulable) avec la PROVENANCE de chaque case (document, colonne, ligne).
+  Panneau de l'agent : « Les feuilles de données à remplir » = une ligne par colonne (ce que les tests en font, pièce + colonne modifiables,
+  pourquoi), aperçu, « Oui, remplis » ; l'ancienne recherche reste sous « Chercher pièce par pièce ». Le chat de la procédure reçoit la même
+  compréhension (`data_sheets_understanding`) et la règle colonne par colonne. Actions `workfile-sheet-plan` / `workfile-sheet-plan-accept`.
+  Vérifié sur le vrai NL-T01 (45 lignes du TEB : tableau agrandi, formules de PRJ-03 prolongées). Test : `tests/sheet-understanding.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

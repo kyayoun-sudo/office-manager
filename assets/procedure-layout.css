@@ -44,3 +44,10 @@ select option,select optgroup{color:#1b1f24 !important;background-color:#fff !im
 .wf-mem li{margin:6px 0}
 .wf-need-linked{color:#1e7a46;font-weight:600}.wf-need-probable{font-weight:600}.wf-need-missing{color:#b42318;font-weight:600}
 @media (prefers-color-scheme:dark){.wf-need-linked{color:#7ad3a0}.wf-need-missing{color:#ff8a80}}
+
+/* Plan de remplissage d'une feuille de données (2026-10-25) : une ligne par colonne, ce que les tests en font, la pièce, pourquoi. */
+.wf-plan-scroll { overflow-x: auto; max-width: 100%; }
+.wf-plan { border-collapse: collapse; width: 100%; font-size: .86em; margin: .4em 0; }
+.wf-plan th, .wf-plan td { border: 1px solid var(--line, rgba(127,127,127,.3)); padding: .3em .45em; vertical-align: top; text-align: left; }
+.wf-plan th { background: rgba(127,127,127,.12); font-weight: 600; }
+.wf-plan select { max-width: 16em; font-size: .95em; }
