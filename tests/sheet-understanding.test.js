@@ -231,3 +231,40 @@ test('Paul’s method for D2: lines = PTBA sub-totals, category = account number
   const back = new ExcelJS.Workbook(); await back.xlsx.load(wp); const s = back.getWorksheet('D2_BUDGET');
   assert.deepEqual([1, 2, 3, 4, 5].map(c => s.getCell(12, c).value), ['618120', 50, 10, 60, 10]);
 });
+
+test('fonds reçus: credits collected from every bank statement, and one row per credit advice read by the AI — amounts checked in the document', async () => {
+  const w = new ExcelJS.Workbook(), d3 = w.addWorksheet('D3_FONDS_RECUS');
+  d3.getCell('A1').value = 'D3 — Fonds reçus (bailleurs, contrepartie, autres)';
+  head(d3, 10, ['ID ligne', 'Date', 'Pièce / référence', 'Bailleur / contributeur', 'Montant', 'Élig PRJ-07']);
+  for (let r = 11; r <= 30; r++) { for (let c = 1; c <= 5; c++) d3.getCell(r, c).fill = Y; d3.getCell(r, 6).value = { formula: `IF(AND(LEN(A${r})>0),1,0)` }; }
+  const p7 = w.addWorksheet('PRJ-07'); head(p7, 10, ['N°', 'Montant']); p7.getCell('B11').value = { formula: 'SUM(D3_FONDS_RECUS!$E$11:$E$30)' };
+  let wp = Buffer.from(await w.xlsx.writeBuffer()), mod = 1;
+  const book = async rows => { const b = new ExcelJS.Workbook(), s = b.addWorksheet('Relevé'); rows.forEach(r => s.addRow(r)); return Buffer.from(await b.xlsx.writeBuffer()); };
+  const files = {
+    R1: { name: 'releve_janvier.xlsx', buf: await book([['Date', 'Libellé', 'Débit', 'Crédit', 'Solde'], ['05/01/2023', 'Virement FAD tranche 1', null, 5000000, 5000000], ['09/01/2023', 'Frais', 2500, null, 4997500]]) },
+    R2: { name: 'releve_fevrier.xlsx', buf: await book([['Date', 'Libellé', 'Débit', 'Crédit', 'Solde'], ['12/02/2023', 'Contrepartie Etat', null, 800000, 5797500], [null, 'Total', 2500, 800000, null]]) },
+    AV: { name: 'avis_credit_mars.pdf', buf: Buffer.from('x') } };
+  const memory = Object.entries(files).map(([id, f]) => ({ id, name: f.name, title: id, read: true, uses: [] }));
+  const view = { editable: true, card: { steps: [{ text: 'Fonds reçus' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] }, line: { code: 'PRJ-07' } };
+  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })),
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'NL.xlsx', size: wp.length, modifiedTime: 'v' + mod } : { name: files[id].name, size: files[id].buf.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wp : files[id].buf), updateBinary: async (id, o) => { wp = o.buffer; mod++; } },
+    pdfText: async () => ({ text: 'AVIS DE CREDIT — Réf AC-0315 — 15/03/2023 — Donneur d’ordre : BAD — Montant crédité : 1 250 000 FCFA' }),
+    ai: async (p, o) => (/vérifies le plan/.test(o.instructions) ? { text: '{}' } : { provider: 'stub', text: JSON.stringify({ rows_from: { document_ids: ['R1', 'R2'], which: 'credits' }, columns: [{ col: 'B', document_id: 'R1', heading: 'Date' }, { col: 'E', document_id: 'R1', heading: 'Crédit' }] }) }),
+    save: async (o, w2, c) => Object.assign(view.work, c), audit: async () => null, noteMissionEvent: async () => null };
+  const P = await sheetPlan('O', 'M', 'PRJ-07', { sheet: 'D3_FONDS_RECUS' }, { email: 'p' }, d);
+  assert.equal(P.collect.rows, 2); assert.equal(P.collect.read, 2);
+  assert.deepEqual(P.preview.sample.map(r => [r[1], r[4]]), [['05/01/2023', 5000000], ['12/02/2023', 800000]]);   // debits and totals left out
+  // Credit advices: one row per document, the amount must be found in the advice's text.
+  const d2 = { ...d, fileForAI: async id => ({ id, name: files[id].name, text: 'AVIS DE CREDIT — Réf AC-0315 — 15/03/2023 — Donneur d’ordre : BAD — Montant crédité : 1 250 000 FCFA', visual: false }),
+    ai: async (p, o) => (/Chaque document ci-joint est UNE opération/.test(o.instructions) ? { text: JSON.stringify({ rows: [{ document_id: 'AV', values: { B: '15/03/2023', C: 'AC-0315', D: 'BAD', E: '1 250 000' } }] }) }
+      : /vérifies le plan/.test(o.instructions) ? { text: '{}' } : { text: JSON.stringify({ rows_from: { document_ids: ['AV'], which: 'one_per_document' }, columns: [] }) }) };
+  const Q = await sheetPlan('O', 'M', 'PRJ-07', { sheet: 'D3_FONDS_RECUS' }, { email: 'p' }, d2);
+  assert.deepEqual(Q.preview.sample, [[null, '15/03/2023', 'AC-0315', 'BAD', 1250000]], JSON.stringify(Q.collect));
+  await acceptSheetPlan('O', 'M', 'PRJ-07', { sheet: 'D3_FONDS_RECUS', rows_from: Q.rows_from, columns: Q.plan.map(p => ({ col: p.col, document_id: p.document_id, heading: p.heading })) }, { email: 'p' }, d2);
+  const back = new ExcelJS.Workbook(); await back.xlsx.load(wp);
+  assert.equal(back.getWorksheet('D3_FONDS_RECUS').getCell('E11').value, 1250000);
+  // An amount the AI « read » that is not in the advice is not kept.
+  const d3b = { ...d2, ai: async (p, o) => (/Chaque document ci-joint est UNE opération/.test(o.instructions) ? { text: JSON.stringify({ rows: [{ document_id: 'AV', values: { E: '9 999 999' } }] }) } : /vérifies le plan/.test(o.instructions) ? { text: '{}' } : { text: JSON.stringify({ rows_from: { document_ids: ['AV'], which: 'one_per_document' }, columns: [] }) }) };
+  const R = await sheetPlan('O', 'M', 'PRJ-07', { sheet: 'D3_FONDS_RECUS' }, { email: 'p' }, d3b);
+  assert.equal(R.collect.rows, 0); assert.match(R.collect.to_check[0], /non retrouvé/);
+});

@@ -41,6 +41,14 @@ l'IA peut dire `rows_from` (pièce + `lines` / `subtotals`), `gl_document_id`, e
 le code calcule (amendements = final − initial, appliqué aussi d'office quand initial et final viennent de pièces : `by: 'méthode'`), retrouve
 le numéro de compte d'une ligne par son code ou son libellé dans le GL (`ledgerAccounts` / `accountOf` : identique, puis proche et unique)
 et aligne PTBA ↔ TEB par ce numéro. Tests : `tests/ledger-shape.test.js`, `tests/sheet-understanding.test.js` (« Paul's method »).
+Lignes RASSEMBLÉES de plusieurs pièces (`collectRows`, `rows_from.document_ids` + `which`) : `credits` / `debits` = les montants au crédit /
+au débit de chaque relevé ou grand livre (D3 fonds reçus, D4 avances), lignes de total écartées ; `one_per_document` = une ligne par pièce
+(avis de crédit, reçu) lue par l'IA, chaque montant et texte retrouvé dans le document par le code (sinon « à relire », jamais écrit ; scan
+= « lu sur un scan, à relire »), lignes gardées côté serveur (`sheet-plan-rows`) pour écrire exactement ce qui a été montré. Les PDF de
+relevés sont extraits un par un, l'agent enchaîne seul. Archives : `lib/zip-pieces.js` (`expandZips`, appelé au début de la lecture d'un
+dépôt : fichiers extraits à côté du .zip, .zip gardé, rien créé deux fois, chemins assainis, 300 fichiers / 300 Mo max). PRJ-01 : une
+extraction de tableau demandée sur une feuille de test, ou un PDF sans tableau, devient une LECTURE du document (`prepare-sop-step`).
+Tests : `tests/zip-pieces.test.js`, `tests/sheet-understanding.test.js` (« fonds reçus »).
 
 ## Les principes qui ne bougent pas
 

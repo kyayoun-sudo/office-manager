@@ -182,6 +182,8 @@
     var docs = []; got.forEach(function (p) { if (docs.indexOf(p.document) < 0) docs.push(p.document); });
     var tooBig = pv.capacity && pv.rows > pv.capacity;
     var html = '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (got.length && pv.rows ? 'j’ai préparé <b>' + fmt(pv.rows) + ' ligne(s)</b>, en pointillés dans la feuille à droite, depuis ' + esc(docs.join(', ')) + ' : ' + esc(got.map(function (p) { return p.header + ' ← « ' + p.heading + ' »'; }).concat(P.plan.filter(function (p) { return p.compute; }).map(function (p) { return p.header + ' = calcul ' + p.compute.replace('-', ' − '); })).join(' ; ')) + '.' : 'je n’ai trouvé aucune pièce de la mission qui contienne ces colonnes.') + '</p>' +
+      (P.collect ? '<p class="meta">' + esc(P.collect.read + ' document(s) lu(s) sur ' + P.collect.documents + ' : ' + P.collect.rows + ' ligne(s) trouvée(s)' + (P.collect.which === 'credits' ? ' au crédit' : P.collect.which === 'debits' ? ' au débit' : '') + '.') + ((P.collect.pending_pdfs || []).length ? ' ' + P.collect.pending_pdfs.length + ' PDF encore à lire : je continue.' : '') + '</p>' +
+        ((P.collect.to_check || []).length ? '<p class="wf-assist-warn">À relire : ' + esc(P.collect.to_check.join(' ; ')) + '</p>' : '') + ((P.collect.unreadable || []).length ? '<p class="meta">Illisibles : ' + esc(P.collect.unreadable.join(', ')) + '</p>' : '') : '') +
       (miss.length ? '<p class="meta">Pas dans les pièces : ' + esc(miss.map(function (p) { return p.header + (p.missing ? ' (il faut : ' + p.missing + ')' : ''); }).join(' ; ')) + '.</p>' : '') +
       (doubt.length ? '<p class="wf-assist-warn">À vérifier : ' + esc(doubt.map(function (p) { return p.header + ' — ' + (p.why || ''); }).join(' ; ')) + '</p>' : '') +
       (Object.keys(pv.unmatched || {}).length ? '<p class="meta">Lignes sans correspondance laissées vides : ' + esc(Object.keys(pv.unmatched).map(function (k) { return k + ' (' + pv.unmatched[k].length + ')'; }).join(', ')) + '.</p>' : '') +
@@ -206,6 +208,9 @@
       // A PDF the AI chose and not yet turned into a table: the agent does it itself, then prepares again.
       var pdf = (P.plan || []).filter(function (p) { return p.status === 'needs_extraction' && p.pdf; })[0];
       if (pdf && !(st.extracted || {})[pdf.pdf]) { st.extracted = st.extracted || {}; st.extracted[pdf.pdf] = true; return plan(sheet, null, pdf.pdf); }
+      // Several statements to read (one PDF per call): the agent goes on with the next one by itself.
+      var nextPdf = P.collect && (P.collect.pending_pdfs || []).filter(function (id) { return !(st.extracted || {})[id]; })[0];
+      if (nextPdf) { st.extracted = st.extracted || {}; st.extracted[nextPdf] = true; return plan(sheet, null, nextPdf); }
     })
       .catch(function (e) { var m = String(e && e.message || e); st.plans[sheet] = { error: 'analyse impossible — ' + (ERR[m] || m) }; render(); });
   }
