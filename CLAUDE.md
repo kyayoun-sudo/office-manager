@@ -788,8 +788,7 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   rangée et gardée dans la mémoire de la mission ; facture = note pour Sika dans cette mémoire) ; les anciennes sont retirées de
   « À valider », des points de revue du cockpit et des tâches des personnes (`kpi.js`), et une validée = « pris en compte », sans tâche.
   Import manuel (`assets/procedure-workspace.js`) : un seul panneau à la fois, la source proposée et l'étape du SOP qui parle de la
-  feuille présélectionnées ; les trois listes (pièce, feuille, étape du SOP) sont des CHOIX VISIBLES (boutons, `choices()`) au lieu de
-  listes déroulantes, dont la liste ouverte restait illisible sur l'écran de Paul (photo du 2026-10-25) ; couleurs fixes pour les autres listes. Mémoire : `<dossier mission>/_OFFICE_MANAGER/
+  feuille présélectionnées, listes ouvertes lisibles en clair / sombre. Mémoire : `<dossier mission>/_OFFICE_MANAGER/
   OFFICE_MANAGER_MISSION_MEMORY.json` (zone §24, créée une fois ; Drive n'a pas de vrai fichier caché), écrite à chaque événement avec
   l'index central `OFFICE_MANAGER_MISSION_FILES.json` gardé ; lecture = union des deux (`mergeDocuments`, l'entrée la plus récente
   gagne) ; `_OFFICE_MANAGER` est un dossier des agents (`agent-files.js`), jamais rangé par l'Orpailleur. Test : `tests/mission-memory.test.js`.
