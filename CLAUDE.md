@@ -27,6 +27,15 @@ il est lu au début de chaque session. La pensée générale du produit est dans
   les règles dures (document de la mission, titre réel, jamais juste d'office, aucune écriture sans accord humain). Ne jamais remplacer une
   interprétation de l'IA par des mots-clés ; un mot-clé du code n'est qu'un indice ou un garde-fou.
 
+## Logique de remplissage des audits de projets (Paul, 2026-10-25 : « c'est la logique qu'il faudra garder »)
+Texte complet : `claude/LOGIQUE_REMPLISSAGE_PROJETS.md` (aussi dans le projet claude.ai) ; version donnée aux IA : `lib/filling-methods.js`
+(`PROJECT_AUDIT_METHOD`). En bref : PTBA = prévision (dépenses numérotées, catégorie = sous-total) ; TEB = exécution (dépassements, %,
+budget révisé, engagements) ; GL = numéro de compte par écriture (repris de l'en-tête de section ; reports / à-nouveaux / totaux jamais
+copiés) et table de correspondance libellé → compte. D2 : catégorie = numéro de compte trouvé en rapprochant les libellés du PTBA et du GL ;
+initial = PTBA initial ; final = PTBA révisé / final ou budget révisé du TEB ; amendements = final − initial (décision de Paul, PRJ-03
+contrôle ensuite les approbations) ; engagements = TEB. D3 = crédits des relevés + avis de crédit (IA). D4 = avances de l'entité (GL +
+relevés). PRJ-01 = LIRE l'accord de prêt. Les .zip sont ouverts par tous les agents.
+
 ## Les principes qui ne bougent pas
 
 1. **Evidence before assumption.** Un nom de fichier ou de dossier n'est pas une preuve : on lit le contenu.
