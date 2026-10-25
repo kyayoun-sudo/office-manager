@@ -769,6 +769,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   passage cité retrouvé), sans attendre le rangement automatique général (`settings.mission_auto_filing !== false` ; `false` = « À valider »).
   « Revoir, renommer et ranger » envoie toutes les pièces encore dans PIECES_RECUES par ce chemin. Feuilles de données modifiables dans
   l'écran, avec « × » pour vider une ligne (écrit sur « Enregistrer », case par case, version vérifiée). Test : `tests/mission-memory.test.js`.
+- LES PIÈCES DONT LE WORKING FILE A BESOIN, ET OÙ ELLES SONT (Paul, 2026-10-25 : « l'agent n'arrive pas à travailler parce qu'il ne sait
+  pas où sont les pièces ; le SOP nous donne déjà les pièces ; je veux pouvoir supprimer tout un travail fait sur une feuille ») :
+  `lib/workfile-needs.js` (actions `workfile-needs` / `workfile-need-link`) — attendu lu par le CODE dans le working file lui-même (liste
+  PBC + matrice test ↔ pièce ; une feuille de données a besoin des pièces des tests qui la lisent : D2_BUDGET ← PRJ-03 ← PBC-PRJ-01 ; à
+  défaut, « Ce qu'il faut demander » du SOP) ; trouvé dans la mémoire de la mission (lien confirmé d'abord, sinon mots communs entre la
+  pièce attendue et ce qu'EST le document — GL = grand livre, PTBA = budget) ; l'IA ne peut qu'écarter un rapprochement, jamais en
+  ajouter ; « C'est bien ça » / « Ce n'est pas ça » écrit dans la mémoire de la mission (un refus n'est plus reproposé). Panneau de
+  l'agent : ✓ trouvée / ? à confirmer / ✗ manquante, et l'import propose d'abord les pièces trouvées pour la feuille. « Vider tout le
+  travail de cette feuille » (`workfile-clear-sheet`, deux clics) : toutes les cases à remplir des tableaux (saisies, imports, écrits de
+  l'agent), formules et en-têtes gardés, version vérifiée, relu, reçus de la feuille marqués annulés, audit `WORKFILE_SHEET_CLEARED`.
+  Test : `tests/workfile-needs.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

@@ -285,6 +285,10 @@ export const ROUTES = Object.freeze({
       if (b.action === 'workfile-learn-cancel') return (await import('../lib/workfile-learn.js')).cancelWatch(orgId, m, c, b, a);
       if (b.action === 'workfile-learn') return (await import('../lib/workfile-learn.js')).learnFromPerson(orgId, m, c, b, a);
       if (b.action === 'workfile-learn-confirm') return (await import('../lib/workfile-learn.js')).confirmLesson(orgId, m, c, b, a);
+      if (b.action === 'workfile-clear-sheet') return (await import('../lib/workfile-map-view.js')).clearSheetWork(orgId, m, c, a, b);
+      // The pieces the working file needs and where they are in the mission's memory (2026-10-25).
+      if (b.action === 'workfile-needs') return (await import('../lib/workfile-needs.js')).workfileNeeds(orgId, m, c, a);
+      if (b.action === 'workfile-need-link') return (await import('../lib/workfile-needs.js')).linkNeed(orgId, m, c, b, a);
       if (b.action === 'workfile-import-undo') return (await import('../lib/workfile-undo.js')).undoImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-propose') return (await import('../lib/workfile-import-assist.js')).proposeImport(orgId, m, c, b, a);
       if (b.action === 'workfile-import-accept') return (await import('../lib/workfile-import-assist.js')).acceptImport(orgId, m, c, b, a);

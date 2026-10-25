@@ -171,6 +171,10 @@
       if (ins.length > 1) html += '<details class="wfg-more"><summary>Consignes de la feuille</summary>' + ins.slice(1).map(function (i) { return '<p class="wfg-instr">« ' + esc(i.text) + ' »</p>'; }).join('') + '</details>';
       html += '<p class="wfg-built">' + esc(built) + '</p>';
       html += fieldsBlock(v);
+      // « Supprimer tout un travail que j'ai fait sur une feuille » (2026-10-25): asked twice, then written and read back.
+      if (st.editable && t && v.filled) html += '<div class="wfg-row">' + (st.clearAsk === v.name
+        ? '<span class="wfg-meta">Vider toutes les cases à remplir de ' + esc(v.name) + ' (vos saisies, les imports, ce que l’agent a écrit) ? Les formules et les en-têtes du modèle restent.</span> <button type="button" class="btn" data-clearsheet="yes">Oui, vider la feuille</button> <button type="button" class="btn ghost" data-clearsheet="no">Non</button>'
+        : '<button type="button" class="btn ghost" data-clearsheet="ask">Vider tout le travail de cette feuille</button>') + '</div>';
       if (v.role === 'guide') html += '<ol class="wfg-order">' + sheetsInOrder().map(function (s) { return '<li><button type="button" class="wfg-link" data-go="' + esc(s.name) + '">' + esc(s.name) + '</button> <span class="wfg-meta">' + esc(ROLE[s.role] || s.role) + '</span></li>'; }).join('') + '</ol>';
       else if (t && v.role === 'test') html += testScreen(v);
       else if (t) html += tableScreen(v);
@@ -219,6 +223,14 @@
       if (b.classList.contains('wfg-opt')) {
         b.parentNode.querySelectorAll('.wfg-opt').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); o.dataset.picked = ''; });
         b.setAttribute('aria-pressed', 'true'); b.dataset.picked = '1'; return;
+      }
+      if (b.dataset.clearsheet) {
+        if (b.dataset.clearsheet === 'ask') { st.clearAsk = st.sheet; return render(); }
+        if (b.dataset.clearsheet === 'no') { st.clearAsk = null; return render(); }
+        st.clearAsk = null; st.say = 'Je vide la feuille…'; render();
+        return void api('workfile-clear-sheet', { sheet: st.sheet, confirm: true }).then(function (r) {
+          return load(st.sheet, 0).then(function () { st.say = r.cleared + ' case(s) vidée(s) et relue(s) dans ' + r.sheet + '.'; render(); var ref = $('audit-refresh'); if (ref) ref.click(); try { document.dispatchEvent(new CustomEvent('wf-sheet-cleared', { detail: { sheet: r.sheet } })); } catch (_) {} });
+        }).catch(function (e) { st.say = 'Impossible de vider : ' + (e && e.message || e) + '. Rien n’a été forcé.'; render(); });
       }
       if (b.dataset.clear) {
         // Empty the row's input cells, then the person saves (nothing is written before « Enregistrer »).

@@ -72,6 +72,37 @@
     return html + '</div>';
   }
 
+  // (2026-10-25, Paul : « quand on ouvre le working file, il doit savoir de quelle pièce il a besoin pour y travailler ») The pieces the
+  // working file names (its PBC list and test ↔ piece matrix), and where each one is in the mission's memory.
+  var STATUS = { linked: '✓ trouvée', probable: '? à confirmer', missing: '✗ manquante' };
+  function needItem(x, d) {
+    var html = '<li><b>' + esc(x.id) + '</b> ' + esc(x.name) + ' — <span class="wf-need-' + x.status + '">' + STATUS[x.status] + '</span>' + (x.tests && x.tests.length ? ' <span class="meta">(' + esc(x.tests.join(', ')) + ')</span>' : '');
+    (x.docs || []).forEach(function (doc) {
+      html += '<br>→ ' + (doc.url ? '<a href="' + esc(doc.url) + '" target="_blank" rel="noopener">' + esc(doc.name) + '</a>' : esc(doc.name)) + (doc.title ? ' — ' + esc(doc.title) : '') +
+        (doc.location ? ' <span class="meta">· rangé dans ' + esc(doc.location) + '</span>' : '') + (doc.why ? ' <span class="meta">· ' + esc(doc.why) + (doc.ai === true ? ', confirmé par l’IA' : '') + '</span>' : '') +
+        (x.status === 'probable' && d.editable ? ' <button type="button" class="btn ghost" data-a="need-yes" data-pbc="' + esc(x.id) + '" data-file="' + esc(doc.id) + '">C’est bien ça</button> <button type="button" class="btn ghost" data-a="need-no" data-pbc="' + esc(x.id) + '" data-file="' + esc(doc.id) + '">Ce n’est pas ça</button>' : '');
+    });
+    if (x.status === 'missing') html += ' <button type="button" class="btn ghost" data-a="need-ask">Déposer ou demander</button>';
+    return html + '</li>';
+  }
+  function needs(d) {
+    var n = st.needs; if (!n) return st.needsAsked ? '<div class="wf-assist-block"><h3>Pièces dont ce working file a besoin</h3><p class="wf-assist-busy">Je lis la liste des pièces du working file et je les cherche dans la mémoire de la mission…</p></div>' : '';
+    if (n.error) return '<div class="wf-assist-block"><h3>Pièces dont ce working file a besoin</h3><p class="meta">' + esc(n.error) + '</p></div>';
+    var byId = {}; n.items.forEach(function (x) { byId[x.id] = x; });
+    var cur = n.current_test ? n.current_test.pieces.map(function (id) { return byId[id]; }).filter(Boolean) : [];
+    var html = '<div class="wf-assist-block"><h3>Pièces dont ce working file a besoin</h3><p class="meta">Lu dans le working file (sa liste de pièces et quels tests en ont besoin) : ' + n.counts.found + ' trouvée(s) dans la mission, ' + n.counts.missing + ' manquante(s).</p>';
+    if (cur.length) html += '<p><b>Pour ' + esc(n.current_test.code) + ' :</b></p><ul class="wf-agent-list">' + cur.map(function (x) { return needItem(x, d); }).join('') + '</ul>';
+    var sheets = n.sheets.filter(function (s) { return s.pieces.length; });
+    if (sheets.length) html += '<p><b>Pour les feuilles de données :</b></p><ul class="wf-agent-list">' + sheets.map(function (s) {
+      var main = byId[s.pieces[0]]; return '<li><b>' + esc(s.sheet) + '</b> se remplit avec ' + (main ? esc(main.id) + ' « ' + esc(main.name) + ' » — <span class="wf-need-' + main.status + '">' + STATUS[main.status] + '</span>' + ((main.docs || [])[0] ? ' : ' + esc(main.docs[0].name) : '') : '?') + '</li>'; }).join('') + '</ul>';
+    html += '<details><summary>Toutes les pièces du working file (' + n.items.length + ')</summary><ul class="wf-agent-list">' + n.items.map(function (x) { return needItem(x, d); }).join('') + '</ul></details>';
+    return html + '</div>';
+  }
+  function loadNeeds() {
+    st.needsAsked = true; render();
+    return api('workfile-needs').then(function (n) { st.needs = n; render(); }).catch(function (e) { st.needs = { error: 'Liste des pièces non lisible : ' + (e && e.message || e) }; render(); });
+  }
+
   function imports(d) {
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Les feuilles de données à remplir</h3>' + list.map(function (x) {
@@ -113,7 +144,8 @@
   function propose(sheet) {
     st.imports[sheet] = null; st.scan[sheet] = { done: 0, total: 0, found: 0, current: '' }; render();
     var items = [];
-    return api('workfile-import-candidates', { sheet: sheet }).then(function (c) {
+    var prefer = []; if (st.needs && st.needs.sheets) { var sh = st.needs.sheets.filter(function (x) { return x.sheet === sheet; })[0]; if (sh) st.needs.items.filter(function (x) { return sh.pieces.indexOf(x.id) >= 0; }).forEach(function (x) { (x.docs || []).forEach(function (doc) { prefer.push(doc.id); }); }); }
+    return api('workfile-import-candidates', { sheet: sheet, prefer: prefer }).then(function (c) {
       var files = c.files || []; st.scan[sheet].total = files.length; render();
       var i = 0;
       function next() {
@@ -171,7 +203,7 @@
   }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + learning(d) + imports(d) + done(d) + pieces(d) + memory(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? needs(d) + known(d) + learning(d) + imports(d) + done(d) + pieces(d) + memory(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -185,12 +217,14 @@
       var wasReading = st.data && st.data.pieces && st.data.pieces.reading;
       st.data = d; render(); publish();
       if (wasReading && !d.pieces.reading) {
-        st.say = 'Pièces lues et identifiées : je prépare l’étape avec elles.'; render();
+        st.say = 'Pièces lues et identifiées : je prépare l’étape avec elles.'; render(); loadNeeds();
         try { document.dispatchEvent(new CustomEvent('wf-written', { detail: {} })); } catch (_) {}
         // The step of the SOP is prepared again with what was just read (facts proposed in the sheet, permission asked before writing).
         var agent = OM.workingFileAgent; if (agent && agent.prepareCurrent && !(agent.state && agent.state.busy)) agent.prepareCurrent();
       }
-      (d.data_sheets || []).forEach(function (x) { if (!st.asked[x.sheet]) { st.asked[x.sheet] = true; propose(x.sheet); } });
+      // The pieces the working file needs are looked up first: the data sheets' proposals then start from them.
+      var startImports = function () { (d.data_sheets || []).forEach(function (x) { if (!st.asked[x.sheet]) { st.asked[x.sheet] = true; propose(x.sheet); } }); };
+      if (!st.needsAsked) loadNeeds().then(startImports, startImports); else startImports();
       // Once per opening: the pieces nobody read yet are read, identified and renamed without waiting for a click.
       if (d.editable && !st.autoRead && d.pieces.to_read > 0 && !d.pieces.reading) { st.autoRead = true; review(); }
       if (d.pieces.reading && st.polls < 30) { st.polls++; setTimeout(refresh, 20000); }
@@ -221,6 +255,12 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
+    if (b.dataset.a === 'need-yes' || b.dataset.a === 'need-no') {
+      b.disabled = true;
+      api('workfile-need-link', { pbc: b.dataset.pbc, file_id: b.dataset.file, decision: b.dataset.a === 'need-yes' ? 'yes' : 'no' }).then(function () { st.say = b.dataset.a === 'need-yes' ? 'Noté dans la mémoire de la mission : ' + b.dataset.pbc + ' trouvée.' : 'Écarté : je ne le proposerai plus pour ' + b.dataset.pbc + '.'; return loadNeeds(); })
+        .catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); });
+    }
+    if (b.dataset.a === 'need-ask') { var nc = document.getElementById('needs-card'); if (nc) nc.scrollIntoView({ behavior: 'smooth' }); }
     if (b.dataset.a === 'mem-all') { st.memAll = true; render(); }
     if (b.dataset.a === 'learn-start') { b.disabled = true; api('workfile-learn-start').then(function (r) { st.learned = null; st.say = 'Je regarde. Remplissez dans Excel, enregistrez, puis « J’ai fini — apprends ».'; if (r.url) window.open(r.url, '_blank', 'noopener'); return refresh(); }).catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); }); }
     if (b.dataset.a === 'learn-cancel') { api('workfile-learn-cancel').then(refresh); }
@@ -267,6 +307,7 @@
 
   var tries = 0;
   (function wait() { if (place()) { render(); refresh(); return; } if (++tries < 40) setTimeout(wait, 250); })();
+  document.addEventListener('wf-sheet-cleared', function () { st.asked = {}; st.imports = {}; refresh(); });
   // The guide re-reads the sheet after a write: the known facts are published again so they stay visible.
   document.addEventListener('wf-written', function () { setTimeout(publish, 1500); });
 })();

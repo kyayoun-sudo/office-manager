@@ -37,3 +37,5 @@
 .wf-howto li{margin:3px 0}
 .wf-mem-q{margin:6px 0}
 .wf-mem li{margin:6px 0}
+.wf-need-linked{color:#1e7a46;font-weight:600}.wf-need-probable{font-weight:600}.wf-need-missing{color:#b42318;font-weight:600}
+@media (prefers-color-scheme:dark){.wf-need-linked{color:#7ad3a0}.wf-need-missing{color:#ff8a80}}
