@@ -999,6 +999,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   grand livre (raison dite), crédits des relevés (`rows_from … credits`), sans relevé = « aucun relevé bancaire parmi les pièces », rien
   recopié ; feuille qui prend le grand livre (son titre, ou ses colonnes d'écritures date + montant, sauf si elle demande les tiers) → l'auxiliaire est remplacé par le général, ou signalé s'il n'y en a pas. Tests : `tests/corpus.test.js`
   (GL auxiliaire, relevé, GL de 25 000 lignes). Non essayé sur les vrais fichiers de Paul ni avec la vraie IA.
+- D2 PAR LA MÉTHODE DE PAUL, APPLIQUÉE PAR LE CODE (Paul, 2026-10-25 : « reconnaître la catégorie budgétaire avec les noms, chercher dans le
+  grand livre, trouver les comptes ; [montant du PTBA] dans budget initial ; ensuite prendre le TEB, mettre les montants d'engagement
+  correspondant à ses comptes ») : `budgetMethod` (`lib/sheet-understanding.js`) — pièces reconnues par leurs COLONNES (`describeTable` :
+  TEB = budget + engagé / décaissé / réalisé ; PTBA = budget dont les catégories sont prouvées par leurs sommes, sans colonne d'exécution) ;
+  pour une feuille par catégorie qui a « budget initial » : lignes = catégories du PTBA, catégorie = n° de compte trouvé dans le GL général
+  par le nom (sinon le nom, signalé `without_account`), initial = montant du PTBA, final = budget (révisé) du TEB, engagements = TEB rapproché
+  par compte (plusieurs lignes du même compte ADDITIONNÉES, `alignRows`), amendements = final − initial. Remplace ce que l'IA a proposé
+  (sauf choix d'une personne) ; l'IA peut seulement mettre une colonne « à confirmer » avec sa raison. Tests : `tests/corpus.test.js`
+  (« méthode de Paul », IA qui se trompe / en panne, écriture vérifiée). Non essayé sur les vrais PTBA / TEB / GL de Paul.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

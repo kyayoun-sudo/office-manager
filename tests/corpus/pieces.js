@@ -147,6 +147,29 @@ export async function bigGeneralLedger(lines = 25000) {
     for (let i = 0; i < lines; i++) s.addRow([new Date(Date.UTC(2023, i % 12, 1 + (i % 27))), 'OD', accs[i % 5], 'Écriture ' + i, i % 2 ? 0 : 1000, i % 2 ? 1000 : 0]);
   }) };
 }
+// PTBA par NATURE de dépense, sans numéro de compte : les catégories portent les noms des comptes (« Fournitures non stockables »…),
+// une catégorie n'existe pas au grand livre (« Équipements informatiques » : aucune écriture).
+export async function ptbaByNature() {
+  return { name: 'PTBA 2023 approuvé.xlsx', kind: 'ptba-nature', buffer: await xlsxOf(wb => {
+    const s = wb.addWorksheet('PTBA'); s.getCell('A1').value = 'PLAN DE TRAVAIL ET BUDGET ANNUEL 2023'; s.mergeCells('A1:D1');
+    s.getRow(3).values = ['N°', 'Désignation', 'Quantité', 'Montant prévu'];
+    [[1, 'Papier et consommables', 10, 200000], [2, 'Cartouches', 4, 100000], [null, 'Sous-total Fournitures non stockables', null, 300000],
+      [3, 'Billets formation Dakar', 2, 800000], [null, 'Sous-total Transport des agents en formation', null, 800000],
+      [4, 'Consultant suivi', 12, 1500000], [null, 'Sous-total Honoraires', null, 1500000],
+      [5, 'Ordinateurs portables', 3, 900000], [6, 'Imprimante', 1, 150000], [null, 'Sous-total Équipements informatiques', null, 1050000],
+      [null, 'TOTAL GÉNÉRAL', null, 3650000]].forEach((v, i) => { s.getRow(4 + i).values = v; });
+  }) };
+}
+// Tableau d'exécution budgétaire : par numéro de compte (un compte sur DEUX lignes, à additionner), budget révisé, engagements, réalisations.
+export async function tebByAccount() {
+  return { name: 'TEB 31-12-2023.xlsx', kind: 'teb', buffer: await xlsxOf(wb => {
+    const s = wb.addWorksheet('TEB'); s.getCell('A1').value = "TABLEAU D'EXÉCUTION BUDGÉTAIRE AU 31/12/2023";
+    s.getRow(3).values = ['Code', 'Libellé', 'Budget révisé', 'Engagement', 'Décaissement', 'Réalisation', 'Crédit disponible', '%'];
+    [['605300', 'Fournitures non stockables', 320000, 232500, 232500, 232500, 87500, '73%'], ['618120', 'Transport formation (aller)', 500000, 410000, 410000, 410000, 90000, '82%'],
+      ['618120', 'Transport formation (retour)', 400000, 395000, 395000, 395000, 5000, '99%'], ['632400', 'Honoraires', 1500000, 1200000, 1200000, 1200000, 300000, '80%'],
+      [null, 'TOTAL', 2720000, 2237500, 2237500, 2237500, 482500, '82%']].forEach((v, i) => { s.getRow(4 + i).values = v; });
+  }) };
+}
 export async function corpus() {
   return [sageSections(), await odooGrouped(), csvFlat(), await handmade(), ptbaHydromet(), await ptbaMerged(), await ptbaTwoRowHeader(), await trainingPlan()];
 }
