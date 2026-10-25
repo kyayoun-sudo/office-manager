@@ -93,3 +93,13 @@ test('nothing changed: said plainly, nothing learned', async () => {
   const r = await learnFromPerson('O', 'M', 'PRJ-03', {}, paul, f.d);
   assert.equal(r.nothing_changed, true);
 });
+
+test('a read-only view, or a lesson of another model, is refused: nobody decides for a working file they do not prepare', async () => {
+  const f = await setup();
+  await startWatch('O', 'M', 'PRJ-03', {}, paul, f.d);
+  const r = await learnFromPerson('O', 'M', 'PRJ-03', {}, paul, f.d);
+  await assert.rejects(confirmLesson('O', 'M', 'PRJ-03', { template: 'another-model', sheet: 'D2_BUDGET', decision: 'validated' }, paul, f.d), /LESSON_NOT_FOR_THIS_WORKFILE/);
+  f.view.editable = false;
+  await assert.rejects(confirmLesson('O', 'M', 'PRJ-03', { template: r.template, sheet: 'D2_BUDGET', decision: 'validated' }, paul, f.d), /NOT_PREPARER/);
+  await assert.rejects(learnFromPerson('O', 'M', 'PRJ-03', {}, paul, f.d), /NOT_PREPARER/);
+});
