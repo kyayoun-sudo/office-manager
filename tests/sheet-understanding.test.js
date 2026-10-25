@@ -139,7 +139,7 @@ test('plan and fill: TEB for the final budget and engagements, convention for th
   await assert.rejects(acceptSheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', columns: [{ col: 'B', document_id: 'TEBX', heading: "Budget de l'exercice" }, { col: 'D', document_id: 'TEBX', heading: "Budget de l'exercice" }] }, { email: 'p@x' }, d), /SAME_SOURCE_ON_BOTH_SIDES/);
 });
 
-test('any data sheet, any piece: a grand livre fills D1 with Montant = Débit − Crédit, columns by meaning, no AI needed for a confirmed plan', async () => {
+test('any data sheet, any piece: a grand livre fills D1 with Montant = Débit − Crédit, columns by meaning, the AI only verifies a confirmed plan', async () => {
   const w = await workingFile();
   const d1 = w.getWorksheet('D1_GL_PROJET'); for (let r = 11; r <= 12; r++) for (let c = 1; c <= 5; c++) d1.getCell(r, c).value = null;
   let wp = Buffer.from(await w.xlsx.writeBuffer()), mod = 1;
@@ -154,7 +154,7 @@ test('any data sheet, any piece: a grand livre fills D1 with Montant = Débit �
     drive: { getMeta: async id => (id === 'WP' ? { name: 'NL.xlsx', size: wp.length, modifiedTime: 'v' + mod } : { name: 'GL_2024.xlsx', size: gl.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wp : gl), updateBinary: async (id, o) => { wp = o.buffer; mod++; } },
     ai: async () => { called++; return { text: '{}' }; }, save: async (o, w2, c) => Object.assign(view.work, c), audit: async () => null, noteMissionEvent: async () => null };
   const P = await sheetPlan('O', 'M', 'PRJ-11', { sheet: 'D1_GL_PROJET' }, { email: 'p' }, d);
-  assert.equal(called, 0);                                                     // every column already confirmed: no AI call
+  assert.equal(called, 1);                                                     // every column confirmed: the AI is asked only to verify
   assert.equal(P.plan.find(p => p.col === 'D').heading, 'Débit − Crédit');
   assert.deepEqual(P.preview.sample.map(r => r[3]), [300, -40]);
   await acceptSheetPlan('O', 'M', 'PRJ-11', { sheet: 'D1_GL_PROJET', columns: P.plan.map(p => ({ col: p.col, document_id: p.document_id, heading: p.heading })) }, { email: 'p' }, d);
@@ -174,4 +174,27 @@ test('a PDF named for a column is not read in the same call: the plan says « ex
   const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET' }, { email: 'p' }, d);
   const D = P.plan.find(p => p.col === 'D');
   assert.equal(D.status, 'needs_extraction'); assert.equal(D.pdf, 'TEB'); assert.equal(extracted, 0);
+});
+
+test('the AI checks the plan on the real tables: corrects a heading, empties a column, an invented heading is ignored, hard rules stay', async () => {
+  const { verifyWithAi, enforce } = await import('../lib/sheet-understanding.js');
+  const w = await workingFile(), u = understandSheet(w, mapWorkingFile(w), 'D2_BUDGET');
+  const tables = { T: { name: 'TEB.xlsx', headers: ['Code', 'Libellé', "Budget de l'exercice", 'Engagement', 'Réalisation'], rows: [['601', 'Salaires', 1000, 300, 500]] } };
+  const plan = [
+    { col: 'A', header: 'Catégorie budgétaire', document_id: 'T', heading: 'Code', source_index: 0, status: 'to_confirm', why: 'doute' },
+    { col: 'B', header: 'Budget initial', document_id: null, status: 'missing' },
+    { col: 'C', header: 'Amendements', document_id: null, status: 'missing' },
+    { col: 'D', header: 'Budget final approuvé (document)', document_id: 'T', heading: "Budget de l'exercice", source_index: 2, status: 'sure' },
+    { col: 'E', header: 'Engagements au 31/12', document_id: 'T', heading: 'Engagement', source_index: 3, status: 'sure' }];
+  const r = await verifyWithAi(u, plan, tables, { ai: async (p, o) => { const x = JSON.parse(o.input); assert.ok(x.documents[0].first_rows.length); return { provider: 'stub', text: JSON.stringify({ summary: 'ok', columns: [
+    { col: 'A', verdict: 'heading', heading: 'Libellé', why: 'les catégories sont nommées par leur libellé' },
+    { col: 'D', verdict: 'heading', heading: 'Budget révisé', why: 'inventé' },
+    { col: 'E', verdict: 'empty', why: 'ce TEB donne des engagements non soldés, pas au 31/12', missing: 'État des engagements au 31/12' }] }) }; } });
+  assert.equal(r.provider, 'stub');
+  assert.equal(plan[0].heading, 'Libellé'); assert.equal(plan[0].status, 'sure');
+  assert.equal(plan[3].heading, "Budget de l'exercice"); assert.match(plan[3].why, /absent du document/);
+  assert.equal(plan[4].document_id, null); assert.equal(plan[4].missing, 'État des engagements au 31/12');
+  // Even if the AI said « ok », the same column on both sides of PRJ-03 is still refused by the code.
+  plan[1] = { col: 'B', header: 'Budget initial', document_id: 'T', heading: "Budget de l'exercice", status: 'sure' };
+  enforce(u, plan); assert.equal(plan[1].document_id, null);
 });

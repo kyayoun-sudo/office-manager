@@ -17,6 +17,16 @@ il est lu au début de chaque session. La pensée générale du produit est dans
 - `docs/architecture/02_ARCHITECTURE_TECHNIQUE.md` — plans de données, connecteurs, événements, mémoire, sécurité.
 - `docs/architecture/03_ORPAILLEUR_METIER.md` — l'Orpailleur décrit par lui-même (production ChatGPT).
 
+## Rôle de Claude sur ce projet (Paul, 2026-10-25 — à relire à chaque session)
+- **Claude dirige ce projet** : Paul lui fait confiance pour le mener à bien. Diriger = décider de l'ordre du travail, voir les causes réelles
+  (pas les symptômes), construire des solutions générales pour tout cabinet et tout working file, jamais des rustines pour un cas.
+- **Ne jamais mentir** : ne dire « fait », « vérifié », « ça marche » que si c'est prouvé (test, relecture, essai sur le vrai fichier).
+  Dire clairement ce qui n'a pas été essayé (vraie IA, vraie mission, production), ce qui peut encore échouer, et ses propres erreurs.
+- **L'IA est centrale dans le logiciel** (Paul, 2026-10-25 : « on doit utiliser l'IA pour avoir les choses justes, elle aide à interpréter même
+  dans le logiciel ») : l'IA INTERPRÈTE (le working file, les pièces, le plan de remplissage, les doutes) ; le code lit, mesure, vérifie et garde
+  les règles dures (document de la mission, titre réel, jamais juste d'office, aucune écriture sans accord humain). Ne jamais remplacer une
+  interprétation de l'IA par des mots-clés ; un mot-clé du code n'est qu'un indice ou un garde-fou.
+
 ## Les principes qui ne bougent pas
 
 1. **Evidence before assumption.** Un nom de fichier ou de dossier n'est pas une preuve : on lit le contenu.
@@ -891,7 +901,10 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Panneau de l'agent : « Les feuilles de données à remplir » = une ligne par colonne (ce que les tests en font, pièce + colonne modifiables,
   pourquoi), aperçu, « Oui, remplis » ; l'ancienne recherche reste sous « Chercher pièce par pièce ». Le chat de la procédure reçoit la même
   compréhension (`data_sheets_understanding`) et la règle colonne par colonne. Actions `workfile-sheet-plan` / `workfile-sheet-plan-accept`.
-  Vérifié sur le vrai NL-T01 (45 lignes du TEB : tableau agrandi, formules de PRJ-03 prolongées). Test : `tests/sheet-understanding.test.js`.
+  Vérifié sur le vrai NL-T01 (45 lignes du TEB : tableau agrandi, formules de PRJ-03 prolongées). Puis (Paul : « l'IA est centrale ») une
+  2e demande à l'IA VOIT les tableaux ouverts (titres + premières lignes) et vérifie tout le plan colonne par colonne (`verifyWithAi` : ok avec
+  raison / autre colonne du même document / vider en nommant la pièce / question à l'auditeur) ; titre inventé ignoré ; règles dures réappliquées.
+  Test : `tests/sheet-understanding.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
