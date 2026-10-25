@@ -47,6 +47,9 @@
   // A previous edit accidentally nested the direct-create listener inside the TDR submit handler.
   // Capture the click here so “Sans TDR” works immediately on a fresh page and cannot double-submit.
   function installDirectCreateFix() {
+    // (2026-10-25) No longer needed: the page's own handler is now at the top level and creates the MISSION (route mission-quick).
+    // This capture sent « sans TDR » to the opportunities server, which requires a TDR (TDR_REQUIRED shown to the person).
+    return;
     var b = document.getElementById('send-direct');
     if (!b || b.dataset.directCreateFixed === '1') return;
     b.dataset.directCreateFixed = '1';

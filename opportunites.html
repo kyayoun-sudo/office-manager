@@ -281,17 +281,18 @@
         Type de mission
         <select id="direct-kind">
           <option value="">Choisir</option>
-          <option value="Audit légal">Audit légal</option>
-          <option value="Audit contractuel">Audit contractuel</option>
-          <option value="Expertise comptable">Expertise comptable</option>
-          <option value="Conseil">Conseil</option>
-          <option value="Due diligence">Due diligence</option>
-          <option value="Autre">Autre</option>
+          <option value="statutory">Audit légal / commissariat aux comptes</option>
+          <option value="contractual">Audit contractuel</option>
+          <option value="project">Audit de projet / bailleur</option>
+          <option value="review">Examen limité / revue</option>
+          <option value="agreed">Procédures convenues</option>
+          <option value="due_diligence">Due diligence</option>
+          <option value="advisory">Conseil / autre</option>
         </select>
       </label>
 
       <label>
-        Période
+        Période auditée (ou dates jj/mm/aaaa-jj/mm/aaaa)
         <input
           id="direct-period"
           type="text"
@@ -489,8 +490,8 @@ $('back-from-direct').addEventListener(
       return fetch(s.upload_url, { method: 'PUT', body: file }).then(function (r) { if (!r.ok) throw new Error('UPLOAD_FAILED_' + r.status); return r.json(); });
     }).then(function (g) { return { file_ids: [g.id], staged: true }; });
   }
-  $('send').addEventListener('click', function () {
-    var link = $('links').value.trim();$('send-direct').addEventListener(
+  // « Créer sans TDR » : its own handler, at the top level (it was nested inside the TDR button's handler, so never attached).
+  $('send-direct').addEventListener(
   'click',
   function () {
 
@@ -516,56 +517,47 @@ $('back-from-direct').addEventListener(
     $('say').textContent =
       'Création de l’opportunité…';
 
+    // (2026-10-25) « Créer sans TDR » crée la MISSION directement (même chemin que « + Nouvelle mission »), jamais une opportunité
+    // sans document : le serveur des opportunités exige un TDR (TDR_REQUIRED). Dates « jj/mm/aaaa-jj/mm/aaaa » = dates prévues.
+    var per = $('direct-period').value.trim(), dm = per.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s*[-–à]+\s*(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    var iso = function (d, m, y) { return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2); };
+    window.__directRequestId = window.__directRequestId || ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, function () { return (Math.random() * 16 | 0).toString(16); }));
+    var kind = $('direct-kind').value;
     var body = {
-
       action: 'create',
-
-      // LA NOUVELLE PORTE
-      entry_mode: 'direct',
-
+      request_id: window.__directRequestId,
       client: client,
-
-      title:
-        $('direct-title').value.trim(),
-
-      reference:
-        $('direct-reference').value.trim(),
-
-      kind:
-        $('direct-kind').value,
-
-      period:
-        $('direct-period').value.trim(),
-
-      summary:
-        $('direct-summary').value.trim(),
-
-      source: 'saisie directe'
+      name: $('direct-title').value.trim() || (client + (kind ? ' — ' + $('direct-kind').selectedOptions[0].textContent : '')),
+      engagement_type: kind || null,
+      origin: 'direct',
+      period: dm ? null : per,
+      planned_start: dm ? iso(dm[1], dm[2], dm[3]) : null,
+      planned_end: dm ? iso(dm[4], dm[5], dm[6]) : null,
+      reference: $('direct-reference').value.trim(),
+      summary: $('direct-summary').value.trim(),
+      confirm_duplicate: b.dataset.confirm === '1'
     };
+    $('say').textContent = 'Création de la mission…';
 
-    api(body)
+    OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify(body) })
 
       .then(function (r) {
-
-        if (
-          !r ||
-          !r.opportunity ||
-          !r.opportunity.id
-        ) {
-          throw new Error(
-            'OPPORTUNITY_CREATION_FAILED'
-          );
-        }
-
-        location.href =
-          '/opportunites.html?id=' +
-          encodeURIComponent(
-            r.opportunity.id
-          );
-
+        if (!r || !r.mission || !r.mission.id) throw new Error('MISSION_CREATION_FAILED');
+        location.href = r.url || ('/mission.html?id=' + encodeURIComponent(r.mission.id));
       })
 
       .catch(function (e) {
+        if (String(e && e.message || e).indexOf('POSSIBLE_DUPLICATE') >= 0) {
+          $('say').className = 'status error';
+          $('say').textContent = 'Une mission de ce client porte déjà ce nom. Cliquez de nouveau pour la créer quand même.';
+          b.dataset.confirm = '1';
+          throw null;
+        }
+        throw e;
+      })
+
+      .catch(function (e) {
+        if (e === null) return;
 
         $('say').className =
           'status error';
@@ -581,6 +573,8 @@ $('back-from-direct').addEventListener(
 
   }
 );
+  $('send').addEventListener('click', function () {
+    var link = $('links').value.trim();
     if (!picked && !link) { $('say').textContent = ERR.TDR_REQUIRED; return; }
     var b = this; b.disabled = true; $('say').className = 'status'; $('say').textContent = picked ? 'Envoi du document…' : 'Envoi…';
     (picked ? upload(picked) : Promise.resolve({ file_ids: UI.driveIds(link) }))
