@@ -810,6 +810,8 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   confirmation en attente (aucune écriture dans le working file) ; le panneau de l'agent se rafraîchit. Panneau : si aucune pièce Excel ne
   remplit la feuille (aucune cochée, ex. PTBA à 0 % des colonnes), les PDF passent en premier, ouverts, classés par nom / pièce attendue
   (« exécution », « TEB »…), les Excel repliés.
+  Import manuel : `TABLE_TOO_SMALL` (pièce plus longue que le tableau du modèle) n'est plus une impasse — message clair et « Oui, agrandis le
+  tableau et importe » (même import avec `extend: true`, `extendTable`).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
