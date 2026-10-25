@@ -119,6 +119,34 @@ async function trainingPlan() {
     ['Gestion financière', 12, 3, 1800000], ['Passation des marchés', 8, 2, 900000], ['Suivi-évaluation', 10, 2, 1000000], ['Anglais', 4, 20, 2400000], ['Excel avancé', 6, 3, 700000]]]]) };
 }
 
+// Grand livre AUXILIAIRE (tiers) : les comptes fournisseurs / clients, exporté à part (« GL AUXIL ») — ce n'est pas le grand livre général.
+export function auxLedger(yearTag = '2023') {
+  const aoa = [['GRAND LIVRE AUXILIAIRE FOURNISSEURS'], [], ['Date', 'Jnl', 'N° pièce', 'Libellé', 'Débit', 'Crédit', 'Solde']];
+  for (const [acc, lab] of [['401100', 'Fournisseur PAPETERIE CENTRALE'], ['401200', 'Fournisseur AIR AFRIQUE VOYAGES']]) {
+    aoa.push([acc + ' ' + lab]);
+    aoa.push(['05/01/' + yearTag, 'AC', 'FA001', 'Facture fournitures', null, fr(150000), null], ['10/01/' + yearTag, 'BQ', 'RG001', 'Règlement', fr(150000), null, null]);
+    aoa.push([null, null, null, 'Total compte ' + acc, fr(150000), fr(150000), null]);
+  }
+  return { name: '02042026 GL AUXIL ' + yearTag + '.xls', kind: 'aux', buffer: xlsOf([['Feuil1', aoa]]) };
+}
+// Relevé bancaire : un compte en banque, IBAN, date de valeur, débit / crédit, solde.
+export async function bankStatement(month = '06') {
+  return { name: 'Releve SGCI ' + month + '-2023.xlsx', kind: 'bank', buffer: await xlsxOf(wb => {
+    const s = wb.addWorksheet('Relevé'); s.addRow(['RELEVÉ DE COMPTE — SGCI']); s.addRow(['IBAN CI93 CI00 0101 0000 1234 5678 90', null, 'Période : ' + month + '/2023']); s.addRow([]);
+    s.addRow(['Date opération', 'Date valeur', 'Libellé', 'Débit', 'Crédit', 'Solde']);
+    s.addRow(['12/' + month + '/2023', '12/' + month + '/2023', 'VIR RECU BAILLEUR TRANCHE 2', null, 25000000, 25000000]);
+    s.addRow(['15/' + month + '/2023', '15/' + month + '/2023', 'FRAIS TENUE DE COMPTE', 15000, null, 24985000]);
+    s.addRow(['28/' + month + '/2023', '28/' + month + '/2023', 'VIR RECU CONTREPARTIE ETAT', null, 5000000, 29985000]);
+  }) };
+}
+// Un vrai grand livre général d'une année de projet est GROS : plus de 20 000 lignes (avant : refusé sans le dire).
+export async function bigGeneralLedger(lines = 25000) {
+  return { name: 'GRAND LIVRE GENERAL 2023.xlsx', kind: 'gl-big', lines, buffer: await xlsxOf(wb => {
+    const s = wb.addWorksheet('GL'); s.addRow(['Date', 'Journal', 'Compte', 'Libellé', 'Débit', 'Crédit']);
+    const accs = ['605300', '618120', '521100', '632400', '241000'];
+    for (let i = 0; i < lines; i++) s.addRow([new Date(Date.UTC(2023, i % 12, 1 + (i % 27))), 'OD', accs[i % 5], 'Écriture ' + i, i % 2 ? 0 : 1000, i % 2 ? 1000 : 0]);
+  }) };
+}
 export async function corpus() {
   return [sageSections(), await odooGrouped(), csvFlat(), await handmade(), ptbaHydromet(), await ptbaMerged(), await ptbaTwoRowHeader(), await trainingPlan()];
 }

@@ -82,3 +82,47 @@ test('l’IA ne répond pas au premier appel : elle est redemandée (entrée all
   assert.equal(P.ai_error, null); assert.equal(P.ai_retried, 'AI_TIMEOUT'); assert.equal(P.ai, 'ia');
   assert.ok(P.cells.length > 0);
 });
+
+// Paul, 2026-10-25 : « le GL est là, il ne l'a pas touché ; il a pris les GL auxiliaires au lieu du GL ; D3 il a recopié le GL encore une fois ».
+import { auxLedger, bankStatement, bigGeneralLedger } from './corpus/pieces.js';
+const general = pieces.find(x => /SAGE/.test(x.name));
+async function planWith(sheet, docs, answer) {
+  const files = Object.fromEntries(docs.map((p, i) => ['F' + i, p])), memory = Object.entries(files).map(([id, p]) => ({ id, name: p.name, read: true, uses: [] }));
+  const view = { editable: true, card: { steps: [{ text: 'x' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] }, line: { code: 'PRJ-07' }, mission: { period_label: 'Exercice 2023' } };
+  return sheetPlan('O', 'M', 'PRJ-07', { sheet }, { email: 'p' }, { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })), save: async () => null,
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'WF.xlsx', size: wpBuf.length } : { name: files[id].name, size: files[id].buffer.length }), downloadBuffer: async id => (id === 'WP' ? wpBuf : files[id].buffer) },
+    ai: async (pr, o) => (/vérifies le plan/.test(o.instructions) ? { text: '{}' } : answer(JSON.parse(o.input))) });
+}
+const shapeOf = async p => (await peekDocument({ id: 'x', name: p.name }, driveOf(p))).sheets[0].shape;
+
+test('grand livre général, auxiliaire, relevé bancaire : reconnus par leur contenu', async () => {
+  assert.match((await shapeOf(general)).looks_like, /GÉNÉRAL/);
+  assert.match((await shapeOf(auxLedger())).looks_like, /AUXILIAIRE/);
+  assert.match((await shapeOf(await bankStatement())).looks_like, /relevé bancaire/);
+});
+
+test('D1 : l’IA prend le grand livre AUXILIAIRE — le code remet le grand livre GÉNÉRAL', async () => {
+  const P = await planWith('D1_GL_PROJET', [auxLedger('2023'), auxLedger('2024'), general], inp => ({ text: JSON.stringify({ rows_from: { document_id: 'F0', which: 'lines' }, columns: inp.columns.map(c => ({ col: c.col, document_id: 'F0', heading: null })) }) }));
+  assert.ok(P.plan.filter(p => p.document_id).every(p => p.document === general.name), JSON.stringify(P.plan.map(p => p.document)));
+  assert.equal(new Set(P.cells.map(c => c.address.match(/\d+/)[0])).size, general.expect.entries);
+});
+
+test('D3 : l’IA recopie le grand livre — refusé ; les crédits des relevés bancaires sont pris', async () => {
+  const docs = [general, await bankStatement('06'), await bankStatement('09')];
+  const P = await planWith('D3_FONDS_RECUS', docs, inp => ({ text: JSON.stringify({ rows_from: { document_id: 'F0', which: 'credits' }, columns: inp.columns.map(c => ({ col: c.col, document_id: 'F0', heading: null })) }) }));
+  assert.ok(!P.plan.some(p => p.document === general.name), 'aucune colonne de D3 ne vient du grand livre');
+  assert.ok(P.plan.some(p => /relevés bancaires/.test(p.why || '')));
+});
+
+test('D3 sans relevé bancaire parmi les pièces : rien n’est recopié du grand livre, et il est dit qu’il manque les relevés', async () => {
+  const P = await planWith('D3_FONDS_RECUS', [general], inp => ({ text: JSON.stringify({ rows_from: { document_id: 'F0', which: 'credits' }, columns: inp.columns.map(c => ({ col: c.col, document_id: 'F0', heading: null })) }) }));
+  assert.equal(P.cells.length, 0);
+  assert.ok(P.plan.some(p => /aucun relevé bancaire/.test(p.why || '')));
+});
+
+test('un grand livre général de 25 000 lignes est lu (avant : refusé sans le dire, les auxiliaires pris à sa place)', async () => {
+  const big = await bigGeneralLedger(25000);
+  const t = await clientTable('x', driveOf(big));
+  assert.equal(t.rows.length - 1 - t.header_row, 25000);
+  assert.match((await shapeOf(big)).looks_like, /GÉNÉRAL/);
+});

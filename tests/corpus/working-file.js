@@ -39,6 +39,12 @@ export async function workingFile() {
     p11.getCell(r, 5).value = { formula: `IF(C${r}="","",SUMIFS(D1_GL_PROJET!$D$11:$D$30,D1_GL_PROJET!$E$11:$E$30,C${r}))` };
     p11.getCell(r, 6).value = { formula: `IF(C${r}="","",IF(E${r}>N(D${r}),"EXCEPTION","PASS"))` };
   }
+  const d3 = w.addWorksheet('D3_FONDS_RECUS'); d3.getCell('A1').value = 'D3 — Fonds reçus (bailleurs, contrepartie, autres)';
+  d3.getCell('A2').value = 'Reporter les crédits des relevés bancaires et les avis de crédit.';
+  head(d3, 10, ['ID ligne', 'Date', 'Pièce / référence', 'Bailleur / contributeur', 'Montant', 'Élig PRJ-07']);
+  for (let r = 11; r <= 30; r++) { for (let c = 1; c <= 5; c++) d3.getCell(r, c).fill = Y; d3.getCell(r, 6).value = { formula: `IF(AND(LEN(A${r})>0),1,0)` }; }
+  const p7 = w.addWorksheet('PRJ-07'); p7.getCell('A1').value = 'PRJ-07 — Fonds reçus';
+  head(p7, 10, ['N°', 'Montant reçu']); p7.getCell('B11').value = { formula: 'SUM(D3_FONDS_RECUS!$E$11:$E$30)' };
   return w;
 }
 

@@ -989,6 +989,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   interprète et choisit ; si elle ne répond pas, elle est REDEMANDÉE une fois avec une entrée allégée (`ai_retried`) ; seulement si elle
   échoue encore, l'écran le dit, propose « Relancer l'IA » en premier, et la proposition du code seul n'est qu'un secours (« Remplir quand
   même, sans l'IA », bouton secondaire). Test : `tests/corpus.test.js` (« redemandée »).
+- GL GÉNÉRAL ≠ GL AUXILIAIRE, D3 = RELEVÉS (Paul, 2026-10-25 : « D1 : le GL est là, il ne l'a pas touché ; il a pris les GL auxiliaires ;
+  D3 il a recopié le GL ») — causes prouvées : 1) un vrai grand livre général d'une année dépassait les limites (20 Mo / 20 000 lignes ; aperçu
+  15 Mo) et était écarté SANS LE DIRE, les petits auxiliaires restaient seuls ; 2) rien ne distinguait général et auxiliaire ; 3) rien
+  n'interdisait un GL pour une feuille de fonds reçus. Désormais : limites 40 Mo / 200 000 lignes (`clientTable`, `.xls`, `peekDocument`) ;
+  `describeTable` mesure les CLASSES de comptes (plusieurs classes = GÉNÉRAL ; seulement tiers 40x/41x = AUXILIAIRE) et reconnaît un relevé
+  bancaire (un seul compte, débit / crédit, et banque / IBAN / date de valeur ou une colonne « Solde ») ; `sheetWants(u)` lit dans le titre et les consignes de la feuille ce
+  qu'elle attend (relevés / avis de crédit, grand livre, dépenses). Règles du CODE quoi que dise l'IA : feuille de fonds reçus → jamais un
+  grand livre (raison dite), crédits des relevés (`rows_from … credits`), sans relevé = « aucun relevé bancaire parmi les pièces », rien
+  recopié ; feuille qui prend le grand livre (son titre, ou ses colonnes d'écritures date + montant, sauf si elle demande les tiers) → l'auxiliaire est remplacé par le général, ou signalé s'il n'y en a pas. Tests : `tests/corpus.test.js`
+  (GL auxiliaire, relevé, GL de 25 000 lignes). Non essayé sur les vrais fichiers de Paul ni avec la vraie IA.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
