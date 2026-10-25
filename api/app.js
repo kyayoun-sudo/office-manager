@@ -1,4 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
+import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
 import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
@@ -405,6 +406,28 @@ export const ROUTES = Object.freeze({
     },
     unavailable: 'TOOL_GATEWAY_UNAVAILABLE'
   },
+  // Several firms in one installation (2026-10-24): my firms, create one, join by invitation; administrators invite.
+  // Signed-in identity only (a newcomer belongs to no firm yet); inviting needs an administrator of the firm.
+  cabinets: {
+    GET: open(async (orgId, req) => {
+      // The personal session only (a person without a firm never holds the shared pilot token).
+      if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
+      const c = await import('../lib/cabinet-onboarding.js'), u = await import('../lib/user-auth.js');
+      if (req.query?.view === 'invitations') return { invitations: await c.listInvitations(orgId, await u.currentAccount(req, { orgId })) };
+      return { cabinets: await c.myCabinets(await u.sessionUser(req)), current: orgId };
+    }),
+    POST: open(async (orgId, req) => {
+      if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
+      const c = await import('../lib/cabinet-onboarding.js'), u = await import('../lib/user-auth.js');
+      const b = req.body || {}, action = String(b.action || '');
+      if (action === 'create') return c.createCabinet(await u.sessionUser(req), b);
+      if (action === 'join') return c.acceptInvitation(await u.sessionUser(req), b);
+      if (action === 'invite') return c.createInvitation(orgId, await u.currentAccount(req, { orgId }), b);
+      if (action === 'revoke') return c.revokeInvitation(orgId, await u.currentAccount(req, { orgId }), String(b.id || ''));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'CABINETS_UNAVAILABLE'
+  },
   'tender-step': { POST: async (orgId, req) => (await import('../lib/tender-watch.js')).tenderStep(orgId, req, req.body || {}), unavailable: 'TENDERS_UNAVAILABLE' },
   'shadow-code-step': { POST: async (orgId, req) => (await import('../lib/shadow-code.js')).codeStep(orgId, req, req.body || {}), unavailable: 'SHADOW_UNAVAILABLE' },
   // Shadow's background investigations and exams (2026-10-11).
@@ -466,7 +489,18 @@ export const ROUTES = Object.freeze({
   },
   passes: { GET: (orgId) => listPasses(orgId), unavailable: 'PASSES_UNAVAILABLE' },
   // Public route: the scheduler secret is checked inside tick().
-  'scheduler-tick': { POST: open((orgId, req) => tick(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
+  // Several firms: one scheduler call runs the due passes of EVERY firm, each in its own context (its Google, its Drive).
+  'scheduler-tick': { POST: open(async (orgId, req) => {
+    if (!multiCabinet()) return tick(orgId, req);
+    (await import('../lib/agent-passes.js')).requireSchedulerSecret(req);
+    const firms = await rest('office_organizations?select=id&order=created_at.asc&limit=1000') || [];
+    const results = [];
+    for (const f of firms) results.push(await runInFirm(f.id, async () => {
+      await loadGoogleConnection(f.id).catch(() => null);
+      return tick(f.id, req).then(r => ({ org_id: f.id, ...r }), e => ({ org_id: f.id, error: String(e.message || e).slice(0, 200) }));
+    }));
+    return { firms: results.length, results };
+  }), unavailable: 'SCHEDULER_UNAVAILABLE' },
   'scheduler-run': { POST: owner((orgId, req) => runNow(orgId, req)), unavailable: 'SCHEDULER_UNAVAILABLE' },
   coordination: {
     GET: users(MANAGERS, async (orgId, req) => {
@@ -1082,7 +1116,13 @@ export const ROUTES = Object.freeze({
   'google-callback': {
     GET: open(async (orgId, req) => {
       try {
-        const out = await completeGoogleReturn(orgId, req);
+        // Several firms: Google comes back without the firm header; the firm is the one in the state the server signed.
+        let firm = orgId;
+        if (multiCabinet()) {
+          const peek = (() => { try { return JSON.parse(Buffer.from(String(req.query?.state || '').split('.')[0], 'base64url').toString('utf8')); } catch { return {}; } })();
+          if (peek.org && peek.org !== orgId) { (await import('../lib/google-connection.js')).readState(req.query?.state, peek.org); firm = peek.org; }
+        }
+        const out = await runInFirm(firm, () => completeGoogleReturn(firm, req));
         console.log('[google-callback] ok');
         return out;
       } catch (e) {
@@ -1140,19 +1180,24 @@ export const ROUTE_SCREENS = Object.freeze({
   methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
 });
 const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
+const PILOT_ONLY = new Set(['bootstrap-owner', 'claim-owner', 'firm-restart']);
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
   const run = route[req.method];
   if (typeof run !== 'function') { requirePilotAccess(req); throw fail('METHOD_NOT_ALLOWED', 405); }
   if (!run.public) requirePilotAccess(req);
+  // The firm of the request (lib/firm-context.js). Several firms per installation: the shared pilot token is no
+  // longer enough, the person must belong to the firm (or the call is a signed internal one). Switch off: DEFAULT_ORG_ID.
+  const orgId = await resolveRequestOrg(req, { requireMember: !run.public });
+  // The owner code and FIRST_OWNER_EMAILS are the pilot firm's: never a way into another firm.
+  if (PILOT_ONLY.has(String(req.query?.route || '')) && orgId !== pilotOrgId()) throw fail('PILOT_FIRM_ONLY', 403);
   // Owner-only routes (2026-10-11): the owner's or a partner's personal session is enough — no code to type,
-  // the product is sold to other firms. The owner code still works (older pages, scripts).
+  // the product is sold to other firms. The owner code still works (older pages, scripts) — for the pilot firm only.
   if (run.ownerOnly) {
-    try { requireFirmOwner(req); }
+    try { if (orgId !== pilotOrgId()) throw fail('OWNER_SESSION_REQUIRED', 401); requireFirmOwner(req); }
     catch (e) { const acc = await requireRole(req, [...FIRM_LEAD]).catch(() => null); if (!acc) throw e; req.account = acc; }
   }
-  const orgId = process.env.DEFAULT_ORG_ID;
   if (!orgId && route !== ROUTES.diagnostic) throw new Error('DEFAULT_ORG_ID_MISSING');
   // Test mode (preview): never on the real firm's organisation (test run TATY TEST).
   if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
@@ -1167,11 +1212,12 @@ export async function handleApp(req) {
     } catch (e) { await logAccess(orgId, req.account, 'ACCESS_REFUSED', String(req.query?.route || '') + ':' + e.message); throw e; }
   }
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
-  if (orgId) await loadGoogleConnection(orgId).catch(() => null);
+  if (orgId) await runInFirm(orgId, () => loadGoogleConnection(orgId)).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
   const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => withOperationActor({orgId,actor:req.account?.email || 'office-manager-system',kind:req.account?'human':'system'},()=>run(orgId, req))));
-  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, invoke);
-  return invoke();
+  const inFirm = () => runInFirm(orgId, invoke);
+  if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, inFirm);
+  return inFirm();
 }
 
 export default async function handler(req, res) {

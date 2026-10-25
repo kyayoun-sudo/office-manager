@@ -14,6 +14,7 @@
 import crypto from "node:crypto";
 import { driveAdapter } from "../lib/drive-adapter.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
+import { resolveRequestOrg, multiCabinet, pilotOrgId } from "../lib/firm-context.js";
 import { loadMemory, ownerSecret } from "../lib/memory-runtime.js";
 import {
   buildMappingReport,
@@ -122,7 +123,10 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: "Method not allowed" });
     }
     // The firm's Google connection (Paramètres → Connecter Google) for the memory files.
-    if (process.env.DEFAULT_ORG_ID) await loadGoogleConnection(process.env.DEFAULT_ORG_ID).catch(() => null);
+    // Owner code = the pilot firm's own tools; with several firms, the person must belong to the firm.
+    const ownerOrg = await resolveRequestOrg(req, { requireMember: multiCabinet() });
+    if (multiCabinet() && ownerOrg !== pilotOrgId()) return res.status(403).json({ error: 'OWNER_TOOLS_PILOT_ONLY' });
+    if (ownerOrg) await loadGoogleConnection(ownerOrg).catch(() => null);
     return res.status(200).json(await handleOwnerRequest(req));
   } catch (error) {
     return res

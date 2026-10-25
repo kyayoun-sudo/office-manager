@@ -5,6 +5,7 @@ import {
   SPECIALIST_KEYS
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
+import { resolveRequestOrg } from "../lib/firm-context.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import {
   getAgentSetting,
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const orgId = process.env.DEFAULT_ORG_ID;
+    const orgId = await resolveRequestOrg(req);
     if (!orgId) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
