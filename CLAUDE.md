@@ -950,6 +950,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Non essayé : vraie IA, vraie mission. Reste : sans IA, saisir le test à la main dans l'écran (le serveur l'accepte déjà : `pipeline` +
   `source_file_id`) ; working file généré depuis la fiche du SOP quand le cabinet n'a aucun modèle (cas 1) ; premier écran « cabinet
   d'audit / entreprise (audit interne) » (décidé plus tard par Paul, pas codé).
+- LE GL ET LE PTBA VUS PAR LEUR CONTENU (Paul, 2026-10-25 : « il n'a toujours pas compris le PTBA ; je viens de mettre le GL, il ne sait même
+  pas qu'il y est ») — causes prouvées dans le code : 1) le texte envoyé à l'IA était COUPÉ (`JSON.stringify(...).slice(0, 60000)`) : JSON
+  cassé et derniers documents — la pièce déposée en dernier — jamais vus ; 2) seules les 30 premières pièces étaient ouvertes ; 3) un .xls
+  n'était jamais ouvert ; 4) l'IA ne voyait que les 12 premières lignes (titres du PTBA, pas sa structure) ; 5) les catégories du PTBA
+  n'étaient reconnues que par le mot « Sous-total », sinon TOUTES les lignes étaient prises sans le dire. Désormais : `lib/ai-input.js`
+  (`fitJson` : réduit les détails, jamais le texte coupé ; aussi dans la vérification, la collecte et le test en mots) ; toutes les pièces
+  tableur puis les PDF ouverts (80) ; .xls lu ; `describeTable` (titres, en-têtes, premières et dernières lignes, nombre de lignes, FORME) ;
+  `lib/table-structure.js` : catégories PROUVÉES par l'arithmétique (montant = somme des lignes couvertes, catégorie au-dessus ou sous-total
+  au-dessous, niveaux imbriqués, total général écarté), quels que soient les mots ; forme « grand livre » mesurée (date, compte, débit /
+  crédit, années, comptes) ; l'IA reçoit ces mesures (consigne ASSIGN) ; lignes de D2 = catégories prouvées, sinon le mot, sinon « aucune
+  ligne de catégorie trouvée » dit ; GL de correspondance trouvé par sa forme ; l'écran dit ce qui a été reconnu (grand livre, budget par
+  catégorie). Test : `tests/table-structure.test.js`. Non essayé sur le vrai PTBA ni le vrai GL de Paul (pas dans ce Drive).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

@@ -178,7 +178,8 @@ test('the AI chooses from what each document CONTAINS (table rows, PDF text), an
   const doc = id => input.documents.find(x => x.id === id);
   assert.match(doc('TEB').content.text, /Budget de l exercice/);
   assert.match(doc('LET').content.text, /non-objection/);
-  assert.deepEqual(doc('PTBA').content.sheets[0].rows[0], ['Activité', 'Budget']);
+  assert.deepEqual(doc('PTBA').content.sheets[0].headers, ['Activité', 'Budget']);
+  assert.deepEqual(doc('PTBA').content.sheets[0].first_lines[0], ['Atelier', '50']);
   assert.deepEqual(extracted, ['TEB']);                                            // the agent extracts the PDF it chose, without a click
   assert.equal(P.plan.find(p => p.col === 'D').status, 'unreadable');              // and says when it could not
 });
