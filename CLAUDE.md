@@ -849,6 +849,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (« exécution », « TEB »…), les Excel repliés.
   Import manuel : `TABLE_TOO_SMALL` (pièce plus longue que le tableau du modèle) n'est plus une impasse — message clair et « Oui, agrandis le
   tableau et importe » (même import avec `extend: true`, `extendTable`).
+  Cause réelle du « TABLE_TOO_SMALL » qui revenait même après « Oui, agrandis » (Paul, 2026-10-25) : la ligne TOTAL sous D2 était comptée
+  comme une ligne déjà remplie (l'import commençait SOUS le total) et l'agrandissement refusait d'écrire par-dessus. Désormais : seules les
+  cases jaunes de saisie du tableau comptent (`load` : `used`, `inputLast` = dernière ligne de saisie, pas la ligne de total) ; et
+  `extendTable` INSÈRE les lignes au-dessus de ce qui suit le tableau, comme Excel (`shiftAfter` : toutes les formules du classeur et les noms
+  qui pointent sous le tableau descendent ; listes de choix déplacées ; cellules fusionnées sous le tableau = refus `MERGED_CELLS_BELOW_TABLE`),
+  puis prolonge les plages (SUM(D5:D9) → SUM(D5:D16)). Test : `tests/table-import-total-row.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

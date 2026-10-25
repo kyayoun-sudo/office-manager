@@ -40,9 +40,12 @@ test('a table made larger keeps formats, formulas and the totals of the other sh
   assert.equal(w.getWorksheet('PRJ-04').getCell('C11').value.formula, 'SUM(D1_GL_PROJET!$D$5:$D$10)');
 });
 
-test('nothing is extended over content below the table', async () => {
+test('content below the table is never written over: rows are inserted and it moves down', async () => {
   const w = await workbook(); w.getWorksheet('D1_GL_PROJET').getCell('B9').value = 'note';
-  assert.throws(() => extendTable(w, 'D1_GL_PROJET', { first_row: 5, last_row: 7 }, 10), /ROWS_BELOW_TABLE_NOT_EMPTY/);
+  const r = extendTable(w, 'D1_GL_PROJET', { first_row: 5, last_row: 7 }, 10);
+  assert.equal(r.rows_inserted, 3);
+  assert.equal(w.getWorksheet('D1_GL_PROJET').getCell('B12').value, 'note');
+  assert.equal(w.getWorksheet('D1_GL_PROJET').getCell('B9').value, null);
 });
 
 test('import of more entries than the table: refused without permission, done with « agrandis »', async () => {
