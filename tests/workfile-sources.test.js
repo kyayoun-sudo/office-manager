@@ -40,16 +40,17 @@ test('a PDF becomes a new Excel next to it: verified rows in TABLEAU, doubtful o
   };
   const d = { drive, view: async () => ({ editable: true, workpaper: { file_id: 'WP' }, work: { status: 'in_progress' } }), audit: async () => null,
     sources: async () => [{ file_id: 'TEB', name: 'TEB_2023.pdf' }], missionMemory: async () => [], fitName: async n => ({ name: n }),
-    readPdf: async () => ({ text: 'TABLEAU D EXECUTION BUDGETAIRE 2023\nPersonnel 1 200 000 800 000\nFormation 450 000 300 000', pages_read: [1], ocr_pages: [] }),
-    ai: async () => ({ text: JSON.stringify({ what: 'Tableau d’exécution budgétaire', period: '2023', fits: true, rows: [['Personnel', '1 200 000', '800 000'], ['Formation', '450 000', '300 000'], ['Inventé', '7 777 777', '1']] }) }),
+    readPdf: async () => ({ text: 'TABLEAU D EXECUTION BUDGETAIRE 2023\n213100 Personnel 1 200 000 800 000\n244100 Formation 450 000 300 000', pages_read: [1], ocr_pages: [] }),
+    ai: async () => ({ text: JSON.stringify({ what: 'Tableau d’exécution budgétaire', period: '2023', fits: true, headers: ['Code', 'Libellé', 'Budget de l’exercice', 'Engagement'], rows: [['213100', 'Personnel', '1 200 000', '800 000'], ['244100', 'Formation', '450 000', '300 000'], ['999999', 'Inventé', '7 777 777', '1']] }) }),
     noteMissionEvent: async (o, m, f, e) => { notes.push([f, e]); } };
   const r = await extractPdfTable('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', file_id: 'TEB' }, { email: 'paul@x.ci' }, d);
   assert.equal(r.rows, 2); assert.equal(r.to_check, 1);
   assert.equal(created.N.parentId, 'P'); assert.match(created.N.name, /^TEB_2023_TABLEAU_EXTRAIT\.xlsx$/);
   const back = new ExcelJS.Workbook(); await back.xlsx.load(created.N.buffer);
   const t = back.getWorksheet('TABLEAU');
-  assert.deepEqual([t.getCell('A1').value, t.getCell('A2').value, t.getCell('B2').value, t.getCell('C3').value], ['Catégorie', 'Personnel', 1200000, 300000]);
-  assert.equal(back.getWorksheet('A_VERIFIER').getCell('A2').value, 'Inventé');
+  // the document's OWN columns, codes kept as text, amounts as numbers
+  assert.deepEqual([t.getCell('A1').value, t.getCell('C1').value, t.getCell('A2').value, t.getCell('B2').value, t.getCell('C2').value, t.getCell('D3').value], ['Code', 'Budget de l’exercice', '213100', 'Personnel', 1200000, 300000]);
+  assert.equal(back.getWorksheet('A_VERIFIER').getCell('B2').value, 'Inventé');
   assert.match(String(back.getWorksheet('SOURCE').getCell('B1').value), /TEB_2023\.pdf/);
   const mine = notes.find(n => n[0] === 'N')[1];
   assert.deepEqual(chosenIn([{ id: 'N', uses: mine.uses }], 'D2_BUDGET'), ['N']);

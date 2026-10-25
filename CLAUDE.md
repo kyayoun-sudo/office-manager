@@ -855,6 +855,12 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `extendTable` INSÈRE les lignes au-dessus de ce qui suit le tableau, comme Excel (`shiftAfter` : toutes les formules du classeur et les noms
   qui pointent sous le tableau descendent ; listes de choix déplacées ; cellules fusionnées sous le tableau = refus `MERGED_CELLS_BELOW_TABLE`),
   puis prolonge les plages (SUM(D5:D9) → SUM(D5:D16)). Test : `tests/table-import-total-row.test.js`.
+  PDF extrait avec SES colonnes (Paul, 2026-10-25 : « voici le TEB vs comment il a été rempli, c'est de la folie ») : l'IA recopiait le tableau
+  directement dans les colonnes de D2 et choisissait seule (Budget de l'exercice → « Budget final approuvé », colonne de décision jamais
+  importée ; « Budget initial » vide) → seuls libellés et engagements arrivaient. Désormais `extractPdfTable` recopie le tableau TEL QU'IL
+  EST (Code, Libellé, Budget de l'exercice, Décaissement, Engagement, Réalisation, Crédit disponible, % — codes en texte, montants en
+  nombres, chaque valeur vérifiée dans le PDF) ; la correspondance avec les colonnes de la feuille se fait ensuite à l'import, à la vue de
+  la personne. Un ancien extrait (méthode précédente) n'est jamais réutilisé (`method: 'document_columns'`).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
