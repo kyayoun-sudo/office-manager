@@ -57,7 +57,7 @@ function world() {
     if (path.startsWith('office_work_programmes')) return [programme];
     return [];
   };
-  const drive = { findFilesByExactName: async () => [], getMeta: async id => ({ id, parents: ['1WPFOLDERxxxxxxxxxxxxxxxxx'] }),
+  const drive = { findFilesByExactName: async () => [], getMeta: async id => ({ id, name: id, parents: id === '1WPFOLDERxxxxxxxxxxxxxxxxx' ? [] : ['1WPFOLDERxxxxxxxxxxxxxxxxx'] }),
     copyFile: async (id, name, parent) => { copies.push({ id, name, parent }); return { id: 'COPY' }; },
     createBinary: async () => ({ id: 'GEN' }), readText: async id => files[id] || '' };
   return { files, copies, patches, d: { fetchRows, drive, methodology: async () => ({ sops: [] }), firmName: 'C', audit: async () => null } };

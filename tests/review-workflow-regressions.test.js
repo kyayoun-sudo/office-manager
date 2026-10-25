@@ -26,7 +26,7 @@ async function world(count = 15) {
     return [];
   };
   const drive = {
-    getMeta: async id => id === 'POP' ? { id, mimeType: 'application/vnd.google-apps.spreadsheet' } : { id, modifiedTime: files.get(id)?.mt, parents: [files.get(id)?.parent] },
+    getMeta: async id => id === 'POP' ? { id, mimeType: 'application/vnd.google-apps.spreadsheet' } : { id, name: files.get(id)?.name || id, modifiedTime: files.get(id)?.mt, parents: [files.get(id)?.parent] },
     getValues: async () => [['Ref', 'Date', 'Tiers', 'Montant'], ...Array.from({ length: count }, (_, i) => ['F'+i, '2026-01-01', 'Client', 1])],
     downloadBuffer: async id => files.get(id).buf,
     updateBinary: async (id, { buffer }) => { files.get(id).buf = buffer; files.get(id).mt = 'm'+(++n); },
@@ -90,11 +90,11 @@ async function useCabinetModel(w) {
   w.d.templatesFolder=async()=>({status:'KNOWN',folder_id:'MODELS'});w.d.listTemplateFiles=async()=>[{id:'MODEL',name:'Cabinet_Achats.xlsx'}];
   w.d.drive.copyFile=async(id,name,parent)=>{const key='copied'+w.files.size;w.files.set(key,{name,parent,buf:Buffer.from(w.files.get(id).buf),mt:'copy'});return {id:key};};
 }
-test('new programme versions receive new workbooks without overwriting the previous version', async () => {
+test('an unbound legacy workbook is preserved when a cabinet model is first adopted', async () => {
   const w=await world();await useCabinetModel(w);const {programme,files,d}=w;programme.id='p2';programme.version=2;programme.workpapers=[];
   programme.cycles[0].procedures.push({code:'ACH-02',active:true});
   const r=await prepareCycleWorkpapers('org',M,mia,d);
-  assert.equal(r.workpapers[0].status,'CREATED_FROM_MODEL');assert.match(r.workpapers[0].name,/_v2\.xlsx$/);
+  assert.equal(r.workpapers[0].status,'CREATED_FROM_MODEL');assert.match(r.workpapers[0].name,/^WP_ACH_.+\.xlsx$/);
   assert.ok(files.has('WP'));
   const wb=new ExcelJS.Workbook();await wb.xlsx.load(files.get(r.workpapers[0].file_id).buf);assert.ok(wb.getWorksheet('ACH-02'));
   assert.equal((await prepareCycleWorkpapers('org',M,mia,d)).workpapers[0].status,'ALREADY_EXISTS');
@@ -142,5 +142,5 @@ test('legacy workbook associations pointing to an older programme are replaced b
   const w=await world();await useCabinetModel(w);const {programme,files,d}=w;programme.version=2;programme.id='p2';programme.workpapers[0].name='WP_ACH_Achats_Audit.xlsx';
   const old=Buffer.from(files.get('WP').buf);
   const result=await prepareCycleWorkpapers('org',M,mia,d);
-  assert.equal(result.workpapers[0].status,'CREATED_FROM_MODEL');assert.equal(result.workpapers[0].previous_file_id,'WP');assert.match(result.workpapers[0].name,/_v2\.xlsx$/);assert.ok(files.get('WP').buf.equals(old));
+  assert.equal(result.workpapers[0].status,'CREATED_FROM_MODEL');assert.equal(result.workpapers[0].previous_file_id,'WP');assert.match(result.workpapers[0].name,/^WP_ACH_.+\.xlsx$/);assert.ok(files.get('WP').buf.equals(old));
 });

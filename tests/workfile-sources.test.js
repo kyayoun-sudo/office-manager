@@ -34,7 +34,7 @@ test('a PDF becomes a new Excel next to it: verified rows in TABLEAU, doubtful o
   const created = {}, notes = [];
   const drive = {
     getMeta: async id => (id === 'TEB' ? { name: 'TEB_2023.pdf', size: 1000, parents: ['P'], mimeType: 'application/pdf' } : created[id] ? { id, webViewLink: 'https://x/' + id } : { size: wp.length }),
-    downloadBuffer: async id => (id === 'TEB' ? Buffer.from('%PDF fake') : wp),
+    downloadBuffer: async id => (id === 'TEB' ? Buffer.from('%PDF fake') : created[id]?.buffer || wp),
     findFilesByExactName: async () => [],
     createBinary: async ({ name, parentId, buffer }) => { created.N = { name, parentId, buffer }; return { id: 'N' }; }
   };
@@ -45,7 +45,7 @@ test('a PDF becomes a new Excel next to it: verified rows in TABLEAU, doubtful o
     noteMissionEvent: async (o, m, f, e) => { notes.push([f, e]); } };
   const r = await extractPdfTable('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', file_id: 'TEB' }, { email: 'paul@x.ci' }, d);
   assert.equal(r.rows, 2); assert.equal(r.to_check, 1);
-  assert.equal(created.N.parentId, 'P'); assert.match(created.N.name, /^TEB_2023_TABLEAU_EXTRAIT\.xlsx$/);
+  assert.equal(created.N.parentId, 'P'); assert.match(created.N.name, /^TEB_2023_TABLEAU_EXTRAIT_[a-f0-9]{10}\.xlsx$/);
   const back = new ExcelJS.Workbook(); await back.xlsx.load(created.N.buffer);
   const t = back.getWorksheet('TABLEAU');
   // the document's OWN columns, codes kept as text, amounts as numbers

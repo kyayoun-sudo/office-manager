@@ -32,6 +32,15 @@ function db() {
 const mia = { role: 'manager', email: 'mia@c.ci' };
 const deps = (x, extra = {}) => ({ fetchRows: x.fetchRows, methodology: async () => LIB, audit: async () => ({}), emit: async () => ({}), ...extra });
 
+test('a new programme version inherits server-recorded workpaper IDs, never browser bindings', async () => {
+  const x = db(), cycles = [proposeCycle(LIB.sops[0])];
+  x.t.programmes.push({ id: 'p1', version: 1, status: 'validated', cycles,
+    workpapers: [{ cycle_code: 'ACH', file_id: 'EXISTING', model: { id: 'MODEL' } }] });
+  const r = await saveProgramme('org', M, { cycles, workpapers: [{ file_id: 'FORGED' }] }, mia, deps(x));
+  assert.equal(r.programme.version, 2);
+  assert.deepEqual(r.programme.workpapers, x.t.programmes[0].workpapers);
+});
+
 test('a cycle is proposed from the SOP: mandatory procedures ticked, risk-dependent and optional to decide', () => {
   const c = proposeCycle(LIB.sops[0]);
   assert.deepEqual(c.procedures.map(p => [p.code, p.active]), [['ACH-01', true], ['ACH-03', true], ['ACH-08', false], ['ACH-13', false]]);
