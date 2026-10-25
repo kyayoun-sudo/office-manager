@@ -60,3 +60,7 @@
 .wfg-agent{opacity:.8;font-weight:500}
 .wfg-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin:8px 0 12px}
 .wfg-fields>.wfg-row{grid-column:1/-1}
+.wfg-clear{width:28px;text-align:center}
+.wfg-x{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:22px;height:22px;line-height:18px;cursor:pointer;padding:0}
+.wfg-cleared td{opacity:.55;text-decoration:line-through}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}

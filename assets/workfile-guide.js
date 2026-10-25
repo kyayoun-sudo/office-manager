@@ -123,20 +123,22 @@
       // (the table's last row is often its total line: it does not count as a used row)
       v.rows.forEach(function (r, i) { if (r.row < t.last_row && t.columns.some(function (c) { return ['fact', 'free', 'judgment'].indexOf(c.role) >= 0 && r.cells[c.col]; })) last = i; });
       // The rows already used, plus a few empty ones: not a wall of empty boxes.
-      var show = v.rows.slice(0, v.role === 'data' ? 8 : Math.max(5, last + 4));
+      var show = v.rows.slice(0, Math.min(v.rows.length, Math.max(8, last + 4)));
       var examples = (t.prefilled_rows || []).filter(function (r) { return r < t.first_row + 10; });
       return (examples.length && v.role === 'lead' ? '<p class="wfg-pending">Lignes ' + examples.join(', ') + ' : texte déjà mis par le modèle (exemples de rubriques). Remplacez-les par les comptes de la balance.</p>' : '') +
-        '<div class="wfg-wrap"><table class="wfg-table"><thead><tr>' + t.columns.map(function (c) { return '<th scope="col">' + esc(c.header) + '<small>' + esc(COLROLE[c.role] || '') + '</small></th>'; }).join('') + '</tr></thead><tbody>' +
+        '<div class="wfg-wrap"><table class="wfg-table"><thead><tr>' + (st.editable ? '<th scope="col" class="wfg-clear"><span class="sr-only">Vider</span></th>' : '') + t.columns.map(function (c) { return '<th scope="col">' + esc(c.header) + '<small>' + esc(COLROLE[c.role] || '') + '</small></th>'; }).join('') + '</tr></thead><tbody>' +
         show.map(function (r) {
-          return '<tr data-row="' + r.row + '">' + t.columns.map(function (c) {
-            var val = r.cells[c.col], editable = st.editable && v.role !== 'data' && ['fact', 'free', 'judgment'].indexOf(c.role) >= 0, pr = !val ? proposal(c.col + r.row) : null;
+          var filledRow = t.columns.some(function (c) { return ['fact', 'free', 'judgment'].indexOf(c.role) >= 0 && r.cells[c.col]; });
+          return '<tr data-row="' + r.row + '">' + (st.editable ? '<td class="wfg-clear">' + (filledRow ? '<button type="button" class="wfg-x" data-clear="' + r.row + '" title="Vider cette ligne" aria-label="Vider la ligne ' + r.row + '">×</button>' : '') + '</td>' : '') + t.columns.map(function (c) {
+            // (2026-10-25, Paul : « si j'ai écrit manuellement dans budget, je ne peux pas supprimer ce que j'ai écrit ») data sheets editable too.
+            var val = r.cells[c.col], editable = st.editable && ['fact', 'free', 'judgment'].indexOf(c.role) >= 0, pr = !val ? proposal(c.col + r.row) : null;
             if (pr) return '<td class="wfg-r-prop" title="' + esc((pr.source || '') + (pr.quote ? ' — ' + pr.quote : '')) + '">' + esc(pr.value) + '</td>';
             if (!editable) return '<td class="wfg-r-' + c.role + '">' + esc(val == null ? 'ƒ' : val) + '</td>';
             if (c.role === 'judgment' && c.list && c.list.length) return '<td class="wfg-r-judgment"><select data-cell="' + c.col + r.row + '" data-expected="' + esc(val || '') + '"><option value=""></option>' + c.list.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></td>';
             return '<td class="wfg-r-' + c.role + '"><input type="text" data-cell="' + c.col + r.row + '" data-expected="' + esc(val || '') + '" value="' + esc(val || '') + '"></td>';
           }).join('') + '</tr>';
         }).join('') + '</tbody></table></div>' +
-        (st.editable && v.role !== 'data' ? '<div class="wfg-row"><button type="button" class="btn" data-save="table">Enregistrer les modifications dans le fichier</button></div>' : '');
+        (st.editable ? '<div class="wfg-row"><button type="button" class="btn" data-save="table">Enregistrer les modifications dans le fichier</button></div>' : '');
     }
 
     function chips(v) {
@@ -217,6 +219,11 @@
       if (b.classList.contains('wfg-opt')) {
         b.parentNode.querySelectorAll('.wfg-opt').forEach(function (o) { o.setAttribute('aria-pressed', 'false'); o.dataset.picked = ''; });
         b.setAttribute('aria-pressed', 'true'); b.dataset.picked = '1'; return;
+      }
+      if (b.dataset.clear) {
+        // Empty the row's input cells, then the person saves (nothing is written before « Enregistrer »).
+        var tr = b.closest('tr'); tr.querySelectorAll('[data-cell]').forEach(function (n) { n.value = ''; }); tr.classList.add('wfg-cleared');
+        st.say = 'Ligne ' + b.dataset.clear + ' vidée à l’écran : cliquez « Enregistrer les modifications dans le fichier » pour l’écrire.'; var sayN = board.querySelector('.wfg-say'); if (sayN) sayN.textContent = st.say; return;
       }
       if (b.dataset.save) return void save(b.dataset.save === 'table' ? board : (b.dataset.save === 'fields' ? b.closest('.wfg-fields') : b.closest('.wfg-item')));
       if (b.dataset.chip != null) {

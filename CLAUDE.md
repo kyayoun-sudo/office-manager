@@ -757,6 +757,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   renommage permis, jamais déplacés), Mission Controller (`mission-filing`), pièces PBC confirmées (`filedName` : référence + titre lu +
   période), pièces des tests de l'Enhanced Auditor (titre précis demandé à l'IA qui lit la pièce, renommées `<CODE>_<S01>_<TITRE>`, même
   fichier). Objectifs des agents complétés (`lib/agent-goals.js`) pour que Shadow le surveille. Test : `tests/document-naming.test.js`.
+- UNE MÉMOIRE DE LA MISSION, LES PIÈCES DÉPOSÉES SONT RANGÉES (Paul, 2026-10-25 : « le rangement est fou ; l'Enhanced Auditor ne connaît
+  pas les fichiers ; quand on met les pièces, il doit lire chaque pièce, la comprendre et la ranger ; une mémoire unique dans la mission que
+  tous les agents remplissent ; si j'ai écrit manuellement dans budget je ne peux pas supprimer ») : le registre existant
+  `OFFICE_MANAGER_MISSION_FILES.json` devient LA mémoire de la mission (une seule vérité) — par document : titre précis, emplacement
+  (`location`, `folder_id`), utilisations (`uses` : pbc, preuve, import…), historique (`history` : qui, quoi, quand, 30 derniers).
+  `noteMissionEvent` / `missionMemory` (`lib/mission-files.js`) ; écrit par : dépôt (lu, compris, renommé), exécution des rangements
+  (`action-executor`, toute action liée à une mission), pièce PBC confirmée, pièces des tests de l'Enhanced Auditor, imports et annulations.
+  Lue par : panneau de l'agent (« Mémoire de la mission », recherche), chat de la procédure (`mission_memory`), sources des étapes.
+  Pièces déposées DANS une mission : rangées dans la mission dès qu'elles sont lues avec certitude (lecture complète, confiance haute,
+  passage cité retrouvé), sans attendre le rangement automatique général (`settings.mission_auto_filing !== false` ; `false` = « À valider »).
+  « Revoir, renommer et ranger » envoie toutes les pièces encore dans PIECES_RECUES par ce chemin. Feuilles de données modifiables dans
+  l'écran, avec « × » pour vider une ligne (écrit sur « Enregistrer », case par case, version vérifiée). Test : `tests/mission-memory.test.js`.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

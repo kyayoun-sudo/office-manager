@@ -133,18 +133,33 @@
     }).catch(function (e) { var m = String(e && e.message || e); st.imports[sheet] = { error: 'proposition impossible — ' + (ERR[m] || m) }; render(); });
   }
 
+  // The pieces just deposited (PIECES_RECUES): how many, how many not read yet; each is read, understood, renamed and filed.
   function pieces(d) {
     var p = d.pieces, list = p.pieces || [];
-    var html = '<div class="wf-assist-block"><h3>Les pièces reçues de la mission (' + list.length + ')</h3>';
+    var html = '<div class="wf-assist-block"><h3>Pièces déposées à ranger (' + list.length + ')</h3>';
     if (p.error) return html + '<p class="meta">Dossier des pièces non lisible : ' + esc(p.error) + '.</p></div>';
-    if (!list.length) return html + '<p>Aucune pièce dans « Pièces reçues » pour l’instant. Déposez-les plus bas, ou je prépare la demande au client.</p></div>';
-    html += '<ul class="wf-agent-list">' + list.slice(0, 12).map(function (x) {
-      return '<li>' + (x.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.name) + '</a>' : esc(x.name)) + ' — ' +
-        (x.understood ? '<b>' + esc(x.type || 'identifiée') + '</b>' + (x.period ? ' · ' + esc(x.period) : '') + (x.summary ? '<br><span class="meta">' + esc(x.summary) + '</span>' : '') : '<span class="meta">pas encore lue</span>') + '</li>';
-    }).join('') + '</ul>' + (list.length > 12 ? '<p class="meta">… et ' + (list.length - 12) + ' autre(s).</p>' : '');
-    if (p.reading) html += '<p class="wf-assist-busy">Je lis les pièces, je les identifie et je les renomme d’après leur contenu…</p>';
-    else if (d.editable) html += '<div class="row"><button type="button" class="btn' + (p.to_read ? '' : ' ghost') + '" data-a="review">' + (p.to_read ? 'Lire et identifier les ' + p.to_read + ' pièce(s) non lues' : 'Revoir et renommer les pièces') + '</button></div>';
+    if (!list.length) return html + '<p class="meta">Aucune pièce en attente dans « Pièces reçues » : tout ce qui a été déposé a été rangé (voir la mémoire de la mission ci-dessous).</p></div>';
+    html += '<p>' + list.length + ' pièce(s) dans « Pièces reçues »' + (p.to_read ? ', dont ' + p.to_read + ' pas encore lue(s)' : '') + '. Chaque pièce est lue, comprise, renommée d’après ce qu’elle est et rangée dans le bon dossier de la mission.</p>';
+    if (p.reading) html += '<p class="wf-assist-busy">Je lis les pièces, je les identifie, je les renomme et je les range…</p>';
+    else if (d.editable) html += '<div class="row"><button type="button" class="btn' + (p.to_read ? '' : ' ghost') + '" data-a="review">' + (p.to_read ? 'Lire, renommer et ranger les ' + p.to_read + ' pièce(s)' : 'Revoir, renommer et ranger les pièces') + '</button></div>';
     return html + '</div>';
+  }
+
+  // (2026-10-25, Paul : « une mémoire unique dans la mission, que tous les agents remplissent, pour comprendre ce qui a été rangé »)
+  function memory(d) {
+    var list = d.memory || []; if (!list.length) return '';
+    var q = (st.memQ || '').toLowerCase();
+    var shown = list.filter(function (x) { return !q || [x.name, x.title, x.location, x.summary].join(' ').toLowerCase().indexOf(q) >= 0; });
+    return '<div class="wf-assist-block"><h3>Mémoire de la mission (' + list.length + ' document(s))</h3><p class="meta">Ce que chaque document est, où il est rangé, et ce que les agents en ont fait — la même mémoire pour tous les agents.</p>' +
+      '<input type="search" class="wf-mem-q" placeholder="Chercher : budget, grand livre, convention…" value="' + esc(st.memQ || '') + '" aria-label="Chercher dans la mémoire de la mission">' +
+      '<ul class="wf-agent-list wf-mem">' + shown.slice(0, st.memAll ? 200 : 12).map(function (x) {
+        var last = (x.history || []).slice(-1)[0];
+        return '<li>' + (x.url ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.name) + '</a>' : esc(x.name)) +
+          (x.title ? ' — <b>' + esc(x.title) + '</b>' : (x.read ? '' : ' — <span class="meta">pas encore lu</span>')) + (x.period ? ' · ' + esc(x.period) : '') +
+          (x.location ? '<br><span class="meta">Rangé dans : ' + esc(x.location) + '</span>' : '') +
+          ((x.uses || []).length ? '<br><span class="meta">Utilisé : ' + esc(x.uses.map(function (u) { return u.what + ' ' + (u.where || ''); }).join(' ; ')) + '</span>' : '') +
+          (last ? '<br><span class="meta">Dernier : ' + esc(last.what) + (last.agent ? ' (' + esc(last.agent) + ')' : '') + (last.detail ? ' — ' + esc(last.detail) : '') + '</span>' : '') + '</li>';
+      }).join('') + '</ul>' + (shown.length > 12 && !st.memAll ? '<button type="button" class="btn ghost" data-a="mem-all">Voir les ' + shown.length + ' documents</button>' : '') + '</div>';
   }
 
   // « Comment j'importe, comment je remplis ? » (Paul, 2026-10-25): the path, in three lines, always at hand.
@@ -156,7 +171,7 @@
   }
   function render() {
     var d = st.data;
-    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + learning(d) + imports(d) + done(d) + pieces(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
+    box.innerHTML = '<h2>L’agent</h2>' + howto() + (d ? known(d) + learning(d) + imports(d) + done(d) + pieces(d) + memory(d) : '<p class="meta">Lecture de ce qu’il sait et des pièces reçues…</p>') +
       '<p class="status" role="status" aria-live="polite">' + esc(st.say) + '</p>';
   }
 
@@ -191,7 +206,7 @@
   }
 
   box.addEventListener('toggle', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('wf-howto')) st.howtoOpen = ev.target.open; }, true);
-  box.addEventListener('input', function (ev) { var t = ev.target; if (t && t.classList && t.classList.contains('wf-learn-note')) { st.notes = st.notes || {}; st.notes[t.dataset.sheet] = t.value; } });
+  box.addEventListener('input', function (ev) { var t = ev.target; if (t && t.classList && t.classList.contains('wf-mem-q')) { st.memQ = t.value; var pos = t.selectionStart; render(); var n = box.querySelector('.wf-mem-q'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; } if (t && t.classList && t.classList.contains('wf-learn-note')) { st.notes = st.notes || {}; st.notes[t.dataset.sheet] = t.value; } });
   box.addEventListener('change', function (ev) { var c = ev.target; if (c && c.dataset && c.dataset.pick) { st.pick[c.dataset.pick] = c.checked; render(); } });
   box.addEventListener('click', function (ev) {
     var b = ev.target.closest('button'); if (!b || b.disabled) return;
@@ -206,6 +221,7 @@
     if (b.dataset.a === 'no') { st.declined = true; render(); publish(); }
     if (b.dataset.a === 'undo') { st.declined = false; render(); publish(); }
     if (b.dataset.a === 'review') review();
+    if (b.dataset.a === 'mem-all') { st.memAll = true; render(); }
     if (b.dataset.a === 'learn-start') { b.disabled = true; api('workfile-learn-start').then(function (r) { st.learned = null; st.say = 'Je regarde. Remplissez dans Excel, enregistrez, puis « J’ai fini — apprends ».'; if (r.url) window.open(r.url, '_blank', 'noopener'); return refresh(); }).catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); }); }
     if (b.dataset.a === 'learn-cancel') { api('workfile-learn-cancel').then(refresh); }
     if (b.dataset.a === 'learn') {

@@ -106,9 +106,9 @@ test('received pieces: understood ones are renamed from what was read, the other
     piecesReceived: async (o, req, body) => { readWith = body; return { analysis: { id: 'dep-1' } }; } };
   const r = await reviewPieces('o', null, 'm1', 'PRJ-01', paul, d);
   assert.deepEqual(renamedWith.understood.map(u => u.id), ['p1']);
-  assert.deepEqual(readWith.files, [{ id: 'p2' }]);
+  assert.deepEqual(readWith.files, [{ id: 'p1' }, { id: 'p2' }]);   // all still in PIECES_RECUES: read, renamed and filed
   assert.equal(r.renamed.length, 1);
-  assert.equal(r.to_read, 1);
+  assert.equal(r.to_read, 2);
 });
 
 test('the validated programme’s decisions are proposed in the programme sheet (Activé ?, justification), written on « Oui »', async () => {
