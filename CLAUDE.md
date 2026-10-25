@@ -35,6 +35,12 @@ copiés) et table de correspondance libellé → compte. D2 : catégorie = numé
 initial = PTBA initial ; final = PTBA révisé / final ou budget révisé du TEB ; amendements = final − initial (décision de Paul, PRJ-03
 contrôle ensuite les approbations) ; engagements = TEB. D3 = crédits des relevés + avis de crédit (IA). D4 = avances de l'entité (GL +
 relevés). PRJ-01 = LIRE l'accord de prêt. Les .zip sont ouverts par tous les agents.
+CODE (2026-10-25) : `lib/ledger-shape.js` (`flattenLedger`, appelé par `clientTable` : GL par sections → « Compte » + « Intitulé du
+compte » sur chaque écriture, reports / à-nouveaux / totaux / soldes écartés et comptés, ligne d'origine gardée) ; `lib/sheet-understanding.js` :
+l'IA peut dire `rows_from` (pièce + `lines` / `subtotals`), `gl_document_id`, et par colonne `compute: "D-B"` ou `account_from_gl` ;
+le code calcule (amendements = final − initial, appliqué aussi d'office quand initial et final viennent de pièces : `by: 'méthode'`), retrouve
+le numéro de compte d'une ligne par son code ou son libellé dans le GL (`ledgerAccounts` / `accountOf` : identique, puis proche et unique)
+et aligne PTBA ↔ TEB par ce numéro. Tests : `tests/ledger-shape.test.js`, `tests/sheet-understanding.test.js` (« Paul's method »).
 
 ## Les principes qui ne bougent pas
 

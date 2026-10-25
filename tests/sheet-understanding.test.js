@@ -122,15 +122,15 @@ test('plan and fill: TEB for the final budget and engagements, convention for th
   assert.equal(at('A').document_id, 'TEBX'); assert.equal(at('A').heading, 'Libellé');   // the PDF's verified extract is what is read
   assert.match(at('A').why, /100 % des valeurs retrouvées/);                              // checked against the GL's categories
   assert.equal(at('B').document_id, 'CONV');
-  assert.equal(at('C').status, 'missing'); assert.equal(plan.missing.find(m => m.col === 'C').piece, 'Avenants / no-objections');
+  assert.equal(at('C').compute, 'D-B'); assert.match(at('C').why, /méthode du cabinet/);       // Paul's method: amendments = final − initial
   assert.equal(at('D').heading, "Budget de l'exercice");
   assert.equal(plan.preview.rows, 2);                                                     // TOTAL line left out
-  assert.deepEqual(plan.preview.sample[0], ['Salaires', 900, null, 1000, 300]);
-  const r = await acceptSheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', columns: plan.plan.map(p => ({ col: p.col, document_id: p.document_id, heading: p.heading })) }, { email: 'p@x' }, d);
+  assert.deepEqual(plan.preview.sample[0], ['Salaires', 900, 100, 1000, 300]);
+  const r = await acceptSheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', columns: plan.plan.map(p => ({ col: p.col, document_id: p.document_id, heading: p.heading, compute: p.compute })) }, { email: 'p@x' }, d);
   assert.equal(r.rows, 2);
   const back = new ExcelJS.Workbook(); await back.xlsx.load(wp); const s = back.getWorksheet('D2_BUDGET');
-  assert.deepEqual([1, 2, 3, 4, 5].map(c => s.getCell(11, c).value), ['Salaires', 900, null, 1000, 300]);
-  assert.deepEqual([1, 2, 4, 5].map(c => s.getCell(12, c).value), ['Loyers', 350, 400, 0]);
+  assert.deepEqual([1, 2, 3, 4, 5].map(c => s.getCell(11, c).value), ['Salaires', 900, 100, 1000, 300]);
+  assert.deepEqual([1, 2, 3, 4, 5].map(c => s.getCell(12, c).value), ['Loyers', 350, 50, 400, 0]);
   const rec = view.work.walkthrough.at(-1).receipt.cells;
   assert.equal(rec.find(c => c.cell === 'B11').file_id, 'CONV');                          // each cell keeps its own document
   assert.equal(rec.find(c => c.cell === 'D11').file_id, 'TEBX');
@@ -204,4 +204,30 @@ test('the AI checks the plan on the real tables: corrects a heading, empties a c
   // Even if the AI said « ok », the same column on both sides of PRJ-03 is still refused by the code.
   plan[1] = { col: 'B', header: 'Budget initial', document_id: 'T', heading: "Budget de l'exercice", status: 'sure' };
   enforce(u, plan); assert.equal(plan[1].document_id, null);
+});
+
+test('Paul’s method for D2: lines = PTBA sub-totals, category = account number found through the GL labels, initial = PTBA, final and engagements = TEB, amendments = final − initial', async () => {
+  const w = await workingFile();
+  const d1 = w.getWorksheet('D1_GL_PROJET'); for (let r = 11; r <= 12; r++) for (let c = 1; c <= 5; c++) d1.getCell(r, c).value = null;
+  let wp = Buffer.from(await w.xlsx.writeBuffer()), mod = 1;
+  const book = async (sheet, rows) => { const b = new ExcelJS.Workbook(), s = b.addWorksheet(sheet); rows.forEach(r => s.addRow(r)); return Buffer.from(await b.xlsx.writeBuffer()); };
+  const files = {
+    PTBA: { name: 'PLAN_2023_VF.xlsx', buf: await book('PTBA', [['N°', 'Désignation', 'Montant'], ['1.1', 'Achat carburant', 100], ['1.2', 'Gasoil groupe', 82.5], [null, 'Sous-total Fournitures non stockables – Autres énergies', 182.5],
+      ['2.1', 'Billets Dakar', 50], [null, 'Sous-total Transport des agents en formation à l’étranger', 50], [null, 'TOTAL GENERAL', 232.5]]) },
+    GL: { name: 'GL AUXIL 2023.xlsx', buf: await book('GL', [['Date', 'Journal', 'Pièce', 'Libellé', 'Débit', 'Crédit'], ['605300 Fournitures non stockables – Autres énergies'], ['03/01/2023', 'BQ', 'P1', 'Carburant', 182.5, null],
+      [null, null, null, 'Total compte 605300', 182.5, 0], ['618120 TRANSPORT DES AGENTS EN FORMATION A L’ETRANGER'], ['10/03/2023', 'BQ', 'P9', 'Billet', 54, null]]) },
+    TEB: { name: 'TEB_2023_TABLEAU_EXTRAIT.xlsx', buf: await book('TABLEAU', [['Code', 'Libellé', "Budget de l'exercice", 'Engagement'], ['605300', 'Fournitures non stockables – Autres énergies', 200, 0], ['618120', 'TRANSPORT DES AGENTS EN FORMATION A L’ETRANGER', 60, 10]]) } };
+  const memory = Object.entries(files).map(([id, f]) => ({ id, name: f.name, title: id, read: true, uses: [] }));
+  const view = { editable: true, card: { steps: [{ text: 'Importer le budget' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: [] }, line: { code: 'PRJ-03' } };
+  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })),
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'NL.xlsx', size: wp.length, modifiedTime: 'v' + mod } : { name: files[id].name, size: files[id].buf.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wp : files[id].buf), updateBinary: async (id, o) => { wp = o.buffer; mod++; } },
+    ai: async (p, o) => (/vérifies le plan/.test(o.instructions) ? { text: '{}' } : { provider: 'stub', text: JSON.stringify({ rows_from: { document_id: 'PTBA', which: 'subtotals' }, gl_document_id: 'GL', columns: [
+      { col: 'A', document_id: 'PTBA', heading: 'Désignation', account_from_gl: true }, { col: 'B', document_id: 'PTBA', heading: 'Montant' }, { col: 'C', compute: 'D-B' },
+      { col: 'D', document_id: 'TEB', heading: "Budget de l'exercice" }, { col: 'E', document_id: 'TEB', heading: 'Engagement' }] }) }),
+    save: async (o, w2, c) => Object.assign(view.work, c), audit: async () => null, noteMissionEvent: async () => null };
+  const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET' }, { email: 'p' }, d);
+  assert.deepEqual(P.preview.sample, [['605300', 182.5, 17.5, 200, 0], ['618120', 50, 10, 60, 10]]);
+  await acceptSheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', rows_from: P.rows_from, gl_document_id: P.gl_document_id, columns: P.plan.map(p => ({ col: p.col, document_id: p.document_id, heading: p.heading, compute: p.compute, account_from_gl: p.account_from_gl })) }, { email: 'p' }, d);
+  const back = new ExcelJS.Workbook(); await back.xlsx.load(wp); const s = back.getWorksheet('D2_BUDGET');
+  assert.deepEqual([1, 2, 3, 4, 5].map(c => s.getCell(12, c).value), ['618120', 50, 10, 60, 10]);
 });

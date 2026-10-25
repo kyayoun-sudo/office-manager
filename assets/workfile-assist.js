@@ -177,11 +177,11 @@
     var P = st.plans[x.sheet];
     if (!P) return '<p class="wf-assist-busy"><b>' + esc(x.sheet) + '</b> : je lis les pièces de la mission et je prépare la feuille…</p>';
     if (P.error) return '<p class="wf-assist-err"><b>' + esc(x.sheet) + '</b> : ' + esc(P.error) + ' <button type="button" class="link" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">réessayer</button></p>';
-    var pv = P.preview || {}, got = P.plan.filter(function (p) { return p.document_id && p.heading; }), miss = P.plan.filter(function (p) { return !p.document_id; });
+    var pv = P.preview || {}, got = P.plan.filter(function (p) { return p.document_id && p.heading; }), miss = P.plan.filter(function (p) { return !p.document_id && !p.compute; });
     var doubt = P.plan.filter(function (p) { return p.document_id && p.status !== 'sure'; });
     var docs = []; got.forEach(function (p) { if (docs.indexOf(p.document) < 0) docs.push(p.document); });
     var tooBig = pv.capacity && pv.rows > pv.capacity;
-    var html = '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (got.length && pv.rows ? 'j’ai préparé <b>' + fmt(pv.rows) + ' ligne(s)</b>, en pointillés dans la feuille à droite, depuis ' + esc(docs.join(', ')) + ' : ' + esc(got.map(function (p) { return p.header + ' ← « ' + p.heading + ' »'; }).join(' ; ')) + '.' : 'je n’ai trouvé aucune pièce de la mission qui contienne ces colonnes.') + '</p>' +
+    var html = '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (got.length && pv.rows ? 'j’ai préparé <b>' + fmt(pv.rows) + ' ligne(s)</b>, en pointillés dans la feuille à droite, depuis ' + esc(docs.join(', ')) + ' : ' + esc(got.map(function (p) { return p.header + ' ← « ' + p.heading + ' »'; }).concat(P.plan.filter(function (p) { return p.compute; }).map(function (p) { return p.header + ' = calcul ' + p.compute.replace('-', ' − '); })).join(' ; ')) + '.' : 'je n’ai trouvé aucune pièce de la mission qui contienne ces colonnes.') + '</p>' +
       (miss.length ? '<p class="meta">Pas dans les pièces : ' + esc(miss.map(function (p) { return p.header + (p.missing ? ' (il faut : ' + p.missing + ')' : ''); }).join(' ; ')) + '.</p>' : '') +
       (doubt.length ? '<p class="wf-assist-warn">À vérifier : ' + esc(doubt.map(function (p) { return p.header + ' — ' + (p.why || ''); }).join(' ; ')) + '</p>' : '') +
       (Object.keys(pv.unmatched || {}).length ? '<p class="meta">Lignes sans correspondance laissées vides : ' + esc(Object.keys(pv.unmatched).map(function (k) { return k + ' (' + pv.unmatched[k].length + ')'; }).join(', ')) + '.</p>' : '') +
@@ -211,7 +211,7 @@
   }
   function currentColumns(sheet) {
     var P = st.plans[sheet]; if (!P || !P.plan) return null;
-    return P.plan.map(function (p) { return { col: p.col, document_id: p.document_id || null, heading: p.heading || null }; });
+    return P.plan.map(function (p) { return { col: p.col, document_id: p.document_id || null, heading: p.heading || null, compute: p.compute || null, account_from_gl: !!p.account_from_gl }; });
   }
   var ERR = { SAME_SOURCE_ON_BOTH_SIDES: 'la même colonne d’une pièce ne peut pas remplir une colonne recalculée et celle à laquelle elle est comparée', SOURCE_HEADING_NOT_FOUND: 'une colonne choisie n’existe pas dans la pièce', SOURCE_TABLE_UNREADABLE: 'une pièce choisie n’est pas lisible comme tableau (un PDF doit d’abord être extrait : « Refaire l’analyse »)', HUMAN_CONFIRMATION_REQUIRED: 'une écriture précédente attend votre confirmation (voir le travail de l’agent)', DOCUMENT_INVENTORY_UNAVAILABLE: 'la liste des pièces de la mission n’est pas lisible pour l’instant', IN_REVIEW_OR_NOT_EDITABLE: 'le test est en revue ou vous n’en êtes pas le préparateur', TABLE_CAPACITY_OR_OCCUPIED_CELL: 'des cases du tableau sont déjà remplies', TABLE_TOO_SMALL: 'le tableau du modèle est trop petit', ROWS_BELOW_TABLE_NOT_EMPTY: 'il y a déjà quelque chose sous le tableau : je ne l’agrandis pas par-dessus', SOURCE_TYPE_MISMATCH: 'la pièce ne ressemble pas au contenu attendu par cette feuille', WORK_CHANGED_PREPARE_AGAIN: 'le fichier ou la pièce a changé, je refais la proposition' };
   // (2026-10-25, Paul : « l'application peut importer sans que ce soit l'IA ; l'IA vérifie que c'est bon ») The CODE opens the pieces one
@@ -395,7 +395,7 @@
     if (b.dataset.a === 'plan-fill') {
       var psh = b.dataset.sheet, P = st.plans[psh]; if (!P) return;
       b.disabled = true; P.run_error = null; st.say = 'Je remplis ' + psh + ' colonne par colonne, depuis les pièces retenues…'; render();
-      api('workfile-sheet-plan-accept', { sheet: psh, columns: currentColumns(psh), extend: b.dataset.extend === '1' }).then(function (r) {
+      api('workfile-sheet-plan-accept', { sheet: psh, columns: currentColumns(psh), rows_from: P.rows_from || null, gl_document_id: P.gl_document_id || null, extend: b.dataset.extend === '1' }).then(function (r) {
         st.say = fmt(r.rows) + ' ligne(s) écrites et relues dans ' + psh + ' : ' + (r.filled || []).map(function (f) { return f.col + ' ← « ' + f.heading + ' » (' + f.document + ')'; }).join(' ; ') + ((r.left_empty || []).length ? ' ; laissées vides : ' + r.left_empty.map(function (f) { return f.header; }).join(', ') : '') + '. Chaque case garde sa pièce d’origine.';
         delete st.plans[psh]; publishPlans();
         try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: psh } })); } catch (_) {}
