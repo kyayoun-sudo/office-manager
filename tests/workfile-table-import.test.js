@@ -2,6 +2,22 @@ import test from 'node:test';import assert from 'node:assert/strict';import Exce
 import {previewTableImport,runTableImport,parseClientCsv} from '../lib/workfile-table-import.js';import {reviewWorkpaper,pendingConfirmation,dialogueRecords} from '../lib/workpaper-dialogue.js';
 async function fixture(){const w=new ExcelJS.Workbook(),s=w.addWorksheet('D1_GL_PROJET');s.getCell('A4').value='Référence';s.getCell('B4').value='Montant';for(const row of [5,6]){for(const col of [1,2])s.getCell(row,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};s.getCell(row,3).value={formula:'B'+row+'*2',result:0};}let bytes=Buffer.from(await w.xlsx.writeBuffer()),updates=0,rows=[['Référence','Montant'],['P001',100],['P002',200]];const view={editable:true,line:{code:'PRJ-04'},card:{steps:[{text:'Importer le GL du projet.'}]},workpaper:{file_id:'WP'},work:{status:'to_do',walkthrough:[]}};const d={view:async()=>view,sources:async()=>[{file_id:'GL',name:'GL.xlsx'}],readTable:async()=>({meta:{name:'GL.xlsx'},rows,header_row:0}),save:async(o,w,c)=>Object.assign(view.work,c),drive:{getMeta:async()=>({name:'Working.xlsx',size:1000,modifiedTime:'v1'}),downloadBuffer:async()=>bytes,updateBinary:async(id,o)=>{assert.equal(o.expectedModifiedTime,'v1');bytes=o.buffer;updates++;}}};return {d,view,bytes:()=>bytes,updates:()=>updates,setRows:r=>rows=r};}
 const body={step:1,sheet:'D1_GL_PROJET',source_file_id:'GL'},human={email:'auditeur@test'};
+
+test('import, undo and replacement data rewrite the same workbook and preserve its formulas', async () => {
+  const { undoImport } = await import('../lib/workfile-undo.js');
+  const f = await fixture(), d = { ...f.d, audit: async () => null, noteMissionEvent: async () => null };
+  let p = await previewTableImport('O', 'M', 'PRJ-04', body, human, d);
+  const first = await runTableImport('O', 'M', 'PRJ-04', { ...body, revision: p.revision, mapping: [{ column: 1, source: 0 }, { column: 2, source: 1 }] }, human, d);
+  await undoImport('O', 'M', 'PRJ-04', { plan_id: first.plan_id }, human, d);
+  f.setRows([['Référence', 'Montant'], ['NEW001', 300], ['NEW002', 400]]);
+  p = await previewTableImport('O', 'M', 'PRJ-04', body, human, d);
+  await runTableImport('O', 'M', 'PRJ-04', { ...body, revision: p.revision, mapping: [{ column: 1, source: 0 }, { column: 2, source: 1 }] }, human, d);
+  assert.equal(f.view.workpaper.file_id, 'WP'); assert.equal(f.updates(), 3);
+  const back = new ExcelJS.Workbook(); await back.xlsx.load(f.bytes());
+  assert.equal(back.getWorksheet(body.sheet).getCell('A5').value, 'NEW001');
+  assert.equal(back.getWorksheet(body.sheet).getCell('B6').value, 400);
+  assert.equal(back.getWorksheet(body.sheet).getCell('C6').formula, 'B6*2');
+});
 test('budget headers are refused by the server for a GL destination before writing',async()=>{
   const f=await fixture();f.setRows([['Catégorie budgétaire','Budget approuvé'],['Personnel',200]]);
   await assert.rejects(previewTableImport('O','M','PRJ-04',body,human,f.d),/SOURCE_TYPE_MISMATCH/);assert.equal(f.updates(),0);
