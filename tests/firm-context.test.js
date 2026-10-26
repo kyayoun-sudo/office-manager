@@ -81,6 +81,20 @@ test('login with several firms: the session names its firm and lists them; no fi
   });
 });
 
+test('several firms: a WAITING sign-up left in the pilot firm does not lock the person out — they may create their own firm', async () => {
+  await withEnv(env, async () => {
+    const tokens = { user: { id: 'u9', email: 'new@x.test' }, refresh_token: 'r', access_token: 'a' };
+    const authCall = async () => ({ status: 200, data: tokens });
+    const fetchRows = async path => {
+      if (path.startsWith('office_app_users?org_id=eq.') && path.includes('&active=eq.true')) return [{ auth_user_id: 'owner' }];   // the pilot firm has its owner
+      if (path.startsWith('office_app_users?org_id=eq.')) return [{ auth_user_id: 'u9', email: 'new@x.test', display_name: 'N', role: 'collaborator', active: false }];
+      return [];
+    };
+    const s = await login(PILOT, { email: 'new@x.test', password: 'x' }, { authCall, fetchRows });
+    assert.equal(s.needs_cabinet, true); assert.equal(s.org_id, null); assert.equal(s.pilot_token, null);
+  });
+});
+
 test('router with several firms: the shared token alone opens nothing; the owner code never enters another firm', async () => {
   await withEnv({ ...env, OFFICE_MANAGER_ACCESS_TOKEN: 't' }, async () => {
     const { handleApp } = await import('../api/app.js');
