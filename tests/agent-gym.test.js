@@ -218,3 +218,31 @@ test('ancien audit : l’agent lit tout le dossier fichier par fichier, les leç
   assert.equal(trashed.length, 2); assert.ok(gone.files.every(f => f.removed));
   assert.equal(T.office_gym_lessons.filter(l => l.step === 'archive').length, 4, 'les leçons restent');
 });
+
+test('une BALANCE : ses comptes sont mesurés (colonne titrée ou colonne A sans titre), en-tête sur deux lignes combiné ; plus de « aucune colonne de comptes »', async () => {
+  const { describeTable } = await import('../lib/sheet-understanding.js');
+  const { codeDoubt } = await import('../lib/piece-profile.js');
+  const body = [[162100, 'Emprunt FAD', 0, 1000000, 0, 500000, 0, 1500000], [163120, 'Avances', 0, 200, 0, 0, 0, 200], [401100, 'Fournisseurs', 0, 0, 300, 400, 0, 100],
+    [521000, 'Banque', 50000, 0, 900000, 850000, 100000, 0], [601000, 'Achats', 0, 0, 1200, 0, 1200, 0], ['Total classe 6', null, 0, 0, 1200, 0, 1200, 0]];
+  const d = describeTable('BAL', [['Balance générale 2023'], ['Numéro Compte', 'Libellé écriture', 'Report à nouveau', null, 'Mouvements', null, 'Solde', null], [null, null, 'Débit', 'Crédit', 'Débit', 'Crédit', 'Débit', 'Crédit'], ...body]);
+  assert.match(d.shape.looks_like, /^balance des comptes/); assert.equal(d.shape.accounts, 5);
+  assert.deepEqual(Object.keys(d.shape.account_classes), ['1', '4', '5', '6']);
+  assert.equal(d.headers[2], 'Report à nouveau Débit'); assert.equal(d.headers[7], 'Solde Crédit');
+  assert.equal(d.shape.accounts_list[0].title, 'Emprunt FAD');
+  assert.equal(codeDoubt({ family: 'balance' }, { sheets: [d] }), null);
+  const noTitle = describeTable('BAL', [['', 'Intitulé', 'Solde'], ...body.map(r => [r[0], r[1], r[6]])]);
+  assert.equal(noTitle.shape.accounts, 5, 'colonne A sans titre reconnue par ses valeurs');
+});
+
+test('un seul avis par essai : un second clic n’enregistre pas la même leçon deux fois', async () => {
+  const { fetchRows, T } = db(); const files = {}; let k = 0;
+  const d = { fetchRows, gymHome: 'HOME', findOrCreateFolder: async (p, nme) => ({ id: p + '/' + nme }),
+    createBinary: async ({ name, buffer }) => { const id = 'F' + (++k); files[id] = { name, buffer }; return { id }; },
+    fileForAI: async id => ({ id, text: 'ACCORD' }), ai: async () => ({ text: JSON.stringify({ facts: [] }) }) };
+  const token = (await createTrainer(ORG, PAUL, { name: 'Awa' }, { fetchRows })).link_path.split('#')[1];
+  const t = await gym(ORG, {}, { token, action: 'create', title: 'X' }, d);
+  await gym(ORG, {}, { token, action: 'upload', training_id: t.id, name: 'a.pdf', base64: Buffer.from('%PDF').toString('base64'), role: 'piece' }, d);
+  await gym(ORG, {}, { token, action: 'run', training_id: t.id, step: 'mission' }, d);
+  for (let i = 0; i < 3; i++) await gym(ORG, {}, { token, action: 'verdict', training_id: t.id, step: 'mission', verdict: 'faux', explanation: 'Lire l’accord de prêt.' }, d);
+  assert.equal(T.office_gym_lessons.length, 1);
+});
