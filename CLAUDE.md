@@ -1029,6 +1029,22 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   écarté, mission A validée → mission B autres noms / autre présentation / IA en panne remplie par la recette, dépôt → fiche → nom).
   NON ESSAYÉ : la vraie IA, les vrais fichiers de Paul, deux vraies missions. Les pièces déjà déposées reçoivent leur fiche au premier
   remplissage (quelques-unes par appel ; les autres sont vues par leurs mesures en attendant).
+- ENTRAÎNEMENT DES AGENTS AVEC DE VRAIES PERSONNES (Paul, 2026-10-26 : « je veux juste permettre d'entraîner les agents afin qu'on puisse
+  comprendre » ; « la personne y mettra de vraies missions, fera et expliquera à l'agent » ; « elle n'a pas besoin de l'application »).
+  Branche `feature/entrainement-agents` (PAS dans `feature/white-label-desktop` tant que Paul ne l'a pas essayé). Erreur à ne pas refaire :
+  le 2026-10-26 au matin, une page « Entraîner les agents » a été ajoutée DANS l'application sans regarder l'existant (Shadow a déjà
+  Entraînement : cabinet virtuel, tests spécialisés, campagne de 5 jours) — retirée. Désormais : outil À PART, `entrainement-agents.html`
+  (aucune session de l'application, jeton personnel dans le # de l'URL, haché en base, révocable), route publique `agent-gym`
+  (`lib/agent-gym.js`) ; administration dans la page EXISTANTE `entrainement.html` → Tests spécialisés → « Avec de vraies personnes »
+  (route `agent-gym-admin`, propriétaire / associé du cabinet pilote : liens, progrès, leçons à valider). `db/agent-gym.sql` :
+  `office_gym_trainers`, `office_gym_sessions` (fichiers, essais par étape), `office_gym_lessons`. Étapes (`STEPS`) avec les VRAIS moteurs :
+  comprendre la mission (document fondateur, faits avec passage vérifié mot pour mot), reconnaître les pièces (`peekDocument` +
+  `profilePieces`), catégories ↔ comptes (`aiAccountMap`), remplir chaque feuille (`sheetPlan` sur le working file vierge déposé, comparé
+  LIGNE par LIGNE au working file rempli par l'entraîneur) ; « tests » et « revue » = bientôt. Verdict « faux » = explication obligatoire =
+  LEÇON de l'étape, redonnée à l'agent tout de suite dans l'entraînement (`lessonsFor(step, { gym: true })`) ; dans l'application, seules les
+  leçons VALIDÉES (`lessons_from_trainers` dans `profilePieces`, `aiAccountMap`, `sheetPlan`). Fichiers dans `<maison des agents>/
+  ENTRAINEMENT_AGENTS/…` (jamais rangés par l'Orpailleur, jamais une mission du cabinet). Test : `tests/agent-gym.test.js`.
+  NON ESSAYÉ : vraie IA, vrai entraîneur, SQL installé, envoi direct des gros fichiers vers Google depuis la page.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

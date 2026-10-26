@@ -343,3 +343,29 @@ Pour verifier sur votre vrai modele sans le mettre dans le depot (le depot est p
   WORKFILE_MAP_SAMPLE=/chemin/vers/NL-T01_PRJ.xlsx node --test tests/workfile-map.test.js
 A noter : 11 tests echouaient deja sur la branche avant ce travail (dont « 12 fonctions Vercel Hobby »,
 fournisseurs d'IA, INSTALL_TOUT.sql) ; ils sont inchanges. A regarder separement.
+
+
+12. [ ] ENTRAÎNER LES AGENTS AVEC DE VRAIES PERSONNES                          (2026-10-26, branche feature/entrainement-agents)
+-----------------------------------------------------------------------------------------------------------------
+Un outil À PART : l'entraîneur n'a pas de compte dans l'application. Il ouvre un lien personnel, dépose une vraie mission, l'agent fait
+chaque étape, l'entraîneur dit « Juste » ou explique ce qui ne va pas (c'est la leçon), puis « Refaire ». Rien ne touche aux missions du
+cabinet : les fichiers vont dans <maison des agents>/ENTRAINEMENT_AGENTS dans votre Drive.
+
+Une seule fois :
+  1. Supabase → SQL Editor : exécuter  db/agent-gym.sql  (ou relancer  db/INSTALL_TOUT.sql ). Sans danger si relancé.
+     Vérifier :  select count(*) from public.office_gym_lessons;  → 0 (pas d'erreur).
+  2. Déployer la branche feature/entrainement-agents sur un aperçu (Preview) d'abord ; le Drive du cabinet doit être choisi
+     (Paramètres) et la vraie IA réglée (point 11).
+
+Pour chaque entraîneur :
+  3. Avec votre compte (propriétaire ou associé) : Entraînement → « Tests spécialisés » → « Avec de vraies personnes — vraies missions »
+     → nom de l'entraîneur → « Créer son lien ». Le lien n'est montré QU'UNE fois : copiez-le et envoyez-le-lui. « Retirer le lien » le coupe.
+  4. L'entraîneur ouvre le lien → « Nouvelle mission d'entraînement » → dépose les pièces, le working file vierge du cabinet, et s'il le
+     veut son working file rempli (l'agent sera comparé à lui, ligne par ligne) → étape par étape : « Faire faire l'étape à l'agent »,
+     puis « Juste » ou « Pas juste » avec l'explication → « Refaire ».
+     Étapes prêtes : comprendre la mission, reconnaître les pièces, catégories ↔ comptes, remplir chaque feuille de données.
+     « Exécuter les tests » et « Revue » : affichées « bientôt ».
+
+Vous, ensuite : même endroit → « Leçons à valider ». Validée = donnée aux vrais agents de l'application (fiches des pièces, comptes,
+remplissage) ; refusée = gardée, jamais appliquée. « Progrès de l'agent » = la part d'étapes justes du premier coup, et combien d'essais.
+-----------------------------------------------------------------------------------------------------------------

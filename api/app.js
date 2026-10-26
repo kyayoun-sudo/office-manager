@@ -952,6 +952,22 @@ export const ROUTES = Object.freeze({
   //   GET  workflow&mission_id=…            the mission's workflow, its current step and who acts
   //   POST workflow {action: save | confirm | propose}   a partner: draft, confirmation, proposal read from the firm's document
   //   POST workflow {action: advance, mission_id, outcome, reason?}   the outcome of the current step (gates: reason, traced)
+  // ENTRAÎNEMENT DES AGENTS (2026-10-26): a separate tool opened by a personal link (no account in the application); the owner /
+  // partners create the links, validate the lessons and see the progress (lib/agent-gym.js).
+  'agent-gym': { POST: open(async (orgId, req) => (await import('../lib/agent-gym.js')).gym(orgId, req, req.body || {})) },
+  'agent-gym-admin': {
+    GET: users([...FIRM_LEAD], async (orgId, req) => {
+      const g = await import('../lib/agent-gym.js');
+      return { trainers: await g.listTrainers(orgId, req.account), lessons: await g.listLessons(orgId, req.account, { status: req.query?.status }), ...(await g.overview(orgId, req.account)) };
+    }),
+    POST: users([...FIRM_LEAD], async (orgId, req) => {
+      const b = req.body || {}, g = await import('../lib/agent-gym.js');
+      if (b.action === 'trainer') return g.createTrainer(orgId, req.account, b);
+      if (b.action === 'revoke') return g.revokeTrainer(orgId, req.account, b);
+      if (b.action === 'decide') return g.decideLesson(orgId, req.account, b);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+  },
   workflow: {
     GET: users(ALL_ROLES, async (orgId, req) => {
       const m = await import('../lib/firm-workflow.js'), id = String(req.query?.mission_id || '');

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Entraînement des agents</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>
+  body{background:var(--bg,#f6f6f4)}
+  .gym{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  .gym h1{margin:0 0 4px;font-size:24px}
+  .muted{color:var(--muted,#666);font-size:13.5px;line-height:1.5}
+  .card{background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:12px;padding:14px 16px;margin:12px 0}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  input[type=text],textarea,select{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line,#ccc);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#111)}
+  textarea{width:100%;box-sizing:border-box;min-height:70px}
+  button{font:inherit;font-size:14px;padding:7px 13px;border-radius:8px;border:1px solid var(--accent,#1f3864);background:var(--accent,#1f3864);color:#fff;cursor:pointer}
+  button.ghost{background:transparent;color:var(--accent,#1f3864)}
+  button:disabled{opacity:.5;cursor:default}
+  .list a{display:block;padding:6px 0;cursor:pointer;color:var(--accent,#1f3864)}
+  .list a.on{font-weight:600}
+  .step{border:1px solid var(--line,#ddd);border-radius:10px;padding:12px 14px;margin:10px 0;background:var(--surface,#fff)}
+  .step.later{opacity:.55}
+  .step h3{margin:0;font-size:16px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:#eef1f6;margin-left:6px}
+  .tag.ok{background:#e3f4e6;color:#1d5b27}.tag.ko{background:#fde7e7;color:#8a1f1f}
+  .items{margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.55}
+  .items .d{color:var(--muted,#666);font-size:13px}
+  .warn{color:#8a3b00}
+  table{border-collapse:collapse;font-size:13.5px}
+  td,th{border-bottom:1px solid var(--line,#ddd);padding:4px 8px;text-align:left}
+  .files li{font-size:14px;margin:3px 0}
+  @media (prefers-color-scheme: dark){ body{background:#15171a} .tag{background:#2a2f38} .tag.ok{background:#1d3a22;color:#a8e0b0} .tag.ko{background:#4a1d1d;color:#ffb3b3} .warn{color:#ffb98a} }
+</style>
+</head>
+<body>
+<div class="gym">
+  <h1>Entraînement des agents</h1>
+  <p class="muted" id="who"></p>
+  <div class="card" id="intro">
+    <b>Comment ça marche.</b>
+    <span class="muted">Créez une mission d'entraînement et déposez une vraie mission : les pièces, le working file vierge du cabinet, et si vous voulez le working file que vous avez rempli vous-même. Pour chaque étape, l'agent fait le travail d'abord. Dites « Juste », ou expliquez-lui ce qui ne va pas et ce qu'il aurait fallu faire : c'est sa leçon. Puis « Refaire » : il doit faire mieux. Ce qui est fait ici ne touche à aucune mission du cabinet.</span>
+  </div>
+  <div id="err" class="card warn" hidden></div>
+  <div class="card" id="prog-card" hidden><b>Mes entraînements : l'agent juste du premier coup</b><table id="prog" style="margin-top:6px"></table></div>
+  <div class="row" style="align-items:flex-start;gap:16px">
+    <div class="card" style="flex:0 0 260px">
+      <b>Mes missions d'entraînement</b>
+      <div class="list" id="list"></div>
+      <div style="margin-top:10px"><input type="text" id="title" placeholder="Nom (ex. Projet X — 2023)" style="width:100%;box-sizing:border-box"></div>
+      <div style="margin-top:6px"><input type="text" id="period" placeholder="Exercice (ex. 2023)" style="width:100%;box-sizing:border-box"></div>
+      <div style="margin-top:6px"><button id="create" type="button">Nouvelle mission d'entraînement</button></div>
+    </div>
+    <div style="flex:1;min-width:300px" id="main"><div class="card muted">Choisissez ou créez une mission d'entraînement.</div></div>
+  </div>
+</div>
+<script>
+(function () {
+  var token = (location.hash || '').slice(1);
+  var st = { me: null, t: null, sheet: {}, busy: {} };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var ERR = { GYM_LINK_REQUIRED: 'Ce lien d’entraînement est incomplet.', GYM_LINK_INVALID: 'Ce lien d’entraînement n’est plus valable : demandez-en un nouveau.', AGENT_GYM_SQL_NOT_INSTALLED: 'L’entraînement n’est pas encore installé (db/agent-gym.sql).',
+    FIRM_DRIVE_NOT_CHOSEN: 'Le cabinet n’a pas encore choisi son Drive.', EXPLANATION_REQUIRED: 'Expliquez à l’agent ce qui ne va pas.', RUN_THE_STEP_FIRST: 'Faites d’abord faire l’étape à l’agent.', STEP_NOT_BUILT_YET: 'Cette étape arrive bientôt.' };
+  function api(body) {
+    return fetch('/api/app?route=agent-gym', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ token: token }, body)) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+  }
+  function err(e) { var m = String(e && e.message || e); $('err').hidden = false; $('err').textContent = ERR[m] || m; setTimeout(function () { $('err').hidden = true; }, 9000); }
+  function loadMe(select) {
+    return api({ action: 'me' }).then(function (d) {
+      st.me = d; $('who').textContent = 'Entraîneur : ' + d.trainer.name;
+      $('list').innerHTML = d.trainings.map(function (t) { return '<a data-id="' + esc(t.id) + '"' + (st.t && st.t.id === t.id ? ' class="on"' : '') + '>' + esc(t.title) + '</a>'; }).join('') || '<p class="muted">Aucune pour l’instant.</p>';
+      var p = d.progress || []; $('prog-card').hidden = !p.length;
+      $('prog').innerHTML = '<tr><th>Étape</th><th>Entraînements</th><th>Juste du 1er coup</th><th>Essais pour y arriver</th></tr>' + p.map(function (x) { return '<tr><td>' + esc(x.title) + '</td><td>' + x.trainings + '</td><td>' + x.right_first_rate + ' %</td><td>' + (x.avg_attempts == null ? '—' : x.avg_attempts) + '</td></tr>'; }).join('');
+      if (select) open(select);
+    }).catch(err);
+  }
+  function open(id) { api({ action: 'view', training_id: id }).then(function (d) { st.t = d.training; render(); loadMe(); }).catch(err); }
+  $('list').addEventListener('click', function (e) { var a = e.target.closest('a[data-id]'); if (a) open(a.dataset.id); });
+  $('create').addEventListener('click', function () {
+    var title = $('title').value.trim(); if (!title) return; $('create').disabled = true;
+    api({ action: 'create', title: title, period_label: $('period').value.trim() }).then(function (t) { $('create').disabled = false; $('title').value = ''; st.t = t; render(); loadMe(); }).catch(function (e) { $('create').disabled = false; err(e); });
+  });
+
+  var ROLE = { piece: 'pièce de la mission', workfile: 'working file vierge du cabinet', reference: 'mon working file rempli (référence)' };
+  function render() {
+    var t = st.t; if (!t) return;
+    var files = t.files || [];
+    var html = '<div class="card"><div class="row"><b style="flex:1">' + esc(t.title) + '</b><span class="muted">Exercice</span><input type="text" id="per" value="' + esc(t.period_label || '') + '" style="width:90px"></div>' +
+      '<p class="muted">Déposez les pièces de la mission, le working file vierge, et si vous voulez votre working file rempli : l’agent comparera son travail au vôtre, case par case.</p>' +
+      '<div class="row"><input type="file" id="files" multiple><select id="frole"><option value="">Rôle : deviner</option><option value="piece">Pièces de la mission</option><option value="workfile">Working file vierge</option><option value="reference">Mon working file rempli</option></select><button id="up" type="button">Déposer</button><span id="upmsg" class="muted"></span></div>' +
+      (files.length ? '<ul class="files">' + files.map(function (f) { return '<li>' + esc(f.name) + ' — <select data-file="' + esc(f.id) + '">' + Object.keys(ROLE).map(function (k) { return '<option value="' + k + '"' + (f.role === k ? ' selected' : '') + '>' + ROLE[k] + '</option>'; }).join('') + '</select></li>'; }).join('') + '</ul>' : '') + '</div>';
+    html += st.me.steps.map(stepCard).join('');
+    $('main').innerHTML = html;
+  }
+  function attemptsOf(key) { return ((st.t.steps || {})[key] || {}).attempts || []; }
+  function stepCard(s) {
+    if (s.later) return '<div class="step later"><h3>' + esc(s.title) + '<span class="tag">bientôt</span></h3><div class="muted">' + esc(s.agent) + ' — ' + esc(s.what) + '</div></div>';
+    var sheet = s.per_sheet ? (st.sheet[s.key] || '') : '';
+    var key = s.key + (sheet ? ':' + sheet : ''), a = attemptsOf(key), last = a[a.length - 1];
+    var sheets = s.per_sheet ? ((attemptsOf(s.key).slice(-1)[0] || {}).proposal || {}).sheets || (last && last.proposal && last.proposal.sheets) || [] : [];
+    var h = '<div class="step"><div class="row"><h3 style="flex:1">' + esc(s.title) + (a.length ? '<span class="tag">' + a.length + ' essai(s)</span>' : '') + a.map(function (x, i) { return x.verdict ? '<span class="tag ' + (x.verdict === 'juste' ? 'ok' : 'ko') + '">' + (i + 1) + ' : ' + x.verdict + '</span>' : ''; }).join('') + '</h3></div>' +
+      '<div class="muted">' + esc(s.agent) + ' — ' + esc(s.what) + '</div>';
+    if (s.per_sheet) h += '<div class="row" style="margin-top:6px"><span class="muted">Feuille :</span><select data-sheet-for="' + s.key + '"><option value="">' + (sheets.length ? 'choisir' : '— lancer d’abord pour lire le working file —') + '</option>' + sheets.map(function (x) { return '<option' + (x === sheet ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>';
+    h += '<div class="row" style="margin-top:8px"><button data-run="' + s.key + '" type="button"' + (st.busy[key] ? ' disabled' : '') + '>' + (st.busy[key] ? 'L’agent travaille…' : a.length ? 'Refaire (avec ses leçons)' : 'Faire faire l’étape à l’agent') + '</button></div>';
+    if (last) h += proposal(last.proposal) + (last.proposal && last.proposal.empty ? '' : last.verdict ? '<p class="muted">Votre avis : <b>' + esc(last.verdict) + '</b>' + (last.explanation ? ' — ' + esc(last.explanation) : '') + '</p>' : verdictBox(key));
+    return h + '</div>';
+  }
+  function proposal(p) {
+    if (!p) return '';
+    if (p.empty) return '<p class="warn">' + esc(p.empty) + '</p>';
+    var h = '';
+    if (p.ai_error) h += '<p class="warn">L’IA n’a pas répondu : ' + esc(p.ai_error) + '</p>';
+    if (p.founding_document) h += '<p><b>Document fondateur :</b> ' + esc(p.founding_document.name) + ' <span class="muted">' + esc(p.founding_document.why || '') + '</span></p>';
+    if (p.gl) h += '<p class="muted">Grand livre : ' + esc(p.gl) + ' — budget : ' + esc(p.budget) + '</p>';
+    if (p.rows != null && p.sheet) h += '<p><b>' + esc(p.rows) + ' ligne(s)</b> préparée(s) pour ' + esc(p.sheet) + (p.summary ? ' — <span class="muted">' + esc(p.summary) + '</span>' : '') + '</p>';
+    if ((p.items || []).length) h += '<ul class="items">' + p.items.map(function (x) {
+      return '<li><b>' + esc(x.label) + '</b> : ' + esc(x.value) + (x.verified === true ? ' <span class="tag ok">passage retrouvé</span>' : x.verified === false && x.quote ? ' <span class="tag ko">passage non retrouvé</span>' : '') +
+        (x.quote ? '<div class="d">« ' + esc(x.quote) + ' »</div>' : '') + ((x.detail || []).length ? '<div class="d">' + x.detail.map(esc).join(' · ') + '</div>' : '') + (x.warning ? '<div class="d warn">⚠ ' + esc(x.warning) + '</div>' : '') + '</li>';
+    }).join('') + '</ul>';
+    if ((p.sample || []).length) h += '<table style="margin-top:8px"><tr>' + (p.columns || []).map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' + p.sample.map(function (r) { return '<tr>' + r.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+    if (p.comparison) { var c = p.comparison; h += '<p style="margin-top:8px"><b>Comparé à votre working file (' + esc(c.with) + ') :</b> ' + c.same + ' de vos lignes retrouvée(s) chez l’agent, ' + c.missing + ' manquante(s) ou différente(s), ' + c.extra + ' ligne(s) en plus chez l’agent' + (c.score != null ? ' — <b>' + c.score + ' %</b> juste' : '') + '.</p>' +
+      ((c.examples || []).length ? '<table><tr><th>Votre ligne</th><th>Valeurs</th><th>Chez l’agent</th></tr>' + c.examples.map(function (x) { return '<tr><td>' + esc(x.cell) + '</td><td>' + esc(x.expected) + '</td><td>' + esc(x.got == null ? 'pas trouvée' : x.got) + '</td></tr>'; }).join('') + '</table>' : ''); }
+    if ((p.expected_pieces || []).length) h += '<p class="muted">Pièces attendues : ' + p.expected_pieces.map(esc).join(' ; ') + '</p>';
+    if ((p.questions || []).length) h += '<p class="muted">Questions de l’agent : ' + p.questions.map(esc).join(' ; ') + '</p>';
+    return h;
+  }
+  function verdictBox(key) {
+    return '<div style="margin-top:10px"><div class="row"><button data-ok="' + esc(key) + '" type="button">Juste</button><span class="muted">ou expliquez ce qui ne va pas :</span></div>' +
+      '<textarea data-expl="' + esc(key) + '" placeholder="Ce qui ne va pas, et ce qu’il aurait fallu faire (comme à un auditeur débutant)…" style="margin-top:6px"></textarea>' +
+      '<textarea data-correct="' + esc(key) + '" placeholder="La bonne réponse (facultatif)" style="margin-top:6px;min-height:46px"></textarea>' +
+      '<div class="row" style="margin-top:6px"><button class="ghost" data-ko="' + esc(key) + '" type="button">Pas juste — c’est sa leçon</button></div></div>';
+  }
+  $('main').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset.file) api({ action: 'file-role', training_id: st.t.id, file_id: t.dataset.file, role: t.value }).then(function (x) { st.t = x; render(); }).catch(err);
+    if (t.dataset.sheetFor) { st.sheet[t.dataset.sheetFor] = t.value; render(); }
+    if (t.id === 'per') api({ action: 'period', training_id: st.t.id, period_label: t.value }).then(function (x) { st.t = x; }).catch(err);
+  });
+  $('main').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'up') return upload();
+    if (b.dataset.run) {
+      var s = b.dataset.run, sheet = st.sheet[s] || '', key = s + (sheet ? ':' + sheet : '');
+      st.busy[key] = true; render();
+      return api({ action: 'run', training_id: st.t.id, step: s, sheet: sheet || undefined }).then(function (r) { st.busy[key] = false; st.t = r.training; render(); }).catch(function (x) { st.busy[key] = false; render(); err(x); });
+    }
+    if (b.dataset.ok || b.dataset.ko) {
+      var k = b.dataset.ok || b.dataset.ko, ex = document.querySelector('[data-expl="' + k + '"]'), co = document.querySelector('[data-correct="' + k + '"]');
+      return api({ action: 'verdict', training_id: st.t.id, step: k, verdict: b.dataset.ok ? 'juste' : 'faux', explanation: ex ? ex.value : '', correct: co ? co.value : '' }).then(function (r) { st.t = r.training; render(); loadMe(); }).catch(err);
+    }
+  });
+  function upload() {
+    var input = $('files'), list = Array.prototype.slice.call(input.files || []), role = $('frole').value || undefined; if (!list.length) return;
+    var say = function (t) { var m = $('upmsg'); if (m) m.textContent = t; }, done = 0;
+    var next = function () {
+      if (!list.length) { say(done + ' fichier(s) déposé(s).'); return; }
+      var f = list.shift(); say('Envoi de ' + f.name + '…');
+      var p = f.size <= 3 * 1024 * 1024
+        ? new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1]); }; r.onerror = rej; r.readAsDataURL(f); }).then(function (b64) { return api({ action: 'upload', training_id: st.t.id, name: f.name, mime: f.type, base64: b64, role: role }); })
+        : api({ action: 'upload-start', training_id: st.t.id, name: f.name, mime: f.type, size: f.size }).then(function (s) { return fetch(s.upload_url, { method: 'PUT', body: f }).then(function (r) { return r.json(); }); })
+            .then(function (g) { return api({ action: 'upload-done', training_id: st.t.id, file_id: g.id, role: role }); });
+      p.then(function (t) { done++; st.t = t; render(); say(done + ' fichier(s) déposé(s)…'); next(); }).catch(function (e) { err(e); next(); });
+    };
+    next();
+  }
+  if (!token) { $('err').hidden = false; $('err').textContent = ERR.GYM_LINK_REQUIRED; return; }
+  loadMe();
+})();
+</script>
+</body>
+</html>

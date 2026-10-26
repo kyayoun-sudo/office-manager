@@ -77,6 +77,16 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
     <section id="training-specialized" class="training-panel" aria-labelledby="training-specialized-title" hidden>
       <h2 id="training-specialized-title">Tests spécialisés</h2>
       <p class="lead">Choisissez un exercice ciblé. Chaque exercice conserve sa propre campagne et ses propres résultats.</p>
+      <details class="card training-exercise" id="gym-admin" hidden>
+        <summary><strong>Avec de vraies personnes — vraies missions</strong><span>Un lien par entraîneur : il dépose une vraie mission, l'agent fait chaque étape, l'entraîneur corrige ; vous validez les leçons.</span></summary>
+        <div class="stack" style="gap:12px;margin-top:10px">
+          <div class="row" style="display:flex;flex-wrap:wrap;gap:8px"><input type="text" id="gym-name" placeholder="Nom de l'entraîneur"><input type="text" id="gym-email" placeholder="E-mail (facultatif)"><button class="btn" type="button" id="gym-create">Créer son lien</button></div>
+          <p class="small" id="gym-link"></p>
+          <div><strong>Entraîneurs</strong><ul id="gym-trainers" class="small"></ul></div>
+          <div><strong>Progrès de l'agent, étape par étape</strong><ul id="gym-progress" class="small"></ul></div>
+          <div><strong>Leçons à valider</strong> <span class="small">(validée = donnée aux vrais agents de l'application)</span><div id="gym-lessons"></div></div>
+        </div>
+      </details>
       <details class="card training-exercise">
         <summary><strong>Analyse comptable — cinq organisations fictives</strong><span>Grand livre, échantillonnage, pièces et anomalies.</span></summary>
         <div id="audit-sandbox-host"></div>
@@ -574,6 +584,45 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 </html>
 
 <script src="/assets/training-navigation.js"></script>
+<script>
+// Entraînement des agents avec de vraies personnes (2026-10-26) : liens, progrès, leçons à valider. Construit élément par élément (aucune injection de HTML).
+(function () {
+  var box = document.getElementById('gym-admin'); if (!box || !window.OM) return;
+  function el(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
+  function post(b) { return OM.api('/api/app?route=agent-gym-admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); }
+  function load() {
+    OM.api('/api/app?route=agent-gym-admin&status=proposed').then(function (d) {
+      box.hidden = false;
+      var tr = document.getElementById('gym-trainers'); tr.textContent = '';
+      (d.trainers || []).forEach(function (t) { var li = el('li', t.name + (t.email ? ' — ' + t.email : '') + (t.active ? '' : ' (lien retiré)')); if (t.active) { var b = el('button', 'Retirer le lien', 'btn ghost'); b.type = 'button'; b.style.marginLeft = '8px'; b.onclick = function () { post({ action: 'revoke', id: t.id }).then(load); }; li.appendChild(b); } tr.appendChild(li); });
+      var pg = document.getElementById('gym-progress'); pg.textContent = '';
+      (d.progress || []).forEach(function (p) { pg.appendChild(el('li', p.title + ' : juste du premier coup dans ' + p.right_first_rate + ' % des ' + p.trainings + ' entraînement(s)' + (p.avg_attempts ? ', ' + p.avg_attempts + ' essai(s) en moyenne pour y arriver' : ''))); });
+      if (!(d.progress || []).length) pg.appendChild(el('li', 'Pas encore d’entraînement jugé.'));
+      var ls = document.getElementById('gym-lessons'); ls.textContent = '';
+      (d.lessons || []).forEach(function (l) {
+        var c = el('div', null, 'card'); c.style.margin = '6px 0';
+        c.appendChild(el('div', l.step + (l.sheet ? ' · ' + l.sheet : '') + ' — ' + (l.trainer_name || ''), 'small'));
+        c.appendChild(el('div', l.lesson));
+        if (l.correct) c.appendChild(el('div', 'Bonne réponse : ' + l.correct, 'small'));
+        if (l.proposed) c.appendChild(el('div', 'L’agent avait proposé : ' + l.proposed.slice(0, 400), 'small'));
+        var ok = el('button', 'Valider', 'btn'), ko = el('button', 'Refuser', 'btn ghost'); ok.type = ko.type = 'button';
+        ok.onclick = function () { post({ action: 'decide', id: l.id, decision: 'validated' }).then(load); };
+        ko.onclick = function () { post({ action: 'decide', id: l.id, decision: 'rejected' }).then(load); };
+        var r = el('div'); r.style.marginTop = '6px'; r.appendChild(ok); r.appendChild(document.createTextNode(' ')); r.appendChild(ko); c.appendChild(r); ls.appendChild(c);
+      });
+      if (!(d.lessons || []).length) ls.appendChild(el('p', 'Aucune leçon en attente.', 'small'));
+    }).catch(function () { box.hidden = true; });
+  }
+  document.getElementById('gym-create').onclick = function () {
+    var n = document.getElementById('gym-name').value.trim(); if (!n) return;
+    post({ action: 'trainer', name: n, email: document.getElementById('gym-email').value.trim() }).then(function (r) {
+      var url = location.origin + r.link_path, p = document.getElementById('gym-link'); p.textContent = 'Lien à envoyer à ' + n + ' (montré une seule fois) : ';
+      var a = el('a', url); a.href = url; a.target = '_blank'; a.rel = 'noopener'; p.appendChild(a); document.getElementById('gym-name').value = ''; load();
+    }).catch(function (e) { document.getElementById('gym-link').textContent = 'Erreur : ' + String(e && e.message || e); });
+  };
+  load();
+})();
+</script>
 <script src="/assets/audit-sandbox.js"></script>
 
 <script src="/assets/firm-simulation.js"></script>
