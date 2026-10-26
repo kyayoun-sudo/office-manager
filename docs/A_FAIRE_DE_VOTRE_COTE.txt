@@ -7,6 +7,28 @@ ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. 
 Dernière mise à jour : 24 octobre 2026
 Branche concernée : feature/white-label-desktop
 
+-----------------------------------------------------------------------------------------------------------------
+0. [ ] CONNEXION GOOGLE : UNE SEULE ADRESSE DE RETOUR, POUR TOUJOURS              (urgent — « redirect_uri_mismatch »)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : chaque aperçu (Preview) donnait à Google sa propre adresse de retour ; une nouvelle branche = une adresse que
+Google ne connaît pas = « Erreur 400 : redirect_uri_mismatch ». Désormais TOUTES les versions (production et tous les
+aperçus, toutes les branches) donnent à Google la même adresse : celle de la production. La production renvoie ensuite
+le navigateur vers l'aperçu d'où la connexion est partie (adresse gardée dans l'état signé), et c'est l'aperçu qui finit.
+
+Comment faire (une seule fois) :
+  1. Google Cloud Console → API et services → Identifiants → votre client OAuth → « URI de redirection autorisés » :
+     vérifier qu'il y a bien  https://<adresse de production>/oauth/google/callback
+     (ex. https://office-manager-personal-pilot.vercel.app/oauth/google/callback). Les adresses des aperçus ne servent plus.
+  2. Vercel → projet → Settings → Environment Variables : OAUTH_STATE_SECRET (ou OWNER_APPROVAL_SECRET) doit avoir la
+     MÊME valeur pour « Production » et « Preview » (sinon la production refuse de renvoyer vers l'aperçu). Ne pas me
+     donner la valeur : cochez seulement les deux environnements sur la même variable.
+  3. Promouvoir / redéployer la production UNE fois avec ce code (sinon la production ne sait pas encore renvoyer vers
+     l'aperçu). Ensuite, tout nouvel aperçu marche sans rien toucher dans Google.
+  4. Essai : sur l'aperçu, Paramètres → « Connecter Google ». Attendu : la page Google s'ouvre sans erreur 400, puis on
+     revient sur l'aperçu, connecté.
+  Non essayé par moi : un vrai aller-retour avec Google (testé seulement par des tests automatiques).
+
+
 
 -----------------------------------------------------------------------------------------------------------------
 1. [ ] INSTALLER LA COLONNE DES FONCTIONS SUR LA MISSION DANS SUPABASE          (urgent — point 2, rôles par mission)

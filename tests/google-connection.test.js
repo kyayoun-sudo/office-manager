@@ -287,3 +287,45 @@ test('never another Drive: without the firm’s choice, no silent fallback on a 
     assert.equal(memoryFolderId(), 'OLD_MEMORY');
   } finally { keys.forEach(k => saved[k] === undefined ? delete process.env[k] : process.env[k] = saved[k]); }
 });
+
+test('a preview gives Google the SAME registered address as production, and production sends the browser back to the preview', async () => {
+  const { relayTarget, selfOrigin } = await import('../lib/google-connection.js');
+  const PROD = 'office-manager-personal-pilot.vercel.app';
+  const BRANCH = 'office-manager-personal-pilot-git-feature-entr-1a2b3c-paul-bc10.vercel.app';
+  const secret = 'state-secret-shared-by-preview-and-production';
+  const preview = { VERCEL_ENV: 'preview', VERCEL_PROJECT_PRODUCTION_URL: PROD, VERCEL_BRANCH_URL: BRANCH, OAUTH_STATE_SECRET: secret };
+  const production = { VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: PROD, OAUTH_STATE_SECRET: secret };
+  const onPreview = { headers: { host: 'office-manager-personal-pilot-x9y8z7-paul-bc10.vercel.app' } };
+  // 1. every deployment, any branch: the one address registered in Google
+  assert.equal(redirectUri(onPreview, preview), `https://${PROD}/oauth/google/callback`);
+  assert.equal(selfOrigin(onPreview, preview), `https://${BRANCH}`);
+  // 2. the signed state remembers where the person started
+  const state = makeState('org-1', 'Paul', preview, Date.now(), '/parametres.html', null, selfOrigin(onPreview, preview));
+  assert.equal(JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString()).o, `https://${BRANCH}`);
+  // 3. Google returns to production, which relays code + state untouched to the preview
+  const back = { headers: { host: PROD }, query: { route: 'google-callback', code: 'abc', state, scope: 'drive' } };
+  const to = relayTarget(back, production);
+  assert.ok(to.startsWith(`https://${BRANCH}/oauth/google/callback?`));
+  const u = new URL(to);
+  assert.equal(u.searchParams.get('code'), 'abc'); assert.equal(u.searchParams.get('state'), state); assert.equal(u.searchParams.get('route'), null);
+  // 4. on the preview itself: no relay, it exchanges the code
+  assert.equal(relayTarget({ headers: { host: BRANCH }, query: back.query }, preview), null);
+  // a production start (no origin in the state): no relay
+  assert.equal(relayTarget({ headers: { host: PROD }, query: { code: 'abc', state: makeState('org-1', 'Paul', production) } }, production), null);
+});
+
+test('the relay never sends Google’s answer to an address the server did not sign, or outside Vercel / the firm’s address', async () => {
+  const { relayTarget } = await import('../lib/google-connection.js');
+  const env = { VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: 'om.vercel.app', OAUTH_STATE_SECRET: 's1' };
+  const here = { host: 'om.vercel.app' };
+  const forged = makeState('org-1', 'x', { OAUTH_STATE_SECRET: 'other' }, Date.now(), '/parametres.html', null, 'https://evil-preview.vercel.app');
+  assert.throws(() => relayTarget({ headers: here, query: { code: 'c', state: forged } }, env), /OAUTH_STATE_INVALID/);
+  const foreign = makeState('org-1', 'x', env, Date.now(), '/parametres.html', null, 'https://evil.example.com');
+  assert.equal(relayTarget({ headers: here, query: { code: 'c', state: foreign } }, env), null);
+  const http = makeState('org-1', 'x', env, Date.now(), '/parametres.html', null, 'http://p.vercel.app');
+  assert.equal(relayTarget({ headers: here, query: { code: 'c', state: http } }, env), null);
+  const expired = makeState('org-1', 'x', env, Date.now() - 24 * 3600e3, '/parametres.html', null, 'https://p.vercel.app');
+  assert.throws(() => relayTarget({ headers: here, query: { code: 'c', state: expired } }, env), /OAUTH_STATE_EXPIRED/);
+  const own = makeState('org-1', 'x', { ...env, OFFICE_MANAGER_PUBLIC_URL: 'https://office.cabinet.ci' }, Date.now(), '/parametres.html', null, 'https://office.cabinet.ci');
+  assert.equal(relayTarget({ headers: here, query: { code: 'c', state: own } }, { ...env, OFFICE_MANAGER_PUBLIC_URL: 'https://office.cabinet.ci' }).startsWith('https://office.cabinet.ci/oauth/google/callback?'), true);
+});

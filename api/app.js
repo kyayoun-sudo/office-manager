@@ -1121,6 +1121,9 @@ export const ROUTES = Object.freeze({
   },
   'google-callback': {
     GET: open(async (orgId, req) => {
+      // Started on a preview: Google always comes back to the ONE registered address (production); the browser is sent back to the
+      // preview with Google's answer, and the preview finishes (lib/google-connection.js, relayTarget).
+      try { const to = (await import('../lib/google-connection.js')).relayTarget(req); if (to) return { __relay: to }; } catch (e) { console.error('[google-callback] relay refused:', String(e.message || e).slice(0, 80)); }
       try {
         // Several firms: Google comes back without the firm header; the firm is the one in the state the server signed.
         let firm = orgId;
@@ -1235,6 +1238,8 @@ export default async function handler(req, res) {
   try {
     const out = await handleApp(req);
     // Only the Google callback redirects, and only to a page of this app.
+    // The Google relay only (built from a state this server signed, https, checked in relayTarget).
+    if (out && typeof out.__relay === 'string' && /^https:\/\//.test(out.__relay) && req.query?.route === 'google-callback') { res.statusCode = 302; res.setHeader('Location', out.__relay); return res.end(); }
     if (out && typeof out.__redirect === 'string' && out.__redirect.startsWith('/')) {
       res.statusCode = 302; res.setHeader('Location', out.__redirect); return res.end();
     }
