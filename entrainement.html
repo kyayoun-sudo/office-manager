@@ -601,7 +601,8 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       var ls = document.getElementById('gym-lessons'); ls.textContent = '';
       (d.lessons || []).forEach(function (l) {
         var c = el('div', null, 'card'); c.style.margin = '6px 0';
-        c.appendChild(el('div', l.step + (l.sheet ? ' · ' + l.sheet : '') + ' — ' + (l.trainer_name || ''), 'small'));
+        var AG = { 'firm-manager': 'Firm Manager', 'mission-controller': 'Mission Controller', 'enhanced-auditor': 'Enhanced Auditor', orpailleur: 'Orpailleur', sika: 'Sika' }, cx = l.context || {};
+        c.appendChild(el('div', (l.step === 'archive' ? 'Ancien audit · ' + (AG[cx.agent] || cx.agent || '') + (cx.theme ? ' · ' + cx.theme : '') + (cx.trainer_kept ? ' · gardée par l’entraîneur' : '') : l.step + (l.sheet ? ' · ' + l.sheet : '')) + ' — ' + (l.trainer_name || ''), 'small'));
         c.appendChild(el('div', l.lesson));
         if (l.correct) c.appendChild(el('div', 'Bonne réponse : ' + l.correct, 'small'));
         if (l.proposed) c.appendChild(el('div', 'L’agent avait proposé : ' + l.proposed.slice(0, 400), 'small'));
@@ -611,6 +612,13 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
         var r = el('div'); r.style.marginTop = '6px'; r.appendChild(ok); r.appendChild(document.createTextNode(' ')); r.appendChild(ko); c.appendChild(r); ls.appendChild(c);
       });
       if (!(d.lessons || []).length) ls.appendChild(el('p', 'Aucune leçon en attente.', 'small'));
+      // The lessons memory on the EYNOWA server (validated lessons of old audits are written there).
+      var mem = el('div', null, 'small'); mem.style.marginTop = '10px';
+      var mb = el('button', 'Vérifier la mémoire du serveur EYNOWA', 'btn ghost'); mb.type = 'button';
+      var mt = el('span', ' '); mem.appendChild(mb); mem.appendChild(mt); ls.appendChild(mem);
+      mb.onclick = function () { mt.textContent = ' vérification…'; post({ action: 'memory-status' }).then(function (r) {
+        mt.textContent = r.ready ? ' La mémoire répond. ' + r.sent + ' leçon(s) envoyée(s), ' + Math.max(0, r.waiting) + ' en attente.' : ' La mémoire ne répond pas encore (' + (r.reason || r.error || '?') + ') : les leçons validées restent gardées ici et partiront dès qu’elle répondra.';
+      }).catch(function (e) { mt.textContent = ' ' + String(e && e.message || e); }); };
     }).catch(function () { box.hidden = true; });
   }
   document.getElementById('gym-create').onclick = function () {

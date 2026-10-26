@@ -8,6 +8,17 @@ Dernière mise à jour : 24 octobre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+0ter. [ ] MÉMOIRE DES LEÇONS SUR LE SERVEUR EYNOWA (Christian)                    (pour l'étude des anciens audits)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : les leçons tirées des anciens audits de TATY sont gardées sur le serveur EYNOWA (leçons seulement, jamais les documents).
+Aucune clé d'API à ajouter dans Vercel : le broker EYNOWA est déjà réglé.
+Comment faire :
+  1. Envoyer à Christian le fichier  docs/MEMOIRE_SERVEUR_EYNOWA.md  (ce qu'il doit installer et ajouter au broker et au worker).
+  2. Quand il a fini : Entraînement → Tests spécialisés → « Vérifier la mémoire du serveur EYNOWA » doit dire « La mémoire répond ».
+  3. Déposer les anciens audits dans l'outil d'entraînement (une mission d'entraînement par audit) → « Faire lire tout le dossier ».
+  4. Valider les leçons gardées (même page Entraînement) : seules les leçons validées vont aux agents et au serveur.
+
+-----------------------------------------------------------------------------------------------------------------
 0bis. [ ] ALLUMER « PLUSIEURS CABINETS » POUR POUVOIR CRÉER SON PROPRE CABINET       (urgent — « votre compte attend… »)
 -----------------------------------------------------------------------------------------------------------------
 Pourquoi : le code « plusieurs cabinets » est là, mais il reste éteint tant que la variable OFFICE_MANAGER_MULTI_CABINET

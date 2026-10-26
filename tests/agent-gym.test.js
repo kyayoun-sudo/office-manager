@@ -19,6 +19,7 @@ function db() {
   const match = (row, qs) => {
     for (const part of qs.split('&')) {
       let m = part.match(/^([a-z_]+)=(eq|neq)\.(.*)$/); if (m) { const v = decodeURIComponent(m[3]); const x = String(row[m[1]] ?? ''); if (m[2] === 'eq' ? x !== v : x === v) return false; continue; }
+      m = part.match(/^context->>([a-z_]+)=eq\.(.*)$/); if (m) { if (String(row.context?.[m[1]] ?? '') !== decodeURIComponent(m[2])) return false; continue; }
       m = part.match(/^or=\(sheet\.is\.null,sheet\.eq\.(.*)\)$/); if (m) { if (row.sheet != null && row.sheet !== decodeURIComponent(m[1])) return false; }
     }
     return true;
@@ -175,4 +176,45 @@ test('faire un test d’audit SEUL (aucun rôle, aucun programme à valider) : l
   assert.equal((await lessonsFor('tests', { gym: true, orgId: ORG }, { fetchRows })).length, 1);
   const rv = await gym(ORG, {}, { token, action: 'run', training_id: t.id, step: 'revue', sheet: 'PRJ-05' }, d);
   assert.match(rv.proposal.items[0].label, /Point majeur/); assert.equal(rv.proposal.items.at(-1).label, 'Bien fait');
+});
+
+test('ancien audit : l’agent lit tout le dossier fichier par fichier, les leçons sont nettoyées (noms, montants), gardées / corrigées / retirées, validées puis envoyées à la mémoire du serveur ; les fichiers sont effacés, les leçons restent', async () => {
+  const { redact } = await import('../lib/lesson-memory.js');
+  assert.equal(redact('Le client ACME a payé 1 250 000 FCFA le 12/03/2023 (compta@acme.ci)', ['ACME']).text, 'Le client [nom] a payé [montant] FCFA le [date] ([courriel])');
+  const { fetchRows, T } = db(); const files = {}; let k = 0; const pushed = [], trashed = [];
+  const d = { fetchRows, gymHome: 'HOME', findOrCreateFolder: async (p, nme) => ({ id: p + '/' + nme }),
+    createBinary: async ({ name, buffer }) => { const id = 'F' + (++k); files[id] = { name, buffer }; return { id }; },
+    fileForAI: async id => ({ id, text: 'Rapport d’audit du Projet Kaya pour ACME, montant 45 000 000.' }),
+    trashFile: async id => { trashed.push(id); },
+    lessonMemory: { pushLesson: async row => { pushed.push(row); return { id: 'om-' + row.id, at: 'now' }; }, searchLessons: async () => null },
+    ai: async () => ({ text: JSON.stringify({ document_kind: 'Rapport d’audit du Projet Kaya', stage: 'rapport', names_to_hide: ['ACME', 'Kaya'],
+      lessons: [{ agent: 'enhanced-auditor', theme: 'conclusion', lesson: 'Le cabinet chiffre chaque exception (45 000 000 chez ACME) et la relie à la ligne du test avant de conclure.' },
+                { agent: 'orpailleur', theme: 'nommage', lesson: 'Le rapport final est rangé dans 08_RAPPORT sous RAPPORT_FINAL_<client>_<exercice>.' },
+                { agent: 'inconnu', lesson: 'ignorée car agent inconnu' }] }) }) };
+  const token = (await createTrainer(ORG, PAUL, { name: 'Yvan' }, { fetchRows })).link_path.split('#')[1];
+  const t = await gym(ORG, {}, { token, action: 'create', title: 'ACME Kaya 2022' }, d);
+  for (const n of ['rapport.pdf', 'lettre.pdf']) await gym(ORG, {}, { token, action: 'upload', training_id: t.id, name: n, base64: Buffer.from('%PDF').toString('base64'), role: 'piece' }, d);
+  await assert.rejects(gym(ORG, {}, { token, action: 'archive-forget', training_id: t.id, confirm: 'EFFACER' }, d), /ARCHIVE_NOT_ALL_READ/);
+  let r, n = 0; do { r = await gym(ORG, {}, { token, action: 'archive-read', training_id: t.id }, d); n++; } while (!r.finished && n < 5);
+  assert.equal(r.total, 2); assert.equal(n, 2, 'un fichier par appel ; le dernier dit « fini »');
+  const list = await gym(ORG, {}, { token, action: 'archive-lessons', training_id: t.id }, d);
+  assert.equal(list.lessons.length, 4, 'deux leçons par fichier, l’agent inconnu écarté');
+  const ea = list.lessons.find(l => l.agent === 'enhanced-auditor');
+  assert.ok(!/ACME|45 000 000|Kaya/.test(JSON.stringify(list.lessons)), JSON.stringify(list.lessons));
+  assert.match(ea.lesson, /\[nom\]/); assert.match(ea.lesson, /\[montant\]/);
+  const eas = list.lessons.filter(l => l.agent === 'enhanced-auditor'), a1 = eas[0], a3 = eas[1], a2 = list.lessons.find(l => l.agent === 'orpailleur');
+  await gym(ORG, {}, { token, action: 'archive-judge', training_id: t.id, lesson_id: a1.id, verdict: 'keep' }, d);
+  await gym(ORG, {}, { token, action: 'archive-judge', training_id: t.id, lesson_id: a2.id, verdict: 'fix', text: 'Le rapport final va dans le dossier RAPPORT de la mission, nommé RAPPORT_FINAL_<client>_<exercice>.' }, d);
+  const after = await gym(ORG, {}, { token, action: 'archive-judge', training_id: t.id, lesson_id: a3.id, verdict: 'drop' }, d);
+  assert.equal(after.lessons.find(l => l.id === a3.id).status, 'rejected');
+  // not yet in the application: a partner validates, then it goes to the server's memory and to the agents
+  assert.equal((await lessonsFor('tests', { orgId: ORG }, d)).length, 0);
+  const v = await decideLesson(ORG, PAUL, { id: a1.id, decision: 'validated' }, d);
+  assert.equal(v.memory.id, 'om-' + a1.id); assert.equal(pushed.length, 1);
+  const forAgent = await lessonsFor('tests', { orgId: ORG }, d);
+  assert.equal(forAgent.length, 1); assert.equal(forAgent[0].from, 'anciens audits du cabinet');
+  assert.equal((await lessonsFor('mission', { orgId: ORG }, d)).length, 0, 'une leçon de l’Enhanced Auditor ne va pas au Mission Controller');
+  const gone = await gym(ORG, {}, { token, action: 'archive-forget', training_id: t.id, confirm: 'EFFACER' }, d);
+  assert.equal(trashed.length, 2); assert.ok(gone.files.every(f => f.removed));
+  assert.equal(T.office_gym_lessons.filter(l => l.step === 'archive').length, 4, 'les leçons restent');
 });

@@ -1060,6 +1060,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   fermée de `audit-pipeline`, EXÉCUTÉE par le code sur la pièce ; conclusion proposée ; comparé case par case au même test du working file
   rempli par l'entraîneur. « Revoir un test rempli » (`stepReview`) : l'agent revoit le test du working file de l'entraîneur comme un manager
   (points majeurs / mineurs, à faire, bien fait). SQL `db/agent-gym.sql` installé (vérifié le 26/10).
+  ANCIENS AUDITS DE TATY + MÉMOIRE SUR LE SERVEUR EYNOWA (Paul, 2026-10-26 : « recevoir les audits complets de TATY, les lire et les
+  comprendre ; les leçons restent et ils disparaissent » ; « la mémoire sur le serveur de Christian » ; choix de Paul : LES LEÇONS SEULEMENT
+  sur ce serveur). Dans l'outil d'entraînement, une mission d'entraînement = un ancien audit : « Faire lire tout le dossier » (`archive-read`,
+  un fichier par appel, .zip ouverts) → l'IA écrit des leçons par agent (méthode, jamais de nom ni de montant) ; le CODE nettoie
+  (`redact` : montants, dates, courriels, téléphones, comptes, noms signalés par l'IA et mots du titre) ; l'entraîneur garde / corrige /
+  retire ; un associé valide (page Entraînement) → `pushLesson` vers la mémoire EYNOWA (broker : `memory.semantic_store` /
+  `memory.semantic_search`, à ajouter par Christian au broker et au worker — `docs/MEMOIRE_SERVEUR_EYNOWA.md`) ; la liste reste dans
+  `office_gym_lessons` (`step = 'archive'`, `context.agent`) et `syncPending` renvoie ce qui manque ; « Effacer les fichiers » (`EFFACER`,
+  seulement quand tout est lu) met les copies du Drive à la corbeille, les leçons restent. `lessonsFor` ajoute à chaque étape les leçons des
+  anciens audits de son agent (`STEP_AGENT`) : recherche sur le serveur (8 s, coupé 10 min s'il ne répond pas), sinon la base. Shadow : la
+  veille open source (`lib/shadow-code-watch.js`) cherche déjà, agent par agent, les agents spécialisés existants et propose idées et PR en
+  brouillon. Test : `tests/agent-gym.test.js` (« ancien audit »). Non essayé : le vrai serveur, la vraie IA, un vrai dossier.
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

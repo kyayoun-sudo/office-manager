@@ -965,6 +965,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'trainer') return g.createTrainer(orgId, req.account, b);
       if (b.action === 'revoke') return g.revokeTrainer(orgId, req.account, b);
       if (b.action === 'decide') return g.decideLesson(orgId, req.account, b);
+      // The lessons memory on the EYNOWA server: is it answering, and send again the validated lessons it does not have yet.
+      if (b.action === 'memory-status') { const m = await import('../lib/lesson-memory.js'); return { ...(await m.memoryStatus()), ...(await m.syncPending(orgId)) }; }
       throw fail('UNKNOWN_ACTION', 400);
     }),
   },
