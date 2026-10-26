@@ -1036,6 +1036,21 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   écarté, mission A validée → mission B autres noms / autre présentation / IA en panne remplie par la recette, dépôt → fiche → nom).
   NON ESSAYÉ : la vraie IA, les vrais fichiers de Paul, deux vraies missions. Les pièces déjà déposées reçoivent leur fiche au premier
   remplissage (quelques-unes par appel ; les autres sont vues par leurs mesures en attendant).
+- L'IA DONNE LES ORDRES, LE CODE EXÉCUTE ET VÉRIFIE (Paul, 2026-10-26 : « le code a la capacité de lire, mais sa capacité de comprendre et son
+  cerveau, c'est l'IA » ; « le SOP, c'est le working file en action : l'IA doit dire au code prends x lignes, mets-les dans z » ; « je voulais
+  ça pour tous les agents »). Constat : le remplissage laissait le CODE décider (lignes prises, sous-totaux, nature des pièces, colonnes par
+  mots-clés, GL choisi, doutes imposés) ; l'IA ne choisissait qu'un document par colonne. `lib/fill-orders.js` (routes `workfile-sheet-plan` /
+  `-accept`, remplace `sheetPlan` / `acceptSheetPlan` à l'écran) : le code LIT (feuille + ce que les tests en font, SOP des tests, CONTENU des
+  pièces ligne par ligne avec vrais n° de ligne et lettres) ; l'IA rend des ORDRES (blocs : pièce, feuille, lignes from/to/except/only/where,
+  colonnes source → cible, minus, transform ; alignement sur une clé ; calculs ; correspondances qu'elle a trouvées ; contrôles de total ;
+  manquants ; questions ; « why » tiré du SOP) ; le code EXÉCUTE tels quels et VÉRIFIE (pièce de la mission, colonne de saisie, montants,
+  correspondance présente dans la pièce citée, total = pièce, jamais la même colonne des deux côtés d'un recalcul) ; un écart est DIT, jamais
+  corrigé par le code ; IA en panne = dit, rien proposé par le code. Ordres gardés côté serveur (`walkthrough` kind `fill-orders`), réexécutés
+  à « Oui, remplis ». Test : `tests/fill-orders.test.js`. Non essayé : vraie IA, vraies pièces de Paul. Ancien moteur (`sheet-understanding`)
+  gardé pour ses lectures (compréhension par formules) ; ses règles de décision ne pilotent plus l'écran. Prochain : même principe pour les
+  autres agents (relevé fait le 2026-10-26 : liste PBC, contacts client, rattachement des pièces, cases du classeur d'acceptation).
+- Mise en production : « Promote » sur le DERNIER déploiement, jamais « Redeploy » sur celui en production (le 2026-10-26, un Redeploy a remis
+  la version du 23/10 et caché tout le travail ; la connexion Google passant par la production, l'aperçu montrait aussi l'ancienne version).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

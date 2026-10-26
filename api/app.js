@@ -288,8 +288,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'workfile-learn-confirm') return (await import('../lib/workfile-learn.js')).confirmLesson(orgId, m, c, b, a);
       if (b.action === 'workfile-clear-sheet') return (await import('../lib/workfile-map-view.js')).clearSheetWork(orgId, m, c, a, b);
       // The pieces the working file needs and where they are in the mission's memory (2026-10-25).
-      if (b.action === 'workfile-sheet-plan') return (await import('../lib/sheet-understanding.js')).sheetPlan(orgId, m, c, b, a);
-      if (b.action === 'workfile-sheet-plan-accept') return (await import('../lib/sheet-understanding.js')).acceptSheetPlan(orgId, m, c, b, a);
+      if (b.action === 'workfile-sheet-plan') return (await import('../lib/fill-orders.js')).fillOrdersPlan(orgId, m, c, b, a);   // l'IA donne les ordres, le code exécute (2026-10-26)
+      if (b.action === 'workfile-sheet-plan-accept') return (await import('../lib/fill-orders.js')).acceptFillOrders(orgId, m, c, b, a);
       // (2026-10-26) A person says what a piece really is: kept on the piece and learned by the firm (lib/piece-profile.js).
       if (b.action === 'piece-profile-correct') { const v = await (await import('../lib/procedure-work.js')).procedureView(orgId, m, c, a); if (!v?.editable) throw Object.assign(new Error('PROCEDURE_NOT_EDITABLE'), { status: 403 }); return (await import('../lib/piece-profile.js')).correctProfile(orgId, m, b, a); }
       if (b.action === 'workfile-needs') return (await import('../lib/workfile-needs.js')).workfileNeeds(orgId, m, c, a);

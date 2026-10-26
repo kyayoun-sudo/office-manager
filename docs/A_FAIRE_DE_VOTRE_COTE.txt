@@ -8,6 +8,17 @@ Dernière mise à jour : 24 octobre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+00. [ ] METTRE UNE VERSION EN LIGNE : TOUJOURS « PROMOTE », JAMAIS « REDEPLOY »            (26 octobre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le 26/10 au matin, un « Redeploy » du déploiement déjà en production a remis la version du 23 octobre ;
+tout le travail du 24-25 semblait avoir disparu (il était intact sur la branche). La connexion Google passe par
+l'adresse principale : si la production est ancienne, on retombe sur l'ancienne version même depuis l'aperçu.
+Comment faire :
+  1. Vercel → projet office-manager-personal-pilot → Deployments.
+  2. Prendre le déploiement LE PLUS RÉCENT de feature/white-label-desktop (en haut, « Ready »).
+  3. Bouton « … » à droite → « Promote ». Ne jamais choisir « Redeploy ».
+
+-----------------------------------------------------------------------------------------------------------------
 0bis. [ ] ALLUMER « PLUSIEURS CABINETS » POUR POUVOIR CRÉER SON PROPRE CABINET       (urgent — « votre compte attend… »)
 -----------------------------------------------------------------------------------------------------------------
 Pourquoi : le code « plusieurs cabinets » est là, mais il reste éteint tant que la variable OFFICE_MANAGER_MULTI_CABINET
