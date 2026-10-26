@@ -277,7 +277,6 @@
       var mine = node('div', null, 'gm-group'); var ma = node('a', 'Mon IA', 'gm-head'); ma.href = '/mon-ia.html'; mine.appendChild(ma); menu.appendChild(mine);
       // The firm's methodology library (SOP read procedure by procedure) — 2026-10-12.
       // The secretariat (models, MI / letters / reports to prepare and send) — 2026-10-12.
-      { var tg = node('div', null, 'gm-group'); var ta = node('a', 'Entraîner les agents', 'gm-head'); ta.href = '/entrainer.html'; tg.appendChild(ta); menu.appendChild(tg); }
       if (['owner', 'partner', 'manager', 'supervisor', 'bdm', 'secretary', 'senior'].indexOf(OM.getRole()) >= 0) { var sg = node('div', null, 'gm-group'); var sa = node('a', 'Secrétariat et modèles', 'gm-head'); sa.href = '/secretariat.html'; sg.appendChild(sa); menu.appendChild(sg); }
       if (OM.getRole()) { var mg = node('div', null, 'gm-group'); var mm = node('a', 'Méthodologie du cabinet', 'gm-head'); mm.href = '/methodologie.html'; mg.appendChild(mm); menu.appendChild(mg); }
       var lang = node('div', null, 'gm-group gm-row');

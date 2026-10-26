@@ -952,16 +952,6 @@ export const ROUTES = Object.freeze({
   //   GET  workflow&mission_id=…            the mission's workflow, its current step and who acts
   //   POST workflow {action: save | confirm | propose}   a partner: draft, confirmation, proposal read from the firm's document
   //   POST workflow {action: advance, mission_id, outcome, reason?}   the outcome of the current step (gates: reason, traced)
-  // Entraîner les agents avec de vraies personnes (2026-10-26): every correction of every cabinet, validated by the platform's leads.
-  'agent-feedback': {
-    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/agent-training.js')).listFeedback(orgId, req.account, { status: req.query?.status })),
-    POST: users(ALL_ROLES, async (orgId, req) => {
-      const b = req.body || {}, t = await import('../lib/agent-training.js');
-      if (b.action === 'decide') return t.decideFeedback(orgId, req.account, b);
-      if (b.action === 'note') return (await t.recordFeedback(orgId, { agent: String(b.agent || 'enhanced-auditor'), step: String(b.step || 'remarque'), kind: 'free_note', mission_id: b.mission_id || null, correction: String(b.text || '').slice(0, 2000) }, req.account)) || { recorded: false };
-      throw fail('UNKNOWN_ACTION', 400);
-    }),
-  },
   workflow: {
     GET: users(ALL_ROLES, async (orgId, req) => {
       const m = await import('../lib/firm-workflow.js'), id = String(req.query?.mission_id || '');
