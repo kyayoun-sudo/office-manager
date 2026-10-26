@@ -290,6 +290,8 @@ export const ROUTES = Object.freeze({
       // The pieces the working file needs and where they are in the mission's memory (2026-10-25).
       if (b.action === 'workfile-sheet-plan') return (await import('../lib/sheet-understanding.js')).sheetPlan(orgId, m, c, b, a);
       if (b.action === 'workfile-sheet-plan-accept') return (await import('../lib/sheet-understanding.js')).acceptSheetPlan(orgId, m, c, b, a);
+      // (2026-10-26) A person says what a piece really is: kept on the piece and learned by the firm (lib/piece-profile.js).
+      if (b.action === 'piece-profile-correct') { const v = await (await import('../lib/procedure-work.js')).procedureView(orgId, m, c, a); if (!v?.editable) throw Object.assign(new Error('PROCEDURE_NOT_EDITABLE'), { status: 403 }); return (await import('../lib/piece-profile.js')).correctProfile(orgId, m, b, a); }
       if (b.action === 'workfile-needs') return (await import('../lib/workfile-needs.js')).workfileNeeds(orgId, m, c, a);
       if (b.action === 'workfile-need-link') return (await import('../lib/workfile-needs.js')).linkNeed(orgId, m, c, b, a);
       // The person's choice of piece for a sheet, and a PDF turned into a verified table (2026-10-25).

@@ -132,7 +132,7 @@ test('the AI chooses from what each document CONTAINS (table rows, PDF text), an
   const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })),
     drive: { getMeta: async id => ({ name: id === 'WP' ? 'NL.xlsx' : memory.find(m => m.id === id).name, size: 10 }), downloadBuffer: async id => (id === 'WP' ? wp : id === 'PTBA' ? ptba : Buffer.from(id)) },
     pdfText: async bytes => ({ text: String(bytes) === 'TEB' ? 'TABLEAU D EXECUTION BUDGETAIRE 2024 Code Libellé Budget de l exercice Décaissement Engagement Réalisation 601 Salaires 1 000 000 200 000 300 000 500 000 ' + 'x'.repeat(60) : 'Nous avons l honneur de vous informer de notre non-objection sur le PTBA 2024 et le PPM. ' + 'y'.repeat(60) }),
-    ai: async (p, o) => { if (!input) input = JSON.parse(o.input); return { text: JSON.stringify({ columns: [{ col: 'D', document_id: 'TEB', heading: "Budget de l'exercice" }] }) }; },
+    ai: async (p, o) => { if (/Pour chaque pièce d'une mission|Voici des libellés de lignes/.test(o.instructions)) return { text: '{}' }; if (!input) input = JSON.parse(o.input); return { text: JSON.stringify({ columns: [{ col: 'D', document_id: 'TEB', heading: "Budget de l'exercice" }] }) }; },
     extractPdf: async (o, m, c, body) => { extracted.push(body.file_id); throw new Error('PDF_UNREADABLE'); } };
   const P = await sheetPlan('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET' }, { email: 'p' }, d);
   const doc = id => input.documents.find(x => x.id === id);

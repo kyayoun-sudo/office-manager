@@ -276,7 +276,7 @@ test('a TDR among the pieces received goes to the Mission Controller, read from 
   };
   const r = await startDepositAnalysis(ORG, {}, { purpose: 'pieces', mission_id: RID, files: [{ id: 'F1', name: 'balance_scan.pdf' }, { id: 'F2', name: 'tdr.xlsx' }], by: 'Awa' }, d);
   let st = await depositStep(ORG, {}, { id: r.id }, d);
-  for (let i = 0; i < 4 && st.status === 'running'; i++) st = await depositStep(ORG, {}, { id: r.id }, d);
+  for (let i = 0; i < 8 && st.status === 'running'; i++) st = await depositStep(ORG, {}, { id: r.id }, d);
   assert.equal(st.status, 'done');
   assert.deepEqual(prep.tdr_file_ids, ['F1']);
   assert.equal(prep.mission_id, RID);
@@ -286,7 +286,7 @@ test('a TDR among the pieces received goes to the Mission Controller, read from 
   d.ai = async () => ({ provider: 'test', text: JSON.stringify({ documents: [{ file_id: 'F2', role: 'etat_financier' }] }) });
   const r2 = await startDepositAnalysis(ORG, {}, { purpose: 'pieces', mission_id: RID, files: [{ id: 'F2', name: 'b.xlsx' }] }, d);
   let st2 = await depositStep(ORG, {}, { id: r2.id }, d);
-  for (let i = 0; i < 4 && st2.status === 'running'; i++) st2 = await depositStep(ORG, {}, { id: r2.id }, d);
+  for (let i = 0; i < 8 && st2.status === 'running'; i++) st2 = await depositStep(ORG, {}, { id: r2.id }, d);
   assert.equal(st2.status, 'done'); assert.equal(prep, null); assert.equal(st2.handed_to, undefined);
 });
 

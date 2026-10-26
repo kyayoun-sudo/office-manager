@@ -995,19 +995,40 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   n'interdisait un GL pour une feuille de fonds reçus. Désormais : limites 40 Mo / 200 000 lignes (`clientTable`, `.xls`, `peekDocument`) ;
   `describeTable` mesure les CLASSES de comptes (plusieurs classes = GÉNÉRAL ; seulement tiers 40x/41x = AUXILIAIRE) et reconnaît un relevé
   bancaire (un seul compte, débit / crédit, et banque / IBAN / date de valeur ou une colonne « Solde ») ; `sheetWants(u)` lit dans le titre et les consignes de la feuille ce
-  qu'elle attend (relevés / avis de crédit, grand livre, dépenses). Règles du CODE quoi que dise l'IA : feuille de fonds reçus → jamais un
+  qu'elle attend (relevés / avis de crédit, grand livre, dépenses). Règles du CODE (RETIRÉES le 2026-10-26, voir plus bas : remplacées par la fiche + contrôle) : feuille de fonds reçus → jamais un
   grand livre (raison dite), crédits des relevés (`rows_from … credits`), sans relevé = « aucun relevé bancaire parmi les pièces », rien
   recopié ; feuille qui prend le grand livre (son titre, ou ses colonnes d'écritures date + montant, sauf si elle demande les tiers) → l'auxiliaire est remplacé par le général, ou signalé s'il n'y en a pas. Tests : `tests/corpus.test.js`
   (GL auxiliaire, relevé, GL de 25 000 lignes). Non essayé sur les vrais fichiers de Paul ni avec la vraie IA.
-- D2 PAR LA MÉTHODE DE PAUL, APPLIQUÉE PAR LE CODE (Paul, 2026-10-25 : « reconnaître la catégorie budgétaire avec les noms, chercher dans le
-  grand livre, trouver les comptes ; [montant du PTBA] dans budget initial ; ensuite prendre le TEB, mettre les montants d'engagement
-  correspondant à ses comptes ») : `budgetMethod` (`lib/sheet-understanding.js`) — pièces reconnues par leurs COLONNES (`describeTable` :
-  TEB = budget + engagé / décaissé / réalisé ; PTBA = budget dont les catégories sont prouvées par leurs sommes, sans colonne d'exécution) ;
-  pour une feuille par catégorie qui a « budget initial » : lignes = catégories du PTBA, catégorie = n° de compte trouvé dans le GL général
-  par le nom (sinon le nom, signalé `without_account`), initial = montant du PTBA, final = budget (révisé) du TEB, engagements = TEB rapproché
-  par compte (plusieurs lignes du même compte ADDITIONNÉES, `alignRows`), amendements = final − initial. Remplace ce que l'IA a proposé
-  (sauf choix d'une personne) ; l'IA peut seulement mettre une colonne « à confirmer » avec sa raison. Tests : `tests/corpus.test.js`
-  (« méthode de Paul », IA qui se trompe / en panne, écriture vérifiée). Non essayé sur les vrais PTBA / TEB / GL de Paul.
+- RETIRÉ LE 2026-10-26 — la règle D2 écrite en dur (`budgetMethod`) et les blocages par mots-clés de D1 / D3 sur la réponse de l'IA (Paul :
+  « tu as codé de sorte que nous devons refaire le code pour chaque cabinet ; l'IA devait permettre à l'application de savoir automatiquement
+  ce qu'il faut prendre »). Remplacés par ce qui suit. Les mots-clés de `sheetWants` ne servent plus qu'au SECOURS sans IA (« à confirmer »).
+- LA FICHE DE CHAQUE PIÈCE, LA RECETTE APPRISE (Paul, 2026-10-26 : « si quand on dépose les documents l'IA les connaît tous, aura-t-on ce
+  problème ? » ; « GL aux et GL : si l'IA est entraînée elle fera la différence, mais elle se perd ; on a écrit B1 au lieu de chercher le
+  numéro de compte ; et il n'apprend pas »). Cause : au dépôt l'IA ne lisait que 20 000 caractères et choisissait dans une liste fermée sans
+  grand livre / PTBA / TEB / relevé ; rien n'était gardé du tableau ; au remplissage l'agent ne voyait que des titres ; une confirmation ne
+  valait que pour la mission. Désormais :
+  1) `lib/piece-profile.js` — FICHE faite au dépôt dans une mission (étape `profile` de `deposit-analysis.js`, après le rattachement) et, à
+  défaut, au premier remplissage (`ensureProfiles`, borné en temps) : le CODE mesure TOUTE la pièce (`peekDocument` jusqu'à 200 000 lignes :
+  lignes du début / milieu / fin, classes de comptes, liste des comptes et intitulés, années, catégories prouvées par leurs sommes) ; l'IA dit
+  la famille (liste PROPOSÉE `FAMILIES`, « autre:<mot> » accepté), ce qu'est la pièce, ce qu'est une ligne, sa clé, le sens de chaque
+  colonne ; le code ne fait que SIGNALER un doute (`codeDoubt` : « grand livre général » avec seulement des comptes de tiers…). Fiche gardée
+  dans la mémoire de la mission (`profile`, par version du fichier) ; le nom de la pièce en vient (`familyTitle`). Correction d'une personne
+  (« C'est autre chose… » dans « Ce que je sais des pièces », action `piece-profile-correct` de la route `procedure`) : gardée sur la pièce
+  (jamais réécrite par l'IA) ET comme leçon du cabinet (`OFFICE_MANAGER_PIECE_LESSONS.json`, forme de la pièce + bonne famille, sans données),
+  donnée à l'IA pour les pièces de même forme dans toutes les missions.
+  2) Remplissage (`sheetPlan`) : l'IA choisit à partir des FICHES (et des mesures), dit `sheet_expects` (familles attendues par la feuille) ;
+  le code CONTRÔLE (fiche ≠ famille attendue, doute mesuré → « à confirmer » avec la raison, `doubts`), ne remplace jamais. Compte d'une
+  ligne de budget / de TEB : l'IA le trouve PAR LE SENS parmi les comptes du GL (numéro, intitulé, nombre d'écritures ; `aiAccountMap`), le
+  code ne garde que des numéros qui existent dans le GL ; sans IA, le titre le plus proche (secours). La liste montrée (`account_map`) est
+  renvoyée à « Oui, remplis » et revérifiée. Colonne « Compte » = code de la ligne ; libellé = colonne de texte si aucun titre ne le dit.
+  3) `lib/fill-recipes.js` — après « Oui, remplis » vérifié, la RECETTE de la feuille pour ce modèle de working file (`map.key` + feuille) :
+  familles des pièces, sens des colonnes, calculs, source des lignes — jamais de noms de fichiers ni de données
+  (`OFFICE_MANAGER_FILL_RECIPES.json`). Mission suivante : l'IA reçoit la recette (`recipe_validated_before`) et retrouve les pièces de même
+  famille ; IA en panne : `applyRecipe` l'applique par les fiches (« à confirmer »). Tests : `tests/piece-profile-and-recipes.test.js`
+  (fiche sur toute la pièce, doute signalé sans décider, correction apprise, choix de l'IA contrôlé, compte par le sens et numéro inventé
+  écarté, mission A validée → mission B autres noms / autre présentation / IA en panne remplie par la recette, dépôt → fiche → nom).
+  NON ESSAYÉ : la vraie IA, les vrais fichiers de Paul, deux vraies missions. Les pièces déjà déposées reçoivent leur fiche au premier
+  remplissage (quelques-unes par appel ; les autres sont vues par leurs mesures en attendant).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
