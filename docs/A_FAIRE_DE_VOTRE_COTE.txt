@@ -343,3 +343,39 @@ Pour verifier sur votre vrai modele sans le mettre dans le depot (le depot est p
   WORKFILE_MAP_SAMPLE=/chemin/vers/NL-T01_PRJ.xlsx node --test tests/workfile-map.test.js
 A noter : 11 tests echouaient deja sur la branche avant ce travail (dont « 12 fonctions Vercel Hobby »,
 fournisseurs d'IA, INSTALL_TOUT.sql) ; ils sont inchanges. A regarder separement.
+
+
+12. [ ] DONNER L'APPLICATION À UN AUDITEUR POUR ENTRAÎNER LES AGENTS                (2026-10-26)
+-----------------------------------------------------------------------------------------------------------------
+But : un auditeur crée SA mission, avec SON Drive, travaille jusqu'aux tests et corrige l'IA, encore et encore. Il ne voit RIEN
+du cabinet TATY. Ses corrections arrivent chez vous ; celles que vous validez sont appliquées par les agents dans tous les cabinets.
+
+Une seule fois (vous) :
+  1. Faire d'abord le point 10 (plusieurs cabinets) : SQL  db/cabinet-onboarding.sql  +  OFFICE_MANAGER_MULTI_CABINET = on.
+  2. Supabase → SQL Editor : exécuter  db/agent-training.sql  (ou relancer  db/INSTALL_TOUT.sql ). Sans danger si relancé.
+     Vérifier :  select count(*) from public.office_agent_feedback;  → 0 (pas d'erreur).
+  3. Redéployer la branche feature/white-label-desktop sur un aperçu (Preview) d'abord.
+  4. Préparer un dossier Google Drive « Kit entraînement » et le PARTAGER avec l'auditeur (lecteur) : le working file modèle
+     (NL-T01 vierge), les SOP du cabinet (dossier Word), et les pièces d'une vraie mission anonymisée (convention, PTBA, TEB,
+     grand livre, relevés). Rien d'autre.
+
+Pour chaque auditeur (lui, environ 15 minutes la première fois) :
+  1. Ouvrir l'adresse de l'application → « Créer un compte » avec son e-mail → confirmer l'e-mail reçu.
+  2. « Mes cabinets » → « Créer un cabinet » (ex. « Entraînement Awa ») : il en est propriétaire, il ne voit que ce cabinet.
+  3. « Démarrer » : connecter SON compte Google, choisir SON Drive (un dossier vide suffit).
+  4. Méthodologie : coller le lien du dossier des SOP du kit → « Lire ». Quand l'agent demande le dossier des modèles de working
+     files, donner le dossier du kit qui contient le NL-T01.
+  5. « + Nouvelle mission » → nom + client → déposer les pièces du kit dans « Pièces reçues ».
+  6. « Mes tests » → ouvrir un test → laisser l'agent préparer → corriger chaque erreur :
+       - sur une pièce : « Ce que je sais des pièces » → « C'est autre chose… » ;
+       - sur une feuille : « Pas juste ? Dites-le » → « Refaire » ;
+       - tout le reste : menu ⚙ → « Entraîner les agents » → « Dire à l'agent ce qui ne va pas ».
+     Quand c'est juste : « Oui, remplis ». Puis recommencer avec une nouvelle mission.
+
+Vous (chaque jour) : menu ⚙ → « Entraîner les agents » (avec votre compte TATY de propriétaire ou d'associé) → « À valider » :
+  « Valider » = tous les agents l'appliquent partout ; « Refuser » = gardé, jamais appliqué. Le tableau « Progrès des agents »
+  montre la part des feuilles validées sans correction : c'est la preuve que l'entraînement sert (ou pas).
+
+À savoir : la vraie IA doit être réglée (point 11) ; chaque correction contient ce que l'agent proposait et la phrase de l'auditeur,
+jamais les documents ; si l'auditeur écrit un nom de client dans sa phrase, il y sera — lui dire d'écrire de façon générale.
+-----------------------------------------------------------------------------------------------------------------

@@ -231,9 +231,12 @@
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Ce que je remplis pour vous</h3>' + list.map(function (x) { return planBlock(x, d); }).join('') + '</div>';
   }
+  // what the agent had proposed before a correction (sent with the correction, so the platform learns from the pair)
+  function prevSummary(sheet) { var P = st.lastPlans && st.lastPlans[sheet]; if (!P || !P.plan) return null; return P.plan.filter(function (p) { return p.document_id || p.compute; }).map(function (p) { return p.header + ' ← ' + (p.compute ? 'calcul ' + p.compute : '« ' + (p.heading || '?') + ' » de ' + (p.document || '?')); }).join(' ; ').slice(0, 1800); }
   function plan(sheet, columns, extract) {
+    st.lastPlans = st.lastPlans || {}; if (st.plans[sheet] && st.plans[sheet].plan) st.lastPlans[sheet] = st.plans[sheet];
     st.plans[sheet] = null; render();
-    return api('workfile-sheet-plan', Object.assign({ sheet: sheet }, columns ? { columns: columns } : {}, extract ? { extract: extract } : {}, st.hints && st.hints[sheet] ? { hint: st.hints[sheet] } : {})).then(function (P) {
+    return api('workfile-sheet-plan', Object.assign({ sheet: sheet }, columns ? { columns: columns } : {}, extract ? { extract: extract } : {}, st.hints && st.hints[sheet] ? { hint: st.hints[sheet], previous: prevSummary(sheet) } : {})).then(function (P) {
       st.plans[sheet] = P; render(); publishPlans();
       // A PDF the AI chose and not yet turned into a table: the agent does it itself, then prepares again.
       var pdf = (P.plan || []).filter(function (p) { return p.status === 'needs_extraction' && p.pdf; })[0];
@@ -430,7 +433,7 @@
     if (b.dataset.a === 'plan-fill') {
       var psh = b.dataset.sheet, P = st.plans[psh]; if (!P) return;
       b.disabled = true; P.run_error = null; st.say = 'Je remplis ' + psh + ' colonne par colonne, depuis les pièces retenues…'; render();
-      api('workfile-sheet-plan-accept', { sheet: psh, columns: currentColumns(psh), rows_from: P.rows_from || null, gl_document_id: P.gl_document_id || null, account_map: P.account_map || null, extend: b.dataset.extend === '1' }).then(function (r) {
+      api('workfile-sheet-plan-accept', { sheet: psh, columns: currentColumns(psh), rows_from: P.rows_from || null, gl_document_id: P.gl_document_id || null, account_map: P.account_map || null, after_correction: Boolean(st.hints && st.hints[psh]), extend: b.dataset.extend === '1' }).then(function (r) {
         st.say = fmt(r.rows) + ' ligne(s) écrites et relues dans ' + psh + ' : ' + (r.filled || []).map(function (f) { return f.col + ' ← « ' + f.heading + ' » (' + f.document + ')'; }).join(' ; ') + ((r.left_empty || []).length ? ' ; laissées vides : ' + r.left_empty.map(function (f) { return f.header; }).join(', ') : '') + '. Chaque case garde sa pièce d’origine.';
         delete st.plans[psh]; publishPlans();
         try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: psh } })); } catch (_) {}

@@ -1029,6 +1029,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   écarté, mission A validée → mission B autres noms / autre présentation / IA en panne remplie par la recette, dépôt → fiche → nom).
   NON ESSAYÉ : la vraie IA, les vrais fichiers de Paul, deux vraies missions. Les pièces déjà déposées reçoivent leur fiche au premier
   remplissage (quelques-unes par appel ; les autres sont vues par leurs mesures en attendant).
+- ENTRAÎNER LES AGENTS AVEC DE VRAIES PERSONNES (Paul, 2026-10-26 : « je veux donner à un auditeur aujourd'hui, qui n'a pas accès à toute
+  l'application ; il crée sa mission, met son Drive, travaille et corrige ; il fait et refait »). L'auditeur crée SON cabinet d'entraînement
+  (plusieurs cabinets, `OFFICE_MANAGER_MULTI_CABINET=on`) : il ne voit rien de TATY. `lib/agent-training.js` + `db/agent-training.sql`
+  (`office_agent_feedback`, une table pour toute la plateforme) : chaque correction (pièce corrigée `piece_family`, « Pas juste ? » d'une
+  feuille `sheet_hint` avec ce que l'agent proposait, feuille validée `accepted_as_is` / `accepted_after_correction` avec sa recette,
+  remarque libre `free_note`) y est enregistrée sans bloquer le travail ; le propriétaire / associé du cabinet PILOTE valide ou refuse
+  (`decideFeedback`) ; une correction VALIDÉE est donnée à l'IA dans tous les cabinets (`validatedFeedback` : leçons des fiches de pièces,
+  `corrections_taught_by_auditors` et recette validée de la feuille par modèle de working file dans `sheetPlan`). Page `entrainer.html`
+  (menu ⚙ « Entraîner les agents » : mode d'emploi, remarque libre, progrès = part des feuilles validées sans correction, liste à valider),
+  route `agent-feedback`. Pas à pas pour Paul et l'auditeur : `docs/A_FAIRE_DE_VOTRE_COTE.txt` point 12. Test : `tests/agent-training.test.js`.
+  NON ESSAYÉ en vrai (ni la table installée, ni un auditeur réel).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a
