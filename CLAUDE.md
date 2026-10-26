@@ -1052,6 +1052,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   leçons VALIDÉES (`lessons_from_trainers` dans `profilePieces`, `aiAccountMap`, `sheetPlan`). Fichiers dans `<maison des agents>/
   ENTRAINEMENT_AGENTS/…` (jamais rangés par l'Orpailleur, jamais une mission du cabinet). Test : `tests/agent-gym.test.js`.
   NON ESSAYÉ : vraie IA, vrai entraîneur, SQL installé, envoi direct des gros fichiers vers Google depuis la page.
+  Étapes « tests » et « revue » CONSTRUITES (Paul, 2026-10-26 : « il ne faut pas qu'il ne puisse pas faire les tests d'audit parce qu'il est seul ;
+  on teste les agents, pas toute l'application ») : aucun rôle, aucun programme à valider, aucune seconde personne. « Faire les tests d'audit »
+  (`stepTest`) : par feuille de test du working file vierge, l'IA reçoit la feuille (consignes, étapes, colonnes et rôles, lignes du modèle),
+  les fiches et le texte des pièces ; elle remplit les lignes (seulement fait / libre / jugement PROPOSÉ dans la liste de la colonne — calcul,
+  résultat, clé écartés par le code), cite un passage (retrouvé ou non par le code), et pour un calcul donne une suite d'opérations de la liste
+  fermée de `audit-pipeline`, EXÉCUTÉE par le code sur la pièce ; conclusion proposée ; comparé case par case au même test du working file
+  rempli par l'entraîneur. « Revoir un test rempli » (`stepReview`) : l'agent revoit le test du working file de l'entraîneur comme un manager
+  (points majeurs / mineurs, à faire, bien fait). SQL `db/agent-gym.sql` installé (vérifié le 26/10).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
   écritures existantes sur la carte (`writeWorkpaper` : la colonne « N° » serait écrasée et la conclusion est cherchée sous le tableau ;
   `writableCell` : les colonnes ✓ L/M/N de PRJ-05 sont écrites avant confirmation ; `drawSample` : lire le tirage du fichier quand il en a

@@ -127,3 +127,52 @@ test('comprendre la mission : chaque fait porte le passage du document, retrouv�
   assert.equal(r.proposal.founding_document.name, 'accord.pdf');
   assert.deepEqual(r.proposal.items.map(x => x.verified), [true, false], 'un montant inventé n’est pas retrouvé dans le document');
 });
+
+test('faire un test d’audit SEUL (aucun rôle, aucun programme à valider) : l’agent remplit les lignes, le code écarte les calculs, vérifie les passages et compare au test de l’entraîneur ; puis la revue', async () => {
+  const { fetchRows } = db();
+  const { Y, head } = await import('./corpus/working-file.js');
+  const build = async filled => {
+    const wb = await workingFile(); const s = wb.addWorksheet('PRJ-05'); s.getCell('A1').value = 'PRJ-05 — Éligibilité des dépenses';
+    s.getCell('A3').value = 'Comment faire : pour chaque critère de la convention, noter le constat et dire si la dépense est conforme.';
+    head(s, 10, ['N°', 'Critère', 'Constat', 'Conforme ?', 'Résultat']);
+    for (let r = 11; r <= 13; r++) {
+      s.getCell(r, 1).value = r - 10; s.getCell(r, 2).value = ['Dépense dans la période', 'Catégorie prévue au budget', 'Pièce justificative'][r - 11];
+      s.getCell(r, 3).fill = Y; s.getCell(r, 4).fill = Y; s.getCell(r, 4).dataValidation = { type: 'list', formulae: ['"Oui,Non,N/A"'] };
+      s.getCell(r, 5).value = { formula: `IF(D${r}="","",IF(D${r}="Oui","PASS","EXCEPTION"))` };
+      if (filled) { s.getCell(r, 3).value = ['Toutes les dépenses en 2023', 'Salaires prévus', 'Facture manquante pour L2'][r - 11]; s.getCell(r, 4).value = ['Oui', 'Oui', 'Non'][r - 11]; }
+    }
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  };
+  const files = {}; let k = 0; const asked = [];
+  const d = { fetchRows, gymHome: 'HOME', findOrCreateFolder: async (p, nme) => ({ id: p + '/' + nme }),
+    createBinary: async ({ name, buffer }) => { const id = 'F' + (++k); files[id] = { name, buffer }; return { id }; },
+    drive: { getMeta: async id => ({ id, name: files[id].name, parents: [] }), downloadBuffer: async id => files[id].buffer },
+    fileForAI: async id => ({ id, name: files[id].name, text: 'CONVENTION. Les dépenses sont éligibles si engagées entre le 1er janvier 2023 et le 31 décembre 2023.' }),
+    ai: async (p, o) => {
+      asked.push(o.instructions);
+      if (/Pour chaque pièce d'une mission/.test(o.instructions)) return { text: JSON.stringify({ pieces: [] }) };
+      if (/fais la REVUE/.test(o.instructions)) { const inp = JSON.parse(o.input); assert.equal(inp.test.rows.length, 3); assert.equal(inp.test.rows[2].cells.D, 'Non');
+        return { provider: 'ia', text: JSON.stringify({ overall: 'Test fait, une exception', points: [{ where: 'ligne 13', issue: 'Exception sans montant ni suite', severity: 'majeur', requested_action: 'Chiffrer et proposer un ajustement' }], well_done: ['Période vérifiée'] }) }; }
+      const inp = JSON.parse(o.input); assert.equal(inp.test.code, 'PRJ-05'); assert.ok(inp.test.columns.some(c => c.col === 'D' && c.role === 'judgment'));
+      return { provider: 'ia', text: JSON.stringify({ understood: 'Éligibilité selon la convention', conclusion: 'Une dépense sans pièce',
+        rows: [{ row: 11, cells: { C: 'Toutes les dépenses en 2023', D: 'Oui', E: 'PASS' }, source: { file_id: 'F1', quote: 'engagées entre le 1er janvier 2023 et le 31 décembre 2023' } },
+               { row: 12, cells: { C: 'Salaires prévus', D: 'Peut-être' }, source: { file_id: 'F1', quote: 'phrase inventée' } }] }) }; } };
+  const token = (await createTrainer(ORG, PAUL, { name: 'Awa' }, { fetchRows })).link_path.split('#')[1];
+  const t = await gym(ORG, {}, { token, action: 'create', title: 'Projet X 2023', period_label: '2023' }, d);
+  await gym(ORG, {}, { token, action: 'upload', training_id: t.id, name: 'convention.pdf', base64: Buffer.from('%PDF').toString('base64'), role: 'piece' }, d);
+  await gym(ORG, {}, { token, action: 'upload', training_id: t.id, name: 'WF vierge.xlsx', base64: (await build(false)).toString('base64'), role: 'workfile' }, d);
+  await gym(ORG, {}, { token, action: 'upload', training_id: t.id, name: 'WF rempli.xlsx', base64: (await build(true)).toString('base64'), role: 'reference' }, d);
+  const list = await gym(ORG, {}, { token, action: 'run', training_id: t.id, step: 'tests' }, d);
+  assert.ok(list.proposal.sheets.includes('PRJ-05'));
+  const r = await gym(ORG, {}, { token, action: 'run', training_id: t.id, step: 'tests', sheet: 'PRJ-05' }, d);
+  const [l11, l12] = r.proposal.items;
+  assert.match(l11.value, /Conforme \? \(proposé\) = Oui/); assert.match(l11.warning, /E \(calculé par le fichier\)/, 'jamais une colonne calculée');
+  assert.equal(l11.verified, true); assert.equal(l12.verified, false, 'passage inventé : non retrouvé');
+  assert.match(l12.warning, /pas dans la liste/);
+  assert.equal(r.proposal.comparison.by, 'cases'); assert.equal(r.proposal.comparison.same, 3, JSON.stringify(r.proposal.comparison));
+  assert.equal(r.step, 'tests:PRJ-05');
+  await gym(ORG, {}, { token, action: 'verdict', training_id: t.id, step: 'tests:PRJ-05', verdict: 'faux', explanation: 'La ligne 13 (pièce justificative) manque : vérifier chaque facture du GL.' }, d);
+  assert.equal((await lessonsFor('tests', { gym: true, orgId: ORG }, { fetchRows })).length, 1);
+  const rv = await gym(ORG, {}, { token, action: 'run', training_id: t.id, step: 'revue', sheet: 'PRJ-05' }, d);
+  assert.match(rv.proposal.items[0].label, /Point majeur/); assert.equal(rv.proposal.items.at(-1).label, 'Bien fait');
+});

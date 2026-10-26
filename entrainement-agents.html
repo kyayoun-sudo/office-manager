@@ -103,7 +103,7 @@
     var sheets = s.per_sheet ? ((attemptsOf(s.key).slice(-1)[0] || {}).proposal || {}).sheets || (last && last.proposal && last.proposal.sheets) || [] : [];
     var h = '<div class="step"><div class="row"><h3 style="flex:1">' + esc(s.title) + (a.length ? '<span class="tag">' + a.length + ' essai(s)</span>' : '') + a.map(function (x, i) { return x.verdict ? '<span class="tag ' + (x.verdict === 'juste' ? 'ok' : 'ko') + '">' + (i + 1) + ' : ' + x.verdict + '</span>' : ''; }).join('') + '</h3></div>' +
       '<div class="muted">' + esc(s.agent) + ' — ' + esc(s.what) + '</div>';
-    if (s.per_sheet) h += '<div class="row" style="margin-top:6px"><span class="muted">Feuille :</span><select data-sheet-for="' + s.key + '"><option value="">' + (sheets.length ? 'choisir' : '— lancer d’abord pour lire le working file —') + '</option>' + sheets.map(function (x) { return '<option' + (x === sheet ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>';
+    if (s.per_sheet) h += '<div class="row" style="margin-top:6px"><span class="muted">' + (s.pick === 'test' ? 'Test :' : 'Feuille :') + '</span><select data-sheet-for="' + s.key + '"><option value="">' + (sheets.length ? 'choisir' : '— lancer d’abord pour lire le working file —') + '</option>' + sheets.map(function (x) { return '<option' + (x === sheet ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>';
     h += '<div class="row" style="margin-top:8px"><button data-run="' + s.key + '" type="button"' + (st.busy[key] ? ' disabled' : '') + '>' + (st.busy[key] ? 'L’agent travaille…' : a.length ? 'Refaire (avec ses leçons)' : 'Faire faire l’étape à l’agent') + '</button></div>';
     if (last) h += proposal(last.proposal) + (last.proposal && last.proposal.empty ? '' : last.verdict ? '<p class="muted">Votre avis : <b>' + esc(last.verdict) + '</b>' + (last.explanation ? ' — ' + esc(last.explanation) : '') + '</p>' : verdictBox(key));
     return h + '</div>';
@@ -115,14 +115,18 @@
     if (p.ai_error) h += '<p class="warn">L’IA n’a pas répondu : ' + esc(p.ai_error) + '</p>';
     if (p.founding_document) h += '<p><b>Document fondateur :</b> ' + esc(p.founding_document.name) + ' <span class="muted">' + esc(p.founding_document.why || '') + '</span></p>';
     if (p.gl) h += '<p class="muted">Grand livre : ' + esc(p.gl) + ' — budget : ' + esc(p.budget) + '</p>';
+    if (p.understood) h += '<p><b>' + (p.test_title ? esc(p.test_title) + ' — ' : '') + 'ce que l’agent a compris :</b> ' + esc(p.understood) + '</p>';
+    if (p.calc && (p.calc.problems || []).length) h += '<p class="warn">Calcul non fait : ' + p.calc.problems.map(esc).join(' ; ') + '</p>';
+    if (p.calc && p.calc.source) h += '<p><b>Calcul fait par l’application sur « ' + esc(p.calc.source) + ' » :</b> ' + esc(p.calc.count) + ' ligne(s) — <span class="muted">' + p.calc.steps.map(esc).join(' → ') + '</span></p>';
     if (p.rows != null && p.sheet) h += '<p><b>' + esc(p.rows) + ' ligne(s)</b> préparée(s) pour ' + esc(p.sheet) + (p.summary ? ' — <span class="muted">' + esc(p.summary) + '</span>' : '') + '</p>';
     if ((p.items || []).length) h += '<ul class="items">' + p.items.map(function (x) {
       return '<li><b>' + esc(x.label) + '</b> : ' + esc(x.value) + (x.verified === true ? ' <span class="tag ok">passage retrouvé</span>' : x.verified === false && x.quote ? ' <span class="tag ko">passage non retrouvé</span>' : '') +
         (x.quote ? '<div class="d">« ' + esc(x.quote) + ' »</div>' : '') + ((x.detail || []).length ? '<div class="d">' + x.detail.map(esc).join(' · ') + '</div>' : '') + (x.warning ? '<div class="d warn">⚠ ' + esc(x.warning) + '</div>' : '') + '</li>';
     }).join('') + '</ul>';
     if ((p.sample || []).length) h += '<table style="margin-top:8px"><tr>' + (p.columns || []).map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' + p.sample.map(function (r) { return '<tr>' + r.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
-    if (p.comparison) { var c = p.comparison; h += '<p style="margin-top:8px"><b>Comparé à votre working file (' + esc(c.with) + ') :</b> ' + c.same + ' de vos lignes retrouvée(s) chez l’agent, ' + c.missing + ' manquante(s) ou différente(s), ' + c.extra + ' ligne(s) en plus chez l’agent' + (c.score != null ? ' — <b>' + c.score + ' %</b> juste' : '') + '.</p>' +
+    if (p.comparison) { var c = p.comparison; h += '<p style="margin-top:8px"><b>Comparé à votre working file (' + esc(c.with) + ') :</b> ' + (c.by === 'cases' ? c.same + ' de vos cases identiques chez l’agent, ' + c.missing + ' différente(s) ou vide(s), ' + c.extra + ' ligne(s) en plus chez l’agent' : c.same + ' de vos lignes retrouvée(s) chez l’agent, ' + c.missing + ' manquante(s) ou différente(s), ' + c.extra + ' ligne(s) en plus chez l’agent') + (c.score != null ? ' — <b>' + c.score + ' %</b> juste' : '') + '.</p>' +
       ((c.examples || []).length ? '<table><tr><th>Votre ligne</th><th>Valeurs</th><th>Chez l’agent</th></tr>' + c.examples.map(function (x) { return '<tr><td>' + esc(x.cell) + '</td><td>' + esc(x.expected) + '</td><td>' + esc(x.got == null ? 'pas trouvée' : x.got) + '</td></tr>'; }).join('') + '</table>' : ''); }
+    if (p.conclusion) h += '<p><b>Conclusion proposée par l’agent :</b> ' + esc(p.conclusion) + ' <span class="muted">(proposition, jamais définitive)</span></p>';
     if ((p.expected_pieces || []).length) h += '<p class="muted">Pièces attendues : ' + p.expected_pieces.map(esc).join(' ; ') + '</p>';
     if ((p.questions || []).length) h += '<p class="muted">Questions de l’agent : ' + p.questions.map(esc).join(' ; ') + '</p>';
     return h;
