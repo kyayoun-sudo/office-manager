@@ -94,6 +94,7 @@
     });
   }
 
+  var guideError = null;
   async function understand() {
     var message = document.getElementById('wf-understanding-message');
     var before = board.innerHTML;
@@ -104,7 +105,10 @@
       loadAgentPanel();
       return true;
     } catch (e) {
-      // The earlier reading below stays available: give it back its frame.
+      // The earlier reading below stays available: give it back its frame — and SAY why the working-file screen did not open
+      // (2026-10-26 : l'erreur était cachée, l'écran semblait avoir disparu).
+      guideError = String(e && e.message || e || 'erreur');
+      try { console.error('[workfile-guide] lecture impossible :', guideError); } catch (_) {}
       board.innerHTML = before; board.setAttribute('aria-label', 'Compréhension globale du Working File');
       message = document.getElementById('wf-understanding-message');
     }
@@ -122,7 +126,7 @@
       return understanding;
     } catch (e) {
       status('Compréhension indisponible', 'blocked');
-      if (message) message.textContent = 'La lecture globale n’a pas pu être terminée : ' + String(e && e.message || e || 'erreur') + '. Le moteur existant reste disponible.';
+      if (message) message.textContent = (guideError ? 'L’écran du working file (feuille par feuille) n’a pas pu s’ouvrir : ' + guideError + '. ' : '') + 'La lecture globale n’a pas pu être terminée : ' + String(e && e.message || e || 'erreur') + '.';
       return null;
     } finally {
       loadAgentPanel();
