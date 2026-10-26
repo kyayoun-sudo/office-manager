@@ -255,6 +255,13 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   (`lib/kpi.js`) ignorent les missions archivées / annulées ; les compétences (`OFFICE_MANAGER_CAPABILITIES.json`) portent le
   `drive_id` et ne s'affichent pas pour un autre Drive. Nom de la fonction pont configurable : `GOOGLE_BRIDGE_FUNCTION`
   (par défaut `taty-google-bridge`, le nom déployé ; un nouveau cabinet peut la déployer sous un nom neutre).
+- **Une seule adresse de retour Google, pour toujours (Paul, 2026-10-26 : « redirect_uri_mismatch » encore, « ça ne doit plus se répéter »)** :
+  `canonicalOrigin` (`lib/google-connection.js`) = adresse de PRODUCTION pour la production ET pour tout aperçu (`VERCEL_PROJECT_PRODUCTION_URL`,
+  `OFFICE_MANAGER_PUBLIC_URL` d'abord) ; l'aperçu met son adresse de branche dans l'état signé (`o`, `selfOrigin`) ; au retour, la production
+  (`relayTarget`, début de `google-callback` dans `api/app.js`, 302) renvoie code + état intacts vers cet aperçu — seulement un état signé et non
+  expiré, https, `*.vercel.app` ou l'adresse publique du cabinet ; l'aperçu échange le code avec la même adresse. Exige le même
+  `OAUTH_STATE_SECRET` en Preview et Production, et la production redéployée une fois. Tests : `tests/google-connection.test.js`. Non essayé
+  avec le vrai Google.
 - « Fichiers de travail » (Équipe) = temps réellement passé dans les fichiers Excel des missions, mesuré par le panneau Excel.
 
 ## Essai avec 4 cabinets (Paul, 2026-10-11 : « est-ce qu'on peut régler définitivement ? »)
