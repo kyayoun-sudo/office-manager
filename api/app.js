@@ -314,6 +314,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'population') return w.setPopulation(orgId, m, c, b, a);
       if (b.action === 'sample') return w.drawSample(orgId, m, c, b, a);
       if (b.action === 'evidence') return w.addEvidence(orgId, m, c, b, a);
+      if (b.action === 'brain-plan') return (await import('../lib/enhanced-auditor-execution.js')).prepareProcedureBrain(orgId, m, c, a);
       if (b.action === 'ai') return w.aiProposal(orgId, m, c, b, a);
       if (b.action === 'item') return w.recordItem(orgId, m, c, b, a);
       if (b.action === 'conclusion') return w.saveConclusion(orgId, m, c, b, a);

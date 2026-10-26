@@ -92,6 +92,9 @@
     <section class="card" aria-labelledby="h-steps" id="steps-card">
       <h2 id="h-steps">Exécuter le test dans le working file</h2>
       <p class="meta">L’Enhanced Auditor prépare l’étape selon le SOP courant et les pièces lisibles. Relisez les faits sourcés et les questions, puis inscrivez la préparation dans le working file. Les opérations chiffrées disponibles produisent leur résultat dans une feuille séparée.</p>
+      <button class="btn ghost" id="brain-plan" type="button">Préparer avec les pièces de la mission</button>
+      <p class="status" id="brain-say" role="status" aria-live="polite"></p>
+      <div id="brain-result"></div>
       <div id="steps-list"></div>
       <p class="status" id="steps-say" role="status" aria-live="polite"></p>
     </section>
@@ -275,6 +278,23 @@
     $('sample-result').textContent = s.size ? s.size + ' élément(s) sur ' + fmt(s.population_rows) + (s.seed ? ' — tirage reproductible (graine ' + s.seed + ')' : '') + ', le ' + UI.dateTime(s.drawn_at) + '.' : '';
   }
 
+  $('brain-plan').addEventListener('click', function () { act(this, { action: 'brain-plan' }, $('brain-say')); });
+  function paintBrain() {
+    var locked = ['submitted', 'reviewed'].indexOf(data.work.status) >= 0 || data.editable === false;
+    $('brain-plan').disabled = locked;
+    var host = $('brain-result'); host.textContent = '';
+    var kept = (data.work.walkthrough || []).filter(function (x) { return x.kind === 'audit-brain-plan'; }).pop();
+    if (!kept) return;
+    var brain = kept.brain;
+    host.appendChild(el('p', brain.understanding || 'Préparation du travail'));
+    if (brain.ai_error) host.appendChild(el('p', 'IA indisponible : ' + brain.ai_error, 'status error'));
+    (brain.steps || []).forEach(function (s) { host.appendChild(el('p', s.instruction + ' — SOP ' + s.sop_reference + ', ' + s.working_paper_reference + ' ; pièces : ' + (s.document_ids || []).join(', ') + ' — ' + (s.why || ''))); });
+    (brain.questions || []).forEach(function (q) { host.appendChild(el('p', 'À clarifier : ' + q)); });
+    (brain.refused || []).forEach(function (r) { host.appendChild(el('p', 'Non exécuté : ' + r.action + ' — ' + r.refused)); });
+    if (brain.limit_reached) host.appendChild(el('p', 'Ce passage a atteint sa limite. Relisez la préparation avant de poursuivre.'));
+    host.appendChild(el('p', 'Préparation à revoir ; les liaisons de pièces et décisions de test restent à confirmer.', 'meta'));
+  }
+
   function paintItems() {
     var box = $('items'); box.textContent = '';
     var items = data.work.items || [];
@@ -304,6 +324,14 @@
       }
       if (it.ai) {
         var a = el('div', null, 'ai'); a.appendChild(el('p', null)).appendChild(el('strong', 'Proposition de l’Enhanced Auditor : ' + it.ai.proposed_result));
+        (it.ai.evidence_candidates || []).forEach(function (e) {
+          a.appendChild(el('p', 'Pièce proposée : ' + (e.name || e.file_id)));
+          if (!locked && !(it.evidence || []).some(function (known) { return known.file_id === e.file_id; })) {
+            var confirm = el('button', 'Confirmer cette pièce pour le test', 'btn ghost'); confirm.type = 'button';
+            confirm.addEventListener('click', function () { act(confirm, { action: 'evidence', sample_id: it.sample_id, file: e.file_id }, say); }); a.appendChild(confirm);
+          }
+        });
+        if (it.ai.selection_reason) a.appendChild(el('p', it.ai.selection_reason));
         if (it.ai.reason) a.appendChild(el('p', it.ai.reason));
         (it.ai.attributes || []).forEach(function (x) { a.appendChild(el('p', x.name + ' : ligne « ' + (x.on_line || '') + ' », pièce « ' + (x.on_evidence || '') + ' » — ' + x.match)); });
         if ((it.ai.missing || []).length) a.appendChild(el('p', 'Manque : ' + it.ai.missing.join(', ')));
@@ -356,6 +384,7 @@
   });
 
   function paint() {
+    paintBrain();
     var w = data.work;
     $('title').textContent = data.line.code + ' — ' + data.line.title;
     $('sub').textContent = data.cycle.code + ' · ' + data.cycle.title + ' · préparée par ' + (data.preparer || '?') + ' · programme v' + data.programme.version;
