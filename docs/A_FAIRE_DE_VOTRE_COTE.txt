@@ -8,6 +8,23 @@ Dernière mise à jour : 24 octobre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+0bis. [ ] ALLUMER « PLUSIEURS CABINETS » POUR POUVOIR CRÉER SON PROPRE CABINET       (urgent — « votre compte attend… »)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le code « plusieurs cabinets » est là, mais il reste éteint tant que la variable OFFICE_MANAGER_MULTI_CABINET
+n'est pas à « on ». Vérifié le 26/10 : elle n'existe dans aucun environnement Vercel. Éteint, l'application garde l'ancien
+fonctionnement : un seul cabinet, la première personne inscrite en est propriétaire, toute autre adresse « attend que
+le propriétaire du cabinet lui donne un rôle ». C'est le message que vous avez vu.
+
+Comment faire :
+  1. Supabase → SQL Editor → coller et exécuter  db/cabinet-onboarding.sql  (ou db/INSTALL_TOUT.sql, sans danger si relancé).
+  2. Vercel → projet → Settings → Environment Variables → Add : nom  OFFICE_MANAGER_MULTI_CABINET , valeur  on .
+     Pour essayer d'abord sans toucher la production : cocher seulement « Preview ».
+  3. Redéployer l'aperçu (Deployments → … → Redeploy) : une variable ne compte qu'après un nouveau déploiement.
+  4. Essai : se connecter avec une autre adresse → la page « Cabinets » s'ouvre → « Créer un cabinet » (nom + fuseau) →
+     vous en êtes propriétaire. Une adresse déjà « en attente » dans le cabinet TATY peut maintenant créer son cabinet
+     (corrigé le 26/10 : cette attente la bloquait).
+
+-----------------------------------------------------------------------------------------------------------------
 0. [ ] CONNEXION GOOGLE : UNE SEULE ADRESSE DE RETOUR, POUR TOUJOURS              (urgent — « redirect_uri_mismatch »)
 -----------------------------------------------------------------------------------------------------------------
 Pourquoi : chaque aperçu (Preview) donnait à Google sa propre adresse de retour ; une nouvelle branche = une adresse que
