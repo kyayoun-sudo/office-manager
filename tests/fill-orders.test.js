@@ -27,9 +27,10 @@ const files = { T: { name: 'TEB_2023.xlsx', buffer: await teb() }, G: { name: 'G
 function harness(answer, extra = {}) {
   const memory = Object.entries(files).map(([id, p]) => ({ id, name: p.name, read: true, uses: [] }));
   const saved = [];
-  const view = { editable: true, card: { code: 'PRJ-03', objective: 'Vérifier le budget', steps: [{ text: 'Recalculer le budget final' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: extra.walkthrough || [] }, line: { code: 'PRJ-03' }, mission: { period_label: 'Exercice 2023' } };
+  const view = { editable: true, card: { code: 'PRJ-03', objective: 'Vérifier le budget', steps: [{ text: 'Recalculer le budget final' }] }, workpaper: { file_id: 'WP' }, work: { status: 'in_progress', walkthrough: extra.walkthrough || [] }, line: { code: 'PRJ-03' }, mission_id: 'M', mission: { period_label: 'Exercice 2023' } };
   const asked = [];
-  const d = { view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })), methodology: async () => ({}),
+  const notes = [];
+  const d = { notes, noteMission: async (o, m, n) => { notes.push(...(Array.isArray(n) ? n : [n])); }, missionBrief: async () => ({ open: [{ id: 'n1', kind: 'manquant', text: 'Convention à obtenir' }], settled: [] }), view: async () => view, missionMemory: async () => memory, sources: async () => memory.map(m => ({ file_id: m.id, name: m.name })), methodology: async () => ({}),
     save: async (o, w, patch) => { saved.push(patch); return null; },
     drive: { getMeta: async id => (id === 'WP' ? { name: 'WF.xlsx', size: wpBuf.length } : { name: files[id].name, size: files[id].buffer.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? wpBuf : files[id].buffer) },
     ai: async (pr, o) => { asked.push(JSON.parse(o.input)); return answer(JSON.parse(o.input)); }, ...extra.d };
@@ -51,6 +52,7 @@ test('l’IA reçoit le SOP, la feuille et le CONTENU des pièces avec les vrais
   assert.equal(inp.sheet.name, 'D2_BUDGET');
   assert.ok(inp.sheet.columns.some(c => c.col === 'D' && c.what_the_tests_do.length), 'ce que les tests font de chaque colonne');
   assert.ok(inp.sop.length, 'le SOP est donné');
+  assert.equal(inp.mission_memory.open[0].text, 'Convention à obtenir', 'la mémoire partagée de la mission est donnée à l’IA');
   const t = inp.pieces.find(p => p.document_id === 'T').sheets[0];
   assert.deepEqual(t.lines.find(l => l[0] === 7).slice(0, 3), [7, '', 'Sous-total Personnel'], 'ligne 7 du fichier, valeurs par colonne');
 });
@@ -112,5 +114,6 @@ test('« Oui, remplis » réexécute les ordres GARDÉS sur les fichiers, pas ce
   assert.deepEqual(written.table.rows.slice(1).map(x => [x[0], x[3]]), [['Sous-total Personnel', 350], ['Sous-total Fonctionnement', 100]]);
   assert.deepEqual(written.mapping.map(m => m.column), [1, 4, 5]);
   assert.equal(r.checks[0].ok, true);
+  assert.ok(h.d.notes.some(n => n.kind === 'fait' && /D2_BUDGET rempli/.test(n.text)) && h.d.notes.some(n => n.kind === 'manquant' && /Convention/.test(n.text)), 'la mémoire de la mission apprend ce qui est fait et ce qui manque');
   await assert.rejects(acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'p' }, harness(() => ({ text: '{}' })).d), /PREPARE_AGAIN/);
 });

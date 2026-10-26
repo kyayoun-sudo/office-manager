@@ -1049,6 +1049,15 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   à « Oui, remplis ». Test : `tests/fill-orders.test.js`. Non essayé : vraie IA, vraies pièces de Paul. Ancien moteur (`sheet-understanding`)
   gardé pour ses lectures (compréhension par formules) ; ses règles de décision ne pilotent plus l'écran. Prochain : même principe pour les
   autres agents (relevé fait le 2026-10-26 : liste PBC, contacts client, rattachement des pièces, cases du classeur d'acceptation).
+- SOCLE COMMUN À TOUS LES AGENTS (Paul, 2026-10-26 : « IA intelligence dirige le code partout et pour tous les agents ; mémoire partagée sur
+  les informations dont chacun a besoin dans une mission ») : `lib/agent-brain.js` `think()` = le code lit, l'IA reçoit la tâche + ce qui
+  a été lu + la mémoire de la mission + la liste FERMÉE des actions de l'agent, rend des ordres motivés ; le code vérifie (`check`) et
+  exécute (`run`), met en attente d'une personne les actions `approval` (`runApproved` revérifie), refuse en le disant ; IA en panne = rien
+  décidé. `lib/mission-brief.js` = mémoire partagée : notes de mission (fait / décision / manquant / question / action, « for » = agents
+  concernés), dans le dossier de la mission ET l'index central, jamais supprimées (`closeNote`) ; `missionBrief(org, mission, agent)` = ce
+  que CET agent lit (NEEDS). Branché : Enhanced Auditor (remplissage lit la mémoire, écrit ce qui est fait / manque). À brancher, dans
+  l'ordre : Orpailleur (liste PBC), Mission Controller (pièces ↔ demandes, contacts), Firm Manager (classeur d'acceptation), Sika.
+  Tests : `tests/agent-brain.test.js`.
 - Mise en production : « Promote » sur le DERNIER déploiement, jamais « Redeploy » sur celui en production (le 2026-10-26, un Redeploy a remis
   la version du 23/10 et caché tout le travail ; la connexion Google passant par la production, l'aperçu montrait aussi l'ancienne version).
 - SUITE (dans l'ordre) : 2) carte gardée par version de modèle dans la mémoire des agents + validation par un Manager ; 3) brancher les
