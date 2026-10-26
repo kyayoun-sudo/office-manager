@@ -246,3 +246,13 @@ test('un seul avis par essai : un second clic n’enregistre pas la même leçon
   for (let i = 0; i < 3; i++) await gym(ORG, {}, { token, action: 'verdict', training_id: t.id, step: 'mission', verdict: 'faux', explanation: 'Lire l’accord de prêt.' }, d);
   assert.equal(T.office_gym_lessons.length, 1);
 });
+
+test('un GRAND LIVRE dont la colonne des comptes n’a pas de titre connu (colonne D) : comptes reconnus par leurs valeurs, écritures par leurs dates', async () => {
+  const { describeTable } = await import('../lib/sheet-understanding.js');
+  const rows = [['Date', 'Jnl', 'Pièce', '', 'Libellé', 'Débit', 'Crédit']];
+  const accs = [601100, 521000, 401000, 622000, 162100, 641000];
+  for (let i = 0; i < 30; i++) rows.push([`${String(1 + (i % 28)).padStart(2, '0')}/0${1 + (i % 9)}/2023`, 'AC', 'P' + i, accs[i % 6], 'Opération ' + i, 1000 + i, 0]);
+  const d = describeTable('GLG', rows);
+  assert.match(d.shape.looks_like, /grand livre GÉNÉRAL/); assert.equal(d.shape.accounts, 6); assert.deepEqual(d.shape.years, ['2023']);
+  assert.ok(['1', '4', '5', '6'].every(c => d.shape.account_classes[c]), JSON.stringify(d.shape));
+});
