@@ -354,6 +354,10 @@ cabinet : les fichiers vont dans <maison des agents>/ENTRAINEMENT_AGENTS dans vo
 Une seule fois :
   1. Supabase → SQL Editor : exécuter  db/agent-gym.sql  (ou relancer  db/INSTALL_TOUT.sql ). Sans danger si relancé.
      Vérifier :  select count(*) from public.office_gym_lessons;  → 0 (pas d'erreur).
+  2bis. Si Google répond « Erreur 400 : redirect_uri_mismatch » en vous connectant sur cet aperçu : l'adresse de l'aperçu n'est pas
+     déclarée chez Google. Sur la page d'erreur, cliquer « détails de l'erreur » et copier l'adresse « redirect_uri » affichée
+     (elle finit par /oauth/google/callback). Google Cloud Console → API et services → Identifiants → le client OAuth de
+     l'application → « URI de redirection autorisés » → Ajouter l'URI → coller → Enregistrer. Attendre 5 minutes, réessayer.
   2. Déployer la branche feature/entrainement-agents sur un aperçu (Preview) d'abord ; le Drive du cabinet doit être choisi
      (Paramètres) et la vraie IA réglée (point 11).
 
