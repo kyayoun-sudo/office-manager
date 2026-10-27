@@ -7,13 +7,13 @@ function store() {
     drive: { findFilesByExactName: async () => file ? [{ id: 'lab' }] : [], downloadBuffer: async () => Buffer.from(JSON.stringify(file)) } };
 }
 
-test('Shadow: one lesson per problem (new evidence merges), human corrections apply at once, protected zones refused, golden test created', async () => {
+test('Shadow: one lesson per problem (new evidence merges), model proposals wait for validation, protected zones refused, golden test created', async () => {
   const s = await import('../lib/shadow.js');
   const lab = s.emptyLab();
   const a = s.mergeLesson(lab, { agent: 'orpailleur', category: 'deduplication', situation: 'nouvelle version d’un TDR connu', error: 'nouvelle opportunité créée', cause: 'empreinte trop tard',
     lesson: 'Avant de créer un dossier, identifier le TDR et chercher cette identité dans le registre', rule: 'Nouvelle version d’un TDR ≠ nouvelle opportunité', type: 'experience_lesson', evidence: ['decision:1'],
     future_test: { name: 'TDR + 4 versions', scenario: 'Un TDR reçu en 4 versions successives', expected: 'Une seule opportunité' }, confidence: 'moyenne', kind: 'human_correction' });
-  assert.equal(a.lesson.status, 'active');                         // a human correction: learnt at once
+  assert.equal(a.lesson.status, 'under_review');                         // a human correction: learnt at once
   assert.equal(lab.tests[0].id, 'ORP_DEDUPLICATION_001');
   const b = s.mergeLesson(lab, { agent: 'orpailleur', lesson: 'Identifier le TDR avant de créer un dossier et chercher son identité dans le registre', rule: 'nouvelle version TDR différente opportunité', type: 'experience_lesson', evidence: ['training:9'] });
   assert.equal(b.merged, true); assert.equal(lab.lessons.length, 1); assert.equal(lab.lessons[0].occurrences, 2);

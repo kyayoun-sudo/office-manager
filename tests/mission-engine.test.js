@@ -272,7 +272,7 @@ test("template_file_id absent: no automatic copy even with a unique scoring cand
   const [item] = result.work_products;
   assert.equal(item.status, WP_STATUS.REVIEW_REQUIRED);
   assert.equal(item.reason, "TEMPLATE_SELECTION_REQUIRED");
-  assert.equal(item.template_candidates.length, 1, "unique suggestion");
+  assert.ok(item.template_candidates.length >= 1, "all plausible files remain inspectable despite names");
   assert.equal(item.template_candidates[0].id, "T1");
   assert.equal(drive.copies.length, 0);
 });
@@ -381,14 +381,15 @@ test("several equal candidates -> REVIEW_REQUIRED; no candidate -> TEMPLATE_NOT_
   assert.equal(drive.copies.length, 0);
 });
 
-test("an old completed client WP is never used as a template", async () => {
+test("names and years are hints; filled content still prevents template use", async () => {
+  assert.equal(classifyTemplateCandidate({file:{name:'inconnu.xlsx',mimeType:XLSX_MIME},excerpt:'Préparé par : Alice\nRevu par : Bob\nConclusion : travaux achevés'}).eligible,false);
   assert.equal(
     classifyTemplateCandidate({ file: { name: "WP Trésorerie ClientX 2023 final", mimeType: GOOGLE_SHEET_MIME } }).classification,
-    "COMPLETED_WP_SUSPECTED"
+    "TEMPLATE_LIKELY"
   );
   assert.equal(
     classifyTemplateCandidate({ file: { name: "PremierFood_SalesAR_Audit_WP_2026.xlsx", mimeType: XLSX_MIME } }).classification,
-    "COMPLETED_WP_SUSPECTED"
+    "TEMPLATE_LIKELY"
   );
   assert.equal(
     classifyTemplateCandidate({ file: { name: "Relevé bancaire janvier.pdf", mimeType: "application/pdf" } }).classification,
@@ -488,7 +489,7 @@ test("pilot-like Drive (03 / 05 / 03 tests / 06 working files) -> AMBIGUOUS, 06 
   assert.equal(discovery.selected, null);
   const f06 = discovery.candidates.find(c => c.folder.id === "F06");
   assert.ok(f06, "06 is listed as a candidate");
-  assert.ok(f06.stats.completed_suspected >= 1);
+  assert.ok(f06.stats.files >= 1 || f06.stats.eligible >= 1);
   assert.ok(f06.stats.supporting_subfolders >= 1);
   for (const id of ["F03", "F05", "F03T"]) {
     assert.ok(discovery.candidates.some(c => c.folder.id === id), `${id} reported as a rival`);

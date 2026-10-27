@@ -73,7 +73,7 @@ test('only a validated lesson is used: its columns win over the guess, and the A
   const items = [{ id: 'X|PTBA', file: { file_id: 'X', name: 'PTBA 2024.xlsx' }, sheet: 'PTBA', by: 'code', mapping: [{ column: 2, label: 'Budget initial', source: 3, source_label: 'Révision', by: 'code' }],
     p: { source_headers: ['Code', 'Rubrique', 'Montant 2024', 'Révision'].map((h, i) => (i === 2 ? 'Montant 2023' : h)), sample_rows: [], years: {}, rows: 3, columns: [{ column: 1, label: 'Catégorie budgétaire' }, { column: 2, label: 'Budget initial' }, { column: 3, label: 'Amendements / réallocations (net)' }] } }];
   let told = null;
-  const d = { ...f.d, fetchRows: async () => [{ period_label: '2023' }], ai: async (o, args) => { told = JSON.parse(args.input); return { provider: 't', text: '{}' }; } };
+  const d = { ...f.d, fetchRows: async () => [{ period_label: '2023' }], ai: async (o, args) => { told = JSON.parse(args.input); return { provider: 't', text: JSON.stringify({sources:JSON.parse(args.input).pieces.map(p=>({id:p.id,fits:true,what:'budget',why:'contenu examiné'}))}) }; } };
   const before = await finishImport('O', 'M', 'PRJ-03', { sheet: 'D2_BUDGET', items: JSON.parse(JSON.stringify(items)), profile: { template_key: r.template } }, paul, d);
   assert.equal(before.learned, false);                                  // to confirm: not used yet
   await confirmLesson('O', 'M', 'PRJ-03', { template: r.template, sheet: 'D2_BUDGET', decision: 'validated', note: 'Ignorer les lignes sans code B.x' }, paul, f.d);

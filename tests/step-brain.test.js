@@ -15,6 +15,7 @@ async function fixture() {
   const step = { n: 1, row: null, text: view.card.steps[0].text, source: 'sop' };
   const revisions = { WP: 'v1' }; let asks = 0, reads = 0, saves = 0;
   const d = {
+    readDocumentWindow: async (doc, drive, request) => ({ file_id: doc.id, revision: ((await drive.getMeta(doc.id)).modifiedTime + '||'), window: await drive.readText(doc.id,request) }),
     brainLog: () => {}, view: async () => structuredClone(view), permissions: async () => ({ granted: true }),
     loop: { listRequests: async () => [] }, missionDocuments: async () => sources.map(s => ({ id: s.file_id, name: s.name })),
     fetchRows: async () => [], missionBrief: async () => null, noteMission: async () => {}, closeNote: async () => {},

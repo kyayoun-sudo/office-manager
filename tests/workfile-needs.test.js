@@ -26,28 +26,29 @@ test('the working file says which piece feeds which sheet and which test', () =>
   assert.deepEqual(e.sheets.find(s => s.sheet === 'D1_GL_PROJET').pieces, ['PBC-PRJ-03']);
 });
 
-test('pieces are found in the mission memory: a confirmed link first, then by what the document IS (GL = grand livre)', () => {
+test('pieces are found in the mission memory: confirmed human links are kept; unknown matches wait for content reasoning', () => {
   const r = locatePieces(expectedPieces(map).items, memory);
   const at = id => r.find(x => x.id === id);
   assert.equal(at('PBC-GEN-13').status, 'linked');
-  assert.equal(at('PBC-PRJ-01').status, 'probable');
-  assert.equal(at('PBC-PRJ-01').docs[0].id, 'b');
-  assert.equal(at('PBC-PRJ-03').docs[0].id, 'g');
-  assert.equal(at('PBC-GEN-09').status, 'missing');
+  assert.equal(at('PBC-PRJ-01').status, 'unresolved');
+  assert.deepEqual(at('PBC-PRJ-01').docs, []);
+  assert.deepEqual(at('PBC-PRJ-03').docs, []);
+  assert.equal(at('PBC-GEN-09').status, 'unresolved');
 });
 
-test('the AI can only remove a weak match, never add one; « Ce n’est pas ça » is remembered', async () => {
-  const d = { view: async () => ({ card: {} }), map, missionMemory: async () => memory,
-    ai: async (o, args) => ({ provider: 't', text: JSON.stringify({ checks: [{ pbc: 'PBC-PRJ-01', file_id: 'b', answers: true }, { pbc: 'PBC-PRJ-03', file_id: 'g', answers: false, why: 'grand livre général, pas analytique' }, { pbc: 'PBC-GEN-09', file_id: 'x', answers: true }] }) }) };
+test('the content brain can propose a match without lexical filtering; foreign ids are never shown', async () => {
+  const d = { view: async () => ({ card: {}, work: {walkthrough:[]} }), map, missionMemory: async () => memory, sources:async()=>memory.map(f=>({file_id:f.id,name:f.name})),
+    reasonWithDocuments: async args => ({provider:'t',result:{checks:[{pbc:'PBC-PRJ-01',file_id:'b',answers:true},{pbc:'PBC-PRJ-03',file_id:'g',answers:false},{pbc:'PBC-GEN-09',file_id:'x',answers:true}]}}) };
+
   const r = await workfileNeeds('O', 'M', 'PRJ-01', {}, d);
   assert.equal(r.items.find(x => x.id === 'PBC-PRJ-01').docs[0].ai, true);
-  assert.equal(r.items.find(x => x.id === 'PBC-PRJ-03').status, 'missing');
-  assert.equal(r.items.find(x => x.id === 'PBC-GEN-09').status, 'missing');
+  assert.equal(r.items.find(x => x.id === 'PBC-PRJ-03').status, 'unresolved');
+  assert.equal(r.items.find(x => x.id === 'PBC-GEN-09').status, 'unresolved');
   assert.deepEqual(r.current_test.pieces, ['PBC-GEN-13', 'PBC-GEN-09']);
   let noted = null;
   await linkNeed('O', 'M', 'PRJ-01', { pbc: 'PBC-PRJ-01', file_id: 'b', decision: 'no' }, { email: 'p' }, { view: async () => ({}), noteMissionEvent: async (o, m, f, e) => { noted = e; } });
   const mem2 = memory.map(x => (x.id === 'b' ? { ...x, history: [{ what: noted.what, detail: noted.detail }] } : x));
-  assert.equal(locatePieces(expectedPieces(map).items, mem2).find(x => x.id === 'PBC-PRJ-01').status, 'missing');
+  assert.equal(locatePieces(expectedPieces(map).items, mem2).find(x => x.id === 'PBC-PRJ-01').status, 'unresolved');
 });
 
 test('« Vider tout le travail de cette feuille » empties its input cells, keeps formulas, asks for confirmation', async () => {
