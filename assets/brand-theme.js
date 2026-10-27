@@ -243,6 +243,16 @@
       return OM.api('/api/app?route=branding').then(function (b) { OM.applyBranding(b); return b; });
     }
   };
+  // Serialize preparation requests within this page. A rejected request releases
+  // the queue; it must never replay an execution or an approved write.
+  var procedureQueues = Object.create(null);
+  OM.queueProcedurePreparation = function (key, run) {
+    var previous = procedureQueues[key] || Promise.resolve();
+    var next = previous.catch(function () {}).then(run);
+    procedureQueues[key] = next;
+    next.then(function () { if (procedureQueues[key] === next) delete procedureQueues[key]; }, function () { if (procedureQueues[key] === next) delete procedureQueues[key]; });
+    return next;
+  };
   window.OfficeManager = OM;
 
   // Logout button under the user's name in the side menu.

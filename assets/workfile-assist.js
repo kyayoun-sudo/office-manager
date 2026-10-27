@@ -10,8 +10,10 @@
   if (!missionId || !code) return;
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function api(action, extra) {
-    return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ mission_id: missionId, code: code, action: action }, extra || {})) });
+    var run = function () { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ mission_id: missionId, code: code, action: action }, extra || {})) }); };
+    return ['workfile-needs', 'workfile-sheet-plan', 'workfile-review-pieces'].indexOf(action) >= 0 && OM.queueProcedurePreparation
+      ? OM.queueProcedurePreparation(missionId + ':' + code, run) : run();
   }
   var box = document.createElement('section');
   box.id = 'wf-assist'; box.className = 'card wf-assist'; box.setAttribute('aria-label', 'Ce que l’agent fait pour vous');
@@ -92,6 +94,7 @@
     var byId = {}; n.items.forEach(function (x) { byId[x.id] = x; });
     var cur = n.current_test ? n.current_test.pieces.map(function (id) { return byId[id]; }).filter(Boolean) : [];
     var html = '<details class="wf-assist-block"><summary><b>Pièces que demande ce working file</b> — ' + n.counts.found + ' trouvée(s), ' + n.counts.missing + ' manquante(s), ' + (n.counts.unresolved || 0) + ' à examiner</summary>';
+    if (n.ai_error) html += '<p class="wf-assist-err">La recherche par l’IA est interrompue : ' + esc(n.ai_error) + '. <button type="button" class="btn ghost" data-a="need-retry">Reprendre la recherche</button></p>';
     if (cur.length) html += '<p><b>Pour ' + esc(n.current_test.code) + ' :</b></p><ul class="wf-agent-list">' + cur.map(function (x) { return needItem(x, d); }).join('') + '</ul>';
     var sheets = []; // the data sheets are shown column by column in « Les feuilles de données à remplir »
     if (sheets.length) html += '<p><b>Pour les feuilles de données :</b></p><ul class="wf-agent-list">' + sheets.map(function (s) {
@@ -102,9 +105,9 @@
     return html + '</details>';
   }
   document.addEventListener('document-brain-progress', function(e) { var p=e.detail||{}; st.say='L’IA poursuit la préparation · '+(p.read||0)+' pièce(s) consultée(s) sur '+(p.total||0)+'.'; render(); });
-  function loadNeeds() {
+  function loadNeeds(retry) {
     st.needsAsked = true; render();
-    return api('workfile-needs').then(function (n) { st.needs = n; render(); }).catch(function (e) { st.needs = { error: 'Liste des pièces non lisible : ' + (e && e.message || e) }; render(); });
+    return api('workfile-needs', retry === true ? { retry_ai: true } : {}).then(function (n) { st.needs = n; render(); }).catch(function (e) { var code = e && (e.code || e.message) || ''; st.needs = { error: /MEMORY_CONFLICT/.test(code) ? 'Le travail a changé pendant la préparation. Actualisez la page et reprenez la recherche des pièces.' : 'La recherche des pièces a rencontré une erreur : ' + code }; render(); });
   }
 
   // The mission's PDFs for this sheet: a PDF cannot be imported as it is; « Extraire le tableau » makes a checked Excel next to it.
@@ -190,7 +193,7 @@
       ficheBlock(P, x.sheet) +
       ((P.doubts || []).length ? '<p class="wf-assist-warn">À vérifier : ' + esc(P.doubts.map(function (z) { return z.why; }).join(' ; ')) + '</p>' : '') +
       (P.problem ? '<p class="wf-assist-warn">' + esc(P.problem) + '</p>' : '') +
-      (P.ai_error ? '<p class="wf-assist-err">L’IA n’a pas répondu pour cette feuille, même au second essai (' + esc(P.ai_error) + '). La préparation n’est pas terminée ; relancez l’IA pour poursuivre. <button type="button" class="btn" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">Relancer l’IA</button></p>' : '') +
+      (P.ai_error ? '<p class="wf-assist-err">La préparation par l’IA est interrompue (' + esc(P.ai_error) + '). Aucune correspondance incomplète ne doit être appliquée ; relancez la préparation. <button type="button" class="btn" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">Relancer l’IA</button></p>' : '') +
       (P.collect ? '<p class="meta">' + esc(P.collect.read + ' document(s) lu(s) sur ' + P.collect.documents + ' : ' + P.collect.rows + ' ligne(s) trouvée(s)' + (P.collect.which === 'credits' ? ' au crédit' : P.collect.which === 'debits' ? ' au débit' : '') + '.') + ((P.collect.pending_pdfs || []).length ? ' ' + P.collect.pending_pdfs.length + ' PDF encore à lire : je continue.' : '') + '</p>' +
         ((P.collect.to_check || []).length ? '<p class="wf-assist-warn">À relire : ' + esc(P.collect.to_check.join(' ; ')) + '</p>' : '') + ((P.collect.unreadable || []).length ? '<p class="meta">Illisibles : ' + esc(P.collect.unreadable.join(', ')) + '</p>' : '') : '') +
       (miss.length ? '<p class="meta">Correspondances à résoudre : ' + esc(miss.map(function (p) { return p.header + (p.missing ? ' (il faut : ' + p.missing + ')' : ''); }).join(' ; ')) + '.</p>' : '') +
@@ -204,7 +207,7 @@
       ((P.questions || []).length ? '<p class="wf-assist-warn"><b>Questions de l’IA :</b> ' + esc(P.questions.join(' ; ')) + '</p>' : '') +
       '<details><summary>Pourquoi, colonne par colonne</summary><ul class="wf-agent-list">' + P.plan.map(function (p) { return '<li><b>' + esc(p.header) + '</b> : ' + (p.document_id ? '« ' + esc(p.heading || '?') + ' » de ' + esc(p.document) : 'vide') + (p.why ? ' — <span class="meta">' + esc(p.why) + '</span>' : '') + '</li>'; }).join('') + '</ul>' +
       ((P.account_map || []).length ? '<p class="meta"><b>Comptes du grand livre retrouvés par l’IA :</b> ' + esc(P.account_map.map(function (z) { return z.label + ' → ' + (z.number || 'aucun') + (z.why ? ' (' + z.why + ')' : ''); }).join(' ; ')) + '</p>' : '') + '</details>';
-    if (d.editable) html += '<div class="row">' + (got.length && pv.rows ? '<button type="button" class="btn' + (P.ai_error ? ' ghost' : '') + '" data-a="plan-fill" data-sheet="' + esc(x.sheet) + '"' + (tooBig ? ' data-extend="1"' : '') + '>' + (P.ai_error ? 'Remplir quand même, sans l’IA — ' : 'Oui, remplis ') + esc(x.sheet) + (tooBig ? ' (tableau agrandi à ' + fmt(pv.rows) + ' lignes)' : '') + '</button>' : '') + '</div>' +
+    if (d.editable) html += '<div class="row">' + (got.length && pv.rows && !P.ai_error ? '<button type="button" class="btn" data-a="plan-fill" data-sheet="' + esc(x.sheet) + '"' + (tooBig ? ' data-extend="1"' : '') + '>Oui, remplis ' + esc(x.sheet) + (tooBig ? ' (tableau agrandi à ' + fmt(pv.rows) + ' lignes)' : '') + '</button>' : '') + '</div>' +
       '<div class="row"><input type="text" class="wf-plan-hint" data-sheet="' + esc(x.sheet) + '" placeholder="Pas juste ? Dites-le : « le budget est dans le TEB 2024 »…" aria-label="Dire à l’agent ce qui ne va pas pour ' + esc(x.sheet) + '" style="flex:1;min-width:12em"><button type="button" class="btn ghost" data-a="plan-hint" data-sheet="' + esc(x.sheet) + '">Refaire</button></div>';
     return html + '</div>';
   }
@@ -240,9 +243,9 @@
     var list = d.data_sheets || []; if (!list.length) return '';
     return '<div class="wf-assist-block"><h3>Ce que je remplis pour vous</h3>' + list.map(function (x) { return planBlock(x, d); }).join('') + '</div>';
   }
-  function plan(sheet, columns, extract) {
+  function plan(sheet, columns, extract, retry) {
     st.plans[sheet] = null; render();
-    return api('workfile-sheet-plan', Object.assign({ sheet: sheet }, columns ? { columns: columns } : {}, extract ? { extract: extract } : {}, st.hints && st.hints[sheet] ? { hint: st.hints[sheet] } : {})).then(function (P) {
+    return api('workfile-sheet-plan', Object.assign({ sheet: sheet }, retry === true ? { retry_ai: true } : {}, columns ? { columns: columns } : {}, extract ? { extract: extract } : {}, st.hints && st.hints[sheet] ? { hint: st.hints[sheet] } : {})).then(function (P) {
       st.plans[sheet] = P; render(); publishPlans();
       // A PDF the AI chose and not yet turned into a table: the agent does it itself, then prepares again.
       var pdf = (P.plan || []).filter(function (p) { return p.status === 'needs_extraction' && p.pdf; })[0];
@@ -339,7 +342,7 @@
       var wasReading = st.data && st.data.pieces && st.data.pieces.reading;
       st.data = d; render(); publish();
       if (wasReading && !d.pieces.reading) {
-        st.say = 'Pièces lues et identifiées : je prépare l’étape avec elles.'; render(); loadNeeds();
+        st.say = 'Pièces lues et identifiées. Le travail de l’étape se poursuit dans le panneau de l’agent.'; render();
         try { document.dispatchEvent(new CustomEvent('wf-written', { detail: {} })); } catch (_) {}
         // The step of the SOP is prepared again with what was just read (facts proposed in the sheet, permission asked before writing).
         var agent = OM.workingFileAgent; if (agent && agent.prepareCurrent && !(agent.state && agent.state.busy)) agent.prepareCurrent();
@@ -386,7 +389,7 @@
       api('workfile-need-link', { pbc: b.dataset.pbc, file_id: b.dataset.file, decision: b.dataset.a === 'need-yes' ? 'yes' : 'no' }).then(function () { st.say = b.dataset.a === 'need-yes' ? 'Noté dans la mémoire de la mission : ' + b.dataset.pbc + ' trouvée.' : 'Écarté : je ne le proposerai plus pour ' + b.dataset.pbc + '.'; return loadNeeds(); })
         .catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); });
     }
-    if (b.dataset.a === 'need-retry') return void loadNeeds();
+    if (b.dataset.a === 'need-retry') return void loadNeeds(true);
     if (b.dataset.a === 'need-ask') { var nc = document.getElementById('needs-card'); if (nc) nc.scrollIntoView({ behavior: 'smooth' }); }
     if (b.dataset.a === 'mem-all') { st.memAll = true; render(); }
     if (b.dataset.a === 'choose' || b.dataset.a === 'unchoose') {
@@ -434,7 +437,7 @@
       }).catch(function (e) { var m = String(e && e.message || e); st.say = 'Annulation refusée : ' + (ERR[m] || m) + '.'; render(); });
     }
     if (b.dataset.a === 'import-detail') { var sel = document.getElementById('audit-sheet'); if (sel && b.dataset.sheet) { sel.value = b.dataset.sheet; sel.dispatchEvent(new Event('change')); } var ib = Array.prototype.find.call(document.querySelectorAll('button'), function (x) { return /^Importer les données/.test(x.textContent); }); if (ib) { ib.scrollIntoView({ behavior: 'smooth' }); setTimeout(function () { ib.click(); }, sel && b.dataset.sheet ? 1800 : 0); } }
-    if (b.dataset.a === 'plan-redo') { plan(b.dataset.sheet); }
+    if (b.dataset.a === 'plan-redo') { plan(b.dataset.sheet, null, null, true); }
     if (b.dataset.a === 'plan-hint') { var hi = box.querySelector('.wf-plan-hint[data-sheet="' + b.dataset.sheet + '"]'); st.hints = st.hints || {}; st.hints[b.dataset.sheet] = hi && hi.value ? hi.value : ''; plan(b.dataset.sheet); }
     if (b.dataset.a === 'old-way') { st.asked[b.dataset.sheet] = true; propose(b.dataset.sheet); }
     if (b.dataset.a === 'plan-fill') {
