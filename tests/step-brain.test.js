@@ -52,6 +52,11 @@ test('the actual step route resumes one AI decision or read per request, includi
   p = await run({ brain_job: p.brain_job }); assert.equal(p.pending, true);
   p = await run({ brain_job: p.brain_job }); assert.equal(p.ready, true); assert.equal(p.source_file_id, 'D40');
   assert.deepEqual(p.documents_read, ['D40']); assert.equal(p.params.row_from, 4);
+  const before = f.counts();
+  const resumed = await run({});
+  assert.equal(resumed.ready, true);
+  assert.equal(f.counts().asks, before.asks, 'reopening does not call the AI for an unchanged prepared plan');
+  assert.equal(f.counts().saves, before.saves, 'reopening does not rewrite the checkpoint');
 });
 
 test('a model cannot choose a plan without reading the workbook and the selected source', async () => {
@@ -67,9 +72,14 @@ test('foreign documents are rejected before I/O; refusal returns to the IA', asy
 });
 
 test('AI failure is explicit, preserves the checkpoint and never becomes a missing-piece claim', async () => {
-  const f = await fixture(); await f.run(); f.d.ai = async () => { throw new Error('NO_CREDIT'); };
+  const f = await fixture(); await f.run(); let calls = 0; f.d.ai = async () => { calls++; throw new Error('NO_CREDIT'); };
   const p = await f.run(); assert.equal(p.technical, true); assert.equal(p.pending, false); assert.match(p.ai_error, /NO_CREDIT/);
   assert.equal(p.plan, null); assert.deepEqual(p.questions, []);
+  const after = calls, before = f.counts().saves;
+  assert.equal((await f.run()).technical, true);
+  assert.equal(calls, after, 'reopening does not repeat a failed model call');
+  assert.equal(f.counts().saves, before, 'reopening does not rewrite the failure');
+  await f.run({ retry_ai: true }); assert.ok(calls > after, 'the explicit retry consults the model');
 });
 
 test('an unreadable source returns a tool error, not a false reading receipt', async () => {
@@ -92,7 +102,9 @@ test('changed workbook or SOP cannot resume the old brain job', async () => {
 test('a newer checkpoint cannot be overwritten by an in-flight model response', async () => {
   const f = await fixture(); await f.run();
   f.d.ai = async () => { f.view.work.walkthrough[0].seq++; return { text: '{"orders":[]}' }; };
-  await assert.rejects(f.run(), /MEMORY_CONFLICT/);
+  const resumed = await f.run();
+  assert.equal(resumed.pending, true); assert.equal(resumed.phase, 'resume');
+  assert.equal(f.view.work.walkthrough[0].seq, resumed.sequence);
 });
 
 test('the resumed brain cannot persist into a locked procedure', async () => {

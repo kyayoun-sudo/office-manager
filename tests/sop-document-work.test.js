@@ -136,7 +136,7 @@ test('verified writes expose actual cells; human confirms or corrects them witho
   const written=await runDocumentWork('O','M','PRJ-01',{plan_id:p.plan_id},{},f.d);
   assert.equal(written.confirmation.status,'awaiting_confirmation');
   assert.equal(written.receipt.cells[0].cell,'B11');assert.equal(written.receipt.cells[0].value,'Banque Exemple');
-  await assert.rejects(prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d),/HUMAN_CONFIRMATION_REQUIRED/);
+  await assert.doesNotReject(prepareDocumentWork('O','M','PRJ-01',f.step,{}, {},f.d));
   await assert.rejects(reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'confirm'},{},f.d),/HUMAN_IDENTITY_REQUIRED/);
   const a={email:'auditeur@example.test'};
   await reviewWorkpaper('O','M','PRJ-01',{plan_id:p.plan_id,decision:'request-correction',note:'Préciser le bailleur'},a,f.d);

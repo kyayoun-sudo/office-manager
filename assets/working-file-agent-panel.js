@@ -78,12 +78,14 @@
         body: JSON.stringify(Object.assign({ mission_id: missionId, code: code }, body))
       });
     }
-    if (longRead && window.OfficeManager.readingRequest) {
-      return window.OfficeManager.readingRequest(run, function (seconds) {
+    function request() {
+      if (longRead && window.OfficeManager.readingRequest) return window.OfficeManager.readingRequest(run, function (seconds) {
         message('L’agent lit les pièces de la mission · ' + seconds + ' s.');
       });
+      return run();
     }
-    return run();
+    return body.action === 'step-plan' && window.OfficeManager.queueProcedurePreparation
+      ? window.OfficeManager.queueProcedurePreparation(missionId + ':' + code, request) : request();
   }
 
   function completedSteps(view) {
@@ -240,7 +242,7 @@
     if (plan && (plan.technical || plan.ai_error)) {
       setStatus('Incident technique', 'blocked');
       message('La préparation IA est interrompue : ' + apiError(plan.ai_error || 'Erreur technique') + '. La progression enregistrée est conservée.');
-      addAction('Reprendre', function () { state.autoCount = 0; state.paused = false; prepare(state.current, false); }, true);
+      addAction('Reprendre', function () { state.autoCount = 0; state.paused = false; prepare(state.current, false, { retry_ai: true }); }, true);
       return;
     }
     if (plan && plan.pending) {
@@ -405,7 +407,7 @@
       enableActions();
       if (state.plan && state.plan.pending && !state.paused && state.autoCount < 20) {
         state.autoCount++;
-        var nextOverrides = Object.assign({}, overrides || {}); delete nextOverrides.restart_brain; delete nextOverrides.restart_reading;
+        var nextOverrides = Object.assign({}, overrides || {}); delete nextOverrides.restart_brain; delete nextOverrides.restart_reading; delete nextOverrides.retry_ai;
         state.timer = setTimeout(function () { if (!state.paused && state.current === step) prepare(step, false, nextOverrides); }, 400);
       }
     }

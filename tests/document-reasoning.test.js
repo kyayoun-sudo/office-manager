@@ -34,6 +34,29 @@ test('AI explores beyond the 60th file, reads the wrong-named piece, directs cod
   r = await f.run(); r = await f.run(); assert.deepEqual(r.result.rows, [12]);
 });
 
+test('a concurrent unrelated update is preserved when saving the AI checkpoint', async () => {
+  const f = await fixture(); f.answer({ catalog_page: 1 });
+  const save = f.d.save; let attempts = 0;
+  f.d.save = async (...args) => {
+    if (++attempts === 1) {
+      f.state().work.walkthrough.push({ kind: 'human-note', id: 'existing' });
+      throw Error('MEMORY_CONFLICT');
+    }
+    return save(...args);
+  };
+  assert.equal((await f.run()).pending, true);
+  assert.equal(attempts, 2);
+  assert.ok(f.state().work.walkthrough.some(x => x.id === 'existing'));
+});
+
+test('a newer checkpoint wins over an in-flight AI response for the same job', async () => {
+  const f = await fixture(); f.answer({ catalog_page: 1 }); await f.run();
+  f.answer(() => { f.state().work.walkthrough[0].seq++; return { catalog_page: 0 }; });
+  const r = await f.run();
+  assert.equal(r.pending, true); assert.equal(r.phase, 'resume');
+  assert.equal(f.state().work.walkthrough[0].page, 1);
+});
+
 test('a final answer selecting an unread source becomes a read request and must return to the AI', async () => {
   const f = await fixture(); f.answer({ source_file_id: 'D64' });
   assert.equal((await f.run()).pending, true); assert.equal(f.counts().opened, 0);
@@ -46,7 +69,7 @@ test('foreign sources and invalid ranges cannot reach Drive', async () => {
   const f = await fixture(); f.answer({ inspect: { file_id: 'FOREIGN' } });
   assert.equal((await f.run()).ai_error, 'PIECE_NOT_IN_MISSION'); assert.equal(f.counts().opened, 0);
   f.answer({ inspect: { file_id: 'D0', row_from: -1 } });
-  assert.equal((await f.run()).ai_error, 'DOCUMENT_RANGE_INVALID');
+  assert.equal((await f.run({ retry_ai: true })).ai_error, 'DOCUMENT_RANGE_INVALID');
 });
 
 test('permission denial prevents inference and content reads', async () => {
@@ -56,8 +79,17 @@ test('permission denial prevents inference and content reads', async () => {
 
 test('changed sources invalidate stored knowledge; explicit reanalysis starts fresh', async () => {
   const f = await fixture(); f.answer({ source_file_id: 'D0' }); await f.run(); await f.run(); await f.run();
-  f.versions.D0 = 'v2'; await assert.rejects(f.run(), /DOCUMENT_SOURCE_CHANGED/);
+  f.versions.D0 = 'v2'; f.answer({ catalog_page: 1 });
+  const resumed = await f.run(); assert.equal(resumed.pending, true); assert.deepEqual(resumed.documents_read, []);
   f.answer({ catalog_page: 1 }); assert.equal((await f.run({ reanalyse: true })).pending, true);
+});
+
+test('a changed workbook invalidates the stored decision and starts a fresh brain job', async () => {
+  const f = await fixture(); f.answer({ source_file_id: 'D0' }); await f.run(); await f.run(); await f.run();
+  const before = f.counts().calls; f.versions.WP = 'v2'; f.answer({ catalog_page: 1 });
+  const result = await f.run(); assert.equal(result.pending, true);
+  assert.equal(f.counts().calls, before + 1);
+  assert.deepEqual(result.documents_read, []);
 });
 
 test('a failed extraction is fed back as a technical problem, never recorded as a successful read', async () => {
@@ -66,6 +98,16 @@ test('a failed extraction is fed back as a technical problem, never recorded as 
   const r = await f.run(); assert.deepEqual(r.documents_read, []);
   f.answer(input => { assert.equal(input.feedback.at(-1).error, 'OCR_UNAVAILABLE'); return { questions: ['Vérifier la lecture de cette pièce.'] }; });
   await f.run(); assert.ok((await f.run()).result.questions.length);
+});
+
+test('a failed model call is retained without paying for it again on reopening', async () => {
+  const f = await fixture(); let calls = 0;
+  f.d.ai = async () => { calls++; throw Error('NO_AI_PROVIDER_AVAILABLE'); };
+  assert.match((await f.run()).ai_error, /NO_AI_PROVIDER_AVAILABLE/);
+  const before = calls;
+  assert.match((await f.run()).ai_error, /NO_AI_PROVIDER_AVAILABLE/);
+  assert.equal(calls, before);
+  await f.run({ retry_ai: true }); assert.equal(calls, before + 1);
 });
 
 test('oversized context remains available by offset; catalog entries are never silently pruned', async () => {
