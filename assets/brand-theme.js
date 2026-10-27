@@ -130,7 +130,10 @@
       var headers = Object.assign(base, options.headers || {});
       // A JSON body always says so (the server reads it as JSON).
       if (typeof options.body === 'string' && !Object.keys(headers).some(function (k) { return k.toLowerCase() === 'content-type'; })) headers['Content-Type'] = 'application/json';
-      return fetch(path, Object.assign({}, options, { headers: headers })).then(function (r) {
+      return fetch(path, Object.assign({}, options, { headers: headers })).catch(function (cause) {
+        if (options.signal && options.signal.aborted || cause && cause.name === 'AbortError') throw cause;
+        var error = new Error('NETWORK_REQUEST_FAILED'); error.code = 'NETWORK_REQUEST_FAILED'; throw error;
+      }).then(function (r) {
         return r.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = { error: 'INVALID_RESPONSE' }; }

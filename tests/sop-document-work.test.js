@@ -161,13 +161,13 @@ test('human confirmation is refused after a workbook cell or the SOP changes',as
 });
 
 
-test('supplemental common instructions do not block SOP inputs and writes stay in the current step row',async()=>{
+test('the AI receives both SOP and workbook alignment hints without a hardcoded row restriction',async()=>{
   const f=await fixture();const w=new ExcelJS.Workbook();await w.xlsx.load(f.getBytes());const ws=w.getWorksheet('PRJ-01');
   ws.getCell('A11').value=1;ws.getCell('B11').value=null;ws.getCell('A13').value=2;ws.getCell('B13').value='Consigne commune supplémentaire';
   // stepsInSheet reads the text from column B, so use a separate input column for the fact.
   ws.getCell('B11').value='Identifier le bailleur.';ws.getCell('E10').value='Article';ws.getCell('E11').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};
   ws.getCell('E13').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFF00'}};
   await f.d.drive.updateBinary('WP',{buffer:Buffer.from(await w.xlsx.writeBuffer()),expectedModifiedTime:'v1'});
-  f.d.ai=async(order,args)=>{const input=JSON.parse(args.input);assert.ok(input.workbook.targets.includes('PRJ-01!E11'));assert.equal(input.workbook.targets.includes('PRJ-01!E13'),false);return {text:JSON.stringify({analysis_complete:true,summary:'Bailleur identifié.',questions:[],findings:[{fact:'Banque Exemple',file_id:'DOC',quote:'Le bailleur du projet est la Banque Exemple.',target:'PRJ-01!E11'}]})};};
+  f.d.ai=async(order,args)=>{const input=JSON.parse(args.input);assert.ok(input.workbook.targets.includes('PRJ-01!E11'));assert.equal(input.workbook.targets.includes('PRJ-01!E13'),true);assert.equal(input.workbook.procedure_alignment.exact_text_row,11);return {text:JSON.stringify({analysis_complete:true,summary:'Bailleur identifié.',questions:[],findings:[{fact:'Banque Exemple',file_id:'DOC',quote:'Le bailleur du projet est la Banque Exemple.',target:'PRJ-01!E11'}]})};};
   const p=await prepareReady('O','M','PRJ-01',f.step,{}, {},f.d);assert.equal(p.findings[0].target,'PRJ-01!E11');
 });
