@@ -144,3 +144,58 @@ test('des ordres non confirmés ne deviennent jamais une méthode apprise', asyn
   await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, h.d);
   assert.equal(saved, false);
 });
+
+test('PTBA sans code : l’IA dirige initial PTBA, final TEB, amendements et correspondances GL par le sens', async () => {
+  const ptba = new ExcelJS.Workbook(); const ws = ptba.addWorksheet('Prévision');
+  [['Poste budgétaire','Initial'], ['Rémunérations',300], ['Charges des locaux',90]].forEach(row => ws.addRow(row));
+  const pbytes = Buffer.from(await ptba.xlsx.writeBuffer());
+  const o = { blocks: [
+    { document_id: 'P', sheet: 'Prévision', rows: { from: 2 }, columns: [{ target: 'A', source: 'A' }, { target: 'B', source: 'B', transform: 'number' }] },
+    { document_id: 'T', sheet: 'Exécution 2023', rows: { only: [7,9] }, align: { target: 'A', source: 'B', source_map: [
+      { from: 'Sous-total Personnel', to: 'Rémunérations', why: 'Même poste de personnel, libellés différents dans PTBA et TEB' },
+      { from: 'Sous-total Fonctionnement', to: 'Charges des locaux', why: 'Le détail du TEB comporte le loyer, à valider' }] },
+      columns: [{ target: 'D', source: 'C', transform: 'number' }, { target: 'E', source: 'D', transform: 'number' }] }
+  ], computed: [{ target: 'C', formula: 'D-B', why: 'Budget final TEB moins budget initial PTBA' }],
+  lookups: [{ target: 'A', map: [{ from: 'Rémunérations', to: '661100' }, { from: 'Charges des locaux', to: '622200' }], verify_in: { document_id: 'G', sheet: 'GL', column: 'A' } }] };
+  const h = harness(inp => { assert.ok(inp.pieces.find(p => p.document_id === 'G').sheets[0].measured_structure.accounts_list.some(a => a.account === '661100')); return { text: JSON.stringify(o) }; });
+  const sourceDocs = [...Object.entries(files).map(([id, f]) => ({ id, name: f.name, read: true })), { id: 'P', name: 'document.xlsx', read: true }];
+  h.d.sources = async () => sourceDocs.map(x => ({ file_id: x.id, name: x.name })); h.d.missionMemory = async () => sourceDocs;
+  const download = h.d.drive.downloadBuffer, meta = h.d.drive.getMeta;
+  h.d.drive.downloadBuffer = async id => id === 'P' ? pbytes : download(id);
+  h.d.drive.getMeta = async id => id === 'P' ? { size: pbytes.length, modifiedTime: 'v1' } : meta(id);
+  const original = h.d.ai; h.d.ai = async (providers, request) => { assert.match(request.instructions, /AUCUN code/); assert.match(request.instructions, /budget final approuvé − budget initial/); return original(providers, request); };
+  const result = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, h.d);
+  const row = {}; result.cells.filter(c => c.address.endsWith('11')).forEach(c => { row[c.address[0]] = c.value; });
+  assert.deepEqual(row, { A: '661100', B: 300, C: 50, D: 350, E: 320 });
+  assert.ok(result.order_lines.some(l => /Sous-total Personnel.*Rémunérations/.test(l)));
+  const cleaned = cleanOrders(cleanOrders(o, { columns: ['A','B','C','D','E'].map(col => ({ col })) }, ['P','T','G']), { columns: ['A','B','C','D','E'].map(col => ({ col })) }, ['P','T','G']);
+  assert.equal(cleaned.blocks[1].align.source_map.length, 2, 'les ordres restent identiques après validation serveur');
+});
+
+test('plusieurs comptes vers UN poste : somme du GL, budget conservé une seule fois ; liens absents ou ambigus refusés', async () => {
+  const { executeOrders } = await import('../lib/fill-orders.js');
+  const ctx = { sheet: 'Budget', u: { columns: ['A','B','D'].map(col => ({ col, header: col, amount: col !== 'A' })), comparisons: [] }, docs: [{ id: 'P', name: 'inconnu' }, { id: 'G', name: 'mal-renommé' }], drive: {} };
+  const pieces = { P: { fingerprint: 'p', sheets: [{ name: 'Prévisions', rows: [{ n: 1, v: ['Poste','Initial'] }, { n: 2, v: ['Déplacements',1000] }, { n: 3, v: ['Autre',200] }] }] },
+    G: { fingerprint: 'g', sheets: [{ name: 'GL', rows: [{ n: 1, v: ['Compte','Montant'] }, { n: 2, v: ['625100',300] }, { n: 3, v: ['625200',400] }] }] } };
+  const raw = { blocks: [
+    { document_id: 'P', sheet: 'Prévisions', rows: { from: 2 }, columns: [{ target: 'A', source: 'A' }, { target: 'B', source: 'B' }] },
+    { document_id: 'G', sheet: 'GL', rows: { from: 2 }, align: { target: 'A', source: 'A', source_map: [{ from: '625100', to: 'Déplacements', why: 'transport' }, { from: '625200', to: 'Déplacements', why: 'hébergement' }] }, sum_duplicates: true, columns: [{ target: 'D', source: 'B' }] }
+  ] };
+  const run = r => executeOrders(ctx, cleanOrders(r, ctx.u, ['P','G']), { readPiece: async doc => pieces[doc.id] });
+  const ok = await run(raw); assert.deepEqual(ok.rows, [['Déplacements',1000,700], ['Autre',200,null]]);
+  raw.blocks[1].align.source_map.push({ from: '625100', to: 'Autre', why: 'autre possibilité' });
+  const ambiguous = await run(raw); assert.equal(ambiguous.rows[0][2], 400); assert.equal(ambiguous.rows[1][2], null); assert.match(ambiguous.report.problems.join(' '), /ambiguë/);
+  raw.blocks[1].align.source_map = [{ from: '999999', to: 'Déplacements', why: 'inventé' }];
+  const missing = await run(raw); assert.ok(missing.rows.every(r => r[2] === null)); assert.match(missing.report.problems.join(' '), /non appliquée/);
+});
+
+test('GL par sections : l’IA voit les comptes reportés sur les écritures avec leurs vrais numéros de ligne', async () => {
+  const { readPiece } = await import('../lib/fill-orders.js');
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Export');
+  [['Date','Pièce','Libellé','Débit','Crédit'], ['Compte : 625100 - Transport'], ['2023-01-01','F1','Billet',300,0], ['Total compte',null,null,300,0], ['Compte : 625200 - Hébergement'], ['2023-01-02','F2','Hôtel',400,0]].forEach(r => ws.addRow(r));
+  const bytes = Buffer.from(await wb.xlsx.writeBuffer());
+  const piece = await readPiece({ id: 'G', name: 'scan.xlsx' }, { getMeta: async () => ({ size: bytes.length }), downloadBuffer: async () => bytes });
+  const derived = piece.sheets.find(s => s.derived_from === 'Export');
+  assert.ok(derived); assert.deepEqual(derived.rows.slice(1).map(r => r.n), [3,6]);
+  assert.ok(derived.rows[1].v.includes('625100')); assert.ok(derived.rows[2].v.includes('625200'));
+});
