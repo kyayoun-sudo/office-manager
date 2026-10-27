@@ -81,6 +81,11 @@
       <span class="callout-text" id="setup-text"></span>
     </a>
 
+    <a class="callout" id="completed-learning" href="/missions-terminees.html" hidden>
+      <span class="callout-label">Apprentissage du cabinet</span>
+      <span class="callout-text">Après vos connexions, présentez cinq missions terminées pour apprendre votre méthode aux agents.</span>
+    </a>
+
     <form id="search" role="search" class="searchbox" action="/recherche.html">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--brand)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
       <label for="q" class="sr">Rechercher dans tout le cabinet</label>
@@ -500,6 +505,7 @@
   function loadSetup() {
     if (!OM.isOwner()) return;
     OM.api('/api/app?route=readiness', { headers: { 'x-office-manager-owner-token': OM.getOwnerToken() } }).then(function (d) {
+      $('completed-learning').hidden = !d.checks.some(function (c) { return c.id === 'drive:connected' && c.status === 'ok'; });
       if (d.ready) return;
       $('setup').hidden = false;
       $('setup-num').textContent = d.remaining + ' étape' + (d.remaining > 1 ? 's' : '') + ' restante' + (d.remaining > 1 ? 's' : '');
