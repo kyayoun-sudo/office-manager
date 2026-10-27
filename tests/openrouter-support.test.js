@@ -1,4 +1,6 @@
 import test from 'node:test';
+import { resetPoolHealth } from '../lib/ai-pool.js';
+test.beforeEach(() => resetPoolHealth());
 import assert from 'node:assert/strict';
 import { callModel, firstAvailable, providersStatus, OPENROUTER_DEFAULT_MODEL, openRouterShare, openRouterFirst } from '../lib/ai-plus.js';
 

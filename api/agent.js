@@ -331,6 +331,7 @@ export default async function handler(req, res) {
         summary: result.text.slice(0, 1000),
         metrics: {
           provider: result.provider,
+          providers_used: result.providersUsed || [],
           orchestration,
           logical_agent_key: logicalAgentKey,
           storage_agent_key: runAgentKey,

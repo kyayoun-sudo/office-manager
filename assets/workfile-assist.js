@@ -193,6 +193,7 @@
       (doubt.length ? '<p class="wf-assist-warn">À vérifier : ' + esc(doubt.map(function (p) { return p.header + ' — ' + (p.why || ''); }).join(' ; ')) + '</p>' : '') +
       (Object.keys(pv.unmatched || {}).length ? '<p class="meta">Lignes sans correspondance laissées vides : ' + esc(Object.keys(pv.unmatched).map(function (k) { return k + ' (' + pv.unmatched[k].length + ')'; }).join(', ')) + '.</p>' : '') +
       (P.run_error ? '<p class="wf-assist-err">' + esc(P.run_error) + '</p>' : '') +
+      (P.reused_method ? '<p class="meta">Méthode déjà validée par ' + esc(P.reused_method.validated_by) + ' : réutilisée après vérification du SOP, du working file et des sources, sans nouvel appel IA.</p>' : '') +
       (P.understanding_by_ai ? '<p class="meta"><b>Ce que la feuille doit prouver :</b> ' + esc(P.understanding_by_ai) + '</p>' : '') +
       ((P.order_lines || []).length ? '<details open><summary>Les ordres que l’IA a donnés au code</summary><ul class="wf-agent-list">' + P.order_lines.map(function (o) { return '<li>' + esc(o) + '</li>'; }).join('') + '</ul></details>' : '') +
       ((P.checks || []).length ? '<p class="' + (P.checks.every(function (c) { return c.ok; }) ? 'meta' : 'wf-assist-warn') + '"><b>Contrôles du code :</b> ' + esc(P.checks.map(function (c) { return (c.ok ? '✓ ' : '⚠ ') + c.what + ' — ' + c.detail; }).join(' ; ')) + '</p>' : '') +
