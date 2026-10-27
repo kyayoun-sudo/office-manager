@@ -9,7 +9,7 @@
   var dialogue = workspace && (workspace.querySelector('.audit-dialogue') || document.querySelector('#wf-layout .audit-dialogue'));
   if (!missionId || !code || !workspace || !dialogue || !window.OfficeManager) return;
 
-  var state = { view: null, current: null, plan: null, busy: false };
+  var state = { view: null, current: null, plan: null, busy: false, autoCount: 0, paused: false, timer: null };
   var board = document.createElement('section');
   board.className = 'wf-agent-board';
   board.setAttribute('aria-label', 'Travail autonome de l’Enhanced Auditor');
@@ -42,7 +42,12 @@
 
   function apiError(e) {
     var raw = String((e && (e.message || e.error || e.code)) || e || 'Erreur');
+    if (/Load failed|Failed to fetch|NetworkError/i.test(raw)) raw = 'NETWORK_REQUEST_FAILED';
     var known = {
+      NETWORK_REQUEST_FAILED: 'La connexion au serveur a échoué. Les passages déjà enregistrés peuvent être repris.',
+      READING_REQUEST_TIMEOUT: 'Ce passage a dépassé le délai. Reprenez depuis la dernière progression enregistrée.',
+      DOCUMENT_INVENTORY_UNAVAILABLE: 'Le catalogue de la mission est momentanément inaccessible ; cela ne signifie pas que les pièces manquent.',
+      DOCUMENT_VERSION_REQUIRED: 'La version de cette pièce ne peut pas être vérifiée. La préparation est suspendue.',
       PROPOSAL_CONFIRMATION_REQUIRED: 'Une validation humaine est nécessaire avant l’écriture.',
       HUMAN_CONFIRMATION_REQUIRED: 'Une autre validation humaine est déjà en attente dans ce Working File.',
       SOP_CHANGED_PREPARE_AGAIN: 'Le SOP a changé. L’agent doit préparer à nouveau cette étape.',
@@ -110,7 +115,9 @@
       if (done[step.n]) b.className = 'done';
       if (state.current && state.current.n === step.n) b.setAttribute('aria-current', 'step');
       b.title = step.text || ('Étape ' + step.n);
+      b.disabled = state.busy;
       b.addEventListener('click', function () {
+        if (state.busy) return;
         state.current = step;
         state.plan = null;
         renderStep();
@@ -135,7 +142,9 @@
 
   // (2026-10-25) A button added while the agent was busy stayed disabled for good (« Préparer cette étape » grey, nothing happened):
   // when the work ends, the buttons on screen are usable again.
-  function enableActions() { var a = $('wf-agent-actions'); if (a) a.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
+  function enableActions() {
+    ['wf-agent-actions', 'wf-agent-progress'].forEach(function (id) { var a = $(id); if (a) a.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); });
+  }
 
   function addAction(label, fn, primary) {
     var b = document.createElement('button');
@@ -228,10 +237,27 @@
     $('wf-agent-actions').textContent = '';
     message('');
 
+    if (plan && (plan.technical || plan.ai_error)) {
+      setStatus('Incident technique', 'blocked');
+      message('La préparation IA est interrompue : ' + apiError(plan.ai_error || 'Erreur technique') + '. La progression enregistrée est conservée.');
+      addAction('Reprendre', function () { state.autoCount = 0; state.paused = false; prepare(state.current, false); }, true);
+      return;
+    }
     if (plan && plan.pending) {
-      setStatus('Lecture des pièces', 'working');
-      block('Lecture en cours', '<p>L’agent poursuit la lecture exhaustive des documents nécessaires à cette étape.</p>');
-      addAction('Continuer la lecture', function () { prepare(state.current, false); }, true);
+      setStatus(plan.brain_job ? 'Préparation par l’IA' : 'Lecture des pièces', 'working');
+      var detail = plan.brain_job ? 'L’IA dirige la préparation · ' + esc(plan.phase || 'raisonnement') + ' · ' + (plan.documents_read || []).length + ' pièce(s) lue(s) sur ' + esc(plan.documents_total || 0) + '.' :
+        'Lecture enregistrée : ' + esc(plan.read || 0) + ' / ' + esc(plan.total || 0) + ' document(s)' + (plan.current_document ? ' · ' + esc(plan.current_document) : '') + '.';
+      if (state.autoCount >= 20) detail += ' Passage automatique terminé ; cliquez sur Continuer pour poursuivre.';
+      block('Progression', '<p>' + detail + '</p>' + (plan.understood ? '<p>' + esc(plan.understood) + '</p>' : ''));
+      addAction('Continuer', function () { state.autoCount = 0; state.paused = false; prepare(state.current, false); }, true);
+      addAction('Pause', function () { state.paused = true; clearTimeout(state.timer); message('En pause. La progression enregistrée est conservée.'); }, false);
+      return;
+    }
+    if (plan && plan.blocked) {
+      setStatus('À préciser', 'action');
+      if (plan.understood) block('Compréhension de l’IA', '<p>' + esc(plan.understood) + '</p>');
+      renderQuestions(plan);
+      addAction('Reprendre la préparation', function () { state.paused = false; state.autoCount = 0; prepare(state.current, false); }, true);
       return;
     }
 
@@ -349,27 +375,38 @@
 
   async function prepare(step, explicit, overrides) {
     if (!step || state.busy) return;
+    clearTimeout(state.timer);
+    var continuing = state.current && state.current.n === step.n && state.plan && state.plan.pending;
+    if (!continuing) { state.autoCount = 0; state.paused = false; }
     state.busy = true;
     state.current = step;
     renderProgress();
     setStatus('Recherche et lecture', 'working');
     message('L’agent prépare l’étape à partir du SOP, du Working File et des pièces de cette mission…');
     try {
-      if (state.testStep !== step.n || explicit) { state.testStep = step.n; testFor(step, null); }
-      var body = Object.assign({ action: 'step-plan', step: step.n }, overrides || {});
+      // One automatic preparation. A separate test starts only on the person's explicit instruction.
+      if (state.testStep !== step.n) { state.testStep = step.n; ++testSeq; testBox().innerHTML = askBox(''); bindAsk(step); }
+      var resume = continuing ? { brain_job: state.plan.brain_job, read_job: state.plan.read_job } : {};
+      var body = Object.assign({ action: 'step-plan', step: step.n }, resume, overrides || {});
       var plan = await post(body, true);
       renderPlan(plan || {});
       if (explicit) message('Préparation mise à jour.');
     } catch (e) {
-      setStatus('Action requise', 'blocked');
+      state.paused = true;
+      setStatus('Préparation interrompue', 'blocked');
       message(apiError(e));
       $('wf-agent-body').textContent = '';
       $('wf-agent-actions').textContent = '';
-      addAction('Réessayer', function () { prepare(step, true, overrides); }, true);
-      addAction('Voir / demander les pièces', scrollNeeds, false);
+      addAction('Réessayer', function () { state.paused = false; state.autoCount = 0; prepare(step, true, overrides); }, true);
+      if (/CHANGED|RESTART_REQUIRED|MEMORY_CONFLICT/.test(String(e && (e.code || e.message)))) addAction('Relire la version actuelle', function () { state.plan = null; state.paused = false; state.autoCount = 0; prepare(step, true, { restart_brain: true, restart_reading: true }); }, false);
     } finally {
       state.busy = false;
       enableActions();
+      if (state.plan && state.plan.pending && !state.paused && state.autoCount < 20) {
+        state.autoCount++;
+        var nextOverrides = Object.assign({}, overrides || {}); delete nextOverrides.restart_brain; delete nextOverrides.restart_reading;
+        state.timer = setTimeout(function () { if (!state.paused && state.current === step) prepare(step, false, nextOverrides); }, 400);
+      }
     }
   }
 

@@ -36,6 +36,15 @@ function fixture({pages=1000,documents=8,badPage=null,blankPage=null}={}){
   return {view,sources,h,d,step,pass,drain,seen,windows,stats:()=>({bytesSent,analyses})};
 }
 
+test('the documentary reader executes the AI source selection and preserves it across resume', async () => {
+  const f=fixture({pages:1,documents:20});
+  const initial=await f.pass({source_file_ids:['DOC19','DOC17']});
+  const result=await f.drain(initial);
+  assert.deepEqual([...new Set(f.windows.map(w=>w[0]))].sort(),['DOC17','DOC19']);
+  assert.equal(result.docs.length,2);
+  await assert.rejects(f.pass({source_file_ids:['FOREIGN']}),/DOCUMENT_SOURCE_CHANGED/);
+});
+
 test('1000 pages and more than six documents: every page reaches analysis, including content beyond 60000 characters',async()=>{
   const f=fixture(),first=await f.pass();
   assert.equal(first.pending,true);assert.equal(first.read,0);assert.equal(f.stats().analyses,0);
