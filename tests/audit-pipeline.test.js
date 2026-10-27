@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
-import { cleanPipeline, runPipeline, planPipeline, writePipeline, PIPELINE_MARK } from '../lib/audit-pipeline.js';
+import { cleanPipeline, runPipeline, planPipeline as prepareOnce, writePipeline, PIPELINE_MARK } from '../lib/audit-pipeline.js';
+async function planPipeline(...args) { for(let n=0;n<30;n++){ const r=await prepareOnce(...args); if(!r.pending)return r; } throw new Error('NOT_FINISHED'); }
+
 
 const rows = [
   { row: 2, date: '2025-03-01', account: '605300', label: 'Fournitures bureau', ref: 'F1', party: 'ALPHA', debit: 150000, credit: 0, amount: 150000 },
@@ -56,6 +58,7 @@ async function fakes() {
     loop: { listRequests: async () => [] }, missionDocuments: async () => [{ id: 'gl', name: 'GL_2025.xlsx', type: 'grand livre' }, { id: 'wp', name: 'WP.xlsx' }],
     clientTable: async id => ({ meta: { id, name: 'GL_2025.xlsx', modifiedTime: 't0' }, header_row: 0, rows: [header, ...rows.map(r => [r.date, r.account, r.label, r.ref, r.debit, r.credit])] }),
     peek: async () => ({ sheets: [{ name: 'GL', rows: [header] }] }), permissions: async () => ({ granted: true }),
+    readDocumentWindow: async doc => ({file_id:doc.id,revision:'t1||',window:{text:'Date Compte Débit Crédit Pièce : lignes comptables de test'}}),
     ai: async () => { aiCalls++; return { provider: 'fake', text: JSON.stringify({ understood: 'Doublons date + montant + pièce sur les achats', source_file_id: 'gl', pipeline: [{ op: 'filter', params: { accounts: ['6'] } }, { op: 'duplicates', params: { by: ['date', 'amount', 'ref'] } }, { op: 'checklist', params: { columns: ['Facture vue ?'] } }], questions: [] }) }; },
     save: async (o, w, ch) => { saved.push(ch); work.walkthrough = ch.walkthrough; }, audit: async () => null, now: () => '2026-10-25T10:00:00Z'
   };
@@ -70,11 +73,11 @@ test('opening the step: the agent understands, the code runs, results shown; reo
   assert.deepEqual(r.rows.map(x => x.row), [2, 3]);
   assert.ok(r.columns.some(c => c.key === 'Facture vue ?'));
   const again = await planPipeline('o', 'm', 'C02_ACH-03', { step: 1 }, { email: 'a@x' }, f.d);
-  assert.equal(again.ai, 'cached'); assert.equal(f.calls(), 1); assert.equal(again.count, 2);
+  assert.equal(again.ai, 'cached'); assert.equal(f.calls(), 3); assert.equal(again.count, 2);
   // a source outside the mission proposed by the AI is refused by the code
   f.d.ai = async () => ({ text: JSON.stringify({ source_file_id: 'elsewhere', pipeline: [{ op: 'top', params: { n: 3 } }] }) });
   const bad = await planPipeline('o', 'm', 'C02_ACH-03', { text: 'Les 3 plus gros montants' }, { email: 'a@x' }, f.d);
-  assert.equal(bad.ready, false); assert.ok(bad.problems[0].includes('pas une pièce de la mission'));
+  assert.equal(bad.ready, false); assert.equal(bad.ai_error, 'PIECE_NOT_IN_MISSION');
 });
 
 test('« Écrire » puts the result in a separate sheet of the working file, read back; nothing written before', async () => {

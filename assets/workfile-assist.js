@@ -76,7 +76,7 @@
   // working file names (its PBC list and test ↔ piece matrix), and where each one is in the mission's memory.
   var STATUS = { linked: '✓ trouvée', probable: '? à confirmer', missing: '✗ manquante' };
   function needItem(x, d) {
-    var html = '<li><b>' + esc(x.id) + '</b> ' + esc(x.name) + ' — <span class="wf-need-' + x.status + '">' + STATUS[x.status] + '</span>' + (x.tests && x.tests.length ? ' <span class="meta">(' + esc(x.tests.join(', ')) + ')</span>' : '');
+    var html = '<li><b>' + esc(x.id) + '</b> ' + esc(x.name) + ' — <span class="wf-need-' + x.status + '">' + (STATUS[x.status] || 'à examiner') + '</span>' + (x.tests && x.tests.length ? ' <span class="meta">(' + esc(x.tests.join(', ')) + ')</span>' : '');
     (x.docs || []).forEach(function (doc) {
       html += '<br>→ ' + (doc.url ? '<a href="' + esc(doc.url) + '" target="_blank" rel="noopener">' + esc(doc.name) + '</a>' : esc(doc.name)) + (doc.title ? ' — ' + esc(doc.title) : '') +
         (doc.location ? ' <span class="meta">· rangé dans ' + esc(doc.location) + '</span>' : '') + (doc.why ? ' <span class="meta">· ' + esc(doc.why) + (doc.ai === true ? ', confirmé par l’IA' : '') + '</span>' : '') +
@@ -88,9 +88,10 @@
   function needs(d) {
     var n = st.needs; if (!n) return st.needsAsked ? '<div class="wf-assist-block"><h3>Pièces dont ce working file a besoin</h3><p class="wf-assist-busy">Je lis la liste des pièces du working file et je les cherche dans la mémoire de la mission…</p></div>' : '';
     if (n.error) return '<div class="wf-assist-block"><h3>Pièces dont ce working file a besoin</h3><p class="meta">' + esc(n.error) + '</p></div>';
+    if (n.pending) return '<div class="wf-assist-block"><h3>Pièces du working file</h3><p>L’IA poursuit la lecture des pièces. <button type="button" class="btn ghost" data-a="need-retry">Continuer la recherche</button></p></div>';
     var byId = {}; n.items.forEach(function (x) { byId[x.id] = x; });
     var cur = n.current_test ? n.current_test.pieces.map(function (id) { return byId[id]; }).filter(Boolean) : [];
-    var html = '<details class="wf-assist-block"><summary><b>Pièces que demande ce working file</b> — ' + n.counts.found + ' trouvée(s), ' + n.counts.missing + ' manquante(s)</summary>';
+    var html = '<details class="wf-assist-block"><summary><b>Pièces que demande ce working file</b> — ' + n.counts.found + ' trouvée(s), ' + n.counts.missing + ' manquante(s), ' + (n.counts.unresolved || 0) + ' à examiner</summary>';
     if (cur.length) html += '<p><b>Pour ' + esc(n.current_test.code) + ' :</b></p><ul class="wf-agent-list">' + cur.map(function (x) { return needItem(x, d); }).join('') + '</ul>';
     var sheets = []; // the data sheets are shown column by column in « Les feuilles de données à remplir »
     if (sheets.length) html += '<p><b>Pour les feuilles de données :</b></p><ul class="wf-agent-list">' + sheets.map(function (s) {
@@ -100,6 +101,7 @@
     html += '<p><b>Toutes les pièces du working file (' + n.items.length + ')</b></p><ul class="wf-agent-list">' + n.items.map(function (x) { return needItem(x, d); }).join('') + '</ul>';
     return html + '</details>';
   }
+  document.addEventListener('document-brain-progress', function(e) { var p=e.detail||{}; st.say='L’IA poursuit la préparation · '+(p.read||0)+' pièce(s) consultée(s) sur '+(p.total||0)+'.'; render(); });
   function loadNeeds() {
     st.needsAsked = true; render();
     return api('workfile-needs').then(function (n) { st.needs = n; render(); }).catch(function (e) { st.needs = { error: 'Liste des pièces non lisible : ' + (e && e.message || e) }; render(); });
@@ -132,6 +134,7 @@
       if (!p) { var sc = st.scan[x.sheet] || {}; return '<p class="wf-assist-busy">' + esc(x.sheet) + ' : l’application ouvre les pièces Excel / CSV une par une pour trouver ' + esc(what) + ' (par leurs colonnes et leurs dates, pas par leur nom)' +
         (sc.total ? ' — ' + sc.done + ' / ' + sc.total + (sc.found ? ', ' + sc.found + ' trouvée(s)' : '') : '') + '…</p>' + (sc.current ? '<p class="meta">' + esc(sc.current) + '</p>' : ''); }
       if (p.error) return '<p class="wf-assist-err">' + esc(x.sheet) + ' : ' + esc(p.error) + '</p>';
+      if (p.status === 'AI_UNAVAILABLE' || p.status === 'UNRESOLVED') return '<p>' + esc(x.sheet) + ' : ' + (p.status === 'AI_UNAVAILABLE' ? 'l’IA est indisponible ; aucune correspondance automatique n’est retenue.' : 'les correspondances restent à préciser après examen des contenus.') + '</p>';
       if (p.status === 'NO_SOURCE_FOUND') return '<p>' + esc(x.sheet) + ' : je n’ai trouvé ' + esc(what) + ' dans aucune pièce Excel ou CSV de la mission' + (p.ai === 'unavailable' ? ' (l’IA n’a pas répondu : je n’ai regardé que les colonnes reconnues par le code)' : '') + '. Si la pièce est un PDF, extrayez son tableau ci-dessous ; sinon déposez-la, ou je prépare la demande au client.</p>' + pdfBlock(x, d);
       if (p.status !== 'READY') return '<p>' + esc(x.sheet) + ' : ' + esc(p.status) + '</p>';
       var picked = p.items.filter(function (it, i) { return st.pick[x.sheet + '|' + i]; });
@@ -176,20 +179,21 @@
   function planBlock(x, d) {
     var P = st.plans[x.sheet];
     if (!P) return '<p class="wf-assist-busy"><b>' + esc(x.sheet) + '</b> : je lis les pièces de la mission et je prépare la feuille…</p>';
+    if (P.pending) return '<p class="wf-assist-busy"><b>' + esc(x.sheet) + '</b> : l’IA poursuit ses lectures (' + (P.documents_read || []).length + ' pièce(s) consultée(s)). <button type="button" class="link" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">Continuer</button></p>';
     if (P.error) return '<p class="wf-assist-err"><b>' + esc(x.sheet) + '</b> : ' + esc(P.error) + ' <button type="button" class="link" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">réessayer</button></p>';
     var pv = P.preview || {}, got = P.plan.filter(function (p) { return p.document_id && p.heading; }), miss = P.plan.filter(function (p) { return !p.document_id && !p.compute; });
     var doubt = P.plan.filter(function (p) { return p.document_id && p.status !== 'sure'; });
     var docs = []; got.forEach(function (p) { if (docs.indexOf(p.document) < 0) docs.push(p.document); });
     var tooBig = pv.capacity && pv.rows > pv.capacity;
-    var html = '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (got.length && pv.rows ? 'j’ai préparé <b>' + fmt(pv.rows) + ' ligne(s)</b>, en pointillés dans la feuille à droite, depuis ' + esc(docs.join(', ')) + ' : ' + esc(got.map(function (p) { return p.header + ' ← « ' + p.heading + ' »'; }).concat(P.plan.filter(function (p) { return p.compute; }).map(function (p) { return p.header + ' = calcul ' + p.compute.replace('-', ' − '); })).join(' ; ')) + '.' : 'je n’ai trouvé aucune pièce de la mission qui contienne ces colonnes.') + '</p>' +
+    var html = '<div class="wf-assist-prop"><p><b>' + esc(x.sheet) + '</b> — ' + (got.length && pv.rows ? 'j’ai préparé <b>' + fmt(pv.rows) + ' ligne(s)</b>, en pointillés dans la feuille à droite, depuis ' + esc(docs.join(', ')) + ' : ' + esc(got.map(function (p) { return p.header + ' ← « ' + p.heading + ' »'; }).concat(P.plan.filter(function (p) { return p.compute; }).map(function (p) { return p.header + ' = calcul ' + p.compute.replace('-', ' − '); })).join(' ; ')) + '.' : 'aucune correspondance n’est encore établie dans les passages examinés.') + '</p>' +
       (P.recipe ? '<p class="meta">Je suis la façon de remplir cette feuille validée par ' + esc(P.recipe.validated_by || 'un auditeur') + (P.recipe.at ? ' le ' + esc(String(P.recipe.at).slice(0, 10)) : '') + ', et je retrouve les mêmes sortes de pièces dans cette mission.</p>' : '') +
       ficheBlock(P, x.sheet) +
       ((P.doubts || []).length ? '<p class="wf-assist-warn">À vérifier : ' + esc(P.doubts.map(function (z) { return z.why; }).join(' ; ')) + '</p>' : '') +
       (P.problem ? '<p class="wf-assist-warn">' + esc(P.problem) + '</p>' : '') +
-      (P.ai_error ? '<p class="wf-assist-err">L’IA n’a pas répondu pour cette feuille, même au second essai (' + esc(P.ai_error) + '). Ce qui suit n’est qu’une proposition du code seul : relancez l’IA avant de remplir. <button type="button" class="btn" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">Relancer l’IA</button></p>' : '') +
+      (P.ai_error ? '<p class="wf-assist-err">L’IA n’a pas répondu pour cette feuille, même au second essai (' + esc(P.ai_error) + '). La préparation n’est pas terminée ; relancez l’IA pour poursuivre. <button type="button" class="btn" data-a="plan-redo" data-sheet="' + esc(x.sheet) + '">Relancer l’IA</button></p>' : '') +
       (P.collect ? '<p class="meta">' + esc(P.collect.read + ' document(s) lu(s) sur ' + P.collect.documents + ' : ' + P.collect.rows + ' ligne(s) trouvée(s)' + (P.collect.which === 'credits' ? ' au crédit' : P.collect.which === 'debits' ? ' au débit' : '') + '.') + ((P.collect.pending_pdfs || []).length ? ' ' + P.collect.pending_pdfs.length + ' PDF encore à lire : je continue.' : '') + '</p>' +
         ((P.collect.to_check || []).length ? '<p class="wf-assist-warn">À relire : ' + esc(P.collect.to_check.join(' ; ')) + '</p>' : '') + ((P.collect.unreadable || []).length ? '<p class="meta">Illisibles : ' + esc(P.collect.unreadable.join(', ')) + '</p>' : '') : '') +
-      (miss.length ? '<p class="meta">Pas dans les pièces : ' + esc(miss.map(function (p) { return p.header + (p.missing ? ' (il faut : ' + p.missing + ')' : ''); }).join(' ; ')) + '.</p>' : '') +
+      (miss.length ? '<p class="meta">Correspondances à résoudre : ' + esc(miss.map(function (p) { return p.header + (p.missing ? ' (il faut : ' + p.missing + ')' : ''); }).join(' ; ')) + '.</p>' : '') +
       (doubt.length ? '<p class="wf-assist-warn">À vérifier : ' + esc(doubt.map(function (p) { return p.header + ' — ' + (p.why || ''); }).join(' ; ')) + '</p>' : '') +
       (Object.keys(pv.unmatched || {}).length ? '<p class="meta">Lignes sans correspondance laissées vides : ' + esc(Object.keys(pv.unmatched).map(function (k) { return k + ' (' + pv.unmatched[k].length + ')'; }).join(', ')) + '.</p>' : '') +
       (P.run_error ? '<p class="wf-assist-err">' + esc(P.run_error) + '</p>' : '') +
@@ -382,6 +386,7 @@
       api('workfile-need-link', { pbc: b.dataset.pbc, file_id: b.dataset.file, decision: b.dataset.a === 'need-yes' ? 'yes' : 'no' }).then(function () { st.say = b.dataset.a === 'need-yes' ? 'Noté dans la mémoire de la mission : ' + b.dataset.pbc + ' trouvée.' : 'Écarté : je ne le proposerai plus pour ' + b.dataset.pbc + '.'; return loadNeeds(); })
         .catch(function (e) { st.say = 'Impossible : ' + (e && e.message || e); render(); });
     }
+    if (b.dataset.a === 'need-retry') return void loadNeeds();
     if (b.dataset.a === 'need-ask') { var nc = document.getElementById('needs-card'); if (nc) nc.scrollIntoView({ behavior: 'smooth' }); }
     if (b.dataset.a === 'mem-all') { st.memAll = true; render(); }
     if (b.dataset.a === 'choose' || b.dataset.a === 'unchoose') {

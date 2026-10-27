@@ -151,6 +151,16 @@
             var known = OM.explain(code);
             var err = new Error(known !== code ? known : (data && data.detail ? code + ' (' + data.detail + ')' : code)); err.status = r.status; err.code = code; err.data = data; throw err;
           }
+          // Shared content-brain preparations resume their persisted server job.
+          // This never retries writes or unrelated API calls.
+          if (data && data.document_brain && data.pending && (options.documentBrainPass || 0) < 20 && typeof options.body === 'string') {
+            var nextBody = JSON.parse(options.body); nextBody.document_job = data.job_id;
+            try { document.dispatchEvent(new CustomEvent('document-brain-progress', { detail: { phase: data.phase, read: (data.documents_read || []).length, total: data.documents_total } })); } catch (_) {}
+            return new Promise(function (resolve) { setTimeout(resolve, 250); }).then(function () {
+              if (options.signal && options.signal.aborted) throw new Error('READING_REQUEST_TIMEOUT');
+              return OM.api(path, Object.assign({}, options, { body: JSON.stringify(nextBody), documentBrainPass: (options.documentBrainPass || 0) + 1 }), retried);
+            });
+          }
           return data;
         });
       });

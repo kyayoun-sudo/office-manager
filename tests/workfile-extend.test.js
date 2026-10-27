@@ -54,7 +54,7 @@ test('import of more entries than the table: refused without permission, done wi
   [['Date', 'Compte', 'Libellé', 'Débit', 'Crédit'], ['2024-01-02', '601', 'a', 10, 0], ['2024-01-03', '602', 'b', 20, 0], ['2024-01-04', '603', 'c', 30, 0], ['2024-01-05', '521', 'd', 0, 60], ['2024-01-06', '604', 'e', 5, 0]].forEach(r => x.addRow(r));
   const gl = Buffer.from(await b.xlsx.writeBuffer());
   const view = { editable: true, line: { code: 'PRJ-04' }, card: { steps: [{ text: 'Importer le GL.' }] }, workpaper: { file_id: 'WP' }, work: { status: 'to_do', walkthrough: [] } };
-  const d = { view: async () => view, fetchRows: async () => [{ period_label: 'Exercice 2024' }], sources: async () => [{ file_id: 'G', name: 'x.xlsx' }], ai: async () => { throw new Error('none'); },
+  const d = { view: async () => view, fetchRows: async () => [{ period_label: 'Exercice 2024' }], sources: async () => [{ file_id: 'G', name: 'x.xlsx' }], ai: async (_, request) => ({text:JSON.stringify({sources:JSON.parse(request.input).pieces.map(p=>({id:p.id,fits:true,what:'GL',why:'Écritures comptables lues'}))})}),
     save: async (o, wk, c) => Object.assign(view.work, c), review: async (o, m, c, bd) => { view.work.walkthrough.find(y => y.id === bd.plan_id).confirmation = { status: 'confirmed' }; },
     drive: { getMeta: async id => id === 'WP' ? { name: 'W.xlsx', size: wp.length, modifiedTime: 'v' + modified } : { name: 'x.xlsx', size: gl.length, modifiedTime: 'x' },
       downloadBuffer: async id => id === 'WP' ? wp : gl, updateBinary: async (id, o) => { wp = o.buffer; modified++; } } };

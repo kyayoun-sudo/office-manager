@@ -54,12 +54,12 @@ test('both grand livres are found by their columns, each with its year, both tic
   assert.equal(f.aiCalls(), 1);
 });
 
-test('without AI the code still proposes what it is sure of, and says the AI was unavailable', async () => {
+test('without AI no automatic semantic correspondence is selected', async () => {
   const f = await fixture({ ai: async () => { throw new Error('ALL_DOWN'); } });
   const p = await proposeImport('O', 'M', 'PRJ-04', { sheet: 'D1_GL_PROJET' }, paul, f.d);
   assert.equal(p.ai, 'unavailable');
-  assert.equal(p.items.length, 2);
-  assert.ok(p.items[0].unmatched.includes('Bailleur'));
+  assert.equal(p.status, 'AI_UNAVAILABLE');
+  assert.deepEqual(p.items, []);
 });
 
 test('« Oui, importe » writes 2023 then 2024 below it, total line set aside, formulas kept, receipts closed', async () => {

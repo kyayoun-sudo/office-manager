@@ -347,6 +347,7 @@
     try { r = await post(Object.assign({ action: 'pipeline-plan', step: text ? null : step.n, text: text || undefined }, extra || {}), false); }
     catch (e) { if (seq === testSeq) { box.innerHTML = '<p class="meta">Test non préparé : ' + esc(apiError(e)) + '</p>' + askBox(text); bindAsk(step); } return; }
     if (seq !== testSeq) return;
+    if (r.pending) { box.innerHTML = '<p class="meta">L’IA poursuit la lecture des sources.</p>' + askBox(text); bindAsk(step); return; }
     if (r.calculation === false) { box.innerHTML = askBox(''); bindAsk(step); return; }   // a reading step: the preparation above handles it
     if (r.ai === 'AGENTS_NOT_AUTHORIZED' || r.ai === 'AI_UNAVAILABLE') { box.innerHTML = '<p class="meta">' + (r.ai === 'AI_UNAVAILABLE' ? 'L’IA ne répond pas : le test n’a pas pu être compris.' : 'Les agents ne sont pas autorisés pour ce cabinet.') + '</p>' + askBox(text); bindAsk(step); return; }
     var h = '<h3>Test exécuté par le code</h3>';
