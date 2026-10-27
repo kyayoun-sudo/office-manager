@@ -28,16 +28,17 @@ test('AI explores beyond the 60th file, reads the wrong-named piece, directs cod
   r = await f.run(); assert.equal(f.counts().opened, 0);
   r = await f.run(); assert.equal(f.counts().opened, 1); assert.equal(r.pending, true);
   f.answer(input => { assert.match(input.feedback.at(-1).window.text, /D64/); return { source_file_id: 'D64', rows: [7] }; });
-  r = await f.run(); assert.equal(r.result.source_file_id, 'D64');
+  r = await f.run(); assert.equal(r.pending, true); r = await f.run(); assert.equal(r.result.source_file_id, 'D64');
   assert.equal((await r.reportExecution('plan-A', { count: 0, reason: 'Mauvaise plage' })).pending, true);
   f.answer(input => { assert.equal(input.feedback.at(-1).execution.count, 0); return { source_file_id: 'D64', rows: [12] }; });
-  r = await f.run(); assert.deepEqual(r.result.rows, [12]);
+  r = await f.run(); r = await f.run(); assert.deepEqual(r.result.rows, [12]);
 });
 
 test('a final answer selecting an unread source becomes a read request and must return to the AI', async () => {
   const f = await fixture(); f.answer({ source_file_id: 'D64' });
   assert.equal((await f.run()).pending, true); assert.equal(f.counts().opened, 0);
   assert.equal((await f.run()).pending, true); assert.equal(f.counts().opened, 1);
+  assert.equal((await f.run()).pending,true);
   assert.equal((await f.run()).result.source_file_id, 'D64'); assert.equal(f.counts().calls, 2);
 });
 
@@ -64,14 +65,14 @@ test('a failed extraction is fed back as a technical problem, never recorded as 
   f.d.readDocumentWindow = async () => { throw Error('OCR_UNAVAILABLE'); };
   const r = await f.run(); assert.deepEqual(r.documents_read, []);
   f.answer(input => { assert.equal(input.feedback.at(-1).error, 'OCR_UNAVAILABLE'); return { questions: ['Vérifier la lecture de cette pièce.'] }; });
-  assert.ok((await f.run()).result.questions.length);
+  await f.run(); assert.ok((await f.run()).result.questions.length);
 });
 
 test('oversized context remains available by offset; catalog entries are never silently pruned', async () => {
   const f = await fixture(); f.state().card.long = 'X'.repeat(70000) + 'CLAUSE_FINALE';
   f.answer(input => { assert.equal(input.catalog.length, 30); assert.equal(input.context.partial, true); return { context_offset: 60000 }; }); await f.run();
   f.answer(input => { assert.match(input.context.text, /CLAUSE_FINALE/); return { questions: ['Lecture en cours'] }; });
-  assert.ok((await f.run()).result);
+  await f.run(); assert.ok((await f.run()).result);
 });
 
 test('bytes select the Excel parser even with a PDF name and wrong MIME; later rows are accessible', async () => {
