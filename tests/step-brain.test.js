@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { directStep, STEP_BRAIN_KIND } from '../lib/step-brain.js';
 import { sopRevision } from '../lib/sop-document-work.js';
-import { OPERATIONS, planStep } from '../lib/step-runner.js';
+import { OPERATIONS, planStep, runStep } from '../lib/step-runner.js';
 import { readTable } from '../lib/procedure-work.js';
 
 async function fixture() {
@@ -111,4 +111,18 @@ test('source sheet chosen by the AI is respected instead of the first visible sh
   wb.addWorksheet('Données pertinentes').addRows([['Compte', 'Libellé', 'Montant'], ['60', 'Courant', 120]]);
   const table = await readTable('D', { getMeta: async () => ({ name: 'inconnu.xlsx' }), downloadBuffer: async () => Buffer.from(await wb.xlsx.writeBuffer()) }, 'Données pertinentes');
   assert.equal(table.rows[1][2], 120);
+});
+
+test('execution uses the saved AI plan and rejects sources changed since preparation', async () => {
+  const f = await fixture(); await f.run();
+  f.order('read_workbook', { sheet: 'Feuille inconnue', row_from: 1 }); await f.run(); await f.run();
+  f.order('read_document', { file_id: 'D0', page: 1 }); await f.run(); await f.run();
+  f.order('choose_plan', { operation: 'extract', document_ids: ['D0'], source_file_id: 'D0' }); await f.run();
+  const p = await planStep('O', 'M', 'X-01', { step: 1 }, {}, f.d);
+  let called = false;
+  f.d.readTable = async id => { called = true; assert.equal(id, 'D0'); throw new Error('EXPECTED_SOURCE_READ'); };
+  await assert.rejects(runStep('O', 'M', 'X-01', { plan: { ...p, source_file_id: 'D1' } }, {}, f.d), /EXPECTED_SOURCE_READ/);
+  assert.equal(called, true); called = false; f.revisions.D0 = 'v2';
+  await assert.rejects(runStep('O', 'M', 'X-01', { plan: p }, {}, f.d), /DOCUMENT_SOURCE_CHANGED/);
+  assert.equal(called, false);
 });
