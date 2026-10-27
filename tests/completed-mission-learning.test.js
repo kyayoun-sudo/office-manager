@@ -146,6 +146,14 @@ test('reading failure remains explicit and cannot become learned knowledge', asy
   assert.equal(s.status, 'reading'); assert.equal(f.state().lessons.length, 0);
 });
 
+test('the explicitly chosen all-Drives scope accepts accessible real folders without a virtual parent', async () => {
+  const f = fixture(); f.d.root = () => '__all_drives__';
+  f.files.F.parents = []; f.files.F.driveId = 'SHARED';
+  assert.equal((await f.add()).status, 'cataloguing');
+  await assert.rejects(f.add('NO_ACCESS'), /OUTSIDE_FIRM_DRIVE/);
+  await assert.rejects(f.add('A'), /OUTSIDE_FIRM_DRIVE/);
+});
+
 test('all agents receive validated local methods, mission scope and memory failure explicitly', async () => {
   for (const agent of ['firm-manager', 'mission-controller', 'orpailleur', 'enhanced-auditor', 'sika', 'shadow']) {
     const r = await localAgentLessons(agent, { missionId: 'M', activeLessons: async (key, d) => { assert.equal(d.missionId, 'M'); assert.equal(d.strict, true); return [key + ': méthode']; } });
