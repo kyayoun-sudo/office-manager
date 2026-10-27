@@ -117,3 +117,30 @@ test('« Oui, remplis » réexécute les ordres GARDÉS sur les fichiers, pas ce
   assert.ok(h.d.notes.some(n => n.kind === 'fait' && /D2_BUDGET rempli/.test(n.text)) && h.d.notes.some(n => n.kind === 'manquant' && /Convention/.test(n.text)), 'la mémoire de la mission apprend ce qui est fait et ce qui manque');
   await assert.rejects(acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'p' }, harness(() => ({ text: '{}' })).d), /PREPARE_AGAIN/);
 });
+
+test('une préparation acceptée et vérifiée est réutilisée sans nouvel appel IA, avec les mêmes contrôles et confirmation humaine', async () => {
+  let recipe = null;
+  const h = harness(() => ({ provider: 'ia', text: JSON.stringify({ ...ORDERS, computed: [{ target: 'C', formula: 'D-B', why: 'recalcul' }] }) }), { d: {
+    recipeFor: async () => recipe, saveRecipe: async (key, r) => { recipe = r; },
+    preview: async () => ({ revision: 'r', columns: [1, 2, 3, 4, 5].map(column => ({ column })) }),
+    run: async () => ({ verified: true, plan_id: 'approved-plan' }), review: async () => ({ confirmed: true }), noteMissionEvent: async () => null
+  } });
+  h.d.save = async (o, work, patch) => { Object.assign(h.view.work, patch); return h.view.work; };
+  const first = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'paul@cabinet' }, h.d);
+  assert.equal(h.asked.length, 1); assert.ok(first.order_lines.some(x => /C = D/.test(x)));
+  const accepted = await acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'paul@cabinet' }, h.d);
+  assert.equal(accepted.method_learned, true); assert.equal(recipe.orders_method.validated_by, 'paul@cabinet');
+  const next = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'paul@cabinet' }, h.d);
+  assert.equal(h.asked.length, 1, 'aucun appel IA pour réexpliquer la même méthode');
+  assert.equal(next.ai, 'validated-memory'); assert.equal(next.reused_method.validated_by, 'paul@cabinet');
+  assert.deepEqual(next.cells, first.cells); assert.deepEqual(next.checks, first.checks);
+  await fillOrdersPlan('O', 'M', 'PRJ-03', { ...D2, hint: 'Réexamine ce choix' }, { email: 'paul@cabinet' }, h.d);
+  assert.equal(h.asked.length, 2, 'la personne peut demander une nouvelle analyse');
+});
+
+test('des ordres non confirmés ne deviennent jamais une méthode apprise', async () => {
+  let saved = false;
+  const h = harness(() => ({ text: JSON.stringify(ORDERS) }), { d: { recipeFor: async () => null, saveRecipe: async () => { saved = true; } } });
+  await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, h.d);
+  assert.equal(saved, false);
+});

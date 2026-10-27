@@ -649,7 +649,7 @@ export const ROUTES = Object.freeze({
   translate: { POST: users([...EVERYONE], (orgId, req) => translateTexts(req.body || {})), unavailable: 'TRANSLATION_UNAVAILABLE' },
   // ---- 2026-10-08: capabilities, engagement preparation, submissions, Enhanced Auditor ----
   // Which AI providers are configured (keys in Vercel; nothing secret returned).
-  'ai-providers': { GET: users(ALL_ROLES, () => providersStatus()), POST: users(ACCOUNT_ADMINS, async (orgId,req)=>(await import('../lib/provider-diagnostics.js')).checkProvider(req.body?.provider)), unavailable: 'AI_UNAVAILABLE' },
+  'ai-providers': { GET: users(ALL_ROLES, async (orgId) => ({ ...providersStatus(), availability: await (await import('../lib/ai-pool.js')).poolStatus((await import('../lib/ai-providers.js')).providerOrder(null), { orgId }) })), POST: users(ACCOUNT_ADMINS, async (orgId,req)=>(await import('../lib/provider-diagnostics.js')).checkProvider(req.body?.provider)), unavailable: 'AI_UNAVAILABLE' },
   // The firm's capability database (Grand Contrôleur): read from the HR / CV folders.
   capabilities: {
     GET: users(MANAGERS, async (orgId, req) => req.query?.people ? capabilityContext(orgId) : capabilityInsights(orgId)),
