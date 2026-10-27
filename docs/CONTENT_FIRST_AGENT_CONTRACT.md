@@ -33,6 +33,10 @@ L'interface poursuit les requêtes de préparation marquées `document_brain`, a
 
 ## Vérification et périmètre
 
+Le contrat commun couvre aussi la frontière de transport `callModel` de tous les fournisseurs et l'ancien mode direct `runAI`. Ainsi une extraction, une analyse documentaire ou une revue secondaire reçoit les mêmes règles même si son module n'importe pas le contrat. L'injection est idempotente et conserve le format de sortie propre à la tâche. Elle intervient après le routage : les mots du contrat ne changent pas la sélection des fournisseurs ni les capacités requises. Les racines et spécialistes SDK reçoivent déjà ce même contrat dans leurs instructions.
+
+La règle de réception distingue explicitement compréhension, instruction de classement et mémorisation confirmée par un outil. La mémoire utile reste sourcée, limitée au cabinet et à la mission, liée à une version et à la couverture réellement lue. Cela définit le comportement demandé aux modèles ; ajouter cette instruction ne crée pas à lui seul un déclencheur automatique sur chaque dépôt ni un outil de mémoire absent d'un parcours. Ces branchements restent à vérifier sur les flux réels avant d'affirmer que toute réception est comprise et mémorisée.
+
 Les tests utilisent des IA et connecteurs simulés et de vrais classeurs ExcelJS. Ils vérifient une pièce au-delà de la 60e position, un classeur portant une extension et un MIME trompeurs, les lectures à la demande, le retour d'exécution, les versions modifiées, les refus d'accès, la conservation de mémoire et l'absence de sélection automatique lors d'une panne IA.
 
 Les catalogues de mission exposent les fichiers enregistrés dans la mission ; ils ne prétendent pas inclure des fichiers extérieurs non encore rattachés. La découverte de ces fichiers dans le Drive reste le rôle des outils Drive et de l'Orpailleur. Les limites de taille et de lecture restent annoncées. Ce changement ne constitue pas un essai sur toutes les missions réelles ni une preuve d'absence de tout défaut dans l'application.
