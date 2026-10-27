@@ -535,6 +535,11 @@ export const ROUTES = Object.freeze({
     GET: users([...EVERYONE], (orgId, req) => myKpis(orgId, req.account)),
     unavailable: 'KPI_UNAVAILABLE'
   },
+  'completed-mission-learning': {
+    GET: users(PARTNERS, async (orgId, req) => (await import('../lib/completed-mission-learning.js')).completedLearningView(orgId, req.account)),
+    POST: users(PARTNERS, async (orgId, req) => (await import('../lib/completed-mission-learning.js')).completedLearningAction(orgId, req.account, req.body || {})),
+    unavailable: 'COMPLETED_LEARNING_UNAVAILABLE'
+  },
   training: {
     GET: users(ALL_ROLES, (orgId, req) => getTraining(orgId, req)),
     POST: owner((orgId, req) => trainingAction(orgId, req)),
