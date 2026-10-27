@@ -1,0 +1,38 @@
+[
+  {
+    "id":"ohada-isa505-external-confirmation-control-treasury",
+    "source_id":"OHADA_ISA_IMPLEMENTATION_TOOLS",
+    "domain":"audit",
+    "framework":"ISA",
+    "authority":"CNC-OHADA / OHADA",
+    "title":"ISA 505 — contrôle des demandes de confirmation externe",
+    "reference":"Guide pratique OHADA d'application des normes professionnelles — support de présentation, ISA 505 confirmations externes, pages 67-68",
+    "version":"2017 tools / public presentation support",
+    "effective_from":"2018-01-01",
+    "jurisdiction":"OHADA",
+    "country":"CI",
+    "language":"fr",
+    "source_url":"https://www.ohada.org/wp-content/uploads/2020/10/OHADA-Guide-pratique-dapplication-des-normes-professionnelles-Support-de-Pre%CC%81sentation.pdf",
+    "license_basis":"PUBLIC_OFFICIAL_OHADA_GUIDANCE_PARAPHRASE_ONLY_NOT_FULL_TEXT",
+    "content":"Résumé EYNOWA d'un outil public CNC-OHADA : pour les confirmations externes sous ISA 505, l'auditeur conserve le contrôle sur les informations à confirmer, la sélection des tiers, la conception des demandes, leur envoi et leur suivi. EYNOWA applique ce principe notamment lorsque des confirmations bancaires sont utilisées comme procédure d'audit de la trésorerie.",
+    "metadata":{"topic":"cash_and_banking","subtopic":"external_confirmation_control","source_kind":"official_implementation_guidance","normative_text":false,"requires_normative_followup":false}
+  },
+  {
+    "id":"ohada-isa505-nonresponse-divergence-treasury",
+    "source_id":"OHADA_ISA_IMPLEMENTATION_TOOLS",
+    "domain":"audit",
+    "framework":"ISA",
+    "authority":"CNC-OHADA / OHADA",
+    "title":"ISA 505 — non-réponses et divergences",
+    "reference":"Guide pratique OHADA d'application des normes professionnelles — support de présentation, ISA 505, pages 68-69",
+    "version":"2017 tools / public presentation support",
+    "effective_from":"2018-01-01",
+    "jurisdiction":"OHADA",
+    "country":"CI",
+    "language":"fr",
+    "source_url":"https://www.ohada.org/wp-content/uploads/2020/10/OHADA-Guide-pratique-dapplication-des-normes-professionnelles-Support-de-Pre%CC%81sentation.pdf",
+    "license_basis":"PUBLIC_OFFICIAL_OHADA_GUIDANCE_PARAPHRASE_ONLY_NOT_FULL_TEXT",
+    "content":"Résumé EYNOWA d'un outil public CNC-OHADA : en cas de non-réponse à une confirmation externe, des procédures d'audit alternatives sont nécessaires ; lorsque la réponse est indispensable pour obtenir des éléments probants suffisants et appropriés, l'absence de réponse doit être évaluée quant à son incidence sur l'audit et l'opinion. Les divergences obtenues doivent être investiguées pour déterminer si elles signalent une anomalie.",
+    "metadata":{"topic":"cash_and_banking","subtopic":"confirmation_nonresponse_divergence","source_kind":"official_implementation_guidance","normative_text":false,"requires_normative_followup":false}
+  }
+]

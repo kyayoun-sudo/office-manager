@@ -46,6 +46,7 @@ export default async function handler(req, res) {
     const requestedAgent = String(body.agent || "auto").trim();
     const provider = String(body.provider || "auto").trim();
     const risk = String(body.risk || "normal").trim();
+    const professionalId = String(body.professional_id || body.professionalId || "default").trim() || "default";
 
     if (!message) {
       return res.status(400).json({ error: "message is required" });
@@ -137,8 +138,14 @@ export default async function handler(req, res) {
       provider,
       risk,
       orgId,
-      runId: run?.id || null
+      runId: run?.id || null,
+      professionalId
     });
+
+    const labHelperUsed = (result.toolsUsed || []).includes("consult_eynowa_lab") ||
+      (result.specialistsUsed || []).includes("eynowa-lab") ||
+      (result.eynowaLabConsultations || []).length > 0;
+    const validationCards = Array.isArray(result.validationCards) ? result.validationCards : [];
 
     if (run?.id) {
       await finishAgentRun(run.id, {
@@ -156,6 +163,9 @@ export default async function handler(req, res) {
           legacy_route: legacyRoute,
           specialists_used: result.specialistsUsed || [],
           tools_used: result.toolsUsed || [],
+          eynowa_lab_helper_used: labHelperUsed,
+          eynowa_lab_consultations: (result.eynowaLabConsultations || []).length,
+          validation_cards: validationCards.length,
           version: "v2.1"
         },
         errors: []
@@ -177,6 +187,8 @@ export default async function handler(req, res) {
       lastAgent: result.lastAgent || null,
       specialistsUsed: result.specialistsUsed || [],
       toolsUsed: result.toolsUsed || [],
+      eynowaLabHelperUsed: labHelperUsed,
+      validationCards,
       version: "v2.1"
     });
   } catch (error) {

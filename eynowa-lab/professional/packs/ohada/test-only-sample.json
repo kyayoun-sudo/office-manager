@@ -1,0 +1,19 @@
+{
+  "source_id": "OHADA_AUDCIF_SYSCOHADA",
+  "domain": "accounting",
+  "framework": "SYSCOHADA",
+  "authority": "OHADA",
+  "reference": "TEST-ONLY: official source overview metadata",
+  "version": "2017",
+  "effective_from": "2018-01-01",
+  "jurisdiction": "OHADA",
+  "country": "CI",
+  "language": "fr",
+  "source_url": "https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/",
+  "license_basis": "TEST_ONLY_NON_NORMATIVE_EYNOWA_AUTHORED_CONTENT",
+  "content": "Chunk de test rédigé par EYNOWA pour vérifier le pipeline AUDCIF/SYSCOHADA. Ce contenu ne constitue pas une règle comptable normative et ne doit pas être utilisé pour conclure sur un traitement comptable réel.",
+  "metadata": {
+    "pack": "ohada-accounting",
+    "test_only": true
+  }
+}

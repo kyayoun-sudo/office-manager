@@ -6,6 +6,7 @@ import {
 import { runAI } from "./ai.js";
 import { createToolEvent } from "./supabase.js";
 import { makeSpecialistTools } from "./tools.js";
+import { makeEynowaLabManagerTool } from "./eynowa-lab-tool.js";
 
 function modelName() {
   return process.env.OPENAI_MODEL || "gpt-5.6-luna";
@@ -52,7 +53,8 @@ function specialistFromToolName(toolName) {
   const map = {
     consult_grand_controleur: "grand-controleur",
     consult_orpailleur: "orpailleur",
-    consult_sika: "sika"
+    consult_sika: "sika",
+    consult_eynowa_lab: "eynowa-lab"
   };
   return map[toolName] || null;
 }
@@ -98,12 +100,14 @@ function makeManager(contexts, runtime) {
     contexts.sika,
     runtime
   );
+  const eynowaLab = makeEynowaLabManagerTool(runtime);
 
   return new Agent({
     name: "Office Manager AI",
     model: modelName(),
     instructions: OFFICE_MANAGER_INSTRUCTIONS,
     tools: [
+      ...(eynowaLab ? [eynowaLab] : []),
       grandControleur.asTool({
         toolName: "consult_grand_controleur",
         toolDescription:
@@ -175,6 +179,17 @@ async function runSdkAgent(agent, message) {
   };
 }
 
+function attachLabConsultations(result, runtime) {
+  const consultations = Array.isArray(runtime.eynowaLabConsultations)
+    ? runtime.eynowaLabConsultations
+    : [];
+  return {
+    ...result,
+    eynowaLabConsultations: consultations,
+    validationCards: consultations.map((row) => row?.validation_card).filter(Boolean)
+  };
+}
+
 export async function runOfficeManager({
   message,
   requestedAgent = "auto",
@@ -182,11 +197,12 @@ export async function runOfficeManager({
   provider = "auto",
   risk = "normal",
   orgId = null,
-  runId = null
+  runId = null,
+  professionalId = "default"
 }) {
   const normalizedProvider = String(provider || "auto").toLowerCase();
   const normalizedRisk = String(risk || "normal").toLowerCase();
-  const runtime = { orgId, runId };
+  const runtime = { orgId, runId, professionalId, eynowaLabConsultations: [] };
 
   if (normalizedProvider === "anthropic") {
     const agentKey =
@@ -210,7 +226,9 @@ export async function runOfficeManager({
     return {
       ...result,
       specialistsUsed: [agentKey],
-      toolsUsed: []
+      toolsUsed: [],
+      eynowaLabConsultations: [],
+      validationCards: []
     };
   }
 
@@ -232,6 +250,8 @@ export async function runOfficeManager({
   } else {
     primary = await runSdkAgent(makeManager(contexts, runtime), message);
   }
+
+  primary = attachLabConsultations(primary, runtime);
 
   const claudeReady =
     Boolean(process.env.ANTHROPIC_API_KEY) &&
@@ -279,6 +299,8 @@ ${primary.text}`
     lastAgent: primary.lastAgent,
     reviewed: true,
     specialistsUsed: primary.specialistsUsed || [],
-    toolsUsed: primary.toolsUsed || []
+    toolsUsed: primary.toolsUsed || [],
+    eynowaLabConsultations: primary.eynowaLabConsultations || [],
+    validationCards: primary.validationCards || []
   };
 }
