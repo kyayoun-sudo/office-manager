@@ -42,3 +42,4 @@ jobs:
           tests/working-file-memory-brain.test.js
           tests/inventory-mission-sync.test.js
           tests/kernel-import-boundary.test.js
+          tests/document-reasoning-navigation.test.js
