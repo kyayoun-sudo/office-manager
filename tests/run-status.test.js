@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { presentRun } from '../lib/run-status.js';
+import { deriveRunStatus, presentRun } from '../lib/run-status.js';
 import handler from '../api/runs.js';
 
 test('overdue requests are unknown, never reported as cancelled or completed', () => {
@@ -11,6 +11,31 @@ test('overdue requests are unknown, never reported as cancelled or completed', (
   assert.match(stalled.warning, /preuves avant de relancer/);
   assert.equal(presentRun({ ...row, status: 'verified' }, Date.parse('2026-10-07')).status, 'verified');
   assert.equal(presentRun({ ...row, status: 'running', started_at: 'invalid' }).status, 'running');
+});
+
+test('kernel run status separates execution from business verification', () => {
+  assert.equal(deriveRunStatus(), 'verified');
+  assert.equal(deriveRunStatus({ toolsUsed: [] }), 'verified');
+
+  assert.equal(deriveRunStatus({
+    toolsUsed: ['move_file'],
+    toolEvents: [{ phase: 'completed', tool_name: 'move_file' }]
+  }), 'partial');
+
+  assert.equal(deriveRunStatus({
+    toolsUsed: ['move_file'],
+    toolEvents: [{ phase: 'failed', tool_name: 'move_file' }]
+  }), 'partial');
+
+  assert.equal(deriveRunStatus({
+    toolsUsed: ['move_file'],
+    toolEvents: [{ phase: 'completed', verified_at: '2026-10-29T20:00:00Z', tool_name: 'move_file' }]
+  }), 'verified');
+
+  assert.equal(deriveRunStatus({
+    toolsUsed: ['fill_wp'],
+    toolEvents: [{ phase: 'completed', metadata: { business_verified: true } }]
+  }), 'verified');
 });
 
 const response = () => ({
