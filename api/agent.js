@@ -14,6 +14,7 @@ import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { ensureAgentSettings } from "../lib/agent-permissions.js";
 import { loadPeoplePolicy, peoplePolicyContext } from "../lib/people-policy.js";
+import { deriveRunStatus } from "../lib/run-status.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -323,10 +324,11 @@ export default async function handler(req, res) {
         ...eventSpecialists
       ])
     ];
+    const runStatus = deriveRunStatus({ toolEvents, toolsUsed });
 
     if (run?.id) {
       await finishAgentRun(run.id, {
-        status: "verified",
+        status: runStatus,
         finished_at: new Date().toISOString(),
         summary: result.text.slice(0, 1000),
         metrics: {
@@ -341,6 +343,9 @@ export default async function handler(req, res) {
           legacy_route: legacyRoute,
           specialists_used: specialistsUsed,
           tools_used: toolsUsed,
+          verification_basis: toolsUsed.length
+            ? (runStatus === "verified" ? "explicit_business_verification" : "tool_execution_only")
+            : "no_side_effect",
           release: RELEASE
         },
         errors: []
