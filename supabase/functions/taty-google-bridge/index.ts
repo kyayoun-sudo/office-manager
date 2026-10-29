@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { oauthCredentials } from "./oauth-credentials.ts";
 import { DEFAULT_ORG_ID } from "./deployment-config.ts";
+import { secretsMatch } from "./secret-compare.ts";
 import {
   BridgeError,
   createBinaryFileAction,
@@ -265,7 +266,7 @@ Deno.serve(async req => {
   try {
     if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
     const supplied = req.headers.get("x-orpailleur-secret") || "";
-    if (!JOB_SECRET || supplied !== JOB_SECRET) {
+    if (!JOB_SECRET || !(await secretsMatch(supplied, JOB_SECRET))) {
       return json({ error: "UNAUTHORIZED" }, 401);
     }
 

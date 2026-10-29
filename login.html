@@ -123,7 +123,7 @@
     LOGIN_UNAVAILABLE: 'La connexion par e-mail n\u2019est pas encore activée sur le serveur (table des comptes à créer dans Supabase). Utilisez le code d\u2019accès ci-dessous.',
     BOOTSTRAP_UNAVAILABLE: 'Création impossible : la table des comptes n\u2019existe pas encore dans Supabase (fichier db/app-users.sql à appliquer).',
     SUPABASE_SERVER_CONFIG_MISSING: 'Configuration Supabase manquante sur le serveur.',
-    FIRM_CLOSED: 'Cet espace a été fermé : pour recommencer à zéro, confirmez ci-dessus.', TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer.', FIRM_NOT_CLOSED: 'L’espace est de nouveau ouvert : connectez-vous normalement.',
+    FIRST_OWNER_EMAILS_REQUIRED: 'Ce cabinet n’a pas encore de propriétaire désigné : la personne qui administre l’installation doit d’abord régler FIRST_OWNER_EMAILS (adresse du premier propriétaire) dans Vercel.', FIRM_CLOSED: 'Cet espace a été fermé : pour recommencer à zéro, confirmez ci-dessus.', TYPE_EFFACER_TO_CONFIRM: 'Tapez EFFACER pour confirmer.', FIRM_NOT_CLOSED: 'L’espace est de nouveau ouvert : connectez-vous normalement.',
     SESSION_EXPIRED: 'La connexion Google a expiré : recommencez avec « Continuer avec Google ».', PURGE_SQL_NOT_INSTALLED: 'L’effacement n’est pas encore installé dans Supabase (db/purge.sql) : rien n’a été effacé.'
   };
   // A closed space (2026-10-11): its former owner restarts it from zero, with the same identity.
@@ -238,7 +238,7 @@
       .then(function (r) {
         // Several firms (2026-10-24): an identity first; then create a firm or join one by invitation (Mes cabinets).
         if (r && r.session && r.session.needs_cabinet) { enter(r.session); return; }
-        if (r && r.confirmation_required) { say('signup-status', 'Compte créé. Ouvrez l’e-mail de confirmation envoyé à ' + r.email + ', puis connectez-vous : vous pourrez créer votre cabinet ou rejoindre celui qui vous a invité.'); return; }
+        if (r && r.confirmation_required) { say('signup-status', 'Compte créé. Ouvrez l’e-mail de confirmation envoyé à ' + r.email + ', puis connectez-vous. Ensuite : créer votre cabinet, rejoindre celui qui vous a invité, ou attendre le rôle donné par le propriétaire.'); return; }
         say('signup-status', 'Compte créé. Il sera actif dès que le propriétaire vous aura donné un rôle. Vous êtes le propriétaire ? Cliquez sur « Je suis le propriétaire du cabinet ».');
         $('o-email').value = $('s-email').value.trim();
       })

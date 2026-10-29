@@ -393,3 +393,31 @@ Pour verifier sur votre vrai modele sans le mettre dans le depot (le depot est p
   WORKFILE_MAP_SAMPLE=/chemin/vers/NL-T01_PRJ.xlsx node --test tests/workfile-map.test.js
 A noter : 11 tests echouaient deja sur la branche avant ce travail (dont « 12 fonctions Vercel Hobby »,
 fournisseurs d'IA, INSTALL_TOUT.sql) ; ils sont inchanges. A regarder separement.
+
+AUDIT DU CODE — 29 octobre 2026 : a verifier de votre cote
+1) Sources publiques sur Vercel : CONSTATE le 29 octobre 2026 sur https://office-manager-personal-pilot.vercel.app (production actuelle) :
+   /lib/auth.js, /lib/supabase.js, /agents/index.js et /orchestrator.js etaient telechargeables (200). Vercel publie tel quel chaque
+   fichier du depot. Correction dans vercel.json (redirections vers /accueil.html pour lib, agents, db, scripts, supabase, connectors,
+   desktop, tests, claude, docs sauf les 2 documents lies depuis les pages, et les fichiers .md / verrous / .ts a la racine ;
+   test : tests/source-not-public.test.js). Les 31 anciens .js de la racine sont supprimes. A FAIRE : deployer cette branche, la
+   PROMOUVOIR (Promote, jamais Redeploy), puis verifier :
+     curl -sI https://VOTRE-ADRESSE/lib/auth.js | head -1        (doit donner 307, plus 200)
+     curl -sI https://VOTRE-ADRESSE/accueil.html | head -1       (doit donner 200)
+   Attention : la production actuelle est une ANCIENNE version (/accueil.html y renvoie 404). Elle ne contient pas le travail recent.
+2) FIRST_OWNER_EMAILS doit etre regle dans Vercel pour chaque cabinet : l'inscription par mot de passe l'applique maintenant
+   (comme « Continuer avec Google »). Sans cette variable, la premiere personne inscrite dans un cabinet vide en devient proprietaire.
+
+FIRST_OWNER_EMAILS OBLIGATOIRE EN PRODUCTION (audit du 29 octobre 2026)
+  Un cabinet vide en production refuse maintenant de créer son premier propriétaire tant que FIRST_OWNER_EMAILS
+  n'est pas réglé (erreur FIRST_OWNER_EMAILS_REQUIRED). Les cabinets qui ont déjà un compte ne sont pas touchés.
+  Comment faire : Vercel > le projet du cabinet > Settings > Environment Variables > ajouter FIRST_OWNER_EMAILS =
+  l'adresse du futur propriétaire (plusieurs : séparées par des virgules) > redéployer (Promote du dernier déploiement).
+
+CONFIRMATION DE L'E-MAIL À L'INSCRIPTION (audit du 29 octobre 2026, point 2) — OPTIONNEL, désactivé par défaut
+  Aujourd'hui l'inscription par mot de passe marque l'adresse comme déjà confirmée : quelqu'un peut inscrire l'adresse
+  d'une autre personne avant elle. Pour l'empêcher : Supabase > Authentication > Providers > Email > activer
+  « Confirm email » ; Authentication > SMTP Settings > configurer un expéditeur (sinon aucun message ne part et personne
+  ne peut s'inscrire) ; puis Vercel > Environment Variables > OFFICE_MANAGER_CONFIRM_SIGNUP = on > Promote.
+  Effet : la personne reçoit un e-mail, clique, puis se connecte ; son compte (propriétaire si son adresse est dans
+  FIRST_OWNER_EMAILS sur un cabinet vide, sinon en attente d'un rôle) est créé à cette première connexion.
+  Essayez d'abord avec une adresse à vous : ce flux n'a pas été essayé avec le vrai Supabase.

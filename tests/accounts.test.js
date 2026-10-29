@@ -182,3 +182,99 @@ test('a new firm: the first person who signs up becomes the owner, no code; the 
   const second = await signUp('org-9', { display_name: 'Koffi', email: 'koffi@cabinet.ci', password: 'motdepasse2026' }, { authCall, fetchRows });
   assert.equal(second.pending, true);
 });
+
+test('a new firm with FIRST_OWNER_EMAILS: a stranger signing up first is NOT the owner (audit 2026-10-29)', async () => {
+  const rows = [];
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; }
+    const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1];
+    return id ? rows.filter(r => r.auth_user_id === id) : rows;
+  };
+  const users = {};
+  const authCall = async (path, o = {}) => {
+    if (path === 'admin/users') { users[o.body.email] = { id: UID, password: o.body.password }; return { status: 200, data: { id: UID } }; }
+    return { status: 400, data: {} };
+  };
+  const env = { FIRST_OWNER_EMAILS: 'boss@cabinet.ci' };
+  const r = await signUp('org-7', { display_name: 'Intrus', email: 'intrus@x.ci', password: 'motdepasse2026' }, { authCall, fetchRows, env });
+  assert.equal(r.pending, true);
+  assert.deepEqual(rows.map(x => [x.email, x.role, x.active]), [['intrus@x.ci', 'collaborator', false]]);
+});
+
+test('two sign-ups at the same instant on an empty firm: only one owner (audit 2026-10-29)', async () => {
+  const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
+  const rows = [];
+  let clock = 0, seen = 0, release;
+  const gate = new Promise(r => { release = r; });
+  const fetchRows = async (path, o = {}) => {
+    if (o.method === 'POST') { for (const r of JSON.parse(o.body)) rows.push({ ...r, created_at: '2026-10-29T10:00:0' + (clock++) + 'Z' }); return []; }
+    if (o.method === 'PATCH') { const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1]; rows.filter(r => r.auth_user_id === id).forEach(r => Object.assign(r, JSON.parse(o.body))); return []; }
+    // both sign-ups checked « empty firm » before either wrote
+    if (/select=auth_user_id&limit=1/.test(path)) { if (++seen === 2) release(); await gate; return []; }
+    if (/role=eq\.owner/.test(path)) return rows.filter(r => r.role === 'owner' && r.active).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const id = (path.match(/auth_user_id=eq\.([0-9a-f-]+)/) || [])[1];
+    return id ? rows.filter(r => r.auth_user_id === id) : [];
+  };
+  const users = {};
+  const authCall = async (path, o = {}) => {
+    if (path === 'admin/users') { const id = o.body.email === 'a@c.ci' ? A : B; users[o.body.email] = { id, password: o.body.password }; return { status: 200, data: { id } }; }
+    const u = users[o.body.email]; return u && u.password === o.body.password ? { status: 200, data: { refresh_token: 'r', user: { id: u.id } } } : { status: 400, data: {} };
+  };
+  const [a, b] = await Promise.all([
+    signUp('org-8', { display_name: 'A', email: 'a@c.ci', password: 'motdepasse2026' }, { authCall, fetchRows, env: {} }),
+    signUp('org-8', { display_name: 'B', email: 'b@c.ci', password: 'motdepasse2026' }, { authCall, fetchRows, env: {} })
+  ]);
+  assert.equal([a, b].filter(x => x.owner).length, 1, 'exactly one owner');
+  assert.equal(rows.filter(r => r.role === 'owner' && r.active).length, 1);
+});
+
+test('production, empty firm, no FIRST_OWNER_EMAILS: nobody becomes owner by being first (audit 2026-10-29)', async () => {
+  const rows = [];
+  const fetchRows = async (path, o = {}) => { if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; } return []; };
+  const authCall = async (path) => path === 'admin/users' ? { status: 200, data: { id: UID } } : { status: 400, data: {} };
+  const env = { VERCEL_ENV: 'production' };
+  await assert.rejects(signUp('org-p', { display_name: 'X', email: 'x@c.ci', password: 'motdepasse2026' }, { authCall, fetchRows, env }), /FIRST_OWNER_EMAILS_REQUIRED/);
+  assert.equal(rows.length, 0, 'no account row written');
+  const people = { 'rt-x': { id: UID, email: 'x@c.ci', user_metadata: {} } };
+  const oauthCall = async (p, o) => ({ status: 200, data: { refresh_token: 'n', access_token: 'a', user: people[o.body.refresh_token] } });
+  await assert.rejects(oauthLogin('org-p', { refresh_token: 'rt-x' }, { authCall: oauthCall, fetchRows, env }), /FIRST_OWNER_EMAILS_REQUIRED/);
+  assert.equal(rows.length, 0);
+  // once the list is set, the listed address can open the firm
+  const ok = await signUp('org-p', { display_name: 'X', email: 'x@c.ci', password: 'motdepasse2026' }, { authCall: async (p) => p === 'admin/users' ? { status: 200, data: { id: UID } } : { status: 200, data: { refresh_token: 'r', user: { id: UID } } }, fetchRows: async (p, o = {}) => { if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; } const id = (p.match(/auth_user_id=eq.([0-9a-f-]+)/) || [])[1]; return id ? rows.filter(r => r.auth_user_id === id) : rows; }, env: { ...env, FIRST_OWNER_EMAILS: 'x@c.ci' } });
+  assert.equal(ok.owner, true);
+});
+
+test('OFFICE_MANAGER_CONFIRM_SIGNUP=on: the address is confirmed by e-mail, nothing is created or confirmed for the person (audit 2026-10-29)', async () => {
+  const rows = [], calls = [];
+  const fetchRows = async (path, o = {}) => { if (o.method === 'POST') { rows.push(...JSON.parse(o.body)); return []; } const id = (path.match(/auth_user_id=eq.([0-9a-f-]+)/) || [])[1]; return id ? rows.filter(r => r.auth_user_id === id) : rows; };
+  const authCall = async (path, o = {}) => { calls.push(path); return path === 'signup' ? { status: 200, data: { id: UID } } : { status: 400, data: {} }; };
+  const env = { OFFICE_MANAGER_CONFIRM_SIGNUP: 'on', FIRST_OWNER_EMAILS: 'boss@c.ci' };
+  const r = await signUp('org-q', { display_name: 'Boss', email: 'boss@c.ci', password: 'motdepasse2026' }, { authCall, fetchRows, env });
+  assert.equal(r.confirmation_required, true);
+  assert.deepEqual(calls, ['signup'], 'no admin/users call: the address is not confirmed for the person');
+  assert.equal(rows.length, 0, 'no account row before the confirmation');
+  // after clicking the mail, the first login enrols the person (owner: listed address on an empty firm)
+  const prev = process.env.OFFICE_MANAGER_CONFIRM_SIGNUP, prevL = process.env.FIRST_OWNER_EMAILS;
+  process.env.OFFICE_MANAGER_CONFIRM_SIGNUP = 'on'; process.env.FIRST_OWNER_EMAILS = 'boss@c.ci';
+  try {
+    const confirmedCall = async (path) => ({ status: 200, data: { refresh_token: 'r', access_token: 'a', user: { id: UID, email: 'boss@c.ci', email_confirmed_at: '2026-10-29T10:00:00Z', user_metadata: { display_name: 'Boss' } } } });
+    const s = await login('org-q', { email: 'boss@c.ci', password: 'motdepasse2026' }, { authCall: confirmedCall, fetchRows });
+    assert.equal(s.user.role, 'owner');
+    assert.deepEqual(rows.map(x => [x.email, x.role, x.active, x.display_name]), [['boss@c.ci', 'owner', true, 'Boss']]);
+  } finally { process.env.OFFICE_MANAGER_CONFIRM_SIGNUP = prev; process.env.FIRST_OWNER_EMAILS = prevL; if (prev === undefined) delete process.env.OFFICE_MANAGER_CONFIRM_SIGNUP; if (prevL === undefined) delete process.env.FIRST_OWNER_EMAILS; }
+});
+
+import { currentAccount, forgetAccount, _clearAuthCache } from '../lib/user-auth.js';
+
+test('a deactivated account loses its access at once on this instance (audit 2026-10-29)', async () => {
+  _clearAuthCache();
+  let active = true;
+  const deps = { orgId: 'org-c', supabaseUser: async () => ({ id: UID }), fetchRows: async () => [{ auth_user_id: UID, email: 'a@c.ci', role: 'collaborator', active }] };
+  const req = { headers: { authorization: 'Bearer ' + 'x'.repeat(40) } };
+  assert.equal((await currentAccount(req, deps)).role, 'collaborator');
+  active = false;
+  assert.equal((await currentAccount(req, deps)).role, 'collaborator', 'still cached');
+  forgetAccount(UID);
+  await assert.rejects(currentAccount(req, deps), /ACCOUNT_NOT_ALLOWED/);
+  _clearAuthCache();
+});
