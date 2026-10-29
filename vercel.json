@@ -33,6 +33,21 @@
       "source": "/",
       "destination": "/accueil.html",
       "permanent": false
+    },
+    {
+      "source": "/(lib|agents|db|scripts|supabase|connectors|desktop|tests|claude)/(.*)",
+      "destination": "/accueil.html",
+      "permanent": false
+    },
+    {
+      "source": "/docs/((?!FIRM_SIMULATION_DISK\\.md$|firm-simulation-results/).*)",
+      "destination": "/accueil.html",
+      "permanent": false
+    },
+    {
+      "source": "/(lab-gateway-server\\.js|index\\.ts|audit-dual-theme\\.patch|Dockerfile\\.lab-gateway|pnpm-lock\\.yaml|package-lock\\.json|[A-Za-z0-9_-]+\\.md)",
+      "destination": "/accueil.html",
+      "permanent": false
     }
   ],
   "headers": [

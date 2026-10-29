@@ -15,6 +15,7 @@ import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { ensureAgentSettings } from "../lib/agent-permissions.js";
 import { loadPeoplePolicy, peoplePolicyContext } from "../lib/people-policy.js";
+import { deriveRunStatus } from "../lib/run-status.js";
 import {
   createAgentRun,
   finishAgentRun,
@@ -311,6 +312,7 @@ export default async function handler(req, res) {
         ...eventSpecialists
       ])
     ];
+    const runStatus = deriveRunStatus({ toolEvents, toolsUsed });
 
     if (run?.id) {
       await finishAgentRun(run.id, {
