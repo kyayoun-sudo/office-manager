@@ -39,5 +39,6 @@ jobs:
           tests/agent-kernel.test.js
           tests/kernel-facades.test.js
           tests/working-file-kernel.test.js
+          tests/working-file-memory-brain.test.js
           tests/inventory-mission-sync.test.js
           tests/kernel-import-boundary.test.js
