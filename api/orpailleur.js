@@ -22,12 +22,13 @@ export default async function handler(req, res) {
 
     const orgId = await resolveRequestOrg(req);
 
-    // Pilot entry point for the universal kernel. It is deliberately restricted to
-    // an isolated test organisation in preview/test mode: never use the experimental
-    // route to bypass the production Drive bridge protections.
+    // Universal-kernel continuation entry point. In preview/test it may operate only on
+    // the isolated test organisation; a protected preview must never gain access to the
+    // real firm Drive through this route. In the real deployment the normal Drive bridge
+    // restrictions still apply and every call keeps the firm identity server-side.
     if (req.method === "POST" && req.body?.action === "kernel") {
-      if (!isTestMode()) return res.status(409).json({ error: "KERNEL_PILOT_TEST_ONLY" });
-      assertIsolatedOrg(orgId);
+      if (isTestMode()) assertIsolatedOrg(orgId);
+      else if (bridgeForbiddenHere()) return res.status(409).json({ error: "PREVIEW_BRIDGE_FORBIDDEN" });
       await loadGoogleConnection(orgId);
       const result = await runOrpailleurKernel(orgId, req);
       return res.status(200).json(result);
