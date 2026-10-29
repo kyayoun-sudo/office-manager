@@ -84,3 +84,33 @@ test('une panne IA bloque le travail et aucune fausse réussite n’est produite
   assert.equal(result.error.reason, 'AI_UNAVAILABLE');
   assert.equal(verifyCalled, false);
 });
+
+test('un agent long reste running si son checkpoint est persisté et la prochaine invocation est programmée', async () => {
+  let continuations = 0;
+  const checkpoints = [];
+  const result = await runAgentKernel({
+    orgId: 'O',
+    agent: 'orpailleur',
+    objective: 'Traiter un long lot documentaire',
+    maxCycles: 2,
+    observe: async () => ({ read: { remaining: 10 } }),
+    work: async () => ({
+      understanding: 'Un lot a été traité',
+      done: [{ action: 'batch', result: { ok: true } }],
+      progress: true,
+      proposed: [], refused: [], questions: []
+    }),
+    verify: async () => ({ verified: false, progress: true, reason: 'des fichiers restent' }),
+    onCycleLimit: async () => {
+      continuations += 1;
+      return { continue: true, scheduled: true };
+    },
+    checkpoint: async state => checkpoints.push(state)
+  });
+
+  assert.equal(result.status, KERNEL_STATUS.RUNNING);
+  assert.equal(result.phase, 'continued');
+  assert.equal(result.cycle, 2);
+  assert.equal(continuations, 1);
+  assert.equal(checkpoints.at(-1).status, KERNEL_STATUS.RUNNING);
+});
