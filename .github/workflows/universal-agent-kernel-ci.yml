@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/universal-agent-kernel
+      - feature/white-label-desktop
   pull_request:
     branches:
       - main
@@ -39,3 +40,4 @@ jobs:
           tests/kernel-facades.test.js
           tests/working-file-kernel.test.js
           tests/inventory-mission-sync.test.js
+          tests/kernel-import-boundary.test.js
