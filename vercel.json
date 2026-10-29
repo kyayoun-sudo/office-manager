@@ -7,6 +7,9 @@
     "api/app.js": {
       "maxDuration": 300
     },
+    "api/orpailleur.js": {
+      "maxDuration": 300
+    },
     "api/**/*.js": {
       "maxDuration": 60
     }

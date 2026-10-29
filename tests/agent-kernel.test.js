@@ -1,105 +1,116 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  KERNEL_WORK_STATE,
-  authorizeKernelOrder,
-  executeKernelOrders,
-  runKernelStep
-} from '../lib/agent-kernel.js';
+import { KERNEL_STATUS, runAgentKernel } from '../lib/agent-kernel.js';
 
-test('kernel refuses an action that is not in the agent capability set', async () => {
-  const result = await authorizeKernelOrder({ action: 'delete_everything', params: {}, why: 'synthetic' }, {});
-  assert.equal(result.ok, false);
-  assert.equal(result.work_state, KERNEL_WORK_STATE.REFUSED);
-});
+test('le kernel continue après une action et ne déclare verified qu’après relecture réussie', async () => {
+  let observations = 0;
+  let verifications = 0;
+  const checkpoints = [];
 
-test('kernel keeps human-gated work proposed and does not execute it', async () => {
-  let called = 0;
-  const result = await executeKernelOrders({
-    orders: [{ action: 'sign', params: { id: 'x' }, why: 'requires judgment' }],
-    actions: {
-      sign: {
-        describe: 'professional sign-off',
-        approval: true,
-        run: async () => { called += 1; return { signed: true }; }
-      }
-    }
-  });
-  assert.equal(called, 0);
-  assert.equal(result.proposed.length, 1);
-  assert.equal(result.proposed[0].work_state, KERNEL_WORK_STATE.PROPOSED);
-});
-
-test('kernel separates executed from verified', async () => {
-  const result = await executeKernelOrders({
-    orders: [
-      { action: 'unverified', params: {}, why: 'synthetic' },
-      { action: 'verified', params: {}, why: 'synthetic' }
-    ],
-    actions: {
-      unverified: {
-        describe: 'execute only',
-        run: async () => ({ done: true })
-      },
-      verified: {
-        describe: 'execute then re-read',
-        run: async () => ({ done: true, id: 'f1' }),
-        verify: async (_params, result) => ({ ok: result.id === 'f1', observed: result.id })
-      }
-    }
-  });
-  assert.equal(result.done[0].work_state, KERNEL_WORK_STATE.EXECUTED_UNVERIFIED);
-  assert.equal(result.done[1].work_state, KERNEL_WORK_STATE.VERIFIED);
-  assert.equal(result.done[1].verification.observed, 'f1');
-});
-
-test('bounded kernel step follows observe -> remember -> decide -> act -> verify -> record -> next', async () => {
-  const trace = [];
-  const out = await runKernelStep({
-    agent: 'synthetic-agent',
-    objective: 'finish one synthetic task',
-    state: { cursor: 1 },
-    observe: async () => { trace.push('observe'); return { value: 10 }; },
-    remember: async ({ observed }) => { trace.push('remember'); return { prior: observed.value - 1 }; },
-    decide: async ({ observed, memory }) => {
-      trace.push('decide');
-      assert.equal(observed.value, 10);
-      assert.equal(memory.prior, 9);
-      return { orders: [{ action: 'write', params: { value: 10 }, why: 'synthetic' }] };
+  const result = await runAgentKernel({
+    orgId: 'O',
+    missionId: 'M',
+    agent: 'orpailleur',
+    objective: 'Ranger et vérifier le fichier F1',
+    actions: { move: { describe: 'déplacer un fichier' } },
+    observe: async () => ({ read: { location: observations++ === 0 ? 'INBOX' : 'AUDIT' } }),
+    verify: async () => {
+      verifications += 1;
+      return verifications === 1
+        ? { verified: false, progress: true, reason: 'fichier déplacé mais contrôle suivant requis' }
+        : { verified: true, location: 'AUDIT' };
     },
-    actions: {
-      write: {
-        describe: 'synthetic write',
-        run: async params => { trace.push('act'); return { written: params.value }; },
-        verify: async (_params, result) => { trace.push('verify'); return { ok: result.written === 10 }; }
-      }
-    },
-    record: async snapshot => {
-      trace.push('record');
-      assert.equal(snapshot.done[0].work_state, KERNEL_WORK_STATE.VERIFIED);
-    },
-    next: async snapshot => {
-      trace.push('next');
-      return snapshot.done.every(x => x.work_state === KERNEL_WORK_STATE.VERIFIED)
-        ? { status: 'verified', next: null }
-        : { status: 'partial', next: 'retry' };
-    }
+    checkpoint: async state => checkpoints.push(state)
+  }, {
+    think: async () => ({
+      understanding: 'F1 doit être dans AUDIT',
+      done: [{ action: 'move', result: { ok: true } }],
+      proposed: [], refused: [], questions: [], notes: []
+    })
   });
 
-  assert.deepEqual(trace, ['observe', 'remember', 'decide', 'act', 'verify', 'record', 'next']);
-  assert.equal(out.status, 'verified');
-  assert.equal(out.next, null);
+  assert.equal(result.status, KERNEL_STATUS.VERIFIED);
+  assert.equal(result.cycle, 2, 'une première action réussie ne suffit pas : le kernel repart pour un cycle');
+  assert.equal(result.trace.length, 2);
+  assert.equal(verifications, 2);
+  assert.ok(checkpoints.some(x => x.phase === 'next'), 'la continuation est explicitement enregistrée');
+  assert.equal(checkpoints.at(-1).status, KERNEL_STATUS.VERIFIED);
 });
 
-test('kernel never infers objective verification from successful execution alone', async () => {
-  const out = await runKernelStep({
-    agent: 'synthetic-agent',
-    objective: 'synthetic',
-    decide: async () => ({ orders: [{ action: 'write', params: {}, why: 'synthetic' }] }),
-    actions: {
-      write: { describe: 'write', run: async () => ({ ok: true }) }
-    }
+test('une action qui exige une personne arrête le kernel en awaiting_human', async () => {
+  let verified = false;
+  const result = await runAgentKernel({
+    orgId: 'O', agent: 'mission-controller', objective: 'Envoyer la lettre',
+    observe: async () => ({ read: { letter_ready: true } }),
+    verify: async () => { verified = true; return { verified: true }; }
+  }, {
+    think: async () => ({
+      understanding: 'La lettre est prête mais doit être validée', done: [], refused: [], questions: [],
+      proposed: [{ action: 'send_mail', params: { to: 'client@example.com' }, why: 'envoi externe' }]
+    })
   });
-  assert.equal(out.done[0].work_state, KERNEL_WORK_STATE.EXECUTED_UNVERIFIED);
-  assert.equal(out.status, 'partial');
+
+  assert.equal(result.status, KERNEL_STATUS.AWAITING_HUMAN);
+  assert.equal(result.proposed[0].action, 'send_mail');
+  assert.equal(verified, false, 'on ne masque pas une validation humaine par une vérification automatique');
+});
+
+test('une réponse IA sans action ni preuve de fin est bloquée, jamais verified', async () => {
+  const result = await runAgentKernel({
+    orgId: 'O', agent: 'enhanced-auditor', objective: 'Compléter D1',
+    observe: async () => ({ read: { wp: 'D1' } }),
+    verify: async () => ({ verified: false, reason: 'D1 reste incomplet' })
+  }, {
+    think: async () => ({
+      understanding: 'Il faudrait compléter D1', done: [], proposed: [], refused: [], questions: [], notes: []
+    })
+  });
+
+  assert.equal(result.status, KERNEL_STATUS.BLOCKED);
+  assert.equal(result.error.reason, 'NO_PROGRESS');
+});
+
+test('une panne IA bloque le travail et aucune fausse réussite n’est produite', async () => {
+  let verifyCalled = false;
+  const result = await runAgentKernel({
+    orgId: 'O', agent: 'sika', objective: 'Mettre à jour le suivi',
+    observe: async () => ({ read: {} }),
+    verify: async () => { verifyCalled = true; return { verified: true }; }
+  }, {
+    think: async () => ({ ai_error: 'AI_TIMEOUT', done: [], proposed: [], refused: [], questions: [] })
+  });
+
+  assert.equal(result.status, KERNEL_STATUS.BLOCKED);
+  assert.equal(result.error.reason, 'AI_UNAVAILABLE');
+  assert.equal(verifyCalled, false);
+});
+
+test('un agent long reste running si son checkpoint est persisté et la prochaine invocation est programmée', async () => {
+  let continuations = 0;
+  const checkpoints = [];
+  const result = await runAgentKernel({
+    orgId: 'O',
+    agent: 'orpailleur',
+    objective: 'Traiter un long lot documentaire',
+    maxCycles: 2,
+    observe: async () => ({ read: { remaining: 10 } }),
+    work: async () => ({
+      understanding: 'Un lot a été traité',
+      done: [{ action: 'batch', result: { ok: true } }],
+      progress: true,
+      proposed: [], refused: [], questions: []
+    }),
+    verify: async () => ({ verified: false, progress: true, reason: 'des fichiers restent' }),
+    onCycleLimit: async () => {
+      continuations += 1;
+      return { continue: true, scheduled: true };
+    },
+    checkpoint: async state => checkpoints.push(state)
+  });
+
+  assert.equal(result.status, KERNEL_STATUS.RUNNING);
+  assert.equal(result.phase, 'continued');
+  assert.equal(result.cycle, 2);
+  assert.equal(continuations, 1);
+  assert.equal(checkpoints.at(-1).status, KERNEL_STATUS.RUNNING);
 });

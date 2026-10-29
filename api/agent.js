@@ -9,7 +9,8 @@ import {
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
 import { resolveRequestOrg } from "../lib/firm-context.js";
-import { CONSULT_TOOLS, runOfficeManager } from "../lib/orchestrator.js";
+import { CONSULT_TOOLS } from "../lib/orchestrator.js";
+import { runOfficeManagerKernel, KERNEL_STATUS } from "../lib/office-manager-kernel.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { ensureAgentSettings } from "../lib/agent-permissions.js";
@@ -30,6 +31,13 @@ import {
 const SPECIALISTS = SPECIALIST_KEYS; // mission-controller, orpailleur, sika
 
 const RELEASE = "v2.3-architecture-phase1";
+
+function persistedRunStatus(kernelStatus) {
+  if (kernelStatus === KERNEL_STATUS.VERIFIED) return 'verified';
+  if (kernelStatus === KERNEL_STATUS.AWAITING_HUMAN) return 'partial';
+  if (kernelStatus === KERNEL_STATUS.BLOCKED) return 'blocked';
+  return 'partial';
+}
 
 // Resolves the Supabase configuration of an agent.
 // If mission-controller has no office_agent_settings row yet, the legacy
@@ -96,7 +104,6 @@ const CONSULT_TOOL_TO_SPECIALIST = Object.fromEntries(
 function specialistsFromTools(toolsUsed = [], requestedAgent = ROOT_ROUTE) {
   if (requestedAgent !== ROOT_ROUTE) return [requestedAgent];
 
-  // consult_mission_controller / consult_orpailleur / consult_sika
   return [
     ...new Set(
       toolsUsed
@@ -106,10 +113,6 @@ function specialistsFromTools(toolsUsed = [], requestedAgent = ROOT_ROUTE) {
   ];
 }
 
-// Tool events store the Supabase agent_key in specialist_key (possibly the
-// legacy "grand-controleur" for mission-controller) and the logical agent key
-// in metadata.logical_agent_key. Only real specialists are reported; tools run
-// by the root Grand Contrôleur itself are not a "specialist used".
 function specialistsFromEvents(toolEvents = []) {
   return toolEvents
     .map(event =>
@@ -132,7 +135,6 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const message = String(body.message || "").trim();
     const rawRequestedAgent = String(body.agent || ROOT_ROUTE).trim();
-    // "grand-controleur" (legacy specialist key) now means the root agent.
     const requestedAgent = normalizeRequestedAgent(rawRequestedAgent);
     const provider = String(body.provider || "auto").trim();
     const risk = String(body.risk || "normal").trim();
@@ -151,7 +153,6 @@ export default async function handler(req, res) {
     }
     assertIsolatedOrg(orgId);
     await loadGoogleConnection(orgId).catch(() => null);
-    // Only a verified bearer identity may supply personal working preferences.
     const personalAccount = (req.headers?.authorization || req.headers?.Authorization)
       ? await (await import('../lib/user-auth.js')).currentAccount(req)
       : null;
@@ -170,7 +171,6 @@ export default async function handler(req, res) {
         .json({ error: "CONTENT_PROCESSING_APPROVAL_REQUIRED" });
     }
 
-    // A firm set up in the app (go-ahead given) gets its agents on first use.
     await ensureAgentSettings(orgId).catch(() => null);
 
     let contexts;
@@ -191,9 +191,6 @@ export default async function handler(req, res) {
       storageKeys = { ...loaded.storageKeys, [ROOT_AGENT_KEY]: ROOT_AGENT_KEY };
       legacyFallbacks = loaded.legacyFallbacks;
       rootContext = loadedRoot;
-      // The root agent IS the Grand Contrôleur: its runs are stored under
-      // agent_key "grand-controleur", which is also the historical key used
-      // for manager runs in office_agent_runs (no data migration needed).
       runAgentKey = ROOT_AGENT_KEY;
     } else {
       const resolved = await resolveAgentSetting(orgId, requestedAgent);
@@ -223,14 +220,9 @@ export default async function handler(req, res) {
 
       storageKeys = { [requestedAgent]: resolved.storageKey };
       if (resolved.legacyFallback) legacyFallbacks = [requestedAgent];
-
-      // mission-controller without its own settings row is stored under the
-      // legacy "grand-controleur" agent_key (see resolveAgentSetting).
       runAgentKey = resolved.storageKey;
     }
 
-    // Added 2026-10-08: the agent's own memory (MEMORY/AGENTS) — where it stopped, what is
-    // pending, where its detailed memories are. Short text; never blocks the answer (4 s max).
     try {
       const memAgent = requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent;
       const { AGENT_FILES, loadAgentMemory, memorySummary } = await import("../lib/agent-memory.js");
@@ -241,17 +233,15 @@ export default async function handler(req, res) {
         else if (contexts[requestedAgent]) contexts[requestedAgent] = { ...contexts[requestedAgent], agent_memory: summary };
       }
     } catch { /* memory unavailable: the agent works as before */ }
-    // The names the firm gave its agents (Paramètres → Noms des agents): each agent uses them.
+
     try {
       const { agentSettings } = await import("../lib/agent-persona.js");
       const { names } = await agentSettings(orgId);
       const line = "NOMS DANS CE CABINET (utilise-les pour te présenter et pour parler des autres agents) : agent central = " + names["grand-controleur"] + ", documents et Drive = " + names.orpailleur + ", facturation et administratif = " + names.sika + ", préparation des missions = " + names["mission-controller"] + ", revue d'audit = " + names["enhanced-auditor"] + ".";
-      // Who the firm's people are (team sheet, users, confirmed profiles): every agent knows them.
       let members = null;
       try { members = await Promise.race([(await import("../lib/firm-members.js")).membersLine(orgId), new Promise(r => setTimeout(() => r(null), 5000))]); } catch { members = null; }
       if (members) { rootContext = { ...rootContext, firm_members: members }; for (const k of Object.keys(contexts || {})) contexts[k] = { ...contexts[k], firm_members: members }; }
       rootContext = { ...rootContext, agent_names: line };
-      // What each agent has really learnt (Shadow: lessons confirmed by facts or approved by the owner).
       try {
         const { activeLessons } = await import("../lib/shadow.js");
         const own = await activeLessons(requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent);
@@ -264,7 +254,6 @@ export default async function handler(req, res) {
       requestedAgent === ROOT_ROUTE ? "manager" : "direct-specialist";
     const logicalAgentKey =
       requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent;
-    // Routing hint only; the root agent decides the actual delegation.
     const legacyRoute = chooseAgent(message);
 
     run = await createAgentRun({
@@ -286,17 +275,14 @@ export default async function handler(req, res) {
           : `${requestedAgent} operational direct request started`
     });
 
-    // The firm's people-management policy (from its Drive memory), under the app's hard rules,
-    // for the Grand Contrôleur and the Mission Controller (staffing, briefings, messages, KPIs).
     const policy = peoplePolicyContext((await loadPeoplePolicy().catch(() => ({ text: '' }))).text);
     rootContext = { ...(rootContext || {}), people_management: policy };
     if (contexts && contexts["mission-controller"]) contexts["mission-controller"] = { ...contexts["mission-controller"], people_management: policy };
 
-    // The person reads the app in English (settings wheel): the agents answer in English.
     const english = String(req.headers?.["x-om-lang"] || body.lang || "").toLowerCase() === "en";
     if (english) rootContext = { ...(rootContext || {}), reply_language: "English" };
 
-    const result = await runOfficeManager({
+    const kernel = await runOfficeManagerKernel({
       message: english ? message + "\n\n(Answer in English. The firm's documents can be in French or English.)" : message,
       requestedAgent,
       contexts,
@@ -308,6 +294,8 @@ export default async function handler(req, res) {
       storageKeys,
       personalAccount
     });
+    const result = kernel.result;
+    if (!result?.text) throw new Error('OFFICE_MANAGER_KERNEL_NO_RESULT');
 
     const topLevelTools = result.toolsUsed || [];
     const toolEvents = run?.id
@@ -328,7 +316,7 @@ export default async function handler(req, res) {
 
     if (run?.id) {
       await finishAgentRun(run.id, {
-        status: runStatus,
+        status: persistedRunStatus(kernel.status),
         finished_at: new Date().toISOString(),
         summary: result.text.slice(0, 1000),
         metrics: {
@@ -343,18 +331,18 @@ export default async function handler(req, res) {
           legacy_route: legacyRoute,
           specialists_used: specialistsUsed,
           tools_used: toolsUsed,
-          verification_basis: toolsUsed.length
-            ? (runStatus === "verified" ? "explicit_business_verification" : "tool_execution_only")
-            : "no_side_effect",
+          kernel_status: kernel.status,
+          kernel_cycle: kernel.cycle || null,
+          kernel_verification: kernel.verification || null,
           release: RELEASE
         },
-        errors: []
+        errors: kernel.status === KERNEL_STATUS.BLOCKED
+          ? [String(kernel.error?.reason || 'KERNEL_BLOCKED') + (kernel.error?.detail ? ': ' + kernel.error.detail : '')]
+          : []
       });
     }
 
     return res.status(200).json({
-      // "office-manager" kept as the response value of the root route for
-      // existing clients; rootAgentKey identifies it as the Grand Contrôleur.
       agent:
         requestedAgent === ROOT_ROUTE
           ? "office-manager"
@@ -370,7 +358,10 @@ export default async function handler(req, res) {
       reviewed: Boolean(result.review || result.reviewed),
       lastAgent: result.lastAgent || null,
       specialistsUsed,
-      toolsUsed
+      toolsUsed,
+      kernelStatus: kernel.status,
+      verification: kernel.verification || null,
+      questions: kernel.questions || []
     });
   } catch (error) {
     if (run?.id) {

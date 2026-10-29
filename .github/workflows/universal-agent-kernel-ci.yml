@@ -1,0 +1,41 @@
+name: Universal Agent Kernel CI
+
+on:
+  push:
+    branches:
+      - feature/universal-agent-kernel
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  kernel-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Syntax gate
+        run: npm run check
+
+      - name: Universal kernel regressions
+        run: >-
+          node --test
+          tests/agent-kernel.test.js
+          tests/kernel-facades.test.js
+          tests/working-file-kernel.test.js
+          tests/inventory-mission-sync.test.js
