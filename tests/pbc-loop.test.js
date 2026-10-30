@@ -212,7 +212,12 @@ async function withContents() {
   w.d.storePiece = async (o, mid, f) => { const id = 'D' + (Object.keys(w.files).length + 1); w.files[id] = { name: f.name, buffer: f.buffer }; w.stored.push({ file_id: id, name: f.name }); return { file_id: id, name: f.name }; };
   w.d.drive = { getMeta: async id => ({ id, name: w.files[id].name.replace(/\.pdf$/, '.csv'), mimeType: 'text/csv' }), downloadBuffer: async id => w.files[id].buffer };
   w.d.permissions = async () => ({ granted: true });
-  w.d.ai = async (order, o) => { const year = /2025/.test(o.input.split('PIÈCE :')[1]) ? '2025' : '2024';
+  // The common brain (plan B5, 2026-10-30) for the pieces « à trier »: orders from the closed list, with a quoted passage.
+  w.d.missionBrief = async () => ({ documents: [], open: [] }); w.d.noteMission = async () => null; w.d.closeNote = async () => null;
+  w.brainOrders = null;
+  const brain = o => { const read = JSON.parse(o.input).read; const p = read.pieces[0];
+    return { provider: 'mock', text: JSON.stringify(w.brainOrders ? w.brainOrders(read) : { understanding: 'un grand livre 2025', orders: [{ action: 'suggest_attachment', params: { file_id: p.file_id, request_id: p.conversation_requests[0], excerpt: 'Grand livre fournisseurs 2025' }, why: 'son titre' }], notes: [{ kind: 'fait', text: 'Grand livre fournisseurs 2025 reçu' }] }) }; };
+  w.d.ai = async (order, o) => { if (String(o.input).startsWith('{') && /"actions"/.test(o.input)) return brain(o); const year = /2025/.test(o.input.split('PIÈCE :')[1]) ? '2025' : '2024';
     return { provider: 'mock', text: JSON.stringify({ answers: 0, document_type: 'grand livre', matches: year === '2025' ? 'yes' : 'yes', missing: [], excerpt: 'Grand livre fournisseurs ' + year }) }; };
   const realSubmit = w.d.submit;
   w.d.submit = async (o, m, input, account) => { if (input.purpose === 'relance_pbc') w.sentComplements.push(input); return realSubmit(o, m, input, account); };
@@ -310,4 +315,22 @@ test('a confirmed piece is renamed and filed (same file id, never over another f
   await P.fileAccepted('org', M, { id: 'r1' }, manager, deps);
   const again = new ExcelJS.Workbook(); await again.xlsx.load(files.WP.buf);
   assert.equal(again.getWorksheet('PBC_RECUES').rowCount, 2);
+});
+
+// Plan B5 (2026-10-30): the AI's orders for the pieces « à trier » are checked by the code before anything is stored.
+test('a piece to sort: an order quoting a passage absent from the piece, another conversation or an unknown action is refused', async () => {
+  const w = await withContents();
+  w.thread.push(gmailMsg('c-9', 'CFO <cfo@client.com>', '2026-10-20T09:00:00Z', 'Ci-joint.', ['scan001.pdf']));
+  w.contents['c-9'] = ledger(2025);
+  await P.syncReplies('org', M, w.d);
+  w.brainOrders = read => ({ orders: [
+    { action: 'suggest_attachment', params: { file_id: read.pieces[0].file_id, request_id: read.pieces[0].conversation_requests[0], excerpt: 'Balance générale 2023 certifiée' }, why: 'inventé' },
+    { action: 'suggest_attachment', params: { file_id: read.pieces[0].file_id, request_id: 'r-unknown', excerpt: 'Grand livre fournisseurs 2025' }, why: 'autre demande' },
+    { action: 'suggest_attachment', params: { file_id: 'NOT-IN-BATCH', request_id: read.pieces[0].conversation_requests[0], excerpt: 'Grand livre fournisseurs 2025' }, why: 'autre pièce' },
+    { action: 'attach_piece', params: { file_id: read.pieces[0].file_id }, why: 'action hors liste' }] });
+  const r = await P.controlPieces('org', M, w.d);
+  assert.equal(r.sorting.done, 0);
+  assert.deepEqual(r.sorting.refused, ['passage cité non retrouvé dans la pièce', 'demande inconnue, fermée ou d’une autre conversation', 'pièce hors de ce lot', 'action inconnue pour cet agent']);
+  const fid = w.t.rows[0].responses.at(-1).unassigned[0];
+  assert.ok(!w.t.rows[0].responses.at(-1).suggestions?.[fid], 'nothing stored');
 });
