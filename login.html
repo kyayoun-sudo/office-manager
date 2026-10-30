@@ -213,6 +213,8 @@
   }
   function explainCode(label, varName, c) {
     if (!c.configured) { line(label + ' : la variable ' + varName + ' n\u2019existe pas sur ce déploiement (ou « Preview » n\u2019est pas coché, ou il faut redéployer).', false); return; }
+    // The owner code is no longer checked here (2026-10-30): only whether it is set.
+    if (c.checked === false) { line(label + ' : défini sur le serveur' + (c.extra_spaces ? ', mais sa valeur dans Vercel contient un espace en trop au début ou à la fin : corrigez-la, puis redéployez.' : ' (il n’est pas vérifié sur cette page).'), c.extra_spaces ? false : null); return; }
     if (c.matches) { line('Ce code EST le ' + label.toLowerCase() + '.', true); return; }
     if (c.matches_without_spaces) { line('C\u2019est bien le ' + label.toLowerCase() + ', mais la valeur dans Vercel contient un espace en trop au début ou à la fin : corrigez-la, puis redéployez.', false); return; }
     line('Ce code n\u2019est pas le ' + label.toLowerCase() + '.' + (c.extra_spaces ? ' Attention : la valeur dans Vercel contient un espace en trop.' : ''), null);
@@ -224,10 +226,10 @@
       line('Déploiement : ' + (d.environment === 'preview' ? 'aperçu (Preview)' : d.environment === 'production' ? 'production' : d.environment) + (d.branch ? ' — branche ' + d.branch : ''), null);
       explainCode('Code d\u2019accès', 'OFFICE_MANAGER_ACCESS_TOKEN', d.access_code);
       explainCode('Code propriétaire', 'OFFICE_MANAGER_OWNER_TOKEN', d.owner_code);
-      if (d.access_code.matches && d.owner_code.matches) line('Les deux variables ont la même valeur : choisissez un code propriétaire différent.', false);
+      if (d.owner_code.same_as_access_code) line('Les deux variables ont la même valeur : choisissez un code propriétaire différent.', false);
       if (!d.supabase_configured) line('Supabase n\u2019est pas configuré sur ce déploiement (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).', false);
       if (!d.organisation_configured) line('DEFAULT_ORG_ID manque sur ce déploiement.', false);
-    }).catch(function () { line('Vérification impossible : le serveur ne répond pas.', false); });
+    }).catch(function (e) { line(/TOO_MANY_ATTEMPTS|429/.test(String(e && (e.code || e.message))) ? 'Trop d’essais depuis cette adresse : réessayez dans 10 minutes.' : 'Vérification impossible : le serveur ne répond pas.', false); });
   });
 
   $('signup-link').addEventListener('click', function () { $('signup-form').hidden = !$('signup-form').hidden; if (!$('signup-form').hidden) $('s-name').focus(); });

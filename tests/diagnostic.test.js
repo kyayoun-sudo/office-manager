@@ -4,15 +4,27 @@ import { diagnose } from '../lib/diagnostic.js';
 
 const env = { OFFICE_MANAGER_ACCESS_TOKEN: 'acces-123', OFFICE_MANAGER_OWNER_TOKEN: ' proprio-456 ', VERCEL_ENV: 'preview', SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k' };
 
-test('diagnostic: recognises the access code and the owner code, never returns a secret', () => {
+test('diagnostic: recognises the access code; never says whether a typed code is the owner code', () => {
   const a = diagnose({ code: 'acces-123' }, env);
   assert.equal(a.access_code.matches, true);
-  assert.equal(a.owner_code.matches, false);
   assert.ok(!JSON.stringify(a).includes('acces-123') && !JSON.stringify(a).includes('proprio'));
-  const o = diagnose({ code: 'proprio-456' }, env);
-  assert.equal(o.owner_code.matches, false);
-  assert.equal(o.owner_code.matches_without_spaces, true, 'stray spaces in Vercel are detected');
-  assert.equal(o.owner_code.extra_spaces, true);
+  // Audit 2026-10-30: the owner code typed exactly answers the same as a wrong one (no way to guess it here).
+  const o = diagnose({ code: ' proprio-456 ' }, env), wrong = diagnose({ code: 'nope' }, env);
+  assert.deepEqual(o.owner_code, wrong.owner_code);
+  assert.equal(o.owner_code.matches, undefined);
+  assert.equal(o.owner_code.configured, true);
+  assert.equal(o.owner_code.extra_spaces, true, 'stray spaces in Vercel are still detected');
+  assert.equal(diagnose({}, { OFFICE_MANAGER_ACCESS_TOKEN: 'same', OFFICE_MANAGER_OWNER_TOKEN: 'same' }).owner_code.same_as_access_code, true);
+});
+
+test('diagnostic: a limited number of tries per address', async () => {
+  const { _resetAttempts } = await import('../lib/attempts.js');
+  _resetAttempts();
+  const req = { headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' } };
+  for (let i = 0; i < 10; i++) diagnose({ code: 'x' + i }, env, req);
+  assert.throws(() => diagnose({ code: 'again' }, env, req), /TOO_MANY_ATTEMPTS/);
+  diagnose({ code: 'x' }, env, { headers: { 'x-forwarded-for': '198.51.100.2' } });
+  _resetAttempts();
 });
 
 test('diagnostic: reports missing variables', () => {

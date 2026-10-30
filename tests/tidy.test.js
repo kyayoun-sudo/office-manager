@@ -148,7 +148,10 @@ test('decisions teach the Orpailleur; undo moves back and unlearns', async () =>
 test('requests need instructions; background continuation targets the same app', async () => {
   await assert.rejects(createRequest('org-1', {}, { fetchRows: async () => [] }), /INSTRUCTIONS_REQUIRED/);
   let called = null;
-  await continueInBackground({ headers: { host: 'app.example', 'x-forwarded-proto': 'https' } }, REQ, async (url, o) => { called = { url, body: JSON.parse(o.body) }; return {}; });
+  // app.example is this deployment's own address (Vercel sets VERCEL_URL); a forged Host is not followed (audit 2026-10-30).
+  const savedUrl = process.env.VERCEL_URL; process.env.VERCEL_URL = 'app.example';
+  try { await continueInBackground({ headers: { host: 'app.example', 'x-forwarded-proto': 'https' } }, REQ, async (url, o) => { called = { url, body: JSON.parse(o.body) }; return {}; }); }
+  finally { if (savedUrl === undefined) delete process.env.VERCEL_URL; else process.env.VERCEL_URL = savedUrl; }
   assert.equal(called.url, 'https://app.example/api/app?route=tidy');
   assert.deepEqual(called.body, { action: 'step', request_id: REQ });
   assert.ok(ROUTES.tidy.GET && ROUTES.tidy.POST);

@@ -23,6 +23,12 @@ Comment faire :
   4. Mise en service : « Valider la cartographie » / une décision sur une règle passe sans taper le code propriétaire.
   5. Avec un compte « auditeur » : la liste des missions ne montre que SES missions si le réglage des droits (Paramètres →
      Droits, écran « mission ») dit « les siennes ».
+  6. Les travaux en arrière-plan sont maintenant envoyés à l'adresse du déploiement lui-même (pas à celle que donne la
+     requête). Si le cabinet utilise un domaine à lui (ex. app.cabinet.ci), renseigner OFFICE_MANAGER_PUBLIC_URL dans Vercel
+     avec cette adresse ; sans elle, ils partent vers l'adresse *.vercel.app du déploiement (marche aussi). Sur un serveur
+     hors Vercel (pas localhost), renseigner OFFICE_MANAGER_INTERNAL_URL, sinon aucun travail en arrière-plan ne part.
+  7. « Vérifier mon code » (page de connexion) ne dit plus si un code tapé est le code propriétaire : seulement s'il est
+     défini. 10 essais par 10 minutes et par adresse.
 Si l'un de ces essais affiche « UNAUTHORIZED » ou « USER_SESSION_REQUIRED », le noter avec la page et l'heure.
 Autre effet : l'ancien écran index.html (saisie du code à la main) ne peut plus discuter avec l'agent ni lister les missions ;
 utiliser « Assistant » après connexion.

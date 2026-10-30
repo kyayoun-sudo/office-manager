@@ -15,6 +15,7 @@ import crypto from "node:crypto";
 import { driveAdapter } from "../lib/drive-adapter.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { resolveRequestOrg, multiCabinet, pilotOrgId } from "../lib/firm-context.js";
+import { checkAttempts, countAttempt } from "../lib/attempts.js";
 import { loadMemory, ownerSecret } from "../lib/memory-runtime.js";
 import {
   buildMappingReport,
@@ -38,7 +39,10 @@ export function requireOwnerAccess(req) {
     error.statusCode = 500;
     throw error;
   }
-  if (!safeEqual(req.headers["x-office-manager-owner-token"], expected)) {
+  const supplied = req.headers["x-office-manager-owner-token"];
+  if (supplied) checkAttempts("owner-code", req); // audit 2026-10-30: wrong typed codes are limited per address
+  if (!safeEqual(supplied, expected)) {
+    if (supplied) countAttempt("owner-code", req);
     const error = new Error("OWNER_UNAUTHORIZED");
     error.statusCode = 401;
     throw error;

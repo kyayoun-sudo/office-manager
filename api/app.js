@@ -1,5 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
-import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal } from '../lib/firm-context.js';
+import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal, internalBaseUrl } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
 import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
@@ -488,7 +488,7 @@ export const ROUTES = Object.freeze({
     POST: (orgId, req) => tidyAction(orgId, req),
     unavailable: 'TIDY_UNAVAILABLE'
   },
-  diagnostic: { POST: open((orgId, req) => diagnose(req.body || {})), unavailable: 'DIAGNOSTIC_UNAVAILABLE' },
+  diagnostic: { POST: open((orgId, req) => diagnose(req.body || {}, process.env, req)), unavailable: 'DIAGNOSTIC_UNAVAILABLE' },
   'agent-schedule': {
     GET: owner((orgId) => getSchedule(orgId)),
     POST: owner((orgId, req) => saveSchedule(orgId, req.body || {}, req.body?.updated_by)),
@@ -634,7 +634,8 @@ export const ROUTES = Object.freeze({
     GET: owner(async () => ({ ...(await firmKnowledge()), tidy: await tidyStatus().catch(() => null) })),
     POST: owner(async (orgId, req) => {
       if (req.body?.action === 'learn') { await fireInternal(req, '/api/app?route=firm-learn', { skip_tidy: req.body?.skip_tidy === true }); return { started: true }; }
-      if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: req.body?.by || null });
+      // The connected account answers; the name sent by the page only with the owner code typed by hand (audit 2026-10-30).
+      if (req.body?.action === 'answer') return answerQuestion({ ...req.body, by: who(req) || req.body?.by || null });
       if (req.body?.action === 'tidy') return startTidyPlan(orgId, req, req.body.browser_batches === true ? { resume: true, fire: async () => true } : {});
       if (req.body?.action === 'tidy-batch') return tidyPlanStep(orgId, req, { noLoop: true });
       if (req.body?.action === 'tidy-stop') return stopTidy(orgId, req.account?.display_name || req.account?.email || req.body?.by || 'propriétaire');
@@ -1154,17 +1155,18 @@ export const ROUTES = Object.freeze({
 
 // Starts the next background step without waiting for it (separate invocation).
 export function continueInBackground(req, requestId, fetchImpl = fetch) {
-  const host = req.headers?.host;
-  if (!host || !requestId) return Promise.resolve(false);
-  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+  // This deployment's own address, never a forged Host (audit 2026-10-30, lib/firm-context.js internalBaseUrl).
+  const base = internalBaseUrl(req);
+  if (!base || !requestId) return Promise.resolve(false);
+  const path = '/api/app?route=tidy';
   // The firm travels with the call, signed by the server, as in fireInternal (audit 2026-10-30: several firms, the next
   // step of another firm's tidy-up arrived without it and stopped).
-  const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '', ...internalHeaders() };
+  const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '', ...internalHeaders(undefined, process.env, { path }) };
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   // Protected preview (Vercel Authentication): the owner's own preview cookie lets the background call through.
   const jwt = String(req?.headers?.cookie || '').match(/(?:^|;\s*)(_vercel_jwt=[^;]+)/);
   if (jwt) headers.Cookie = jwt[1];
-  const sent = fetchImpl(proto + '://' + host + '/api/app?route=tidy', {
+  const sent = fetchImpl(base + path, {
     method: 'POST', headers, body: JSON.stringify({ action: 'step', request_id: requestId })
   }).then(() => true, () => false);
   return Promise.race([sent, new Promise(r => setTimeout(() => r(true), 1500))]);

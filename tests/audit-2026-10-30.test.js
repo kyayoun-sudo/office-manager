@@ -48,8 +48,10 @@ test('api/app: a route without its own rule needs a person or the signed server;
       await assert.rejects(handleApp({ method, query: { route }, headers: pilotOnly, body: { action: 'step' } }), /USER_SESSION_REQUIRED/, route + ' must refuse the shared token alone');
     }
     // The server's own background call goes through the access check (it then fails further on, on the missing database).
-    const signed = { ...pilotOnly, ...internalHeaders(ORG) };
-    await assert.rejects(handleApp({ method: 'GET', query: { route: 'passes' }, headers: signed }), e => !/USER_SESSION_REQUIRED|UNAUTHORIZED/.test(e.message));
+    const signed = { ...pilotOnly, ...internalHeaders(ORG, process.env, { path: '/api/app?route=passes' }) };
+    await assert.rejects(handleApp({ method: 'GET', url: '/api/app?route=passes', query: { route: 'passes' }, headers: signed }), e => !/USER_SESSION_REQUIRED|UNAUTHORIZED/.test(e.message));
+    // The same signature does not open another route.
+    await assert.rejects(handleApp({ method: 'POST', url: '/api/app?route=tidy', query: { route: 'tidy' }, headers: signed, body: { action: 'step' } }), /USER_SESSION_REQUIRED/);
     // Every route is now decided: public, owner, roles, screen, or « a person / the server ».
     assert.ok(ROUTES.branding.GET, 'branding stays readable on the login page');
   } finally { process.env = saved; }
@@ -81,15 +83,74 @@ test('the owner tools accept the owner\'s session and sign in the name of the co
   await assert.rejects(handleOwnerRequest({ method: 'GET', headers: {} }, { drive: {}, ownerAccount: { role: 'owner', email: 'p@x' } }), e => !/OWNER_UNAUTHORIZED|OWNER_TOKEN_MISSING/.test(e.message));
 });
 
+test('wrong owner codes typed by hand are limited per address; an empty header (session pages) is not counted', async () => {
+  const saved = { ...process.env };
+  process.env.OFFICE_MANAGER_OWNER_TOKEN = 'the-owner-code';
+  try {
+    const { requireFirmOwner } = await import('../lib/owner-auth.js');
+    const { _resetAttempts } = await import('../lib/attempts.js');
+    _resetAttempts();
+    const from = (code, ip = '203.0.113.9') => ({ headers: { 'x-office-manager-owner-token': code, 'x-forwarded-for': ip } });
+    for (let i = 0; i < 30; i++) assert.throws(() => requireFirmOwner(from('')), /OWNER_ONLY/);
+    for (let i = 0; i < 10; i++) assert.throws(() => requireFirmOwner(from('guess' + i)), /OWNER_ONLY/);
+    assert.throws(() => requireFirmOwner(from('the-owner-code')), /TOO_MANY_ATTEMPTS/, 'even the right code waits once the tries are used');
+    requireFirmOwner(from('the-owner-code', '198.51.100.3'));
+    _resetAttempts();
+  } finally { process.env = saved; }
+});
+
+test('a database failure is not « no Google connection » (and is not remembered as such)', async () => {
+  const { loadGoogleConnection, resetGoogleConnectionCache } = await import('../lib/google-connection.js');
+  resetGoogleConnectionCache();
+  let calls = 0;
+  const down = async () => { calls++; throw new Error('SUPABASE_503: upstream connect error'); };
+  assert.equal(await loadGoogleConnection(ORG, { fetchRows: down }), null);
+  await loadGoogleConnection(ORG, { fetchRows: down });
+  const before = calls;
+  // Not cached as « none »: the next request asks the database again.
+  await loadGoogleConnection(ORG, { fetchRows: down });
+  assert.ok(calls > before, 'the failure was not remembered as « no connection »');
+  // A table not installed yet still means « no connection ».
+  const missing = async () => { throw new Error('SUPABASE_404: {"code":"PGRST205"}'); };
+  assert.equal(await loadGoogleConnection('33333333-3333-4333-8333-333333333333', { fetchRows: missing }), null);
+  resetGoogleConnectionCache();
+});
+
 test('the next tidy step carries the firm, signed', async () => {
   const saved = { ...process.env };
-  Object.assign(process.env, { OFFICE_MANAGER_SCHEDULER_SECRET: 's3cret', DEFAULT_ORG_ID: ORG });
+  Object.assign(process.env, { OFFICE_MANAGER_SCHEDULER_SECRET: 's3cret', DEFAULT_ORG_ID: ORG, VERCEL_URL: 'app.example' });
   try {
     const { continueInBackground } = await import('../api/app.js');
     const { runInFirm } = await import('../lib/firm-context.js');
-    let sent = null;
-    await runInFirm(ORG, () => continueInBackground({ headers: { host: 'app.example' } }, 'req-1', async (url, init) => { sent = init.headers; return { ok: true }; }));
+    let sent = null, to = null;
+    await runInFirm(ORG, () => continueInBackground({ headers: { host: 'app.example' } }, 'req-1', async (url, init) => { to = url; sent = init.headers; return { ok: true }; }));
     assert.equal(sent['x-office-manager-org'], ORG);
-    assert.ok(isSignedInternal({ headers: sent }, ORG, process.env));
+    assert.ok(isSignedInternal({ headers: sent, url: '/api/app?route=tidy' }, ORG, process.env));
+    // A forged Host never receives the call (nor the secrets it carries): this deployment's own address is used.
+    await runInFirm(ORG, () => continueInBackground({ headers: { host: 'attacker.example' } }, 'req-1', async url => { to = url; return { ok: true }; }));
+    assert.equal(to, 'https://app.example/api/app?route=tidy');
   } finally { process.env = saved; }
+});
+
+test('a server signature is valid for one endpoint and a few minutes only', async () => {
+  const { INTERNAL_MAX_AGE_MS } = await import('../lib/firm-context.js');
+  const env = { OFFICE_MANAGER_INTERNAL_SECRET: 's3cret' };
+  const now = 1_800_000_000_000;
+  const headers = internalHeaders(ORG, env, { path: '/api/app?route=tidy-plan-step', now });
+  assert.ok(isSignedInternal({ headers, url: '/api/app?route=tidy-plan-step' }, ORG, env, now + 1000));
+  assert.ok(!isSignedInternal({ headers, url: '/api/app?route=firm-reset' }, ORG, env, now + 1000), 'another route');
+  assert.ok(!isSignedInternal({ headers, url: '/api/agent' }, ORG, env, now + 1000), 'another endpoint');
+  assert.ok(!isSignedInternal({ headers, url: '/api/app?route=tidy-plan-step' }, ORG, env, now + INTERNAL_MAX_AGE_MS + 1), 'expired');
+  assert.ok(!isSignedInternal({ headers: { ...headers, 'x-office-manager-internal-at': String(now + 5000) }, url: '/api/app?route=tidy-plan-step' }, ORG, env, now), 'date changed');
+  assert.ok(!isSignedInternal({ headers: { 'x-office-manager-internal': headers['x-office-manager-internal'] }, url: '/api/app?route=tidy-plan-step' }, ORG, env, now), 'no date');
+});
+
+test('background calls go to this deployment, a forged Host is ignored', async () => {
+  const { internalBaseUrl } = await import('../lib/firm-context.js');
+  const env = { VERCEL_URL: 'om-abc123.vercel.app', VERCEL_BRANCH_URL: 'om-git-branch.vercel.app', OFFICE_MANAGER_PUBLIC_URL: 'https://app.cabinet.ci' };
+  assert.equal(internalBaseUrl({ headers: { host: 'om-git-branch.vercel.app' } }, env), 'https://om-git-branch.vercel.app');
+  assert.equal(internalBaseUrl({ headers: { host: 'app.cabinet.ci' } }, env), 'https://app.cabinet.ci');
+  assert.equal(internalBaseUrl({ headers: { host: 'evil.example' } }, env), 'https://om-abc123.vercel.app');
+  assert.equal(internalBaseUrl({ headers: { host: 'localhost:3000' } }, {}), 'http://localhost:3000');
+  assert.equal(internalBaseUrl({ headers: { host: 'evil.example' } }, {}), null, 'nowhere to send it: nothing is sent');
 });
