@@ -19,7 +19,8 @@ function versionedDrive() {
       if (expectedModifiedTime && expectedModifiedTime !== 'v' + file.v) throw new Error('MEMORY_CONFLICT');
       file = { body: buffer.toString('utf8'), v: ++v };
     },
-    createBinary: async ({ buffer }) => { file = { body: buffer.toString('utf8'), v: ++v }; return { id: 'F' }; }
+    // As the real adapter (lib/memory-files.js): a memory file that already exists is never created twice.
+    createBinary: async ({ buffer }) => { await new Promise(r => setTimeout(r, 2)); if (file) throw new Error('MEMORY_FILE_EXISTS: X'); file = { body: buffer.toString('utf8'), v: ++v }; return { id: 'F' }; }
   };
 }
 
@@ -40,4 +41,14 @@ test('updateJsonFile uses the reader and writer it is given (deposits pass their
   const r = await updateJsonFile('X.json', s => ({ ...s, deposits: { ...s.deposits, b: 2 } }), { drive: {}, folder: 'f', load, save });
   assert.deepEqual(r.state.deposits, { a: 1, b: 2 });
   assert.deepEqual(calls, ['load', 'save:v1'], 'written over the version read');
+});
+
+test('capability gaps of two missions recorded at the same time: both are kept', async () => {
+  const { recordGaps } = await import('../lib/capabilities.js');
+  const drive = versionedDrive();
+  await Promise.all([
+    recordGaps({ mission_id: 'M1', mission: 'Audit A', gaps: [{ capability: 'IFRS 16' }] }, { drive, folder: 'mem' }),
+    recordGaps({ mission_id: 'M2', mission: 'Audit B', gaps: [{ capability: 'Fiscalité minière' }] }, { drive, folder: 'mem' })
+  ]);
+  assert.deepEqual(drive.get().gaps.map(g => g.mission_id).sort(), ['M1', 'M2']);
 });
