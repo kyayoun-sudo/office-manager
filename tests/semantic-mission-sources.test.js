@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { enrichMissionSources, semanticProjection } from '../lib/semantic-mission-sources.js';
+import { enrichMissionSources, semanticProjection, semanticSourceLabel } from '../lib/semantic-mission-sources.js';
 
 test('PBC catalogue entry is enriched by mission meaning instead of hiding it', async () => {
   const base = [{
@@ -52,6 +52,16 @@ test('misleading filename cannot erase the remembered semantic identity of a pie
   assert.equal(result[0].role, 'lettre_avis_non_objection');
   assert.equal(result[0].title, 'Avis de non-objection PTBA');
   assert.match(result[0].summary, /pas un grand livre/);
+  assert.equal(semanticSourceLabel(result[0]), 'Avis de non-objection PTBA — grand_livre.xlsx');
+});
+
+test('meaning-first label falls back to semantic summary before raw filename', () => {
+  const label = semanticSourceLabel({
+    name: 'document123.pdf',
+    role: 'piece_recue',
+    summary: 'Lettre du bailleur approuvant le PTBA 2023.'
+  });
+  assert.equal(label, 'Lettre du bailleur approuvant le PTBA 2023. — document123.pdf');
 });
 
 test('mission-only remembered documents join the Working File catalogue', async () => {
