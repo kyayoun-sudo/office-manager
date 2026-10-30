@@ -78,6 +78,22 @@ test('trusted full inventory path is not rewritten every time by a relative Driv
   assert.equal(writes, 0);
 });
 
+test('reality hydration refuses to reason when a folder hit the current 100-item scan ceiling', async () => {
+  let inventoryCalled = false;
+  const out = await hydrateEnhancedAuditorReality('org-1', 'mission-1', {
+    fetchRows: async () => [{ id: 'mission-1', name: 'Mission A', drive_folder_id: 'root', org_id: 'org-1' }],
+    missionDocuments: async () => [],
+    scanMissionDrive: async () => ({ files: Array.from({ length: 100 }, (_, i) => ({ id: 'doc-' + i })), folders: 1, possibly_truncated: true }),
+    syncInventoryMissionDocuments: async () => { inventoryCalled = true; return { status: 'ok' }; },
+    reconcileMissionMemoryCopies: async () => ({ status: 'ok' })
+  });
+
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'MISSION_REALITY_SCAN_INCOMPLETE');
+  assert.equal(out.drive_scan.possibly_truncated, true);
+  assert.equal(inventoryCalled, false);
+});
+
 test('reality hydration blocks instead of working blind when physical Drive and memory still disagree', async () => {
   const out = await hydrateEnhancedAuditorReality('org-1', 'mission-1', {
     fetchRows: async () => [{ id: 'mission-1', name: 'Mission A', drive_folder_id: 'root', org_id: 'org-1' }],
