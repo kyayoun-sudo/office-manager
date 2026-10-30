@@ -30,12 +30,12 @@ cases d'identité) ; le remplissage des feuilles de données s'en sert. Restent 
 
 | # | Travail | Pourquoi | Comment |
 |---|---|---|---|
-| 1 | Carte gardée par version du modèle + validée par un Manager | aujourd'hui recalculée à chaque ouverture, jamais confirmée | `OFFICE_MANAGER_WORKFILE_MAPS.json` (clé `map.key` + version Drive), bouton « La carte est juste » ; une carte validée passe avant la carte calculée |
+| 1 ⏸ À CONCEVOIR AVEC PAUL (écran de correction du rôle des colonnes : valider sans pouvoir corriger n'apporte rien) | Carte gardée par version du modèle + validée par un Manager | aujourd'hui recalculée à chaque ouverture, jamais confirmée | `OFFICE_MANAGER_WORKFILE_MAPS.json` (clé `map.key` + version Drive), bouton « La carte est juste » ; une carte validée passe avant la carte calculée |
 | 2 | ✅ FAIT le 30/10 — `writeWorkpaper` lit la carte | il écrit aux positions du fichier de base : la colonne « N° » peut être écrasée, la conclusion est cherchée sous le tableau | n'écrire que dans les colonnes que `mayWrite(map, …)` autorise ; conclusion = case d'identité « Conclusion » de la carte, sinon question |
 | 3 | ✅ DÉJÀ FAIT (préparation de l'agent filtrée par `mayWrite`, `sop-document-work.js`) — `writableCell` respecte les jugements | les colonnes de jugement (✓ L/M/N de PRJ-05) sont écrites avant confirmation | refuser les colonnes `judgment` tant que la personne n'a pas confirmé |
-| 4 | Tirage d'échantillon du fichier | `drawSample` tire un second échantillon même si le modèle a déjà le sien | lire le tirage du fichier quand la carte trouve une feuille d'échantillon ; tirer seulement sinon |
-| 5 | Pièce rattachée à la ligne du test | la pièce d'un élément testé n'est liée qu'au test entier | `attach_piece(test, row, file_id)`, lien écrit dans la colonne « référence pièce » si la carte en a une |
-| 6 | Agrandir un tableau sans casser les formules des autres feuilles | ExcelJS ne met pas à jour les formules des autres feuilles | réécriture contrôlée des références + recontrôle des totaux avant / après (déjà en partie dans `lib/workfile-extend.js`) |
+| 4 ⏸ BESOIN D'UN MODÈLE RÉEL qui fait son propre tirage (formules ALEA, feuille d'échantillon) pour le reconnaître sans deviner | Tirage d'échantillon du fichier | `drawSample` tire un second échantillon même si le modèle a déjà le sien | lire le tirage du fichier quand la carte trouve une feuille d'échantillon ; tirer seulement sinon |
+| 5 ✅ DÉJÀ FAIT (pièces par élément, PIECES_<CYCLE>/<CODE>/<CODE>_<S01>_…, écrites sur la ligne par writeWorkpaper) | Pièce rattachée à la ligne du test | la pièce d'un élément testé n'est liée qu'au test entier | `attach_piece(test, row, file_id)`, lien écrit dans la colonne « référence pièce » si la carte en a une |
+| 6 ✅ DÉJÀ FAIT (workfile-extend : formules de toutes les feuilles et noms décalés ; vérifié sur NL-T01 le 25/10) | Agrandir un tableau sans casser les formules des autres feuilles | ExcelJS ne met pas à jour les formules des autres feuilles | réécriture contrôlée des références + recontrôle des totaux avant / après (déjà en partie dans `lib/workfile-extend.js`) |
 
 Essai indispensable : un working file d'**un autre cabinet** (pas NL-T01), réel ou fidèle, avec la vraie IA.
 
