@@ -228,3 +228,25 @@ test('a stale procedure save cannot overwrite a newer reading or human confirmat
   const saved=await P.patch('O',row,{walkthrough:[]},{email:'human@test'},async()=>[{...row,updated_by:'human@test'}]);
   assert.equal(saved.updated_by,'human@test');
 });
+
+// Audit 2026-10-30: on a firm's OWN model, the template's numbering « N° » is the model's, not the sample's: the sample
+// references go to the « Réf. » column and the numbers stay (they used to be replaced: S01, S02… over 1, 2…).
+test('a firm model keeps its « N° » numbering; the sample goes to its reference column', async () => {
+  const { t, d } = world();
+  t.files.POPFILEXXXXXXXXXXXXXXXXX = { buf: await populationXlsx(), mt: 'p1' };
+  const wb0 = new ExcelJS.Workbook(); const ws0 = wb0.addWorksheet('ACH-03');
+  ws0.addRow(['Test ACH-03 (modèle du cabinet)']);
+  const h = ws0.addRow(['N°', 'Réf. échantillon', 'Date', 'Montant', 'Résultat (PASS / EXCEPTION)', 'Commentaire']);
+  h.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; });
+  for (let i = 1; i <= 3; i++) { const r = ws0.addRow([i, '', '', '', '', '']); [2, 3, 4, 5, 6].forEach(c => { r.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }; }); }
+  ws0.addRow([]); ws0.addRow(['Conclusion']); ws0.addRow(['']);
+  t.files.WP1 = { buf: Buffer.from(await wb0.xlsx.writeBuffer()), mt: 'w1' };
+  await P.setPopulation('org', M, 'ACH-03', { file: 'POPFILEXXXXXXXXXXXXXXXXX', columns: { ref: 0, date: 1, party: 2, amount: 4 }, gl_total: 7599500.5 }, ali, d);
+  const s = await P.drawSample('org', M, 'ACH-03', {}, ali, d);
+  for (const it of s.work.items) await P.recordItem('org', M, 'ACH-03', { sample_id: it.sample_id, result: 'PASS', evidence_ref: 'p.' + it.row }, ali, d);
+  await P.writeWorkpaper('org', M, 'ACH-03', ali, d);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(t.files.WP1.buf); const ws = wb.getWorksheet('ACH-03');
+  assert.deepEqual([3, 4, 5].map(r => ws.getRow(r).getCell(1).value), [1, 2, 3], 'the numbering of the model is kept');
+  assert.match(String(ws.getRow(3).getCell(2).value), /^S01/, 'the sample goes to « Réf. échantillon »');
+  assert.equal(ws.getRow(3).getCell(5).value, 'PASS');
+});
