@@ -47,6 +47,37 @@ test('reality hydration registers a physical mission file missing from memory be
   assert.equal(out.documents[0].role, 'piece_recue');
 });
 
+test('trusted full inventory path is not rewritten every time by a relative Drive scan path', async () => {
+  const modifiedTime = '2026-10-30T00:00:00Z';
+  const docs = [{
+    id: 'doc-1',
+    name: 'GL October.xlsx',
+    path: 'Clients/ABC/Audit 2026/Audit/GL October.xlsx',
+    location: 'Clients/ABC/Audit 2026/Audit/GL October.xlsx',
+    folder_id: 'audit',
+    audit_read: { status: 'EXCERPTS_READ', revision: modifiedTime + '|7|abc' }
+  }];
+  let writes = 0;
+
+  const out = await hydrateEnhancedAuditorReality('org-1', 'mission-1', {
+    fetchRows: async () => [{ id: 'mission-1', name: 'Mission A', drive_folder_id: 'root', org_id: 'org-1' }],
+    missionDocuments: async () => docs,
+    recordMissionDocuments: async () => { writes++; },
+    scanMissionDrive: async () => ({
+      files: [{ id: 'doc-1', name: 'GL October.xlsx', path: 'Audit/GL October.xlsx', parent_id: 'audit', modifiedTime }],
+      folders: 2,
+      possibly_truncated: false
+    }),
+    syncInventoryMissionDocuments: async () => ({ status: 'ok', inventory: 1, missing: 0, changed: 0, attached: 0, unchanged: 1 }),
+    reconcileMissionMemoryCopies: async () => ({ status: 'ok', missions: 1, synced: 0, unchanged: 1, documents: 1 })
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.repaired_files, 0);
+  assert.equal(out.changed, false);
+  assert.equal(writes, 0);
+});
+
 test('reality hydration blocks instead of working blind when physical Drive and memory still disagree', async () => {
   const out = await hydrateEnhancedAuditorReality('org-1', 'mission-1', {
     fetchRows: async () => [{ id: 'mission-1', name: 'Mission A', drive_folder_id: 'root', org_id: 'org-1' }],
