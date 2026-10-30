@@ -70,3 +70,6 @@ jobs:
 
       - name: Full repository test suite
         run: npm test
+
+      - name: SQL/schema verification
+        run: npm run test:sql
