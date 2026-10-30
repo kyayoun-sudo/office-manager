@@ -5,7 +5,8 @@ import { introView, saveIntro, driveIdFromLink, AGENT_INTROS } from '../lib/agen
 function store() {
   let settings = {}; const audits = [];
   return { audits, get: () => settings,
-    d: { fetchRows: async (p, o) => { if (o?.method === 'POST') { settings = JSON.parse(o.body)[0].settings; return []; } return [{ settings }]; },
+    // Like the database: the row comes back with its version; a write returns the row it wrote (firm-settings-store).
+    d: { fetchRows: async (p, o) => { if (o?.method === 'POST' || o?.method === 'PATCH') { const b = JSON.parse(o.body); settings = (Array.isArray(b) ? b[0] : b).settings; return [{ settings }]; } return [{ settings, updated_at: 'v1' }]; },
       getMeta: async id => id === 'GOODFILEID1234567890ABC' ? { id, name: 'Liste PBC', mimeType: 'application/vnd.google-apps.spreadsheet' } : id === 'BINNEDFILE1234567890ABC' ? { id, trashed: true } : null,
       audit: async (o, ev) => { audits.push(...ev); } } };
 }

@@ -168,7 +168,8 @@ test('the reviews of a procedure read the firm setting; changing it is refused u
   void t;
   const { saveFirmSettings } = await import('../lib/roles.js');
   const writes = [];
-  const fr = async (path, o) => { if (o?.method) writes.push(path); return path.startsWith('office_firm_settings?org_id') ? [{ settings: { supervisor_position: 'above_manager' } }] : []; };
+  // Like the database: the row has its version; a settings write returns the row it wrote (firm-settings-store).
+  const fr = async (path, o) => { if (o?.method) { writes.push(path); return path.startsWith('office_firm_settings') ? [{ settings: JSON.parse(o.body).settings }] : []; } return path.startsWith('office_firm_settings?org_id') ? [{ settings: { supervisor_position: 'above_manager' }, updated_at: 'v1' }] : []; };
   await assert.rejects(saveFirmSettings('org', { supervisor_position: 'beside' }, 'p@c.ci', fr), /UNKNOWN_SUPERVISOR_POSITION/);
   const saved = await saveFirmSettings('org', { supervisor_position: 'below_manager' }, 'p@c.ci', fr);
   assert.equal(saved.supervisor_position, 'below_manager');

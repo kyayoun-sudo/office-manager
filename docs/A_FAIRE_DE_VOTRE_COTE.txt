@@ -30,6 +30,19 @@ Comment faire :
   7. « Vérifier mon code » (page de connexion) ne dit plus si un code tapé est le code propriétaire : seulement s'il est
      défini. 10 essais par 10 minutes et par adresse.
 Si l'un de ces essais affiche « UNAUTHORIZED » ou « USER_SESSION_REQUIRED », le noter avec la page et l'heure.
+
+-----------------------------------------------------------------------------------------------------------------
+000bis. [ ] MESURER L'AGENT SUR UNE VRAIE MISSION TERMINÉE                                    (30 octobre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : le remplissage des working files n'a jamais été mesuré avec la vraie IA sur de vraies pièces. Il faut une mission
+terminée dont le working file a été rempli à la main (la « référence »).
+Comment faire : suivre docs/MESURER_LE_REMPLISSAGE.md (7 étapes). À la fin, donner à Claude les deux fichiers (référence et
+fichier rempli par l'agent) ou lancer vous-même :
+  node scripts/compare-workfile.mjs reference.xlsx candidat.xlsx --out rapport.md
+Le rapport donne le pourcentage de cases justes et la liste des cases à regarder.
+
+Regarder aussi, de temps en temps, l'onglet « Actions » du dépôt GitHub : la CI était rouge depuis le 30/10 au matin sans
+que personne ne le voie, et c'est ainsi qu'une règle de l'Orpailleur avait été perdue. Elle est de nouveau verte.
 Autre effet : l'ancien écran index.html (saisie du code à la main) ne peut plus discuter avec l'agent ni lister les missions ;
 utiliser « Assistant » après connexion.
 

@@ -16,7 +16,12 @@ noyau universel des agents `lib/*-kernel.js`, absent ci-dessous). Piège prouvé
 clé : `OFFICE_MANAGER_INTERNAL_SECRET` → `…SCHEDULER_SECRET` → `ORPAILLEUR_JOB_SECRET` → clé Supabase) ; les `api/*.js` séparés
 passent par `lib/caller.js` (`requirePersonOrServer`, `visibleMissionIds`). Un appel en arrière-plan passe par `fireInternal`, jamais
 un `fetch` maison : la signature vaut pour UN point d'accès et 10 minutes (`internalHeaders(org, env, { path })`), l'adresse est celle du
-déploiement (`internalBaseUrl`, jamais un Host forgé). Codes tapés : `lib/attempts.js` (10 essais / 10 min / adresse). Le code propriétaire n'est plus remis au navigateur (session du propriétaire / d'un associé).
+déploiement (`internalBaseUrl`, jamais un Host forgé). Codes tapés : `lib/attempts.js` (10 essais / 10 min / adresse).
+**Réglages du cabinet (`office_firm_settings.settings`) : JAMAIS lire-puis-réécrire à la main** — toujours
+`changeFirmSettings(orgId, s => ({ ...s, clé }), …)` (`lib/firm-settings-store.js` : lecture stricte, écriture conditionnelle sur
+`updated_at`). Une lecture en panne effaçait tous les autres réglages ; deux écritures s'écrasaient. Fausses bases des tests : une
+écriture rend la ligne écrite et la lecture donne `updated_at`. Après chaque envoi : `gh run list` (la CI doit être verte, Node 24).
+Mesurer le remplissage sur une vraie mission : `docs/MESURER_LE_REMPLISSAGE.md`, `scripts/compare-workfile.mjs`. Le code propriétaire n'est plus remis au navigateur (session du propriétaire / d'un associé).
 
 **Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.
 
