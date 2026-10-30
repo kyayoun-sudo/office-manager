@@ -4,7 +4,8 @@ import { dispatchPool, providerFailure, resetPoolHealth, trackedProviderCall, po
 import { firstAvailable, multiModel } from '../lib/ai-plus.js';
 import { sdkProviderConfig } from '../lib/ai-sdk-provider.js';
 import { Agent, Runner, tool } from '@openai/agents';
-import { Usage } from '@openai/agents-core';
+// The package the app depends on (pnpm in CI does not expose its internal @openai/agents-core).
+import { Usage } from '@openai/agents';
 
 test.beforeEach(() => resetPoolHealth());
 const env = { OPENAI_API_KEY: 'synthetic-openai', MISTRAL_API_KEY: 'synthetic-mistral' };
