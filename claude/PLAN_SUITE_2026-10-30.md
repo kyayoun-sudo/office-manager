@@ -14,10 +14,10 @@ leur ancien moteur (`work()`), où des choix sont faits par le code (mots-clés,
 
 | # | Agent | Décision aujourd'hui prise par le code | Actions fermées proposées | Vérification par le code |
 |---|---|---|---|---|
-| 1 | Mission Controller | rattacher une pièce reçue à une demande PBC (`assignPiece` : suggestion de l'IA, une personne rattache) ; contacts du client | `attach_piece(request_id, file_id)` *approval* ; `propose_contact(email, role)` *approval* ; `note_missing(document)` | la pièce est dans `PIECES_RECUES` de la mission ; la demande est ouverte ; l'adresse vient d'un vrai message reçu |
-| 2 | Orpailleur | la liste PBC reconnue (`lib/pbc-lists.js` : signature + mots d'en-tête) | `declare_pbc_list(file_id, header_row, columns)` *approval* | les colonnes nommées existent à cette ligne ; le fichier est bien dans le Drive choisi |
-| 3 | Firm Manager | cases du classeur d'acceptation remplies depuis le TDR (`lib/acceptance-workbook.js`) | `fill_cell(sheet, cell, value, source_quote)` ; `ask(question)` | la case est vide et n'est pas une case de décision ; la citation est retrouvée mot pour mot dans le TDR |
-| 4 | Sika | rapprochement facture ↔ encaissement | `match_payment(invoice, credit_line)` *approval* | montant et date retrouvés dans le relevé |
+| 1 ✅ 30/10 | Mission Controller | rattacher une pièce reçue à une demande PBC (`assignPiece` : suggestion de l'IA, une personne rattache) ; contacts du client | `attach_piece(request_id, file_id)` *approval* ; `propose_contact(email, role)` *approval* ; `note_missing(document)` | la pièce est dans `PIECES_RECUES` de la mission ; la demande est ouverte ; l'adresse vient d'un vrai message reçu |
+| 2 ✅ 30/10 | Orpailleur | la liste PBC reconnue (`lib/pbc-lists.js` : signature + mots d'en-tête) | `declare_pbc_list(file_id, header_row, columns)` *approval* | les colonnes nommées existent à cette ligne ; le fichier est bien dans le Drive choisi |
+| 3 ✅ 30/10 (citations vérifiées avant écriture) | Firm Manager | cases du classeur d'acceptation remplies depuis le TDR (`lib/acceptance-workbook.js`) | `fill_cell(sheet, cell, value, source_quote)` ; `ask(question)` | la case est vide et n'est pas une case de décision ; la citation est retrouvée mot pour mot dans le TDR |
+| 4 — sans objet : aucun rapprochement codé à convertir ; Sika est déjà l'agent de conversation (outils choisis par l'IA). Un rapprochement automatique = fonction nouvelle à spécifier (où sont les factures, quels relevés) | Sika | rapprochement facture ↔ encaissement | `match_payment(invoice, credit_line)` *approval* | montant et date retrouvés dans le relevé |
 
 Chaque étape : l'ancien chemin reste le secours quand l'IA ne répond pas (comme aujourd'hui), jamais une décision du code à sa
 place ; tests « IA répond / IA en panne / IA propose une action hors liste / IA cite un passage absent ».

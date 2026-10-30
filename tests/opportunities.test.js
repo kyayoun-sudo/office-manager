@@ -118,7 +118,7 @@ async function setup(templateOverride = null) {
   };
   const d = { drive, folder: 'MEM', home: 'HOME', tidy: fakeTidy(drive), ai, research: async () => ({ text: 'rien de négatif [source](https://example.org)', sources: [{ url: 'https://example.org' }], web: true, provider: 'fake' }),
     fire: async (req, path, body) => { fired.push({ path, body }); }, handleMissionEvents: async () => null, emit: async (org, ev) => { events.push(ev); return { recorded: true }; }, audit: async (org, e) => { audits.push(e); },
-    fileForAI: async id => ({ id, name: drive.files.get(id).name, text: 'TERMES DE RÉFÉRENCE — Société Ivoirienne Test — AO N°2026/015', url: 'https://drive/' + id, visual: false }),
+    fileForAI: async id => ({ id, name: drive.files.get(id).name, text: 'TERMES DE RÉFÉRENCE — Société Ivoirienne Test — AO N°2026/015 — mission d’audit légal — offres avant le 30 novembre 2026', url: 'https://drive/' + id, visual: false }),
     fetchRows: async () => [{ id: 'm1', name: 'Audit SOCIETE IVOIRIENNE TEST 2024', mission_code: 'SIT-24', status: 'closed' }],
     capabilityContext: async () => ({ people: [{ kind: 'employee', full_name: 'A. Senior', title: 'Senior', load_pct: 40 }] }) };
   return { drive, d, fired, events, audits };
@@ -696,4 +696,16 @@ test('independence explanation is required; partner popup, transcribed safeguard
  const cells=await readCells(drive.files.get(o.workbook.id).buffer,[{sheet:'03_PHASE_1',cell:'E76'},{sheet:'03_PHASE_1',cell:'I76'}]);assert.match(cells['03_PHASE_1!E76'],/p@cab.ci/);assert.equal(cells['03_PHASE_1!I76'],'');
  await declareIndependence('org',{...body,details:{'C.01':'Je détiens aussi des actions.'}},person,d);const after=await opportunityView('org',o.id,{role:'partner',email:'p@cab.ci'},d);assert.equal(after.independence_cases[0].status,'pending');assert.equal(after.declaration_history.length,1);
  await assert.rejects(independenceReviewAction('org',{opportunity_id:o.id,case_id:c.id,version:c.version,action:'independence-applied',note:'Revu',evidence:'WP'}, {role:'partner',email:'p@cab.ci'},d),/DECLARATION_CHANGED/);
+});
+
+// Plan B5 (2026-10-30): the quote the AI gives for each value of the fiche is checked in the TDR before anything is written.
+test('fiche values: written only when their quote is in the TDR; otherwise a proposal, with the reason', async () => {
+  const { splitQuoted } = await import('../lib/opportunities.js');
+  const text = 'TERMES DE RÉFÉRENCE — Société Ivoirienne Test — « Audit légal des comptes 2026 » — date limite : 30 novembre 2026';
+  const s = splitQuoted([{ cell: 'C35', value: 'SIT', quote: 'Société  Ivoirienne TEST' }, { cell: 'C41', value: 'audit légal', quote: 'audit legal des comptes 2026' },
+    { cell: 'C44', value: '50 M FCFA', quote: 'budget de 50 millions' }, { cell: 'C50', value: 'x', quote: '' }], text);
+  assert.deepEqual(s.verified.map(v => v.cell), ['C35', 'C41'], 'accents, case and spaces aside');
+  assert.deepEqual(s.proposals.map(p => [p.cell, p.reason]), [['C44', 'citation non retrouvée dans le TDR'], ['C50', 'aucune citation donnée']]);
+  const scan = splitQuoted([{ cell: 'C35', value: 'SIT', quote: 'Société Ivoirienne Test' }], '', true);
+  assert.equal(scan.proposals[0].reason, 'TDR lu sur un scan : à relire');
 });
