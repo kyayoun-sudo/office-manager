@@ -95,3 +95,72 @@ test('coverage is stopped when SOP/Working Paper execution was not actually prep
   assert.equal(out.execution_gate.reason, 'ENHANCED_AUDITOR_EXECUTION_NOT_PREPARED');
   assert.match(out.missing_documents[0], /programme d'audit validé/i);
 });
+
+test('coverage is stopped when a prepared procedure still has business blockers', async () => {
+  const missionId = '11111111-1111-1111-1111-111111111111';
+  let state = {
+    status: 'running', stage: 'execute', analytical_review: false,
+    mission: { id: missionId, name: 'Mission A' }, knowledge_done: ['doc-1'], log: []
+  };
+
+  const out = await auditorStep('org-1', {}, { mission_id: missionId }, {
+    forceKernel: true,
+    hydrateReality: async () => reality(false),
+    state: async () => state,
+    save: async (_id, next) => { state = structuredClone(next); return state; },
+    domainStep: async () => {
+      state = {
+        ...state,
+        stage: 'risks',
+        execution: {
+          status: 'prepared',
+          procedures: [{
+            code: 'D1',
+            locked: false,
+            sop: { loaded: true },
+            working_paper: { loaded: true },
+            brain: { status: 'PREPARED_REVIEW_REQUIRED', limit_reached: false },
+            blockers: ['EVIDENCE_REQUIRED', 'HUMAN_TEST_DECISION_REQUIRED']
+          }]
+        }
+      };
+      return state;
+    },
+    runKernel: async (org, req, _mission, options) => options.step(org, req, { mission_id: missionId }, { fire: async () => true })
+  });
+
+  assert.equal(out.status, 'needs_documents');
+  assert.equal(out.execution_gate.reason, 'ENHANCED_AUDITOR_EXECUTION_INCOMPLETE');
+  assert.ok(out.missing_documents.some(x => /EVIDENCE_REQUIRED/.test(x)));
+  assert.ok(out.missing_documents.some(x => /HUMAN_TEST_DECISION_REQUIRED/.test(x)));
+});
+
+test('an unreadable receipt is persisted with the current Drive revision instead of causing a reread loop', async () => {
+  const missionId = '11111111-1111-1111-1111-111111111111';
+  let state = {
+    status: 'running', stage: 'knowledge', analytical_review: false,
+    mission: { id: missionId, name: 'Mission A' }, knowledge_done: [], log: []
+  };
+  let recorded = null;
+
+  const out = await auditorStep('org-1', {}, { mission_id: missionId }, {
+    forceKernel: true,
+    hydrateReality: async () => reality(false),
+    state: async () => state,
+    save: async (_id, next) => { state = structuredClone(next); return state; },
+    domainDeps: {
+      getMeta: async () => ({ modifiedTime: '2026-10-30T08:00:00.000Z', version: '9', md5Checksum: 'abc' }),
+      recordMissionDocuments: async (_mission, docs) => { recorded = docs; return 1; }
+    },
+    domainStep: async (_org, _req, _body, deps) => {
+      await deps.recordMissionDocuments(state.mission, [{ id: 'doc-1', audit_read: { status: 'UNREADABLE', error: 'SOURCE_UNREADABLE' } }], {});
+      return state;
+    },
+    runKernel: async (org, req, _mission, options) => options.step(org, req, { mission_id: missionId }, { fire: async () => true })
+  });
+
+  assert.equal(out.status, 'running');
+  assert.equal(recorded[0].audit_read.status, 'UNREADABLE');
+  assert.equal(recorded[0].audit_read.revision, '2026-10-30T08:00:00.000Z|9|abc');
+  assert.equal(recorded[0].audit_read.source_state, 'unreadable_at_this_revision');
+});
