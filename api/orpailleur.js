@@ -15,7 +15,7 @@ function workerUrl() {
 
 export default async function handler(req, res) {
   try {
-    requirePilotAccess(req);
+    requirePilotAccess(req, { allowSession: true }); // the session is verified below
 
     if (!["GET", "POST"].includes(req.method)) {
       return res.status(405).json({ error: "Method not allowed" });

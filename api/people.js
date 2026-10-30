@@ -9,7 +9,7 @@ import { assertIsolatedOrg } from '../lib/test-mode.js';
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    requirePilotAccess(req);
+    requirePilotAccess(req, { allowSession: true }); // the session is verified below
     if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     const orgId = await resolveRequestOrg(req);
     if (!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');

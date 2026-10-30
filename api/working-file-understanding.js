@@ -18,7 +18,7 @@ const fail = (code, statusCode = 400) => Object.assign(new Error(code), { status
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    requirePilotAccess(req);
+    requirePilotAccess(req, { allowSession: true }); // the session is verified below
     if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
     const orgId = await resolveRequestOrg(req);
     if (!orgId) throw fail('DEFAULT_ORG_ID_MISSING', 500);

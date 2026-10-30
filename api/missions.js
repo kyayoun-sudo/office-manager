@@ -7,7 +7,7 @@ import { assertIsolatedOrg } from '../lib/test-mode.js';
 export default async function handler(req,res) {
   res.setHeader('Cache-Control','no-store');
   try {
-    requirePilotAccess(req);
+    requirePilotAccess(req, { allowSession: true }); // the session is verified below
     if(req.method !== 'GET') return res.status(405).json({error:'METHOD_NOT_ALLOWED'});
     const orgId = await resolveRequestOrg(req);
     if(!orgId) throw new Error('DEFAULT_ORG_ID_MISSING');
@@ -17,8 +17,7 @@ export default async function handler(req,res) {
     const visible = await visibleMissionIds(orgId, account);
     const missionId=req.query?.mission_id;
     if (missionId !== undefined && visible && !visible.has(missionId)) return res.status(403).json({error:'NOT_ON_THIS_MISSION'});
-    const result=missionId === undefined ? await listMissions(orgId) : await getMissionDossier(orgId,missionId);
-    if (missionId === undefined && visible) result.missions = (result.missions || []).filter(m => visible.has(m.id));
+    const result=missionId === undefined ? await listMissions(orgId, { ids: visible }) : await getMissionDossier(orgId,missionId);
     return res.status(200).json(result);
   } catch(error) {
     const status=error.statusCode || 500;

@@ -126,7 +126,7 @@ export default async function handler(req, res) {
   let run = null;
 
   try {
-    requirePilotAccess(req);
+    requirePilotAccess(req, { allowSession: true }); // the session is verified below
 
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });

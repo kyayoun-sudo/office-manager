@@ -1208,7 +1208,8 @@ export async function handleApp(req) {
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
   const run = route[req.method];
   if (typeof run !== 'function') { requirePilotAccess(req); throw fail('METHOD_NOT_ALLOWED', 405); }
-  if (!run.public) requirePilotAccess(req);
+  // allowSession: every non-public route verifies the session below (requireRole), the firm name included.
+  const gate = run.public ? null : requirePilotAccess(req, { allowSession: true });
   // The firm of the request (lib/firm-context.js). Several firms per installation: the shared pilot token is no
   // longer enough, the person must belong to the firm (or the call is a signed internal one). Switch off: DEFAULT_ORG_ID.
   const orgId = await resolveRequestOrg(req, { requireMember: !run.public });
@@ -1227,7 +1228,8 @@ export async function handleApp(req) {
   const screen = ROUTE_SCREENS[String(req.query?.route || '')];
   // Audit 2026-10-30: the shared pilot token is in every browser and never changes (a deactivated person keeps it).
   // Alone it no longer opens a route: a person comes with their session, the server's background steps sign their call.
-  if (!run.public && !run.ownerOnly && !run.userRoles && !screen && !PILOT_TOKEN_ENOUGH.has(routeKey(req)) && !isSignedInternal(req, orgId)) {
+  // (A session without the token: verified here too, even for the firm's name.)
+  if (!run.public && !run.ownerOnly && !run.userRoles && !screen && !(PILOT_TOKEN_ENOUGH.has(routeKey(req)) && gate === 'token') && !isSignedInternal(req, orgId)) {
     req.account = await requireRole(req, [...EVERYONE]);
   }
   if (screen) {

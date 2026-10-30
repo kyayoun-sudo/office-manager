@@ -41,6 +41,11 @@ fichier rempli par l'agent) ou lancer vous-même :
   node scripts/compare-workfile.mjs reference.xlsx candidat.xlsx --out rapport.md
 Le rapport donne le pourcentage de cases justes et la liste des cases à regarder.
 
+Relances des pièces demandées (nouveau, 30/10) : une demande envoyée au client et restée SANS réponse 7 jours fait
+préparer par l'agent une relance dans la même conversation. Elle n'est PAS envoyée : elle attend dans « À valider »,
+comme les autres messages au client. 3 relances au plus par demande. Pour changer le délai (ou 0 = jamais), il n'y a pas
+encore d'écran : le demander à Claude (réglage pbc_reminder_days).
+
 Regarder aussi, de temps en temps, l'onglet « Actions » du dépôt GitHub : la CI était rouge depuis le 30/10 au matin sans
 que personne ne le voie, et c'est ainsi qu'une règle de l'Orpailleur avait été perdue. Elle est de nouveau verte.
 Autre effet : l'ancien écran index.html (saisie du code à la main) ne peut plus discuter avec l'agent ni lister les missions ;

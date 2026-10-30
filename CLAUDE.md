@@ -21,7 +21,24 @@ déploiement (`internalBaseUrl`, jamais un Host forgé). Codes tapés : `lib/att
 `changeFirmSettings(orgId, s => ({ ...s, clé }), …)` (`lib/firm-settings-store.js` : lecture stricte, écriture conditionnelle sur
 `updated_at`). Une lecture en panne effaçait tous les autres réglages ; deux écritures s'écrasaient. Fausses bases des tests : une
 écriture rend la ligne écrite et la lecture donne `updated_at`. Après chaque envoi : `gh run list` (la CI doit être verte, Node 24).
-Mesurer le remplissage sur une vraie mission : `docs/MESURER_LE_REMPLISSAGE.md`, `scripts/compare-workfile.mjs`. Le code propriétaire n'est plus remis au navigateur (session du propriétaire / d'un associé).
+Mesurer le remplissage sur une vraie mission : `docs/MESURER_LE_REMPLISSAGE.md`, `scripts/compare-workfile.mjs`.
+**Fichiers mémoire partagés par plusieurs missions / dépôts** : jamais `loadJsonFile` puis `saveJsonFile` sans version — toujours
+`updateJsonFile(nom, cur => …)` (`lib/mapping-scan.js`) ou `updateMissionRegister`. **Liste PBC** : jamais une position ni le nom
+`PBC_MASTER` en dur — `locatePbcSheet` / `pbcRange` (`lib/mission-engine.js`), `pbcLayoutOfRows` (`lib/pbc-lifecycle.js`).
+Relances PBC préparées par l'agent (jamais envoyées seules) : `prepareReminders` (`lib/pbc-loop.js`, dans `pbcPass`). Le code propriétaire n'est plus remis au navigateur (session du propriétaire / d'un associé).
+
+## Noyau universel des agents (construit les 29-30/10/2026, décrit le 30/10)
+- `lib/agent-kernel.js` `runAgentKernel` : une boucle commune OBSERVE → THINK (IA, `lib/agent-brain.js`) ou WORK (une unité bornée du moteur
+  existant) → ACT → VERIFY (relecture du système réel, jamais la réponse du modèle) → CHECKPOINT ; statuts `running` / `verified` /
+  `awaiting_human` / `blocked` ; `maxCycles` + `onCycleLimit` (le noyau programme lui-même l'appel suivant, une fonction Vercel reste bornée).
+- `lib/kernel-actions.js` : sens commun des actions (`executed_unverified` ≠ `verified` ≠ `refused`), séparé pour éviter une boucle d'imports.
+- Un noyau par agent : `orpailleur-kernel.js` (rangement, continuation via `/api/orpailleur` action `kernel`), `mission-controller-kernel.js`,
+  `enhanced-auditor-kernel.js` (étapes de revue, `auditor-step`), `working-file-kernel.js` (préparer / exécuter une étape du working file,
+  mémoire d'abord), `office-manager-kernel.js` (agent de conversation, `/api/agent`), `shadow-kernel.js`, `sika-kernel.js`.
+- **Façades** : `tidy-plan.js`, `enhanced-auditor.js`, `step-runner.js`, `agent-passes.js` gardent leurs exports et routent vers le noyau ;
+  l'ancien moteur vit dans `*-domain.js` / `agent-passes-legacy.js` (copie conservée). **Toute correction du moteur va dans le fichier
+  `-domain` / `-legacy`**, pas dans la façade (une correction faite dans l'ancien fichier le 29/10 a été perdue ainsi). Tests :
+  `tests/agent-kernel.test.js`, `tests/kernel-facades.test.js`, `tests/kernel-import-boundary.test.js`.
 
 **Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.
 

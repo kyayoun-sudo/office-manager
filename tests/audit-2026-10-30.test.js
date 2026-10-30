@@ -65,6 +65,42 @@ test('missions a person may see: the firm rights decide « all » or « mine »;
   assert.deepEqual([...await visibleMissionIds(ORG, { role: 'auditor' }, { permissions: { requireScreenAccess: async () => ({ ok: true, mine: true }) }, missionAccess })], ['m1']);
 });
 
+test('a person\'s missions are searched directly (an older one is no longer missed beyond the 100 latest)', async () => {
+  const saved = { ...process.env }, original = globalThis.fetch, asked = [];
+  Object.assign(process.env, { SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k' });
+  globalThis.fetch = async url => { asked.push(String(url)); return new Response(JSON.stringify([{ id: '44444444-4444-4444-8444-444444444444', name: 'Ancienne' }])); };
+  try {
+    const { listMissions } = await import('../lib/mission-dossier.js');
+    const r = await listMissions(ORG, { ids: new Set(['44444444-4444-4444-8444-444444444444', 'not-an-id']) });
+    assert.equal(r.missions.length, 1);
+    assert.match(asked[0], /id=in\.\(44444444-4444-4444-8444-444444444444\)/);
+    assert.deepEqual((await listMissions(ORG, { ids: new Set() })).missions, [], 'no mission: nothing asked');
+    assert.equal(asked.length, 1);
+  } finally { globalThis.fetch = original; process.env = saved; }
+});
+
+test('a personal session passes the first gate without the shared token, and is then verified (the firm name included)', async () => {
+  const saved = { ...process.env };
+  Object.assign(process.env, { OFFICE_MANAGER_ACCESS_TOKEN: 'pilot', DEFAULT_ORG_ID: ORG });
+  delete process.env.OFFICE_MANAGER_MULTI_CABINET; delete process.env.OFFICE_MANAGER_TEST_RUN;
+  try {
+    const { requirePilotAccess } = await import('../lib/auth.js');
+    const bearer = { headers: { authorization: 'Bearer ' + 'a'.repeat(40) } };
+    assert.equal(requirePilotAccess({ headers: { 'x-office-manager-token': 'pilot' } }), 'token');
+    // Fail closed by default: a bearer header is not a proof; only a caller that verifies it right after opts in.
+    assert.throws(() => requirePilotAccess(bearer), /UNAUTHORIZED/);
+    assert.equal(requirePilotAccess(bearer, { allowSession: true }), 'unverified-session');
+    assert.throws(() => requirePilotAccess({ headers: { authorization: 'Bearer short' } }, { allowSession: true }), /UNAUTHORIZED/);
+    assert.throws(() => requirePilotAccess({ headers: {} }, { allowSession: true }), /UNAUTHORIZED/);
+    delete process.env.OFFICE_MANAGER_ACCESS_TOKEN;
+    assert.throws(() => requirePilotAccess(bearer, { allowSession: true }), /ACCESS_TOKEN_MISSING/, 'no token on the server: closed');
+    process.env.OFFICE_MANAGER_ACCESS_TOKEN = 'pilot';
+    // Branding with the token: served. With a made-up « session » and no token: the session is checked (and refused).
+    const { handleApp } = await import('../api/app.js');
+    await assert.rejects(handleApp({ method: 'GET', query: { route: 'branding' }, headers: { authorization: 'Bearer ' + 'x'.repeat(40) } }), e => /SUPABASE|TOKEN|SESSION|AUTH|ACCOUNT/.test(e.message));
+  } finally { process.env = saved; }
+});
+
 test('the owner code is never handed out at login', async () => {
   const saved = { ...process.env };
   Object.assign(process.env, { OFFICE_MANAGER_OWNER_TOKEN: 'owner-code' });
