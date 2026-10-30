@@ -46,6 +46,20 @@ préparer par l'agent une relance dans la même conversation. Elle n'est PAS env
 comme les autres messages au client. 3 relances au plus par demande. Pour changer le délai (ou 0 = jamais), il n'y a pas
 encore d'écran : le demander à Claude (réglage pbc_reminder_days).
 
+Archivage d'une mission terminée (nouveau, 30/10, selon votre spécification §38-42) : carte « Archivage » en bas de la page
+d'une mission. Rien à installer. Pour l'essayer, prendre une mission d'essai terminée : 1) un manager ou un associé clique
+« Demander l'archivage » (un contrôle non rempli peut être passé par un associé, avec une raison) ; 2) au passage suivant des
+agents, l'Orpailleur dépose ARCHIVE_MANIFEST_<date>.xlsx dans le dossier _OFFICE_MANAGER de la mission (rien n'est déplacé ni
+supprimé) ; 3) un associé relit le manifeste puis clique « archiver » : la mission passe en lecture seule dans l'application.
+Les droits du dossier dans Google Drive ne sont PAS changés (votre spécification le laisse à la politique du cabinet).
+
+Compter (et, si vous le voulez, plafonner) l'IA de chaque cabinet (nouveau, 30/10) : tous les cabinets d'une installation
+partagent les mêmes clés d'IA. 1) Le comptage par cabinet et par jour demande la table office_ai_usage : elle est dans
+db/INSTALL_TOUT.sql (le relancer suffit). 2) Plafond FACULTATIF : Vercel → Settings → Environment Variables → Add
+OFFICE_MANAGER_AI_DAILY_LIMIT = un nombre d'appels par cabinet et par jour (ex. 2000). Sans cette variable, rien n'est
+jamais bloqué. Plafond atteint : l'IA du cabinet est « indisponible » jusqu'au lendemain (« Mon IA » continue de marcher).
+Le comptage ne couvre pas l'agent de conversation (/api/agent, qui passe par une autre bibliothèque).
+
 Regarder aussi, de temps en temps, l'onglet « Actions » du dépôt GitHub : la CI était rouge depuis le 30/10 au matin sans
 que personne ne le voie, et c'est ainsi qu'une règle de l'Orpailleur avait été perdue. Elle est de nouveau verte.
 Autre effet : l'ancien écran index.html (saisie du code à la main) ne peut plus discuter avec l'agent ni lister les missions ;

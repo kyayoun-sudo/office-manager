@@ -143,6 +143,18 @@ export const ROUTES = Object.freeze({
     POST: users(ALL_ROLES, async (orgId, req) => (await import('../lib/server-files.js')).serverFiles(orgId, req, req.account)),
     unavailable: 'LOCAL_DOCUMENTS_UNAVAILABLE'
   },
+  // Archiving a finished mission (spec §38-42, technical §66-70): closing controls → MISSION_READY_FOR_ARCHIVE → the
+  // Orpailleur's manifest → a partner freezes it (read-only in the application). lib/mission-archive.js.
+  'mission-archive': {
+    GET: users(ALL_ROLES, async (orgId, req) => (await import('../lib/mission-archive.js')).archiveView(orgId, String(req.query?.mission_id || ''))),
+    POST: users(ALL_ROLES, async (orgId, req) => {
+      const m = await import('../lib/mission-archive.js'), b = req.body || {}, id = String(b.mission_id || '');
+      if (b.action === 'request') return m.requestArchive(orgId, id, b, req.account);
+      if (b.action === 'freeze') return m.freezeArchive(orgId, id, b, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'ARCHIVE_UNAVAILABLE'
+  },
   dossier: {
     GET: users(ALL_ROLES, async (orgId, req) => { const m = await import('../lib/dossier-service.js'); return req.query?.mission_id || req.query?.opportunity_id ? m.dossierView(orgId, req.query || {}, req.account) : m.dossierList(orgId, req.account); }),
     unavailable: 'DOSSIER_UNAVAILABLE'
@@ -1196,9 +1208,9 @@ async function trainingAction(orgId, req) {
 
 export const ROUTE_SCREENS = Object.freeze({
   search: 'documents', 'mission-view': 'mission', actions: 'validations', opportunities: 'opportunities', tenders: 'tenders', shadow: 'shadow',
-  methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter'
+  methodology: 'workpapers', 'work-programme': 'workpapers', procedure: 'workpapers', secretariat: 'engagement_letter', 'mission-archive': 'mission'
 });
-const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
+const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'freeze', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 const PILOT_ONLY = new Set(['bootstrap-owner', 'claim-owner', 'firm-restart']);
 // Read with the shared code alone: the firm's name and colours, shown on the login page before any session.
 const PILOT_TOKEN_ENOUGH = new Set(['branding']);
@@ -1240,6 +1252,9 @@ export async function handleApp(req) {
       if (req.resourceAccess.mine && missionId) await requireMissionAccess(orgId, missionId, req.account);
     } catch (e) { await logAccess(orgId, req.account, 'ACCESS_REFUSED', String(req.query?.route || '') + ':' + e.message); throw e; }
   }
+  // An archived mission is read-only (spec §42): a write is refused, unless a partner gives a reason (traced).
+  const lockMission = req.method === 'POST' && routeKey(req) !== 'mission-archive' ? String(req.body?.mission_id || req.query?.mission_id || '') : '';
+  if (orgId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lockMission)) await (await import('../lib/mission-archive.js')).assertNotArchived(orgId, lockMission, req);
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await runInFirm(orgId, () => loadGoogleConnection(orgId)).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
@@ -1278,7 +1293,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = error.statusCode || 500;
     const route = ROUTES[String(req.query?.route || '')];
-    const shown = [400, 401, 403, 404, 405, 409, 422, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
+    const shown = [400, 401, 403, 404, 405, 409, 422, 423, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
     if (status >= 500) {
       // The real cause, short and without secrets, so the screen (and the logs) say what broke.
