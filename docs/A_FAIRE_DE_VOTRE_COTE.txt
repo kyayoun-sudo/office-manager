@@ -4,8 +4,28 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 24 octobre 2026
+Dernière mise à jour : 30 octobre 2026
 Branche concernée : feature/white-label-desktop
+
+-----------------------------------------------------------------------------------------------------------------
+000. [ ] APRÈS LA MISE EN LIGNE DE L'AUDIT DU 30/10 : SE RECONNECTER, PUIS ESSAYER 4 CHOSES        (30 octobre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : depuis l'audit du 30/10 (AUDIT_2026-10-30.md), le « code d'accès » partagé (que chaque navigateur reçoit) n'ouvre
+plus rien seul : chaque écran passe par la session de la personne connectée, et les travaux en arrière-plan des agents
+signent leur appel avec un secret du serveur. Le code propriétaire n'est plus remis au navigateur : la session du
+propriétaire ou d'un associé suffit. Rien à régler : le serveur signe avec OFFICE_MANAGER_INTERNAL_SECRET,
+OFFICE_MANAGER_SCHEDULER_SECRET ou ORPAILLEUR_JOB_SECRET s'il existe, sinon avec la clé Supabase du serveur (qui ne quitte
+jamais le serveur). Ce n'est pas encore essayé sur Vercel : d'où les essais ci-dessous.
+Comment faire :
+  1. Se déconnecter puis se reconnecter (l'ancienne session gardait le code propriétaire dans le navigateur).
+  2. Accueil : les missions et « Passages des agents » s'affichent.
+  3. Rangement : lancer un petit rangement → il avance tout seul d'étape en étape (travail en arrière-plan signé).
+  4. Mise en service : « Valider la cartographie » / une décision sur une règle passe sans taper le code propriétaire.
+  5. Avec un compte « auditeur » : la liste des missions ne montre que SES missions si le réglage des droits (Paramètres →
+     Droits, écran « mission ») dit « les siennes ».
+Si l'un de ces essais affiche « UNAUTHORIZED » ou « USER_SESSION_REQUIRED », le noter avec la page et l'heure.
+Autre effet : l'ancien écran index.html (saisie du code à la main) ne peut plus discuter avec l'agent ni lister les missions ;
+utiliser « Assistant » après connexion.
 
 -----------------------------------------------------------------------------------------------------------------
 00. [ ] METTRE UNE VERSION EN LIGNE : TOUJOURS « PROMOTE », JAMAIS « REDEPLOY »            (26 octobre 2026)

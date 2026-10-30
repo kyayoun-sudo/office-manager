@@ -42,7 +42,11 @@ test('l’IA ne répond pas : le code ne décide rien, la panne est dite', async
 
 test('une proposition validée est revérifiée avant d’être exécutée', async () => {
   const actions = { send_mail: { describe: 'x', approval: true, check: p => (p.to === 'c@x' ? { ok: true } : { ok: false, why: 'destinataire inconnu' }), run: p => ({ sent: p.to }) } };
-  assert.deepEqual(await runApproved({ orgId: 'O', agent: 'mission-controller', proposal: { action: 'send_mail', params: { to: 'c@x' } }, actions, by: 'm@x' }, { noteMission: async () => null }), { sent: 'c@x' });
+  // Executed without a read-back: said « not verified », never « verified » (kernel, 2026-10-29).
+  assert.deepEqual(await runApproved({ orgId: 'O', agent: 'mission-controller', proposal: { action: 'send_mail', params: { to: 'c@x' } }, actions, by: 'm@x' }, { noteMission: async () => null }), { sent: 'c@x', work_state: 'executed_unverified', verification: null });
+  const checked = { send_mail: { ...actions.send_mail, verify: (p, result) => ({ verified: result.sent === p.to, evidence: 'message id' }) } };
+  const v = await runApproved({ orgId: 'O', agent: 'mission-controller', proposal: { action: 'send_mail', params: { to: 'c@x' } }, actions: checked, by: 'm@x' }, { noteMission: async () => null });
+  assert.equal(v.work_state, 'verified');
   await assert.rejects(runApproved({ orgId: 'O', agent: 'x', proposal: { action: 'send_mail', params: { to: 'z@x' } }, actions, by: 'm@x' }), /ORDER_NO_LONGER_VALID/);
   await assert.rejects(runApproved({ orgId: 'O', agent: 'x', proposal: { action: 'send_mail', params: { to: 'c@x' } }, actions }), /HUMAN_IDENTITY_REQUIRED/);
 });

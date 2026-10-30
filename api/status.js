@@ -6,6 +6,7 @@ import {
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
 import { resolveRequestOrg } from "../lib/firm-context.js";
+import { requirePersonOrServer } from "../lib/caller.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
 import {
   getAgentSetting,
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "DEFAULT_ORG_ID_MISSING" });
     }
     assertIsolatedOrg(orgId);
+    await requirePersonOrServer(req, orgId); // audit 2026-10-30: never the shared token alone
 
     const [permissions, rootSetting, ...specialistSettings] =
       await Promise.all([
@@ -65,6 +67,7 @@ export default async function handler(req, res) {
   } catch (error) {
     return res
       .status(error.statusCode || 500)
-      .json({ error: String(error.message || error) });
+      // A code for 4xx; never the raw message of a 5xx (it may carry a URL or a key).
+      .json({ error: error.statusCode < 500 || /^[A-Z0-9_]+$/.test(String(error.message)) ? String(error.message || error) : "STATUS_UNAVAILABLE" });
   }
 }

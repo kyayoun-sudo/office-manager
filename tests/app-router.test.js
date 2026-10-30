@@ -26,7 +26,8 @@ test('validation errors from workbook inspection keep their actionable 422 code'
  const {default: app}=await import('../api/app.js');
  const route='chat'; const original = ROUTES[route].GET;
  process.env.OFFICE_MANAGER_ACCESS_TOKEN='t';process.env.DEFAULT_ORG_ID='org-1';
- ROUTES[route].GET=()=>{throw Object.assign(new Error('WORKBOOK_LEGEND_NOT_FOUND'),{statusCode:422});};
+ // A bare stub would need a person since the audit of 2026-10-30; public: only the error path is under test here.
+ ROUTES[route].GET=Object.assign(()=>{throw Object.assign(new Error('WORKBOOK_LEGEND_NOT_FOUND'),{statusCode:422});},{public:true});
  let status,body;const res={setHeader(){},status(n){status=n;return this;},json(b){body=b;return this;}};
  try {await app({method:'GET',query:{route},headers:{'x-office-manager-token':'t'}},res);assert.equal(status,422);assert.equal(body.error,'WORKBOOK_LEGEND_NOT_FOUND');}
  finally {ROUTES[route].GET=original;}

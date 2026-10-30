@@ -36,7 +36,8 @@ test('login: right password + active account -> session with tokens by role', as
   const s = await login('org-1', { email: 'paul@taty.info', password: 'x' }, { authCall: auth(200, tokens(UID)), fetchRows });
   assert.equal(s.user.role, 'partner');
   assert.equal(s.pilot_token, 'pilot');
-  assert.equal(s.owner_token, 'owner', 'managing partners get the owner token');
+  // Audit 2026-10-30: the owner code is never handed out; the partner's own session opens the owner routes.
+  assert.equal(s.owner_token, null, 'nobody gets the owner code at login');
   const { fetchRows: f2 } = db([{ auth_user_id: UID, email: 'a@taty.info', display_name: 'A', role: 'collaborator', active: true }]);
   const c = await login('org-1', { email: 'a@taty.info', password: 'x' }, { authCall: auth(200, tokens(UID)), fetchRows: f2 });
   assert.equal(c.owner_token, null, 'collaborators never get the owner token');
@@ -133,7 +134,7 @@ test('sign-up: anyone creates an account, it has NO access until the owner gives
   await assert.rejects(claimOwner('org-1', req('owner', { email: 'kyayoun@gmail.com', password: 'mauvais' }), { authCall, fetchRows }), /INVALID_CREDENTIALS/);
   const s = await claimOwner('org-1', req('owner', { email: 'kyayoun@gmail.com', password: 'motdepasse2026' }), { authCall, fetchRows });
   assert.equal(s.user.role, 'owner');
-  assert.equal(s.owner_token, 'owner');
+  assert.equal(s.owner_token, null);
   assert.equal(rows[1].active, true);
   assert.ok(ROUTES.signup.POST.public && ROUTES['claim-owner'].POST.public);
 });
@@ -178,7 +179,7 @@ test('a new firm: the first person who signs up becomes the owner, no code; the 
   const first = await signUp('org-9', { display_name: 'Awa', email: 'awa@cabinet.ci', password: 'motdepasse2026' }, { authCall, fetchRows });
   assert.equal(first.owner, true);
   assert.equal(first.session.user.role, 'owner');
-  assert.equal(first.session.owner_token, 'owner', 'the owner can configure right away');
+  assert.equal(first.session.owner_token, null, 'the owner configures with their own session');
   const second = await signUp('org-9', { display_name: 'Koffi', email: 'koffi@cabinet.ci', password: 'motdepasse2026' }, { authCall, fetchRows });
   assert.equal(second.pending, true);
 });

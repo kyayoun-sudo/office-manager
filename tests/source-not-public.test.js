@@ -14,7 +14,8 @@ test('source folders and project files are not served', () => {
   for (const p of ['/lib/auth.js', '/lib/agent-tools.js', '/agents/index.js', '/db/INSTALL_TOUT.sql', '/scripts/new-firm.mjs',
     '/supabase/functions/taty-google-bridge/index.ts', '/connectors/local-server/server.mjs', '/desktop/package.json', '/tests/accounts.test.js',
     '/claude/LOGIQUE_REMPLISSAGE_PROJETS.md', '/docs/SECURITE.md', '/docs/PASSATION_SESSION_2026-10-19.md', '/docs/architecture/01_SPECIFICATION_PRODUIT.md',
-    '/lab-gateway-server.js', '/index.ts', '/CLAUDE.md', '/README.md', '/PROJECT_STATUS.md', '/package-lock.json', '/pnpm-lock.yaml', '/Dockerfile.lab-gateway', '/audit-dual-theme.patch']) {
+    '/lab-gateway-server.js', '/index.ts', '/CLAUDE.md', '/README.md', '/PROJECT_STATUS.md', '/package-lock.json', '/pnpm-lock.yaml', '/Dockerfile.lab-gateway', '/audit-dual-theme.patch',
+    '/.github/workflows/ci.yml', '/.claude/settings.json', '/package.json', '/vercel.json', '/.gitignore']) {
     assert.ok(blocked(p), p + ' must not be served');
   }
 });

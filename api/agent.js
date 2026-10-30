@@ -8,7 +8,7 @@ import {
   normalizeRequestedAgent
 } from "../agents/index.js";
 import { requirePilotAccess } from "../lib/auth.js";
-import { resolveRequestOrg } from "../lib/firm-context.js";
+import { resolveRequestOrg, isSignedInternal } from "../lib/firm-context.js";
 import { CONSULT_TOOLS } from "../lib/orchestrator.js";
 import { runOfficeManagerKernel, KERNEL_STATUS } from "../lib/office-manager-kernel.js";
 import { assertIsolatedOrg } from "../lib/test-mode.js";
@@ -156,6 +156,11 @@ export default async function handler(req, res) {
     const personalAccount = (req.headers?.authorization || req.headers?.Authorization)
       ? await (await import('../lib/user-auth.js')).currentAccount(req)
       : null;
+    // Audit 2026-10-30: the shared pilot token alone (every browser has it) no longer opens the agent and its tools
+    // (mission documents, missions). A person comes with their session; the server's own passes sign their call.
+    if (!personalAccount && !isSignedInternal(req, orgId)) {
+      throw Object.assign(new Error("USER_SESSION_REQUIRED"), { statusCode: 401 });
+    }
 
     const permissions = await getPermissions(orgId);
 

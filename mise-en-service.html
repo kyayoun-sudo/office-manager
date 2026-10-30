@@ -133,8 +133,8 @@
   function ownerHeaders() { return { 'Content-Type': 'application/json', 'x-office-manager-owner-token': OM.getOwnerToken() }; }
   // /api/owner is the signed owner endpoint of the Orpailleur memory (same owner code).
   function ownerEndpoint(body) {
-    return fetch('/api/owner', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || 'HTTP_' + r.status); return d; }); });
+    // With the personal session (OM.api): the owner's or a partner's session is enough, no code to type (2026-10-30).
+    return OM.api('/api/owner', { method: 'POST', headers: ownerHeaders(), body: JSON.stringify(body) });
   }
 
   function checkRow(c, isNext) {

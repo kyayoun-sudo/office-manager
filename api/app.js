@@ -1,5 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
-import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet } from '../lib/firm-context.js';
+import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
 import { accessibleMissionIds, requireMissionAccess } from '../lib/mission-access.js';
@@ -1157,7 +1157,9 @@ export function continueInBackground(req, requestId, fetchImpl = fetch) {
   const host = req.headers?.host;
   if (!host || !requestId) return Promise.resolve(false);
   const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
-  const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '' };
+  // The firm travels with the call, signed by the server, as in fireInternal (audit 2026-10-30: several firms, the next
+  // step of another firm's tidy-up arrived without it and stopped).
+  const headers = { 'Content-Type': 'application/json', 'x-office-manager-token': process.env.OFFICE_MANAGER_ACCESS_TOKEN || '', ...internalHeaders() };
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   // Protected preview (Vercel Authentication): the owner's own preview cookie lets the background call through.
   const jwt = String(req?.headers?.cookie || '').match(/(?:^|;\s*)(_vercel_jwt=[^;]+)/);
@@ -1196,6 +1198,9 @@ export const ROUTE_SCREENS = Object.freeze({
 });
 const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 const PILOT_ONLY = new Set(['bootstrap-owner', 'claim-owner', 'firm-restart']);
+// Read with the shared code alone: the firm's name and colours, shown on the login page before any session.
+const PILOT_TOKEN_ENOUGH = new Set(['branding']);
+const routeKey = req => String(req.query?.route || '');
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
@@ -1218,6 +1223,11 @@ export async function handleApp(req) {
   if (route !== ROUTES.diagnostic) assertIsolatedOrg(orgId);
   if (run.userRoles) req.account = await requireRole(req, run.userRoles);
   const screen = ROUTE_SCREENS[String(req.query?.route || '')];
+  // Audit 2026-10-30: the shared pilot token is in every browser and never changes (a deactivated person keeps it).
+  // Alone it no longer opens a route: a person comes with their session, the server's background steps sign their call.
+  if (!run.public && !run.ownerOnly && !run.userRoles && !screen && !PILOT_TOKEN_ENOUGH.has(routeKey(req)) && !isSignedInternal(req, orgId)) {
+    req.account = await requireRole(req, [...EVERYONE]);
+  }
   if (screen) {
     if (!req.account) req.account = await requireRole(req, [...EVERYONE]);
     try {
@@ -1233,6 +1243,17 @@ export async function handleApp(req) {
   const inFirm = () => runInFirm(orgId, invoke);
   if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, inFirm);
   return inFirm();
+}
+
+// The value after « Bearer », « token= », « apikey: »… is removed too, and keys / JWTs that appear alone
+// (audit 2026-10-30: « Bearer eyJ… » kept the token, the old pattern stopped at the space).
+export function redactSecrets(text) {
+  return String(text ?? '')
+    .replace(/\b(bearer|basic)\s+[^\s"',;]+/gi, '$1 …')
+    .replace(/\b(authorization|api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret|password|key)(\s*[:=]\s*)["']?[^\s"',;]+/gi, '$1$2…')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}(\.[A-Za-z0-9_-]+){0,2}/g, '…')
+    .replace(/\b(sk|pk|rk|ghp|gho|github_pat|xox[abp])[-_][A-Za-z0-9_-]{6,}/g, '…')
+    .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '…');
 }
 
 export default async function handler(req, res) {
@@ -1257,7 +1278,7 @@ export default async function handler(req, res) {
     const body = { error: shown };
     if (status >= 500) {
       // The real cause, short and without secrets, so the screen (and the logs) say what broke.
-      const detail = String(error.message || error).replace(/(Bearer|token|secret|key)[^\s,;]*/gi, '$1…').slice(0, 160);
+      const detail = redactSecrets(error.message || error).slice(0, 160);
       body.detail = detail;
       console.error('[app] ' + String(req.query?.route || '') + ' failed:', detail);
     }

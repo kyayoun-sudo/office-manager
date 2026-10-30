@@ -8,6 +8,15 @@ Dépôt des pièces depuis Ma procédure (2026-10-20) : 100 Mio maximum par docu
 
 Correction du lecteur SOP SYCEBNL (2026-10-19) : les « Références techniques » en tête d'une fiche ne terminent plus la lecture lorsque des sections d'exécution suivent. Une bibliographie terminale et la conclusion du cycle restent exclues. Vérifié sur les 8 SOP SYCEBNL : 101/101 procédures retrouvent leurs étapes et demandes ; les 20 SOP d'audit général donnent exactement le même résultat qu'avant. Relire la bibliothèque depuis Méthodologie après déploiement pour reconstruire les fiches déjà enregistrées. Cela ne change pas le modèle Excel associé à une mission ni les choix déjà validés dans son programme.
 
+**Audit du 30 octobre 2026** : lire `AUDIT_2026-10-30.md` (constats, état des corrections) et `sauv.md` (compréhension du projet, dont le
+noyau universel des agents `lib/*-kernel.js`, absent ci-dessous). Piège prouvé : une refonte qui COPIE un fichier (ex. `tidy-plan.js` →
+`tidy-plan-domain.js`) pendant qu'une autre branche le corrige perd la correction à la fusion — relancer `npm test` sur la fusion.
+**Règle depuis le 30/10 : le jeton pilote seul n'ouvre plus rien** (sauf `branding` en lecture). Toute route sans règle propre
+(`open` / `owner` / `users` / écran) exige une session personnelle ou un appel du serveur signé (`internalHeaders` / `isSignedInternal`,
+clé : `OFFICE_MANAGER_INTERNAL_SECRET` → `…SCHEDULER_SECRET` → `ORPAILLEUR_JOB_SECRET` → clé Supabase) ; les `api/*.js` séparés
+passent par `lib/caller.js` (`requirePersonOrServer`, `visibleMissionIds`). Un appel en arrière-plan passe par `fireInternal`, jamais
+un `fetch` maison. Le code propriétaire n'est plus remis au navigateur (session du propriétaire / d'un associé).
+
 **Passation du 19 octobre 2026 (cahier des 11 points de Paul)** : lire [la passation](docs/PASSATION_SESSION_2026-10-19.md) — ce qui est fait, ce qui reste, les décisions de Paul, les pièges.
 
 **Corrections Codex du 12 octobre 2026** : lire [le message pour Claude](docs/NOTE_POUR_CLAUDE_CORRECTIONS_2026-10-12.md) avant de poursuivre. Les corrections sont sur des branches dédiées ; les parcours métier sont conservés.

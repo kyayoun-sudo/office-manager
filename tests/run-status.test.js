@@ -64,8 +64,13 @@ test('history imposes server organisation and never discloses metrics or errors'
     return new Response(JSON.stringify([{id:'synthetic',status:'failed',summary:'Synthetic failure',metrics:{private:'hidden'},errors:['private']}]));
   };
   try {
+    // Audit 2026-10-30: the shared token alone is refused; a person or the server's signed call is needed.
+    const alone=response();
+    await handler({method:'GET',headers:{'x-office-manager-token':'synthetic-token'},query:{}},alone);
+    assert.equal(alone.code,401);
+    const { internalHeaders } = await import('../lib/firm-context.js');
     const res=response();
-    await handler({method:'GET',headers:{'x-office-manager-token':'synthetic-token'},query:{org_id:'attacker'}},res);
+    await handler({method:'GET',headers:{'x-office-manager-token':'synthetic-token',...internalHeaders('server-org')},query:{org_id:'attacker'}},res);
     assert.equal(res.code,200);
     assert.ok(requested.includes('org_id=eq.server-org'));
     assert.ok(!requested.includes('attacker'));

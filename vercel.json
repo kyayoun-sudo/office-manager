@@ -35,7 +35,7 @@
       "permanent": false
     },
     {
-      "source": "/(lib|agents|db|scripts|supabase|connectors|desktop|tests|claude)/(.*)",
+      "source": "/(lib|agents|db|scripts|supabase|connectors|desktop|tests|claude|\\.github|\\.claude)/(.*)",
       "destination": "/accueil.html",
       "permanent": false
     },
@@ -45,7 +45,7 @@
       "permanent": false
     },
     {
-      "source": "/(lab-gateway-server\\.js|index\\.ts|audit-dual-theme\\.patch|Dockerfile\\.lab-gateway|pnpm-lock\\.yaml|package-lock\\.json|[A-Za-z0-9_-]+\\.md)",
+      "source": "/(lab-gateway-server\\.js|index\\.ts|audit-dual-theme\\.patch|Dockerfile\\.lab-gateway|pnpm-lock\\.yaml|package-lock\\.json|package\\.json|vercel\\.json|\\.gitignore|[A-Za-z0-9_-]+\\.md)",
       "destination": "/accueil.html",
       "permanent": false
     }

@@ -1,6 +1,7 @@
 import { requirePilotAccess } from "../lib/auth.js";
 import { bridgeForbiddenHere } from "../lib/google-drive.js";
 import { resolveRequestOrg, multiCabinet, pilotOrgId } from "../lib/firm-context.js";
+import { requirePersonOrServer } from "../lib/caller.js";
 import { loadGoogleConnection } from "../lib/google-connection.js";
 import { assertIsolatedOrg, isTestMode } from "../lib/test-mode.js";
 import { runOrpailleurKernel } from "../lib/orpailleur-kernel.js";
@@ -21,6 +22,8 @@ export default async function handler(req, res) {
     }
 
     const orgId = await resolveRequestOrg(req);
+    // Audit 2026-10-30: called by the server's own passes (signed) or a person — never the shared token alone.
+    await requirePersonOrServer(req, orgId);
 
     // Universal-kernel continuation entry point. In preview/test it may operate only on
     // the isolated test organisation; a protected preview must never gain access to the
@@ -70,8 +73,10 @@ export default async function handler(req, res) {
 
     return res.send(text);
   } catch (error) {
+    // A code for 4xx; a 5xx message may carry a URL or a key: logged, not shown (audit 2026-10-30).
+    if (!(error.statusCode < 500)) console.error("[orpailleur] failed:", String(error.message || error).slice(0, 160));
     return res
       .status(error.statusCode || 500)
-      .json({ error: String(error.message || error) });
+      .json({ error: error.statusCode < 500 || /^[A-Z0-9_]+$/.test(String(error.message)) ? String(error.message || error) : "ORPAILLEUR_UNAVAILABLE" });
   }
 }

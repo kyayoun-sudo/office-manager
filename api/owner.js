@@ -45,8 +45,12 @@ export function requireOwnerAccess(req) {
   }
 }
 
-export async function handleOwnerRequest(req, { drive = driveAdapter, now = new Date() } = {}) {
-  requireOwnerAccess(req);
+export async function handleOwnerRequest(req, { drive = driveAdapter, now = new Date(), ownerAccount = null } = {}) {
+  // The owner's or a partner's own session (checked by the handler), or the owner code (audit 2026-10-30: the code is
+  // no longer handed to the browser at login).
+  if (!ownerAccount) requireOwnerAccess(req);
+  // Signed in: the rule is approved in the name of the connected account, never a name sent by the browser.
+  const approver = ownerAccount ? (ownerAccount.display_name || ownerAccount.email) : null;
   const secret = ownerSecret();
   if (!secret) {
     const error = new Error("OWNER_APPROVAL_SECRET_MISSING");
@@ -79,7 +83,7 @@ export async function handleOwnerRequest(req, { drive = driveAdapter, now = new 
       rule = ownerApproveRole(memory, {
         semanticRole: body.semantic_role,
         targetFileId: body.target_file_id,
-        approvedBy: body.approved_by,
+        approvedBy: approver || body.approved_by,
         notes: body.notes || "",
         secret,
         now: nowIso
@@ -89,7 +93,7 @@ export async function handleOwnerRequest(req, { drive = driveAdapter, now = new 
       rule = ownerRejectRole(memory, {
         semanticRole: body.semantic_role,
         targetFileId: body.target_file_id,
-        approvedBy: body.approved_by,
+        approvedBy: approver || body.approved_by,
         notes: body.notes || "",
         secret,
         now: nowIso
@@ -99,7 +103,7 @@ export async function handleOwnerRequest(req, { drive = driveAdapter, now = new 
       rule = ownerDeactivateRule(memory, { ruleIdToDeactivate: body.rule_id, secret, now: nowIso });
       break;
     case "mark_mapping_reviewed":
-      rule = ownerMarkMappingReviewed(memory, { approvedBy: body.approved_by, secret, now: nowIso });
+      rule = ownerMarkMappingReviewed(memory, { approvedBy: approver || body.approved_by, secret, now: nowIso });
       break;
     default: {
       const error = new Error("UNKNOWN_OWNER_ACTION");
@@ -127,10 +131,15 @@ export default async function handler(req, res) {
     const ownerOrg = await resolveRequestOrg(req, { requireMember: multiCabinet() });
     if (multiCabinet() && ownerOrg !== pilotOrgId()) return res.status(403).json({ error: 'OWNER_TOOLS_PILOT_ONLY' });
     if (ownerOrg) await loadGoogleConnection(ownerOrg).catch(() => null);
-    return res.status(200).json(await handleOwnerRequest(req));
+    let ownerAccount = null;
+    if (req.headers?.authorization || req.headers?.Authorization) {
+      const [{ requireRole }, { FIRM_LEAD }] = await Promise.all([import("../lib/user-auth.js"), import("../lib/roles.js")]);
+      ownerAccount = await requireRole(req, [...FIRM_LEAD]).catch(() => null);
+    }
+    return res.status(200).json(await handleOwnerRequest(req, { ownerAccount }));
   } catch (error) {
     return res
       .status(error.statusCode || 500)
-      .json({ error: String(error.message || error) });
+      .json({ error: error.statusCode < 500 || /^[A-Z0-9_]+$/.test(String(error.message)) ? String(error.message || error) : "OWNER_TOOLS_UNAVAILABLE" });
   }
 }
