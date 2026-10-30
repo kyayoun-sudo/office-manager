@@ -35,8 +35,12 @@ export default async function handler(req, res) {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(Buffer.from(buffer));
     const sopSteps = (view.card?.steps || []).filter(s => !s.common).map((s, i) => ({ n: i + 1, text: s.text || String(s), source: 'sop' }));
-    const sources = await stepSources(orgId, missionId).catch(() => []);
+    const sources = await stepSources(orgId, missionId, { strictSources: true });
     const understanding = understandWorkingFile(wb, { procedureCode: code, sopSteps, sources });
+    // understandWorkingFile intentionally focuses on workbook structure. Do not let that
+    // structural projection erase what the mission already knows about each piece.
+    understanding.mission_sources = sources;
+    understanding.source_principle = 'filename/PBC/folder are hints; semantic mission memory and document content determine what the piece represents';
     await logAccess(orgId, account, 'WORKING_FILE_UNDERSTANDING', `${missionId}:${code}`).catch(() => null);
     return res.status(200).json({ understanding });
   } catch (error) {
