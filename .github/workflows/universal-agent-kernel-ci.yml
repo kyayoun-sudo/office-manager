@@ -5,6 +5,7 @@ on:
     branches:
       - feature/universal-agent-kernel
       - feature/white-label-desktop
+      - 'fix/**'
   pull_request:
     branches:
       - main
@@ -38,6 +39,10 @@ jobs:
           node --test
           tests/agent-kernel.test.js
           tests/kernel-facades.test.js
+          tests/enhanced-auditor-kernel.test.js
+          tests/enhanced-auditor-reality.test.js
+          tests/enhanced-auditor-facade.test.js
+          tests/semantic-mission-sources.test.js
           tests/working-file-kernel.test.js
           tests/working-file-memory-brain.test.js
           tests/inventory-mission-sync.test.js
