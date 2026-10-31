@@ -66,8 +66,14 @@ test('a final answer selecting an unread source becomes a read request and must 
 });
 
 test('foreign sources and invalid ranges cannot reach Drive', async () => {
+  // 2026-10-31: a foreign piece is never opened; the refusal is explained to the AI (one wrong id no longer stops the
+  // search), and three refusals in a row stop it.
   const f = await fixture(); f.answer({ inspect: { file_id: 'FOREIGN' } });
-  assert.equal((await f.run()).ai_error, 'PIECE_NOT_IN_MISSION'); assert.equal(f.counts().opened, 0);
+  const first = await f.run();
+  assert.equal(first.ai_error, null); assert.equal(f.counts().opened, 0);
+  await f.run();
+  assert.equal((await f.run()).ai_error, 'PIECE_NOT_IN_MISSION', 'three refusals in a row: stopped');
+  assert.equal(f.counts().opened, 0, 'never opened');
   f.answer({ inspect: { file_id: 'D0', row_from: -1 } });
   assert.equal((await f.run({ retry_ai: true })).ai_error, 'DOCUMENT_RANGE_INVALID');
 });
@@ -169,4 +175,27 @@ test('a memory failure after an approved action reports execution and never reru
   const r=await runApproved({orgId:'O',missionId:'M',agent:'sika',proposal:{action:'prepare',params:{}},by:'Paul',actions:{prepare:{run:()=>{runs++;return {prepared:true}}}}},
     {noteMission:async()=>{throw Error('MEMORY_UNAVAILABLE')}});
   assert.equal(runs,1); assert.equal(r.executed,true); assert.equal(r.prepared,true); assert.match(r.memory_error,/MEMORY_UNAVAILABLE/);
+});
+
+// 2026-10-31 (« La recherche par l'IA est interrompue : PIECE_NOT_IN_MISSION »): the AI is told why, uses the catalogue,
+// and the search goes on; « Reprendre la recherche » after such a stop tells it too.
+test('a piece outside the catalogue: the AI is told, uses a catalogue id, and the search goes on', async () => {
+  const f = await fixture();
+  f.answer({ source_file_id: 'NOT-IN-MISSION' });
+  let r = await f.run();
+  assert.equal(r.ai_error, null); assert.equal(r.pending, true);
+  f.answer(input => { assert.equal(input.feedback.at(-1).refused, 'PIECE_NOT_IN_MISSION'); assert.deepEqual(input.feedback.at(-1).file_ids, ['NOT-IN-MISSION']); return { inspect: { file_id: 'D3', page: 1 } }; });
+  r = await f.run(); r = await f.run();
+  assert.equal(f.counts().opened, 1, 'the catalogue piece is read');
+  f.answer({ source_file_id: 'D3' });
+  r = await f.run(); r = await f.run();
+  assert.equal(r.result.source_file_id, 'D3');
+});
+
+test('« Reprendre la recherche » after a stop on foreign pieces: the AI is told why', async () => {
+  const f = await fixture(); f.answer({ inspect: { file_id: 'FOREIGN' } });
+  await f.run(); await f.run(); assert.equal((await f.run()).ai_error, 'PIECE_NOT_IN_MISSION');
+  f.answer(input => { assert.match(JSON.stringify(input.feedback), /s’est arrêtée parce que tu as cité des pièces absentes/); return { catalog_page: 1 }; });
+  const r = await f.run({ retry_ai: true });
+  assert.equal(r.ai_error, null); assert.equal(r.pending, true);
 });
