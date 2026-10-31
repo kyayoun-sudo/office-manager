@@ -190,3 +190,37 @@ test('background calls go to this deployment, a forged Host is ignored', async (
   assert.equal(internalBaseUrl({ headers: { host: 'localhost:3000' } }, {}), 'http://localhost:3000');
   assert.equal(internalBaseUrl({ headers: { host: 'evil.example' } }, {}), null, 'nowhere to send it: nothing is sent');
 });
+
+// Audit of the procedure route (2026-10-31).
+test('errors: a business code reaches the screen (422), a status given as `status` is kept, a crash stays generic', async () => {
+  const { httpStatusOf, default: handler, ROUTES } = await import('../api/app.js');
+  assert.equal(httpStatusOf(new Error('PIECE_NOT_IN_MISSION')), 422);
+  assert.equal(httpStatusOf(Object.assign(new Error('PROCEDURE_NOT_EDITABLE'), { status: 403 })), 403, 'some modules set `status`');
+  assert.equal(httpStatusOf(new Error('MEMORY_CONFLICT')), 409);
+  assert.equal(httpStatusOf(new Error('SUPABASE_500: boom')), 500);
+  assert.equal(httpStatusOf(new TypeError('Cannot read properties of undefined')), 500);
+  assert.equal(httpStatusOf(new Error('The operation was aborted due to timeout')), 500);
+  const saved = { ...process.env }; process.env.DEFAULT_ORG_ID = ORG; delete process.env.OFFICE_MANAGER_MULTI_CABINET; delete process.env.OFFICE_MANAGER_TEST_RUN;
+  const original = ROUTES.chat.GET; let status, body;
+  ROUTES.chat.GET = Object.assign(() => { throw new Error('WORK_CHANGED_PREPARE_AGAIN'); }, { public: true });
+  try {
+    await handler({ method: 'GET', query: { route: 'chat' }, headers: {} }, { setHeader() {}, status(n) { status = n; return this; }, json(b) { body = b; return this; } });
+    assert.equal(status, 422); assert.equal(body.error, 'WORK_CHANGED_PREPARE_AGAIN', 'the code itself, not « …_UNAVAILABLE »');
+  } finally { ROUTES.chat.GET = original; process.env = saved; }
+});
+
+test('an archived mission can still be READ through the procedure page; its writes stay locked', async () => {
+  const { READ_ONLY_POST } = await import('../api/app.js');
+  for (const a of ['workfile-map', 'workbook-view', 'steps', 'reading-report']) assert.ok(READ_ONLY_POST.procedure.has(a), a);
+  for (const a of ['write-wp', 'workfile-cells', 'step-plan', 'workfile-review-pieces', 'needs', 'ask-procedure', 'sign']) assert.ok(!READ_ONLY_POST.procedure.has(a), a + ' writes: locked');
+});
+
+test('procedure route: a missing or malformed mission / code / action is said clearly, before any reading', async () => {
+  const { ROUTES } = await import('../api/app.js');
+  const run = (method, q, body) => (method === 'GET' ? ROUTES.procedure.GET : ROUTES.procedure.POST)(ORG, { query: q, body, account: { role: 'auditor', email: 'a@x' } });
+  await assert.rejects(run('GET', {}), /MISSION_AND_CODE_REQUIRED/);
+  await assert.rejects(run('GET', { mission_id: 'abc', code: 'PRJ-01' }), /VALID_MISSION_ID_REQUIRED/);
+  await assert.rejects(run('POST', {}, { mission_id: ORG, code: 'PRJ-01' }), /ACTION_REQUIRED/);
+  await assert.rejects(run('POST', {}, { action: 'steps', code: 'PRJ-01' }), /MISSION_AND_CODE_REQUIRED/);
+  await assert.rejects(run('POST', {}, { action: 'steps', mission_id: ORG, code: "x'; drop" }), /VALID_PROCEDURE_CODE_REQUIRED/);
+});

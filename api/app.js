@@ -263,11 +263,15 @@ export const ROUTES = Object.freeze({
       const w = await import('../lib/procedure-work.js');
       if (req.query?.mine) return w.myProcedures(orgId, req.account);
       if (req.query?.reviews) return (await import('../lib/procedure-review.js')).myReviews(orgId, req.account);
+      // A procedure is named by its mission and its code: said clearly when one is missing (not « no validated programme »).
+      requireProcedureKey(req.query?.mission_id, req.query?.code);
       if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
       return (await import('../lib/procedure-reading-report.js')).publicView(await w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account));
     }),
     POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
+      if (!b.action) throw fail('ACTION_REQUIRED', 400);
+      requireProcedureKey(m, c);
       if (b.action === 'table-import-options') return (await import('../lib/workfile-table-import.js')).tableImportOptions(orgId,m,c,b,a);
       if (b.action === 'preview-table-import') return (await import('../lib/workfile-table-import.js')).previewTableImport(orgId,m,c,b,a);
       if (b.action === 'run-table-import') return (await import('../lib/workfile-table-import.js')).runTableImport(orgId,m,c,b,a);
@@ -1212,9 +1216,21 @@ export const ROUTE_SCREENS = Object.freeze({
 });
 const decisionLevel = req => req.body?.owner_override === true || ['approve', 'decide', 'validate', 'freeze', 'review-decide', 'settings', 'owner-override', 'accept-existing-kyc', 'confirm-agreement', 'independence-decide', 'independence-applied', 'independence-override', 'independence-prohibit'].includes(req.body?.action) ? 'approve' : ['sign'].includes(req.body?.action) ? 'review' : 'prepare';
 const PILOT_ONLY = new Set(['bootstrap-owner', 'claim-owner', 'firm-restart']);
+// POST actions that only READ (no write in the Drive, the workbook or the database): allowed on an archived mission.
+// An action that may write, prepare with the AI or rename pieces is not here — it stays locked after archiving.
+export const READ_ONLY_POST = Object.freeze({
+  procedure: new Set(['table-import-options', 'preview-table-import', 'template-options', 'inspect-template', 'reading-report', 'workspace-brief',
+    'workbook-view', 'workfile-map', 'workfile-import-candidates', 'workfile-import-inspect', 'workfile-long-paths', 'steps', 'population-preview'])
+});
 // Read with the shared code alone: the firm's name and colours, shown on the login page before any session.
 const PILOT_TOKEN_ENOUGH = new Set(['branding']);
 const routeKey = req => String(req.query?.route || '');
+const MISSION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function requireProcedureKey(missionId, code) {
+  if (!missionId || !code) throw fail('MISSION_AND_CODE_REQUIRED', 400);
+  if (!MISSION_UUID.test(String(missionId))) throw fail('VALID_MISSION_ID_REQUIRED', 400);
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.\-]{0,40}$/.test(String(code))) throw fail('VALID_PROCEDURE_CODE_REQUIRED', 400);
+}
 export async function handleApp(req) {
   const route = ROUTES[String(req.query?.route || '')];
   if (!route) { requirePilotAccess(req); throw fail('UNKNOWN_ROUTE', 404); }
@@ -1253,7 +1269,9 @@ export async function handleApp(req) {
     } catch (e) { await logAccess(orgId, req.account, 'ACCESS_REFUSED', String(req.query?.route || '') + ':' + e.message); throw e; }
   }
   // An archived mission is read-only (spec §42): a write is refused, unless a partner gives a reason (traced).
-  const lockMission = req.method === 'POST' && routeKey(req) !== 'mission-archive' ? String(req.body?.mission_id || req.query?.mission_id || '') : '';
+  // Reading stays possible on an archived mission: the POST actions that only read are not locked (audit 2026-10-31).
+  const readOnly = (READ_ONLY_POST[routeKey(req)] || new Set()).has(String(req.body?.action || ''));
+  const lockMission = req.method === 'POST' && routeKey(req) !== 'mission-archive' && !readOnly ? String(req.body?.mission_id || req.query?.mission_id || '') : '';
   if (orgId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lockMission)) await (await import('../lib/mission-archive.js')).assertNotArchived(orgId, lockMission, req);
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await runInFirm(orgId, () => loadGoogleConnection(orgId)).catch(() => null);
@@ -1262,6 +1280,21 @@ export async function handleApp(req) {
   const inFirm = () => runInFirm(orgId, invoke);
   if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, inFirm);
   return inFirm();
+}
+
+// The HTTP status of an error (audit of the procedure route, 2026-10-31): `statusCode`, or `status` as some modules set it;
+// a business code thrown without a status (« PIECE_NOT_IN_MISSION », « WORK_CHANGED_PREPARE_AGAIN »…) is a refusal the person
+// must read (422), not a crash hidden behind « …_UNAVAILABLE »; a concurrent write (MEMORY_CONFLICT) is 409, to retry. A real
+// crash (a JavaScript exception, a free text, an infrastructure answer) stays 500, shown without its details.
+const BUSINESS_CODE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){1,12}$/;
+const INFRASTRUCTURE = /^(SUPABASE|GOOGLE|DRIVE|GMAIL|HTTP|FETCH|AI|OPENAI|ANTHROPIC|GEMINI|OPENROUTER)_/;
+export function httpStatusOf(error) {
+  const given = Number(error?.statusCode || error?.status);
+  if (Number.isInteger(given) && given >= 400 && given <= 599) return given;
+  const m = String(error?.message || '');
+  if (m === 'MEMORY_CONFLICT') return 409;
+  if (BUSINESS_CODE.test(m) && !INFRASTRUCTURE.test(m) && !(error instanceof TypeError || error instanceof ReferenceError || error instanceof SyntaxError)) return 422;
+  return 500;
 }
 
 // The value after « Bearer », « token= », « apikey: »… is removed too, and keys / JWTs that appear alone
@@ -1291,7 +1324,7 @@ export default async function handler(req, res) {
     }
     return res.status(200).json(out);
   } catch (error) {
-    const status = error.statusCode || 500;
+    const status = httpStatusOf(error);
     const route = ROUTES[String(req.query?.route || '')];
     const shown = [400, 401, 403, 404, 405, 409, 422, 423, 429, 503].includes(status) ? error.message : (route?.unavailable || 'APP_UNAVAILABLE');
     const body = { error: shown };
