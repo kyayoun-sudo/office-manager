@@ -124,3 +124,23 @@ test('the initial workspace brief loads authorized mission documents without cal
   assert.equal(f.stats().aiCalls,0);assert.equal(f.stats().downloads,0);
   await assert.rejects(workspaceBrief('org','mission','CASH-01',{}, {...f.d,view:async()=>{throw new Error('DENIED');}}),/DENIED/);
 });
+
+// 2026-10-31 (« PROCEDURE_UNAVAILABLE — The operation was aborted due to timeout »): the AI had 15 s whatever the size of
+// the input; when no provider answers, the conversation says so and does nothing — never a technical error page.
+test('the AI does not answer: the conversation says so, nothing is done or written', async () => {
+  const f = await fixture();
+  let executed = false;
+  const d = { ...f.d, ai: async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); }, execute: () => { executed = true; } };
+  const r = await askProcedure('org', 'mission', 'CASH-01', { message: 'prends les documents du GL des années et rempli D1' }, {}, d);
+  assert.match(r.answer, /n’a pas répondu à temps : rien n’a été fait ni écrit/);
+  assert.match(r.answer, /Oui, remplis/, 'says where data sheets are filled');
+  assert.deepEqual(r.outcomes, []); assert.equal(r.changed, false); assert.equal(executed, false);
+  assert.match(r.ai_error, /timeout/);
+});
+
+test('a large input gets more time (the timeout no longer depends on the answer length only)', async () => {
+  const { requestTimeout } = await import('../lib/ai-plus.js');
+  assert.equal(requestTimeout({ maxTokens: 1800, input: 'x'.repeat(100) }, {}), 15000);
+  assert.equal(requestTimeout({ maxTokens: 1800, input: 'x'.repeat(30000) }, {}), 45000);
+  assert.equal(requestTimeout({ maxTokens: 1800, input: 'x'.repeat(70000) }, {}), 60000);
+});
