@@ -138,12 +138,13 @@ test('une préparation acceptée et vérifiée est réutilisée sans nouvel appe
   const calls = h.asked.length; assert.ok(calls >= 2); assert.ok(first.order_lines.some(x => /C = D/.test(x)));
   const accepted = await acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'paul@cabinet' }, h.d);
   assert.equal(accepted.method_learned, true); assert.equal(recipe.orders_method.validated_by, 'paul@cabinet');
+  const calls2 = h.asked.length; // la relecture après écriture est le seul appel IA de plus
   const next = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'paul@cabinet' }, h.d);
-  assert.equal(h.asked.length, calls, 'aucun appel IA pour réexpliquer la même méthode');
+  assert.equal(h.asked.length, calls2, 'aucun appel IA pour réexpliquer la même méthode');
   assert.equal(next.ai, 'validated-memory'); assert.equal(next.reused_method.validated_by, 'paul@cabinet');
   assert.deepEqual(next.cells, first.cells); assert.deepEqual(next.checks, first.checks);
   await fillOrdersPlan('O', 'M', 'PRJ-03', { ...D2, hint: 'Réexamine ce choix' }, { email: 'paul@cabinet' }, h.d);
-  assert.ok(h.asked.length > calls, 'la personne peut demander une nouvelle analyse');
+  assert.ok(h.asked.length > calls2, 'la personne peut demander une nouvelle analyse');
 });
 
 test('des ordres non confirmés ne deviennent jamais une méthode apprise', async () => {
@@ -239,4 +240,30 @@ test('un modèle dont la première ligne de saisie est déjà écrite : l’IA l
   assert.equal(lay.written_rows_total, 1); assert.equal(lay.input_rows_already_written[0].row, first);
   assert.equal(lay.input_rows_already_written[0].cells[0].value, '401100'); assert.equal(lay.first_free_input_row, first + 1);
   assert.match(P.problem, new RegExp('commence ligne ' + first + ' ; la première ligne de saisie libre du fichier est la ligne ' + (first + 1)));
+});
+
+test('après l’écriture, le code relit le fichier ; l’IA explique et liste ce qu’un humain vérifie ; sans IA, la relecture du code est dite telle quelle', async () => {
+  const probe = harness(() => ({ text: JSON.stringify(ORDERS) }));
+  await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, probe.d);
+  const first = probe.asked.at(-1).context.layout_of_the_template.first_input_row;
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(wpBuf); const ws = wb.getWorksheet('D2_BUDGET');
+  // The file as saved: line 1 as ordered, line 2 with a wrong amount (999 instead of 100).
+  ws.getCell('A' + first).value = 'Sous-total Personnel'; ws.getCell('D' + first).value = 350; ws.getCell('E' + first).value = 320;
+  ws.getCell('A' + (first + 1)).value = 'Sous-total Fonctionnement'; ws.getCell('D' + (first + 1)).value = 999; ws.getCell('E' + (first + 1)).value = 100;
+  const saved = Buffer.from(await wb.xlsx.writeBuffer());
+  const kept = { kind: 'fill-orders', sheet: 'D2_BUDGET', orders: cleanOrders(ORDERS, { columns: ['A', 'B', 'C', 'D', 'E'].map(col => ({ col })) }, ['T', 'G']), fingerprint: null };
+  const mk = ai => harness(ai, { walkthrough: [kept], d: {
+    drive: { getMeta: async id => (id === 'WP' ? { name: 'WF.xlsx', size: saved.length } : { name: files[id].name, size: files[id].buffer.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? saved : files[id].buffer) },
+    preview: async () => ({ revision: 'r', columns: [1, 2, 3, 4, 5].map(column => ({ column })) }),
+    run: async () => ({ verified: true, plan_id: 'p', sheet: 'D2_BUDGET', start_row: first, rows: 2 }), review: async () => ({}), noteMissionEvent: async () => null } });
+  const withAi = mk(() => ({ provider: 'ia', text: JSON.stringify({ message: 'Rempli, mais une somme ne colle pas.', to_verify: ['Contrôler la ligne 2'] }) }));
+  let r = await acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'p' }, withAi.d);
+  assert.equal(r.review.by, 'ia'); assert.match(r.review.message, /somme/);
+  assert.ok(r.review.code_reread.mismatches.some(m => m.where === 'D' + (first + 1) && m.expected === 100 && m.found === 999), 'l’écart est trouvé par le code, pas par l’IA');
+  assert.ok(r.review.to_verify.some(x => /Somme de la colonne D/.test(x)) && r.review.to_verify.includes('Contrôler la ligne 2'));
+  assert.ok(r.review.to_verify.some(x => /Pièce à obtenir : Convention/.test(x)), 'la pièce manquante reste dite');
+  const noAi = mk(() => { throw new Error('AI_DOWN'); });
+  r = await acceptFillOrders('O', 'M', 'PRJ-03', D2, { email: 'p' }, noAi.d);
+  assert.equal(r.review.by, 'code'); assert.match(r.review.message, /L’IA n’a pas relu/); assert.equal(r.review.code_reread.mismatches.length, 1);
+  assert.ok(r.review.to_verify.some(x => /Écart à la relecture en D/.test(x)));
 });

@@ -44,10 +44,11 @@
       try {
         var r = await post(Object.assign({ action: 'workfile-sheet-plan-accept', sheet: sheet }, extend === true ? { extend: true } : {}));
         box.replaceWith(node('div', '')); 
-        bubble('assistant', sheet + ' : ' + (r.rows || 0) + ' ligne(s) écrite(s) et relues. ' + (r.filled || []).map(function (f) { return f.col + ' ← ' + f.document; }).join(' ; ') +
-          ((r.left_empty || []).length ? '\nLaissées vides : ' + r.left_empty.map(function (f) { return f.header; }).join(', ') : '') +
-          ((r.checks || []).length ? '\nContrôles : ' + r.checks.slice(0, 6).map(function (c) { return typeof c === 'string' ? c : c.label || ''; }).join(' ; ') : '') +
-          '\nÀ vérifier par vous : ' + (r.confirmed ? 'le remplissage est enregistré, relisez les montants et les lignes écartées.' : 'confirmez le remplissage dans le compte rendu.'));
+        var rv = r.review;
+        bubble('assistant', (rv ? rv.message : sheet + ' : ' + (r.rows || 0) + ' ligne(s) écrite(s) et relues.') +
+          '\n' + sheet + ' : ' + (r.rows || 0) + ' ligne(s) écrite(s) · ' + (r.filled || []).map(function (f) { return f.col + ' ← ' + f.document; }).join(' ; ') +
+          (rv && rv.to_verify && rv.to_verify.length ? '\n\nÀ vérifier humainement :\n- ' + rv.to_verify.join('\n- ') : '\nÀ vérifier par vous : ' + (r.confirmed ? 'le remplissage est enregistré, relisez les montants.' : 'confirmez le remplissage dans le compte rendu.')) +
+          (rv && rv.by === 'code' ? '\n(Relecture faite par le code seul : l’IA n’a pas répondu.)' : ''));
         window.dispatchEvent(new Event('workpaper-dialogue-updated')); refresh(sheet, 1);
         try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: sheet } })); } catch (_) {}
       } catch (e) {
