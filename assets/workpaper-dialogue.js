@@ -34,7 +34,7 @@
         if(decision==='confirm'&&edits.length)throw new Error('Appliquez vos corrections avant de confirmer.');
         await post({action:'review-workpaper',plan_id:r.plan_id,decision:decision,note:note.value,edits:edits});
         window.dispatchEvent(new Event('workpaper-dialogue-updated'));
-      }catch(e){say.textContent=errors[e.message]||e.message;buttons.forEach(function(x){x.disabled=false;});}};box.appendChild(b);}
+      }catch(e){var code=String(e.message).split(': ')[0],why=String(e.message).slice(code.length+2);say.textContent=errors[code]?errors[code]+(why?' Détail : '+why:''):e.message;buttons.forEach(function(x){x.disabled=false;});}};box.appendChild(b);}
       if(state!=='confirmed'){button('Je confirme ce remplissage','confirm');button('Appliquer mes corrections dans Excel','apply-correction');button('Demander une correction à l’agent','request-correction');}
       box.appendChild(el('small','Cette confirmation porte sur les saisies. Elle ne conclut ni ne signe le test d’audit.'));box.appendChild(say);host.appendChild(box);
     });
