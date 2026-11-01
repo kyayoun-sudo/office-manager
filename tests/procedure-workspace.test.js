@@ -165,3 +165,14 @@ test('a proposal needs the AI and a result: no rows or an AI error is not ready,
   r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-sheet', sheet: 'D2' }, { type: 'write-workpaper' }], 'x', {}, { ...d, ...fake });
   assert.equal(r[0].status, 'blocked');
 });
+
+test('« prépare tout » : le code liste les feuilles de données vides, sans IA ni écriture, et l’action est seule', async () => {
+  const { d, stats } = await fixture(); let asked = 0;
+  const assist = async () => { asked++; return { data_sheets: [{ sheet: 'D1_GL' }, { sheet: 'D2_BUDGET' }] }; };
+  let r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-all' }], 'Prépare tout ce qui peut être pré-rempli', {}, { ...d, workfileAssist: assist });
+  assert.equal(r[0].status, 'sheets'); assert.deepEqual(r[0].sheets, ['D1_GL', 'D2_BUDGET']); assert.equal(stats().aiCalls, 0);
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-all' }], 'x', {}, { ...d, workfileAssist: async () => ({ data_sheets: [] }) });
+  assert.equal(r[0].status, 'unchanged');
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-all' }, { type: 'fill-sheet', sheet: 'D1' }], 'x', {}, { ...d, workfileAssist: assist });
+  assert.equal(r[0].status, 'blocked');
+});
