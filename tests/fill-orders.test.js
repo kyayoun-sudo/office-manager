@@ -207,3 +207,36 @@ test('GL par sections : l’IA voit les comptes reportés sur les écritures ave
   assert.ok(derived); assert.deepEqual(derived.rows.slice(1).map(r => r.n), [3,6]);
   assert.ok(derived.rows[1].v.includes('625100')); assert.ok(derived.rows[2].v.includes('625200'));
 });
+
+test('l’IA reçoit la zone réelle du modèle ; sa lecture du départ de la saisie est vérifiée contre le fichier, un écart est dit', async () => {
+  const same = harness(() => ({ text: JSON.stringify(ORDERS) }));
+  await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, same.d);
+  const lay = same.asked.at(-1).context.layout_of_the_template;
+  assert.ok(lay && lay.first_input_row >= 1 && lay.first_free_input_row === lay.first_input_row, 'zone réelle donnée, aucune ligne déjà écrite');
+  assert.ok(Array.isArray(lay.input_rows_already_written) && Array.isArray(lay.around_the_table));
+  const right = harness(() => ({ text: JSON.stringify({ ...ORDERS, layout: { start_row: lay.first_input_row, lines_come_from: 'catégories du TEB', why: 'première ligne de saisie' } }) }));
+  let P = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, right.d);
+  assert.equal(P.layout.start_row, lay.first_input_row); assert.ok(!/commence ligne/.test(P.problem || ''));
+  const wrong = harness(() => ({ text: JSON.stringify({ ...ORDERS, layout: { start_row: lay.first_input_row + 3, lines_come_from: 'x' } }) }));
+  P = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, wrong.d);
+  assert.match(P.problem, new RegExp('commence ligne ' + (lay.first_input_row + 3)));
+  const out = harness(() => ({ text: JSON.stringify({ ...ORDERS, layout: { start_row: 9999 } }) }));
+  P = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, out.d);
+  assert.match(P.problem, /hors de la zone de saisie/);
+});
+
+test('un modèle dont la première ligne de saisie est déjà écrite : l’IA le voit, le code sait où l’import reprend, un départ faux est dit', async () => {
+  const probe = harness(() => ({ text: JSON.stringify(ORDERS) }));
+  await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, probe.d);
+  const first = probe.asked.at(-1).context.layout_of_the_template.first_input_row;
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(wpBuf);
+  wb.getWorksheet('D2_BUDGET').getCell('A' + first).value = '401100';
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const mk = answer => harness(answer, { d: { drive: { getMeta: async id => (id === 'WP' ? { name: 'WF.xlsx', size: buf.length } : { name: files[id].name, size: files[id].buffer.length, modifiedTime: 'x' }), downloadBuffer: async id => (id === 'WP' ? buf : files[id].buffer) } } });
+  const h = mk(() => ({ text: JSON.stringify({ ...ORDERS, layout: { start_row: first, lines_come_from: 'x' } }) }));
+  const P = await fillOrdersPlan('O', 'M', 'PRJ-03', D2, { email: 'p' }, h.d);
+  const lay = h.asked.at(-1).context.layout_of_the_template;
+  assert.equal(lay.written_rows_total, 1); assert.equal(lay.input_rows_already_written[0].row, first);
+  assert.equal(lay.input_rows_already_written[0].cells[0].value, '401100'); assert.equal(lay.first_free_input_row, first + 1);
+  assert.match(P.problem, new RegExp('commence ligne ' + first + ' ; la première ligne de saisie libre du fichier est la ligne ' + (first + 1)));
+});
