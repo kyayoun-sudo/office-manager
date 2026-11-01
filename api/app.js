@@ -937,6 +937,11 @@ export const ROUTES = Object.freeze({
   'mission-file': { GET: users(ALL_ROLES, (orgId, req) => getMissionFull(orgId, String(req.query?.mission_id || ''))), unavailable: 'MISSION_UNAVAILABLE' },
   // Direct mission creation (2026-10-19): a name and a client, the mission exists « En cours » with its creator on the
   // team; acceptance, independence and the engagement letter stay open items to complete later (never blocking).
+  // What the AI remembers of a mission (2026-11-01): decisions, corrections, cancellations, and what it learned online. A person confirms, corrects or retires.
+  'ai-memory': {
+    GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account); return (await import('../lib/ai-memory.js')).memoryView(orgId, id); }),
+    POST: users(ALL_ROLES, async (orgId, req) => { const b = req.body || {}, id = String(b.mission_id || ''); await requireMissionAccess(orgId, id, req.account); return (await import('../lib/ai-memory.js')).memoryAct(orgId, id, b, req.account); })
+  },
   'mission-quick': {
     GET: users(ALL_ROLES, async (orgId, req) => { const id = String(req.query?.mission_id || ''); await requireMissionAccess(orgId, id, req.account);
       const m = await import('../lib/mission-quick.js');

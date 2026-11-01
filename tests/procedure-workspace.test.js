@@ -176,3 +176,14 @@ test('« prépare tout » : le code liste les feuilles de données vides, sans I
   r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-all' }, { type: 'fill-sheet', sheet: 'D1' }], 'x', {}, { ...d, workfileAssist: assist });
   assert.equal(r[0].status, 'blocked');
 });
+
+test('l’IA qui ne comprend pas un terme le cherche en ligne : résultat « à confirmer », action seule, terme refusé s’il n’est pas général', async () => {
+  const { d } = await fixture(); const asked = [];
+  const searchWeb = async (o, m, b) => { asked.push(b); if (/Hydromet/.test(b.term)) throw Object.assign(new Error('SEARCH_TERM_NOT_GENERAL'), { statusCode: 400 }); return { status: 'learned', term: b.term, finding: 'x', to_confirm: true, sources: [{ url: 'https://exemple.org' }] }; };
+  let r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'search-web', term: 'compte 4011', why: 'plan de comptes' }], 'x', {}, { ...d, searchWeb });
+  assert.equal(r[0].status, 'done'); assert.equal(r[0].to_confirm, true); assert.equal(asked[0].term, 'compte 4011');
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'search-web', term: 'solde Hydromet' }], 'x', {}, { ...d, searchWeb });
+  assert.equal(r[0].status, 'blocked');
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'search-web', term: 'compte 4011' }, { type: 'fill-all' }], 'x', {}, { ...d, searchWeb });
+  assert.equal(r[0].status, 'blocked');
+});

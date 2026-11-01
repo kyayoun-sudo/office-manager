@@ -65,7 +65,7 @@
       try { var r = await planOnce(sheet, hint.value.trim()); box.replaceWith(proposalCard(sheet, planToProposal(r), done)); }
       catch (e) { busy(false); say.textContent = error(e); }
     };
-    no.onclick = function () { box.remove(); if (done) done(); };
+    no.onclick = function () { box.remove(); window.OfficeManager.api('/api/app?route=ai-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mission_id: view.mission_id, op: 'cancelled', sheet: sheet }) }).catch(function () {}); if (done) done(); };
     [ok, edit, hint, no, say].forEach(function (n) { box.appendChild(n); });
     return box;
   }
@@ -114,7 +114,7 @@
       more.type='button';more.addEventListener('click',async function(){more.disabled=true;try{var page=await post({action:'reading-report',plan_id:b.report_plan_id,offset:offset});page.findings.forEach(function(f){host.insertBefore(node('p',f.fact+'\nSource : '+f.source+' — '+f.reference+'\n« '+f.quote+' »'),more);});offset+=page.findings.length;more.hidden=offset>=page.findings_total;}catch(e){$('audit-message').textContent=error(e);}more.disabled=false;});host.appendChild(more);
     }
     if (r.assessment) section('Mon avis provisoire', [r.assessment]);
-    var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon', 'fill-sheet': 'Préparer le remplissage d’une feuille', 'fill-all': 'Préparer toutes les feuilles de données' };
+    var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon', 'fill-sheet': 'Préparer le remplissage d’une feuille', 'fill-all': 'Préparer toutes les feuilles de données', 'search-web': 'Chercher en ligne un terme général' };
     section('Ce que j’ai fait', (r.outcomes || []).map(function (o) {
       var label = names[o.action] || o.action;
       return label + (o.sample_id ? ' · ' + o.sample_id : '') + ' : ' +

@@ -479,3 +479,20 @@ CONFIRMATION DE L'E-MAIL À L'INSCRIPTION (audit du 29 octobre 2026, point 2) �
   Effet : la personne reçoit un e-mail, clique, puis se connecte ; son compte (propriétaire si son adresse est dans
   FIRST_OWNER_EMAILS sur un cabinet vide, sinon en attente d'un rôle) est créé à cette première connexion.
   Essayez d'abord avec une adresse à vous : ce flux n'a pas été essayé avec le vrai Supabase.
+
+L'IA DE « MA PROCÉDURE » : REMPLIR DANS LE CHAT, MÉMOIRE, RECHERCHE EN LIGNE (1er novembre 2026) — À ESSAYER
+  Aucun SQL à exécuter, aucune nouvelle variable. Rien de tout cela n'a été essayé avec la vraie IA ni sur une vraie mission.
+  1. Vercel > le projet > Deployments > prendre le DERNIER déploiement READY de la branche feature/white-label-desktop >
+     Promote (jamais « Redeploy » sur celui en production).
+  2. Ouvrir une vraie mission > Ma procédure. Dans le chat, écrire : « Prends le GL et remplis D2. » Une carte doit
+     apparaître (pièces utilisées, lignes prévues, ce qui manque) avec Valider / Modifier / Annuler. Rien n'est écrit avant Valider.
+  3. Cliquer Valider : le message qui suit doit dire ce qui a été rempli et la liste « À vérifier humainement ».
+     Si le message « Le fichier a changé depuis ce compte rendu » revient, il nomme maintenant la cellule en cause :
+     la recopier à Claude.
+  4. Essayer « Prépare tout ce qui peut être pré-rempli » (une carte par feuille) et une correction (« utilise plutôt tel fichier »).
+  5. Page de la mission > carte « Ce que l'IA a retenu » : les décisions et les connaissances trouvées en ligne s'y affichent ;
+     chaque ligne se confirme, se corrige ou se retire. Une connaissance du web confirmée peut être « proposée au cabinet »
+     (manager ou associé) : elle attend alors la validation d'un associé dans Entraînement.
+  6. La recherche en ligne dépend du fournisseur d'IA actif (Anthropic, OpenAI, Gemini ou OpenRouter). Si elle ne répond pas,
+     l'écran le dit et rien n'est retenu. Pilotage > Modèles d'IA montre les fournisseurs actifs.
+  Un gros grand livre (100 000 lignes en .xlsx) n'a été testé qu'avec des données fabriquées : à surveiller (temps, mémoire).
