@@ -22,6 +22,57 @@
     p.className = 'audit-bubble ' + role; $('audit-conversation').appendChild(p);
     p.scrollIntoView({ block: 'nearest' });
   }
+  // « Remplis D2 » in the chat: the agent shows what it will do (built by the code from checked orders); nothing is written before Valider.
+  function proposalCard(sheet, p) {
+    var box = node('section'); box.className = 'audit-bubble assistant'; box.setAttribute('aria-label', 'Proposition de remplissage de ' + sheet);
+    box.appendChild(node('h3', 'Je vais remplir ' + sheet));
+    if (p.understanding) box.appendChild(node('p', p.understanding));
+    (p.columns || []).forEach(function (c) { box.appendChild(node('p', c.col + ' · ' + (c.header || '') + ' ← ' + (c.document ? '« ' + c.document + ' », ' + (c.heading || '') : c.heading || 'rien (reste vide)') + (c.why ? '\nPourquoi : ' + c.why : ''))); });
+    box.appendChild(node('p', (p.rows || 0) + ' ligne(s) prévue(s)' + (p.capacity != null ? ' sur ' + p.capacity + ' de capacité' : '') + '.'));
+    (p.missing || []).forEach(function (m) { box.appendChild(node('p', 'Manque : ' + (m.header || m.col) + (m.piece ? ' — pièce à obtenir : ' + m.piece : ''))); });
+    (p.questions || []).forEach(function (q) { box.appendChild(node('p', 'Question : ' + q)); });
+    (p.checks || []).forEach(function (c) { box.appendChild(node('p', 'Contrôle : ' + (typeof c === 'string' ? c : c.label || JSON.stringify(c)))); });
+    if (p.problem) box.appendChild(node('p', 'À noter : ' + p.problem));
+    if (p.ai_error) box.appendChild(node('p', 'L’IA n’a pas répondu : aucune proposition fiable. Réessayez.'));
+    var say = node('p'); say.setAttribute('role', 'status');
+    var ok = node('button', 'Valider'), edit = node('button', 'Modifier'), no = node('button', 'Annuler'), hint = node('input');
+    [ok, edit, no].forEach(function (b) { b.type = 'button'; b.className = 'btn ghost'; });
+    ok.disabled = !p.ready; hint.type = 'text'; hint.hidden = true; hint.placeholder = 'Ce qu’il faut changer (ex. : utilise plutôt tel fichier)'; hint.setAttribute('aria-label', 'Modification demandée');
+    function busy(v) { ok.disabled = edit.disabled = no.disabled = v; }
+    ok.onclick = async function (extend) {
+      busy(true); say.textContent = 'Je remplis ' + sheet + ' et je relis le fichier…';
+      try {
+        var r = await post(Object.assign({ action: 'workfile-sheet-plan-accept', sheet: sheet }, extend === true ? { extend: true } : {}));
+        box.replaceWith(node('div', '')); 
+        bubble('assistant', sheet + ' : ' + (r.rows || 0) + ' ligne(s) écrite(s) et relues. ' + (r.filled || []).map(function (f) { return f.col + ' ← ' + f.document; }).join(' ; ') +
+          ((r.left_empty || []).length ? '\nLaissées vides : ' + r.left_empty.map(function (f) { return f.header; }).join(', ') : '') +
+          ((r.checks || []).length ? '\nContrôles : ' + r.checks.slice(0, 6).map(function (c) { return typeof c === 'string' ? c : c.label || ''; }).join(' ; ') : '') +
+          '\nÀ vérifier par vous : ' + (r.confirmed ? 'le remplissage est enregistré, relisez les montants et les lignes écartées.' : 'confirmez le remplissage dans le compte rendu.'));
+        window.dispatchEvent(new Event('workpaper-dialogue-updated')); refresh(sheet, 1);
+        try { document.dispatchEvent(new CustomEvent('wf-written', { detail: { sheet: sheet } })); } catch (_) {}
+      } catch (e) {
+        busy(false);
+        if (String(e && e.message).indexOf('TABLE_TOO_SMALL') >= 0 && extend !== true) { say.textContent = 'Le tableau du modèle est plus court que la pièce. Je peux l’agrandir comme dans Excel (formats et formules recopiés).'; var grow = node('button', 'Agrandir le tableau et valider'); grow.type = 'button'; grow.className = 'btn'; grow.onclick = function () { grow.remove(); ok.onclick(true); }; box.appendChild(grow); }
+        else say.textContent = error(e) + ' Rien n’a été forcé.';
+      }
+    };
+    edit.onclick = async function () {
+      if (hint.hidden) { hint.hidden = false; hint.focus(); return; }
+      if (!hint.value.trim()) return;
+      busy(true); say.textContent = 'Je reprends avec votre consigne…';
+      try { var r = await post({ action: 'workfile-sheet-plan', sheet: sheet, hint: hint.value.trim() }); if (r.pending) throw new Error('Lecture des pièces en cours : redemandez dans un instant.'); box.replaceWith(proposalCard(sheet, planToProposal(r))); }
+      catch (e) { busy(false); say.textContent = error(e); }
+    };
+    no.onclick = function () { box.remove(); };
+    [ok, edit, hint, no, say].forEach(function (n) { box.appendChild(n); });
+    return box;
+  }
+  // The panel route returns the screen shape; the chat card wants the same compact summary the server builds for the chat.
+  function planToProposal(r) {
+    return { sheet: r.sheet, understanding: r.understanding_by_ai || r.summary, rows: r.preview && r.preview.rows, capacity: r.preview && r.preview.capacity, ai_error: r.ai_error, problem: r.problem, questions: r.questions, checks: r.checks,
+      columns: (r.plan || []).map(function (p) { return { col: p.col, header: p.header, document: p.document, heading: p.heading || (p.compute ? 'calcul ' + p.compute : null), why: p.why }; }),
+      missing: r.missing, ready: !!(r.preview && r.preview.rows) && !r.ai_error && (r.plan || []).some(function (p) { return p.document_id || p.compute; }) };
+  }
   function brief(r) {
     var host = $('audit-brief'); host.textContent = ''; host.hidden = false;
     var b = r.brief || {};
@@ -40,11 +91,11 @@
       more.type='button';more.addEventListener('click',async function(){more.disabled=true;try{var page=await post({action:'reading-report',plan_id:b.report_plan_id,offset:offset});page.findings.forEach(function(f){host.insertBefore(node('p',f.fact+'\nSource : '+f.source+' — '+f.reference+'\n« '+f.quote+' »'),more);});offset+=page.findings.length;more.hidden=offset>=page.findings_total;}catch(e){$('audit-message').textContent=error(e);}more.disabled=false;});host.appendChild(more);
     }
     if (r.assessment) section('Mon avis provisoire', [r.assessment]);
-    var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon' };
+    var names = { 'prepare-sop-step': 'Lire les pièces selon le SOP', 'write-sop-preparation': 'Inscrire la préparation sourcée dans Excel', 'prepare-observations': 'Préparer les observations', 'add-note': 'Ajouter votre précision', 'write-workpaper': 'Écrire dans Excel', 'draw-sample': 'Tirer l’échantillon', 'fill-sheet': 'Préparer le remplissage d’une feuille' };
     section('Ce que j’ai fait', (r.outcomes || []).map(function (o) {
       var label = names[o.action] || o.action;
       return label + (o.sample_id ? ' · ' + o.sample_id : '') + ' : ' +
-        ({ done: 'réalisé', unchanged: 'travail existant conservé', blocked: 'non réalisé — ' + o.reason, 'needs-review': 'écriture à vérifier' }[o.status] || o.status) +
+        ({ proposal: 'proposition à valider ci-dessous', reading: 'lecture en cours', done: 'réalisé', unchanged: 'travail existant conservé', blocked: 'non réalisé — ' + o.reason, 'needs-review': 'écriture à vérifier' }[o.status] || o.status) +
         (o.sheet ? ' · feuille « ' + o.sheet + ' »' : '') +
         (o.excel_written === false ? ' · préparation seulement, Excel non modifié' : '') +
         (o.cells != null ? ' · ' + o.cells + ' cellule(s) traitée(s)' : '') +
@@ -111,6 +162,7 @@
       .then(function (r) {
         bubble('assistant', r.answer); history.push({ role: 'user', text: message }, { role: 'assistant', text: r.answer }); history = history.slice(-8);
         if (r.brief) brief(r);
+        (r.outcomes || []).filter(function (o) { return o.action === 'fill-sheet' && o.status === 'proposal'; }).forEach(function (o) { var c = proposalCard(o.sheet, o.proposal); $('audit-conversation').appendChild(c); c.scrollIntoView({ block: 'nearest' }); });
         if (r.work) window.dispatchEvent(new CustomEvent('procedure-assistant-updated', { detail: r }));
         if ((r.outcomes || []).length) refresh(book && book.sheet, book && book.start_row);
         if ((r.outcomes || []).some(function (o) { return (o.action === 'choose-source' || o.action === 'extract-pdf') && o.status === 'done'; })) { try { document.dispatchEvent(new CustomEvent('wf-sheet-cleared', { detail: { reason: 'source-chosen' } })); } catch (_) {} }

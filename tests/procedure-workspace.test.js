@@ -144,3 +144,24 @@ test('a large input gets more time (the timeout no longer depends on the answer 
   assert.equal(requestTimeout({ maxTokens: 1800, input: 'x'.repeat(30000) }, {}), 45000);
   assert.equal(requestTimeout({ maxTokens: 1800, input: 'x'.repeat(70000) }, {}), 60000);
 });
+
+test('« remplis D2 » in the chat gives a proposal built from the checked orders and writes nothing', async () => {
+  const { d } = await fixture(); const calls = [];
+  const plan = { sheet: 'D2', ai: 'mock', understanding_by_ai: 'D2 liste les comptes', preview: { rows: 12, capacity: 40 }, checks: ['Total = pièce'], problem: null, questions: [],
+    plan: [{ col: 'A', header: 'Catégorie', document_id: 'GL', document: 'Grand livre', heading: 'colonne B', why: 'comptes' }, { col: 'B', header: 'Budget', document_id: null, heading: null, status: 'missing' }],
+    missing: [{ col: 'B', header: 'Budget', piece: 'PTBA', why: 'absent' }] };
+  const r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-sheet', sheet: 'D2' }], 'Prends le GL et remplis D2', {}, { ...d, fillOrdersPlan: async (o, m, c, b) => { calls.push(b); return plan; } });
+  assert.equal(r[0].status, 'proposal'); assert.equal(r[0].proposal.rows, 12); assert.equal(r[0].proposal.ready, true);
+  assert.equal(r[0].proposal.columns[0].document, 'Grand livre'); assert.equal(r[0].proposal.missing[0].piece, 'PTBA');
+  assert.equal(calls[0].hint, 'Prends le GL et remplis D2'); assert.equal(calls[0].sheet, 'D2');
+});
+
+test('a proposal needs the AI and a result: no rows or an AI error is not ready, a sheet name is checked, and it stands alone', async () => {
+  const { d } = await fixture(); const fake = { fillOrdersPlan: async () => ({ sheet: 'D2', ai_error: 'timeout', preview: {}, plan: [] }) };
+  let r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-sheet', sheet: 'D2' }], 'remplis D2', {}, { ...d, ...fake });
+  assert.equal(r[0].proposal.ready, false);
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-sheet', sheet: '../x;' }], 'x', {}, { ...d, ...fake });
+  assert.equal(r[0].status, 'blocked');
+  r = await executeProcedureActions('org', 'mission', 'CASH-01', [{ type: 'fill-sheet', sheet: 'D2' }, { type: 'write-workpaper' }], 'x', {}, { ...d, ...fake });
+  assert.equal(r[0].status, 'blocked');
+});
