@@ -548,6 +548,17 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - **OpenRouter est le principal (Paul, 2026-10-19 : « c'est lui le majeur, il fait 45 %, les autres moins »)** : `OPENROUTER_SHARE`
   (0-100, défaut 45) = part des demandes envoyées d'abord à OpenRouter (`openRouterFirst`, dans `firstAvailable` et `runAI` auto) ;
   les autres le soutiennent, et lui les soutient pour le reste. Les pastilles de Pilotage → Modèles d'IA montrent OpenRouter et sa part.
+  **PLUS VRAI depuis le pool commun** (`lib/ai-pool.js`) : les parts ne servent qu'à l'affichage ; l'ordre est celui que demande l'appelant
+  (presque partout `['anthropic','openai','gemini']`), puis le reste du catalogue (`providerOrder`), OpenRouter n'est qu'un secours.
+- **Audit de l'aiguillage des IA (2026-11-02, `tests/ai-routing-audit.test.js`)** : 1) une réponse COUPÉE (limite de longueur, filtre) est
+  refusée pour toutes les IA — OpenAI `status: incomplete`, Gemini `finishReason`, OpenRouter / xAI — et l'IA suivante répond ; avant,
+  `parseJsonLoose` refermait le JSON coupé et un remplissage partiel passait pour complet ; 2) plus de deuxième IA en parallèle par défaut
+  (avant : après 0,7 s, donc deux appels payés par demande) : l'IA suivante part quand la première échoue ou dépasse son délai ;
+  `AI_POOL_HEDGE_MS` le réactive pour un cabinet qui le veut ; 3) l'ordre demandé est tenu (le tri « a déjà réussi une fois » est retiré ;
+  seule une IA déjà occupée par d'autres demandes passe après les libres) ; 4) « Mon IA » a le délai normal d'une demande (avant :
+  0,5 s, l'IA du cabinet répondait et était comptée), une annulation n'est plus notée comme erreur de la clé ; 5) EYNOWA Lab ne répond
+  qu'à un appelant qui le nomme, jamais une tâche d'audit, jamais en secours silencieux ; 6) `/api/health` montre aussi Gemini, xAI,
+  EYNOWA Lab. Non essayé avec les vraies IA.
 
 ## Deux chemins pour créer une mission (Paul, 2026-10-19 : « je veux créer une mission et y aller directement »)
 - Constat : une mission ne naissait que d'une opportunité (TDR / AMI → Phase 0 → … → `ownerWorkflowOverride`) ou de la détection
