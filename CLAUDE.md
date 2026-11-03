@@ -567,6 +567,11 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   puis les décisions des personnes, puis le plus récent ; le nombre d'éléments non joints est dit à l'IA (`memory_left_out`, `left_out`).
   Appliqué à la conversation (`procedure-workspace.js`) et au remplissage (`missionBrief(…, { focus })` depuis `fill-orders.js`). Le
   format JSON dans le Drive est gardé. Reste possible plus tard : index dans Supabase avec recherche par le sens (décision de Paul).
+  Étendu à TOUTES les pages (2026-11-03) : `AGENT_OF_ROUTE` (`lib/agent-context.js`, appliqué à l'entrée commune de `api/app.js`) dit quel
+  agent parle pour chaque route — complément Excel (`workfile`) et pages d'audit = Enhanced Auditor ; programme, PBC, mission, dépôt =
+  Mission Controller ; opportunités, veille, secrétariat, cockpit = Firm Manager (`grand-controleur`) ; rangement = Orpailleur ; Shadow ;
+  Sika. Toute nouvelle route qui fait travailler un agent doit y être ajoutée (le test vérifie que chaque route listée existe).
+  `/api/agent` (discussion) ajoutait déjà les leçons. Le cerveau commun (`agent-brain.js` `think`) reçoit la mémoire choisie selon sa tâche.
 
 ## Deux chemins pour créer une mission (Paul, 2026-10-19 : « je veux créer une mission et y aller directement »)
 - Constat : une mission ne naissait que d'une opportunité (TDR / AMI → Phase 0 → … → `ownerWorkflowOverride`) ou de la détection

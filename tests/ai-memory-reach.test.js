@@ -56,3 +56,40 @@ test('the mission brief puts what concerns the focus first and says how much was
   const brief = await missionBrief('o', 'M1', 'enhanced-auditor', { focus: 'D2 PRJ-03', fetchRows: async () => [{ id: 'M1' }], missionMemory: async () => docs, missionNotes: async () => [], activeLessons: async () => [] });
   assert.ok(brief.documents.some(x => x.id === 'teb')); assert.equal(brief.documents.length, 150); assert.equal(brief.left_out.documents, 51);
 });
+
+test('every screen that works for an agent makes it speak: the Excel add-in and the other pages too', async () => {
+  const { agentOfRoute, AGENT_OF_ROUTE } = await import('../lib/agent-context.js');
+  const id = 'ef188e85-0522-4fd2-937c-0549dedef5f1';
+  assert.deepEqual(agentOfRoute('workfile', id), { agent: 'enhanced-auditor', missionId: id }, 'Excel add-in');
+  assert.equal(agentOfRoute('work-programme').agent, 'mission-controller');
+  assert.equal(agentOfRoute('pbc').agent, 'mission-controller');
+  assert.equal(agentOfRoute('opportunities').agent, 'grand-controleur');
+  assert.equal(agentOfRoute('tidy').agent, 'orpailleur');
+  assert.equal(agentOfRoute('shadow').agent, 'shadow');
+  assert.equal(agentOfRoute('sika-expenses').agent, 'sika');
+  assert.equal(agentOfRoute('login'), null, 'no agent speaks on accounts or settings');
+  assert.equal(agentOfRoute('procedure', 'not-an-id').missionId, null, 'only a real mission id');
+  // Every listed route exists in api/app.js (no typo that would silently leave a screen without its agent).
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../api/app.js', import.meta.url), 'utf8');
+  const missing = Object.keys(AGENT_OF_ROUTE).filter(r => !new RegExp("^  '?" + r + "'?: \{", 'm').test(src));
+  assert.deepEqual(missing, []);
+  assert.match(src, /asAgent\(speaking, \(\) => run\(orgId, req\)\)/, 'the common entry of api/app.js applies it');
+});
+
+test('an AI call made from the Excel add-in route carries the Enhanced Auditor\'s lessons', async () => {
+  const { asAgent: as, agentOfRoute } = await import('../lib/agent-context.js');
+  const sent = [];
+  const d = { env: { ANTHROPIC_API_KEY: 'a', ANTHROPIC_MODEL: 'm' }, activeLessons: async agent => agent === 'enhanced-auditor' ? ['Leçon du cabinet pour le working file'] : [],
+    fetchImpl: async (url, init) => { sent.push(JSON.parse(init.body).system); return ok({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] }); } };
+  await as(agentOfRoute('workfile'), () => callModel({ provider: 'anthropic', instructions: 'Revois la feuille', input: 'x' }, d));
+  assert.match(sent[0], /Leçon du cabinet pour le working file/);
+});
+
+test('the common brain of the agents gives the mission memory chosen for its task', async () => {
+  const { think } = await import('../lib/agent-brain.js');
+  let focus = null;
+  await think({ orgId: 'o', missionId: 'M1', agent: 'mission-controller', task: 'Rapprocher les relevés bancaires de la demande PBC-07', actions: {} },
+    { missionBrief: async (o, m, a, dd) => { focus = dd.focus; return { documents: [], open: [], settled: [] }; }, ai: async () => ({ text: '{"understanding":"","orders":[]}' }) }).catch(() => null);
+  assert.match(String(focus), /PBC-07/);
+});

@@ -1,5 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
-import { asAgent } from '../lib/agent-context.js';
+import { asAgent, agentOfRoute } from '../lib/agent-context.js';
 import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal, internalBaseUrl } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
@@ -1232,6 +1232,8 @@ export const READ_ONLY_POST = Object.freeze({
 // Read with the shared code alone: the firm's name and colours, shown on the login page before any session.
 const PILOT_TOKEN_ENOUGH = new Set(['branding']);
 const routeKey = req => String(req.query?.route || '');
+
+const speakingAgent = req => agentOfRoute(routeKey(req), req.body?.mission_id || req.query?.mission_id);
 const MISSION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function requireProcedureKey(missionId, code) {
   if (!missionId || !code) throw fail('MISSION_AND_CODE_REQUIRED', 400);
@@ -1283,7 +1285,9 @@ export async function handleApp(req) {
   // The firm's Google connection (Paramètres → Connecter Google), used by Drive and Gmail.
   if (orgId) await runInFirm(orgId, () => loadGoogleConnection(orgId)).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
-  const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => withOperationActor({orgId,actor:req.account?.email || 'office-manager-system',kind:req.account?'human':'system'},()=>run(orgId, req))));
+  const speaking = speakingAgent(req);
+  const runSpeaking = speaking ? () => asAgent(speaking, () => run(orgId, req)) : () => run(orgId, req);
+  const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => withOperationActor({orgId,actor:req.account?.email || 'office-manager-system',kind:req.account?'human':'system'},runSpeaking)));
   const inFirm = () => runInFirm(orgId, invoke);
   if (req.account?.auth_user_id) return (await import('../lib/personal-ai.js')).runAs(orgId, req.account, inFirm);
   return inFirm();
