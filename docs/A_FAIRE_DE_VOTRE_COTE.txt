@@ -4,8 +4,26 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 30 octobre 2026
+Dernière mise à jour : 3 novembre 2026
 Branche concernée : feature/white-label-desktop
+
+-----------------------------------------------------------------------------------------------------------------
+0000. [ ] FAIRE ENTRER LES LEÇONS DES MISSIONS TERMINÉES DANS SHADOW, PUIS LES VALIDER              (3 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : l'étude des missions d'entraînement a produit 21 leçons (méthode du cabinet, pièces à demander, contrôles
+qualité). Elles n'entrent dans la mémoire des agents qu'après la décision d'un associé.
+Le fichier à importer est sur l'ordinateur où l'étude a été faite (jamais dans GitHub : il parle de vrais clients) :
+   entrainement\IMPORT_SHADOW_LECONS.json
+Comment faire (un associé, après la mise en production) :
+  1. Ouvrir l'application → menu → Entraînement → carte Shadow → « Garder ce que Shadow a appris » → « Importer ».
+  2. Choisir le fichier IMPORT_SHADOW_LECONS.json. Message attendu : « 21 leçons ajoutées ».
+  3. Onglet « Leçons » : chaque leçon est « à revoir ». Lire, puis « Activer » ou « Refuser ». Seules les leçons
+     activées sont données aux agents.
+  4. Onglet « Contrôle qualité » : choisir une mission → « Contrôler cette mission ». Shadow lit ses documents et liste
+     ce qui ne va pas (feuille d'un autre client, fiche qui contredit la note, rapport sans réserve malgré des points
+     bloquants, redressement non repris…). Il ne corrige rien : c'est à vous de décider.
+Si le fichier a été modifié à la main, l'import est refusé (« fichier modifié ») : le refaire avec
+   node scripts/shadow-lessons-import.mjs entrainement\LECONS_POUR_SHADOW.json entrainement\IMPORT_SHADOW_LECONS.json
 
 -----------------------------------------------------------------------------------------------------------------
 000. [ ] APRÈS LA MISE EN LIGNE DE L'AUDIT DU 30/10 : SE RECONNECTER, PUIS ESSAYER 4 CHOSES        (30 octobre 2026)

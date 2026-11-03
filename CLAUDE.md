@@ -572,6 +572,22 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Mission Controller ; opportunités, veille, secrétariat, cockpit = Firm Manager (`grand-controleur`) ; rangement = Orpailleur ; Shadow ;
   Sika. Toute nouvelle route qui fait travailler un agent doit y être ajoutée (le test vérifie que chaque route listée existe).
   `/api/agent` (discussion) ajoutait déjà les leçons. Le cerveau commun (`agent-brain.js` `think`) reçoit la mémoire choisie selon sa tâche.
+- **Contrôle qualité des missions par Shadow (2026-11-03, `lib/shadow-quality-checks.js`, `tests/shadow-quality-checks.test.js`)** — né de
+  l'étude des missions terminées (dossier local `entrainement/`, exclu de Git : données réelles de clients). 8 contrôles sur le CONTENU
+  (jamais le nom) : C1 en-tête d'une feuille de test = client et exercice de la mission, feuille sans conclusion ; C2 fiche de composant
+  contre note de synthèse, sujet par sujet (CA déclaré TVA/TSE, BIC, redressement, moitié du capital, PV d'inventaire des stocks,
+  honoraires CAC, retraite) ; C3 rapport sans réserve malgré les points d'opinion de la note (rapport d'un autre exercice ignoré) ;
+  C4 notification de redressement non reprise ou niée ; C5 capitaux propres < ½ capital non repris ; C6 chiffre clé d'un livrable
+  introuvable EXACTEMENT dans les pièces (classeurs + textes non livrables ; arrondi « 250 millions » à 0,5 %) ou de signe inverse ;
+  C7 fiche reprise d'un autre exercice (chiffres neutralisés, ≥ 90 %), doublons ; C8 nom du projet et bailleur différents des TDR.
+  L'IA ne fait que CONFIRMER ou écarter une contradiction de sens (C2, C3) à partir des passages cités ; IA en panne = « à confirmer ».
+  Rien corrigé ni bloqué. Shadow → onglet « Contrôle qualité » (associés), action `quality-check` de la route `shadow`, résultat dans
+  `SHADOW_LAB.json` → `quality` (40 derniers), audit `SHADOW_QUALITY_CHECKED`. Essayé en local sur les 4 missions réelles (sans IA) :
+  retrouve les défauts de l'étude, faux positifs corrigés. Limites : `.doc` (Word 97) non lu par l'application (format OLE vu comme
+  « xls ») ; PDF scannés lus par l'OCR de l'IA (coût) ; 120 documents et 200 s par passage.
+- **Leçons de l'étude → Shadow** : `scripts/shadow-lessons-import.mjs` fait un fichier d'import au format de la sauvegarde
+  (`lab-import`), toutes les leçons « à revoir » (un associé décide), texte générique refusé s'il contient un nom de client (les exemples
+  vont dans `evidence`, jamais envoyée à l'IA) ou touche une zone protégée.
 
 ## Deux chemins pour créer une mission (Paul, 2026-10-19 : « je veux créer une mission et y aller directement »)
 - Constat : une mission ne naissait que d'une opportunité (TDR / AMI → Phase 0 → … → `ownerWorkflowOverride`) ou de la détection

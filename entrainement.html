@@ -164,6 +164,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           <button type="button" class="chip" data-p="goals" aria-pressed="false">Objectifs et enquêtes</button>
           <button type="button" class="chip" data-p="perf" aria-pressed="false">Performance</button>
           <button type="button" class="chip" data-p="problems" aria-pressed="false">Problèmes</button>
+          <button type="button" class="chip" data-p="quality" aria-pressed="false">Contrôle qualité</button>
           <button type="button" class="chip" data-p="lessons" aria-pressed="false">Leçons</button>
           <button type="button" class="chip" data-p="tests" aria-pressed="false">Golden tests</button>
           <button type="button" class="chip" data-p="exp" aria-pressed="false">Propositions</button>
@@ -493,6 +494,32 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
     }
     if (panel === 'problems') { if (!data.problems.length) b.appendChild(el('p', 'Aucun problème relevé pour l’instant.', 'empty'));
       data.problems.forEach(function (p) { b.appendChild(item(NAME(p.agent) + ' — ' + (p.category || '') + ' : ' + p.problem, 'Cause probable : ' + (p.cause || '?') + ' · preuves : ' + (p.evidence || []).join(', ') + ' · ' + UI.dateTime(p.at))); }); }
+    // Quality checks of a mission (2026-11-03): Shadow reads the working papers and deliverables and reports, nothing is changed.
+    if (panel === 'quality') {
+      b.appendChild(el('p', 'Shadow lit les feuilles de test, les fiches, la note de synthèse, le rapport et les pièces d’une mission, puis signale : feuille d’un autre client ou d’un autre exercice, feuille sans conclusion, fiche qui contredit la note, rapport sans réserve malgré des points bloquants, redressement fiscal non repris, capitaux propres sous la moitié du capital non repris, chiffre introuvable ou de signe inverse, fiche recopiée d’un autre exercice, nom du projet ou bailleur différent des TDR. Il ne corrige rien : vous décidez.', 'small'));
+      var qr = el('div', null, 'btn-row'), qs = document.createElement('select'); qs.setAttribute('aria-label', 'Mission à contrôler'); qs.appendChild(new Option('Chargement des missions…', ''));
+      OM.api('/api/missions').then(function (r) { qs.textContent = ''; (r.missions || []).forEach(function (m) { qs.appendChild(new Option((m.mission_code ? m.mission_code + ' — ' : '') + m.name, m.id)); }); if (!(r.missions || []).length) qs.appendChild(new Option('Aucune mission ouverte', '')); }).catch(function () { qs.textContent = ''; qs.appendChild(new Option('Missions indisponibles', '')); });
+      qr.appendChild(qs); qr.appendChild(btn('Contrôler cette mission', 'btn', function () { if (!qs.value) return; act({ action: 'quality-check', mission_id: qs.value }, 'Contrôle terminé : résultats ci-dessous.'); }));
+      b.appendChild(qr);
+      var SEV = { haute: 'importance haute', moyenne: 'importance moyenne', basse: 'pour information' };
+      (data.quality || []).forEach(function (q) {
+        var box = el('div', null, 'stack');
+        box.appendChild(el('p', 'Documents lus : ' + q.coverage.read + ' sur ' + q.coverage.documents + (q.coverage.unread.length ? ' — non lus : ' + q.coverage.unread.slice(0, 8).map(function (u) { return u.name + ' (' + u.why + ')'; }).join(', ') : ''), 'small'));
+        if (!q.findings.length) box.appendChild(el('p', 'Aucun point relevé sur les documents lus.', 'small'));
+        q.findings.forEach(function (f) {
+          var p = el('div', null, 'stack');
+          p.appendChild(el('strong', '[' + f.check + ' · ' + (SEV[f.severity] || f.severity) + '] ' + f.title));
+          if (f.detail) p.appendChild(el('p', f.detail, 'small'));
+          (f.quotes || []).forEach(function (x) { p.appendChild(el('p', '« ' + x.text + ' » — ' + x.doc, 'small')); });
+          if (f.confirmed_by_ai === true) p.appendChild(el('p', 'Confirmé par l’IA : ' + (f.ai_why || ''), 'small'));
+          if (f.confirmed_by_ai == null && f.ai_why) p.appendChild(el('p', f.ai_why, 'small'));
+          if (f.suggestion) p.appendChild(el('p', '→ ' + f.suggestion, 'small'));
+          box.appendChild(p);
+        });
+        b.appendChild(item('Contrôle de « ' + (q.mission_name || q.mission_id) + ' » — ' + UI.dateTime(q.at), q.findings.length + ' point(s), dont ' + q.findings.filter(function (f) { return f.severity === 'haute'; }).length + ' d’importance haute' + (q.by ? ' · lancé par ' + q.by : ''), box));
+      });
+      if (!(data.quality || []).length) b.appendChild(el('p', 'Aucun contrôle encore : choisissez une mission.', 'empty'));
+    }
     if (panel === 'lessons') { if (!data.lessons.length) b.appendChild(el('p', 'Aucune leçon pour l’instant.', 'empty'));
       data.lessons.forEach(function (l) {
         var x = el('div', null, 'btn-row');

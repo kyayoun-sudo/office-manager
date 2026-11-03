@@ -216,6 +216,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'exam') { await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { exam: true }); return { started: true }; }
       // The open-source watch (2026-10-19): projects and forums of agents doing the same work → ideas waiting for a person.
       if (b.action === 'code-watch') { const { AGENT_GOALS } = await import('../lib/agent-goals.js'); if (!AGENT_GOALS[b.agent]) throw fail('UNKNOWN_AGENT', 400); await (await import('../lib/agent-passes.js')).fireInternal(req, '/api/app?route=shadow-investigate-step', { code_watch: b.agent }); return { started: true }; }
+      // Quality checks of one mission's working papers and deliverables (2026-11-03): findings for a person, nothing changed.
+      if (b.action === 'quality-check') return (await import('../lib/shadow-quality-checks.js')).missionQualityPass(orgId, String(b.mission_id || ''), who(req) || 'associé');
       if (b.action === 'decide') return s.decide(orgId, b, who(req));
       if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
       if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
