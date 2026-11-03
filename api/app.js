@@ -1,4 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
+import { asAgent } from '../lib/agent-context.js';
 import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal, internalBaseUrl } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
 import { requireScreenAccess } from '../lib/permissions.js';
@@ -268,7 +269,8 @@ export const ROUTES = Object.freeze({
       if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
       return (await import('../lib/procedure-reading-report.js')).publicView(await w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account));
     }),
-    POST: users(ALL_ROLES, async (orgId, req) => {
+    // Every AI call of « Ma procédure » speaks as the Enhanced Auditor of this mission: the firm's validated lessons reach it (2026-11-02).
+    POST: users(ALL_ROLES, (orgId, req) => asAgent({ agent: 'enhanced-auditor', missionId: String(req.body?.mission_id || '') }, async () => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
       if (!b.action) throw fail('ACTION_REQUIRED', 400);
       requireProcedureKey(m, c);
@@ -343,7 +345,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'clear-point') return r.clearPoint(orgId, m, c, b, a);
       if (b.action === 'sign') return r.signOff(orgId, m, c, a);
       throw fail('UNKNOWN_ACTION', 400);
-    }),
+    })),
     unavailable: 'PROCEDURE_UNAVAILABLE'
   },
   // The secretariat (2026-10-12): the firm's document models, documents prepared for an opportunity or a mission,

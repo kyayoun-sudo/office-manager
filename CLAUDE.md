@@ -559,6 +559,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   0,5 s, l'IA du cabinet répondait et était comptée), une annulation n'est plus notée comme erreur de la clé ; 5) EYNOWA Lab ne répond
   qu'à un appelant qui le nomme, jamais une tâche d'audit, jamais en secours silencieux ; 6) `/api/health` montre aussi Gemini, xAI,
   EYNOWA Lab. Non essayé avec les vraies IA.
+- **La mémoire arrive vraiment à l'IA (2026-11-02, `tests/ai-memory-reach.test.js`)** : 1) les leçons validées du cabinet n'étaient ajoutées
+  qu'aux appels qui nommaient leur agent (`agentKey`) — aucun appel de « Ma procédure » (conversation, remplissage, fiche des pièces,
+  import) ; désormais la route `procedure` (POST) fixe l'agent qui parle (`lib/agent-context.js`, `asAgent` : Enhanced Auditor + mission)
+  et `callModel` l'utilise quand le module n'en nomme pas ; 2) l'IA recevait les 40 premières notes / 80 premiers documents dans l'ordre
+  du fichier : `lib/memory-select.js` (`focusTerms`, `pickRelevant`) met d'abord ce qui concerne la question (feuille, test, pièce nommée),
+  puis les décisions des personnes, puis le plus récent ; le nombre d'éléments non joints est dit à l'IA (`memory_left_out`, `left_out`).
+  Appliqué à la conversation (`procedure-workspace.js`) et au remplissage (`missionBrief(…, { focus })` depuis `fill-orders.js`). Le
+  format JSON dans le Drive est gardé. Reste possible plus tard : index dans Supabase avec recherche par le sens (décision de Paul).
 
 ## Deux chemins pour créer une mission (Paul, 2026-10-19 : « je veux créer une mission et y aller directement »)
 - Constat : une mission ne naissait que d'une opportunité (TDR / AMI → Phase 0 → … → `ownerWorkflowOverride`) ou de la détection
