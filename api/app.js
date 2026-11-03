@@ -269,8 +269,8 @@ export const ROUTES = Object.freeze({
       if (req.query?.review) return (await import('../lib/procedure-review.js')).reviewView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account);
       return (await import('../lib/procedure-reading-report.js')).publicView(await w.procedureView(orgId, String(req.query?.mission_id || ''), String(req.query?.code || ''), req.account));
     }),
-    // Every AI call of « Ma procédure » speaks as the Enhanced Auditor of this mission: the firm's validated lessons reach it (2026-11-02).
-    POST: users(ALL_ROLES, (orgId, req) => asAgent({ agent: 'enhanced-auditor', missionId: String(req.body?.mission_id || '') }, async () => {
+    // Every AI call of « Ma procédure » speaks as the Enhanced Auditor (AGENT_OF_ROUTE, set at the common entry after the access check).
+    POST: users(ALL_ROLES, async (orgId, req) => {
       const w = await import('../lib/procedure-work.js'); const b = req.body || {}; const m = String(b.mission_id || ''), c = String(b.code || ''), a = req.account;
       if (!b.action) throw fail('ACTION_REQUIRED', 400);
       requireProcedureKey(m, c);
@@ -345,7 +345,7 @@ export const ROUTES = Object.freeze({
       if (b.action === 'clear-point') return r.clearPoint(orgId, m, c, b, a);
       if (b.action === 'sign') return r.signOff(orgId, m, c, a);
       throw fail('UNKNOWN_ACTION', 400);
-    })),
+    }),
     unavailable: 'PROCEDURE_UNAVAILABLE'
   },
   // The secretariat (2026-10-12): the firm's document models, documents prepared for an opportunity or a mission,
@@ -1286,6 +1286,9 @@ export async function handleApp(req) {
   if (orgId) await runInFirm(orgId, () => loadGoogleConnection(orgId)).catch(() => null);
   // « Mon IA »: a person's own requests may use the AI they connected (warning accepted); else the firm's.
   const speaking = speakingAgent(req);
+  // The mission named by the browser is kept for the agent's lessons only if this person may open it (security review 2026-11-03);
+  // a server-signed call names its mission itself.
+  if (speaking?.missionId && !isSignedInternal(req, orgId)) await requireMissionAccess(orgId, speaking.missionId, req.account).catch(() => { speaking.missionId = null; });
   const runSpeaking = speaking ? () => asAgent(speaking, () => run(orgId, req)) : () => run(orgId, req);
   const invoke = () => import('../lib/local-storage.js').then(m => m.withDocumentContext(orgId, req.account, () => withOperationActor({orgId,actor:req.account?.email || 'office-manager-system',kind:req.account?'human':'system'},runSpeaking)));
   const inFirm = () => runInFirm(orgId, invoke);

@@ -24,10 +24,13 @@ test('an AI call made during « Ma procédure » carries the Enhanced Auditor\'s
   assert.match(sent[2], /MÉMOIRE CENTRALE LOCALE/); assert.doesNotMatch(sent[2], /PTBA initial/);
 });
 
-test('the « Ma procédure » route sets the Enhanced Auditor as the speaking agent', async () => {
+test('the « Ma procédure » route sets the Enhanced Auditor as the speaking agent, and a mission is kept only if the person may open it', async () => {
   const fs = await import('node:fs');
   const src = fs.readFileSync(new URL('../api/app.js', import.meta.url), 'utf8');
-  assert.match(src, /POST: users\(ALL_ROLES, \(orgId, req\) => asAgent\(\{ agent: 'enhanced-auditor', missionId: String\(req\.body\?\.mission_id/);
+  const { agentOfRoute } = await import('../lib/agent-context.js');
+  assert.equal(agentOfRoute('procedure').agent, 'enhanced-auditor');
+  assert.ok(src.includes('if (speaking?.missionId && !isSignedInternal(req, orgId)) await requireMissionAccess(orgId, speaking.missionId, req.account).catch(() => { speaking.missionId = null; });'), 'mission id checked');
+  assert.ok(src.indexOf('requireMissionAccess(orgId, speaking.missionId') < src.indexOf('asAgent(speaking'), 'checked before the agent speaks');
 });
 
 test('an old decision about the sheet in question reaches the AI, even behind 100 newer unrelated notes', () => {
