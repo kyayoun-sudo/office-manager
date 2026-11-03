@@ -10,3 +10,7 @@ work-*.mjs
 *questionnaire*.csv
 *questionnaire*.xlsx
 
+
+# Données réelles de cabinets / clients : jamais dans le dépôt (public)
+entrainement/
+Enqu*te*Finance Audit Conseil*
