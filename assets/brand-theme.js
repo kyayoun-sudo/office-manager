@@ -245,13 +245,22 @@
   };
   // Serialize preparation requests within this page. A rejected request releases
   // the queue; it must never replay an execution or an approved write.
+  // (2026-11-03) One request at a time still, but a waiting request with a higher priority goes first: the proposal of a data
+  // sheet (D1…) no longer waits behind dozens of long SOP readings (seen: more than 8 minutes). A running request is never stopped.
   var procedureQueues = Object.create(null);
-  OM.queueProcedurePreparation = function (key, run) {
-    var previous = procedureQueues[key] || Promise.resolve();
-    var next = previous.catch(function () {}).then(run);
-    procedureQueues[key] = next;
-    next.then(function () { if (procedureQueues[key] === next) delete procedureQueues[key]; }, function () { if (procedureQueues[key] === next) delete procedureQueues[key]; });
-    return next;
+  function pumpProcedureQueue(key) {
+    var q = procedureQueues[key]; if (!q || q.running) return;
+    if (!q.items.length) { delete procedureQueues[key]; return; }
+    q.items.sort(function (a, b) { return (b.priority - a.priority) || (a.seq - b.seq); });
+    var it = q.items.shift(); q.running = true;
+    Promise.resolve().then(it.run).then(it.resolve, it.reject).then(function () { q.running = false; pumpProcedureQueue(key); });
+  }
+  OM.queueProcedurePreparation = function (key, run, priority) {
+    var q = procedureQueues[key] || (procedureQueues[key] = { running: false, items: [], seq: 0 });
+    return new Promise(function (resolve, reject) {
+      q.items.push({ run: run, resolve: resolve, reject: reject, priority: Number(priority) || 0, seq: ++q.seq });
+      pumpProcedureQueue(key);
+    });
   };
   window.OfficeManager = OM;
 

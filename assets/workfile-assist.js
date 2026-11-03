@@ -12,8 +12,10 @@
   function api(action, extra) {
     var run = function () { return OM.api('/api/app?route=procedure', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({ mission_id: missionId, code: code, action: action }, extra || {})) }); };
+    // The proposal of a data sheet goes before the long readings (priority 2), the pieces the working file needs before the rest (1).
+    var PRIORITY = { 'workfile-sheet-plan': 2, 'workfile-needs': 1 };
     return ['workfile-needs', 'workfile-sheet-plan', 'workfile-review-pieces'].indexOf(action) >= 0 && OM.queueProcedurePreparation
-      ? OM.queueProcedurePreparation(missionId + ':' + code, run) : run();
+      ? OM.queueProcedurePreparation(missionId + ':' + code, run, PRIORITY[action] || 0) : run();
   }
   var box = document.createElement('section');
   box.id = 'wf-assist'; box.className = 'card wf-assist'; box.setAttribute('aria-label', 'Ce que l’agent fait pour vous');

@@ -30,6 +30,16 @@ test('a long file name is shortened, keeping its code, years and version', () =>
   assert.equal(shortenName('court.pdf', 30), 'court.pdf');
 });
 
+test('a short room abbreviates the audit words and never cuts a word or a year in two (real case: « GRAND_20_5.xls »)', () => {
+  // Before: « GRAND_LIVRE_GENERAL_PAGFIC_2023.xls » in a deep folder became « GRAND_20 » — kind and year lost.
+  assert.equal(shortenName('GRAND_LIVRE_GENERAL_PAGFIC_2023.xls', 22), 'GL_GEN_PAGFIC_2023.xls');
+  assert.equal(shortenName('GRAND_LIVRE_GENERAL_PAGFIC_2023.xls', 16), 'GL_GEN_2023.xls');
+  assert.equal(shortenName('GRAND_LIVRE_GENERAL_PAGFIC_2023.xls', 12), 'GL_GEN_2023.xls', 'a little too long, but meaningful');
+  assert.equal(shortenName('GRAND_LIVRE_AUXILIAIRE_PAGFIC_2024.xls', 16), 'GL_AUX_2024.xls', 'general and subsidiary ledgers stay distinct');
+  assert.equal(shortenName('BALANCE_GENERALE_PAGFIC_2023.xls', 14), 'BG_2023.xls');
+  assert.doesNotMatch(shortenName('RELEVE_BANCAIRE_SGBCI_DECEMBRE_2024.pdf', 10), /20(\.|$)/, 'a year is never cut');
+});
+
 test('a new name in a deep folder keeps the full path under the limit', async () => {
   const d = drive();
   d.items.M.name = 'PAGFIC — Audit 2023-2024';
