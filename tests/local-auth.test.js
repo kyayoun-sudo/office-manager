@@ -136,3 +136,28 @@ test('« Continuer avec Google »: lib/google-signin.js opens the session on the
   const again = await sessionForEmail('google@cabinet.test', 'Personne Google', call);
   assert.equal(again.user.id, s.user.id, 'the same person, never a second account');
 });
+
+test('wrong-password limits: a right password never refills the address counter; a cap per account over all addresses; IPv6 per /64', async () => {
+  const { call } = await setup();
+  const { _addressKey, _resetFailures } = await import('../lib/local-auth.js');
+  _resetFailures();
+  assert.equal(_addressKey('2001:db8:1:2:aaaa::1'), '2001:db8:1:2::/64');
+  assert.equal(_addressKey('2001:db8:1:2:bbbb:cccc:dddd:eeee'), '2001:db8:1:2::/64');
+  assert.equal(_addressKey('::ffff:192.0.2.9'), '192.0.2.9');
+  await call('admin/users', { admin: true, body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1', email_confirm: true } });
+  // One address tries many accounts, logging in to its own account in between: its address counter keeps growing (50 max).
+  const ip = '192.0.2.50';
+  let refused = 0;
+  for (let i = 0; i < 60; i++) {
+    const r = await call('token?grant_type=password', { body: { email: 'cible' + i + '@cabinet.test', password: 'x' }, ip });
+    if (r.status === 429) refused++;
+    if (i % 5 === 0) await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip });
+  }
+  assert.ok(refused >= 10, 'the address is stopped although it logs in to its own account between tries (' + refused + ')');
+  // One account tried from many addresses: stopped at the account cap (100), whatever the address.
+  _resetFailures();
+  let stopped = 0;
+  for (let i = 0; i < 110; i++) if ((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'faux' }, ip: '198.51.100.' + (i % 250) })).status === 429) stopped++;
+  assert.equal(stopped, 10);
+  _resetFailures();
+});
