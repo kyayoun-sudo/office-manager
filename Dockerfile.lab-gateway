@@ -1,13 +1,16 @@
+# EYNOWA Lab gateway — runs alone: Node builtins only, no Office Manager code or dependency is loaded.
 FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json ./
-COPY lib ./lib
+# Only the gateway's own files (it imports nothing else; tests/lab-gateway-boundary.test.js checks it).
+COPY lab-gateway.package.json ./package.json
+COPY lib/tool-gateway.js lib/lab-v1.js ./lib/
 COPY lab-gateway-server.js ./
 
-ENV PORT=8787
-
+ENV PORT=8787 NODE_ENV=production
+USER node
 EXPOSE 8787
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8787/livez || exit 1
 
 CMD ["node", "lab-gateway-server.js"]

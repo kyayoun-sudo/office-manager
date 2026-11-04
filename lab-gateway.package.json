@@ -1,0 +1,8 @@
+{
+  "name": "eynowa-lab-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "EYNOWA Lab gateway (contract eynowa-lab/1.0). No runtime dependency.",
+  "engines": { "node": ">=20" }
+}
