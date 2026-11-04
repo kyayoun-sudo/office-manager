@@ -154,12 +154,14 @@ test('wrong-password limits: a right password never refills the address counter;
     if (i % 5 === 0) await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip });
   }
   assert.ok(refused >= 10, 'the address is stopped although it logs in to its own account between tries (' + refused + ')');
-  // One account tried from many addresses: over the account cap (100) it is not locked but paced (one try every 5 s).
+  // One account tried from many addresses: over the account cap (100) it is paced (doubling waits), except from an address
+  // that has already signed in to it — the real person keeps getting in from her usual place.
   _resetFailures();
+  assert.equal((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip: '203.0.113.99' })).status, 200);
   let stopped = 0;
   for (let i = 0; i < 110; i++) if ((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'faux' }, ip: '198.51.100.' + (i % 250) })).status === 429) stopped++;
-  assert.equal(stopped, 9, 'after 100 wrong tries, one try per 5 s for this account');
-  await new Promise(r => setTimeout(r, 5100));
-  assert.equal((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip: '203.0.113.99' })).status, 200, 'the real person still gets in');
+  assert.equal(stopped, 9, 'after 100 wrong tries from strangers, the account is paced');
+  assert.equal((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip: '192.0.2.200' })).status, 429, 'a new address waits');
+  assert.equal((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip: '203.0.113.99' })).status, 200, 'the usual address is not paced');
   _resetFailures();
 });
