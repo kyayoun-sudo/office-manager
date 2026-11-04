@@ -249,3 +249,17 @@ test("pages of the catalogue already seen stay visible; « Relancer l'IA » star
   r = await f.run({ retry_ai: true });
   assert.equal(r.ai_error, null); assert.equal(r.pending, true);
 });
+
+test('a catalogue page that does not exist is explained, not fatal; « Continuer » does not reset the guards (D1 of PRJ-01, 2026-11-04)', async () => {
+  const f = await fixture();
+  f.answer({ catalog_page: 9 });
+  let r = await f.run(); assert.equal(r.ai_error, null);
+  f.answer(input => { assert.equal(input.feedback.at(-1).refused, 'CATALOG_PAGE_OUT_OF_RANGE'); assert.equal(input.feedback.at(-1).catalog_pages, 3); return { inspect: { file_id: 'D2', page: 1 } }; });
+  r = await f.run(); r = await f.run(); assert.equal(f.counts().opened, 1);
+  // An AI that keeps coming back while the person clicks « Continuer » (retry_ai on a running job) still stops.
+  const g = await fixture();
+  g.answer({ catalog_page: 1 }); await g.run();
+  g.answer({ catalog_page: 0 });
+  let s; for (let i = 0; i < 6 && !(s && s.ai_error); i++) s = await g.run({ retry_ai: true });
+  assert.equal(s.ai_error, 'AI_NO_PROGRESS');
+});
