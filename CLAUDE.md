@@ -2,6 +2,12 @@
 
 **Apprentissage après connexions (Paul, 2026-10-27)** : deux niveaux locaux, mémoire centrale propre à chaque agent du cabinet et mémoire unique de mission partagée. `missions-terminees.html` / `lib/completed-mission-learning.js` proposent cinq missions terminées après le Drive ; lecture réelle, propositions sourcées puis validation humaine, méthodes limitées à la mission par défaut. Réutiliser les registres existants de mission et Shadow. Leçons génériques revues séparément avant contribution à EYNOWA Lab ; aucune pièce client transmise par cet exercice. Stockage de connaissances ≠ entraînement des paramètres du modèle. Le broker chat actuel n’expose pas le stockage sémantique : ne pas annoncer un transfert réussi sans reçu. Voir `docs/COMPLETED_MISSION_LEARNING.md`.
 
+**Serveur du cabinet, sans Vercel ni Supabase (Paul, 2026-11-04)** : `DATABASE_URL` réglé ⇒ `rest()` traduit les mêmes URL PostgREST en SQL
+(`lib/sql-rest.js`, `lib/pg-db.js`, rôle `service_role` par transaction) et les comptes sont locaux (`lib/local-auth.js`, `auth.users` de
+`db/vps-auth.sql`, même forme que Supabase). Sans `DATABASE_URL` : Supabase comme avant. Serveur `server/index.mjs` (règles de `vercel.json`,
+minuterie = ancien pg_cron), `docker-compose.yml`, guide `docs/INSTALLER_SUR_UN_VPS.md`, plan `claude/PLAN_AUTO_HEBERGEMENT.md`. Ne jamais
+proposer Supabase (même auto-hébergé). Toute nouvelle forme d'URL REST doit être couverte par `tests/sql-rest.test.js`.
+
 **Ligne de procédure légère (2026-11-04, cause prouvée des 57014 sur PRJ-01)** : journaux Postgres = UPDATE de `office_procedure_work`
 coupé à 8 s (rôle `authenticator`) dans le déclencheur `office_capture_mission_change` ; la ligne faisait 1,9 Mo, dont 1,76 Mo de reçus
 d'import (chaque case écrite avec sa valeur). Les reçus de plus de 32 Ko vont dans `<mission>/_OFFICE_MANAGER/RECU_<plan>_<hash>.json.gz`

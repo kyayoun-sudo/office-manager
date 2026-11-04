@@ -1,0 +1,80 @@
+# Office Manager on the firm's own server (VPS), without Vercel or Supabase (2026-11-04).
+#   db      PostgreSQL 17 — the firm's data; the SQL of the application is installed at the first start
+#   app     the Node server (pages, api/*.js, accounts, scheduler every 5 minutes)
+#   caddy   HTTPS (free certificate, renewed automatically) in front of app
+#   backup  a pg_dump every night, 14 days kept, in ./backups
+# Start:   docker compose up -d --build        Logs: docker compose logs -f app
+# The values come from .env (copy .env.example). Step-by-step guide: docs/INSTALLER_SUR_UN_VPS.md
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: office_manager
+      POSTGRES_USER: office_manager
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # First start only (empty database), in this order: compatibility, tables of the application, accounts.
+      - ./db/vps-compat.sql:/docker-entrypoint-initdb.d/01-vps-compat.sql:ro
+      - ./db/INSTALL_TOUT.sql:/docker-entrypoint-initdb.d/02-install-tout.sql:ro
+      - ./db/vps-auth.sql:/docker-entrypoint-initdb.d/03-vps-auth.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U office_manager -d office_manager"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not published on the Internet: only app and backup reach it.
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://office_manager:${POSTGRES_PASSWORD}@db:5432/office_manager
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      OFFICE_MANAGER_DOMAIN: ${OFFICE_MANAGER_DOMAIN:?OFFICE_MANAGER_DOMAIN manquant dans .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  backup:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          sleep 3600
+          if [ "$$(date +%H)" = "02" ]; then
+            f=/backups/office_manager_$$(date +%Y-%m-%d).dump
+            pg_dump -h db -U office_manager -d office_manager -Fc -f "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "sauvegarde $$f"
+            find /backups -name 'office_manager_*.dump' -mtime +14 -delete
+          fi
+        done
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -14,9 +14,11 @@
   "dependencies": {
     "@openai/agents": "0.18.0",
     "@vercel/functions": "3.9.11",
+    "bcryptjs": "3.0.2",
     "exceljs": "4.4.0",
     "jszip": "3.10.1",
     "mammoth": "1.13.0",
+    "nodemailer": "10.1.7",
     "pdf-lib": "1.17.1",
     "pdfkit": "0.17.2",
     "pg": "8.23.1",

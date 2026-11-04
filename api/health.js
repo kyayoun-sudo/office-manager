@@ -15,6 +15,8 @@ export default async function handler(req, res) {
         process.env.SUPABASE_URL &&
         process.env.SUPABASE_SERVICE_ROLE_KEY
       ),
+      // The firm's own PostgreSQL (VPS) replaces Supabase when DATABASE_URL is set.
+      database: Boolean(process.env.DATABASE_URL),
       openai: Boolean(process.env.OPENAI_API_KEY),
       anthropic: Boolean(
         process.env.ANTHROPIC_API_KEY &&

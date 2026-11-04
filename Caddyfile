@@ -1,0 +1,14 @@
+# HTTPS for Office Manager: Caddy obtains and renews the certificate for the domain by itself.
+{$OFFICE_MANAGER_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy app:3000 {
+		# Long agent passes and readings: Caddy waits for the application (no Vercel 300 s limit).
+		transport http {
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+}

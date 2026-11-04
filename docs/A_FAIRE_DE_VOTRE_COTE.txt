@@ -4,8 +4,31 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 3 novembre 2026
+Dernière mise à jour : 4 novembre 2026
 Branche concernée : feature/white-label-desktop
+
+-----------------------------------------------------------------------------------------------------------------
+00000. [ ] PASSER SUR VOTRE PROPRE SERVEUR (VPS), SANS VERCEL NI SUPABASE                            (4 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : vous avez demandé de tout faire depuis votre serveur. Le code est prêt (branche feature/white-label-desktop) :
+la base PostgreSQL, l'application, le HTTPS et les sauvegardes tournent sur un seul serveur ; les comptes sont repris
+avec leurs mots de passe. L'installation actuelle (Vercel + Supabase) n'est pas touchée et reste utilisable jusqu'à la
+bascule. Rien de tout cela n'a encore été essayé sur un vrai serveur.
+Guide complet, pas à pas : docs/INSTALLER_SUR_UN_VPS.md. En bref :
+  1. Louer un VPS Ubuntu 24.04, 4 Go de mémoire (Hetzner, OVHcloud, Scaleway…) ; noter son adresse IP.
+  2. Chez le fournisseur de votre nom de domaine : un enregistrement A « office » → l'IP du serveur.
+  3. Prévoir un compte d'envoi d'e-mails (SMTP) pour les confirmations d'inscription (fournisseur du cabinet, Brevo…).
+  4. Sur le serveur : installer Docker, récupérer le code, copier .env.example en .env et le remplir en recopiant les
+     MÊMES valeurs que dans Vercel (Settings → Environment Variables), surtout DEFAULT_ORG_ID et les clés
+     GOOGLE_TOKEN_ENCRYPTION_KEY / OWNER_APPROVAL_SECRET / OAUTH_STATE_SECRET (sinon il faudra reconnecter Google).
+  5. « docker compose up -d db », puis le script de déménagement scripts/vps-migrate.sh avec l'adresse de la base
+     Supabase (Supabase → Connect → Session pooler). Il arrête tout si une colonne manque et ne supprime rien chez Supabase.
+  6. « docker compose up -d --build » ; vérifier https://votre-adresse/api/health → "database": true.
+  7. Google Cloud → client OAuth → ajouter l'adresse de retour https://votre-adresse/oauth/google/callback.
+  8. Essayer (connexion avec votre mot de passe habituel, une mission, une procédure), puis annoncer la nouvelle adresse.
+Si vous le souhaitez, Claude peut faire les étapes 4 à 6 avec vous en direct (vous tapez les commandes qu'il donne ;
+il ne tape jamais un mot de passe).
+Non disponible sur le serveur : la connexion Microsoft (elle passait par Supabase). Google et le mot de passe restent.
 
 -----------------------------------------------------------------------------------------------------------------
 0000. [ ] FAIRE ENTRER LES LEÇONS DES MISSIONS TERMINÉES DANS SHADOW, PUIS LES VALIDER              (3 novembre 2026)
