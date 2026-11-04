@@ -28,6 +28,8 @@ export default async function handler(req, res) {
       groq: Boolean(process.env.GROQ_API_KEY),
       gemini: Boolean(process.env.GEMINI_API_KEY),
       xai: Boolean(process.env.XAI_API_KEY),
+      kimi: Boolean(process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY),
+      allowedAI: String(process.env.OFFICE_MANAGER_AI_PROVIDERS || "").trim() || null,
       eynowaLab: labReady(process.env),
       orpailleur: Boolean(process.env.ORPAILLEUR_JOB_SECRET),
       googleDriveSheets: googleConnectionConfigured()

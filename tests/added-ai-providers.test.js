@@ -17,7 +17,9 @@ const env = {
   GROQ_API_KEY: 'test-g',
   GROQ_SHARE: '0',
   XAI_API_KEY: 'test-x',
-  XAI_SHARE: '5'
+  XAI_SHARE: '5',
+  KIMI_API_KEY: 'test-k',
+  KIMI_SHARE: '0'
 };
 
 test('added environment keys are detected without exposing credentials; aliases and explicit models', () => {
@@ -36,13 +38,13 @@ test('added environment keys are detected without exposing credentials; aliases 
 
 // Deterministic order (Paul, 2026-10-24, d6ffa11): the caller's order first, then the shared catalog; never random.
 test('runtime selection is deterministic and shares do not remove configured providers', () => {
-  const support = ['openrouter', 'mistral', 'huggingface', 'groq', 'xai'];
+  const support = ['openrouter', 'mistral', 'huggingface', 'groq', 'xai', 'kimi'];
   assert.equal(selectedSupport(env, () => 0), 'openrouter');
-  assert.equal(selectedSupport(env, () => .99), 'xai');
-  assert.equal(selectedSupport({ ...env, GROQ_API_KEY: '' }, () => .99), 'xai');
+  assert.equal(selectedSupport(env, () => .99), 'kimi');
+  assert.equal(selectedSupport({ ...env, GROQ_API_KEY: '', KIMI_API_KEY: '' }, () => .99), 'xai');
 
   const order0 = providerOrder(['openai'], env, () => 0);
-  assert.deepEqual(order0, ['openai', 'openrouter', 'mistral', 'huggingface', 'groq', 'xai']);
+  assert.deepEqual(order0, ['openai', 'openrouter', 'mistral', 'huggingface', 'groq', 'xai', 'kimi']);
   const orderLast = providerOrder(['openai'], env, () => .99);
   assert.deepEqual(orderLast, order0, 'the same order whatever the random draw');
   assert.deepEqual(order0.filter(p => support.includes(p)).sort(), support.slice().sort());
