@@ -8,22 +8,24 @@ Dernière mise à jour : 4 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
-00001. [ ] N'UTILISER QUE TROIS IA : ANTHROPIC (CLAUDE), OPENAI (CHATGPT) ET KIMI                    (4 novembre 2026)
+00001. [ ] N'UTILISER QUE CLAUDE ET CHATGPT, AVEC LEUR MODÈLE LE PLUS PUISSANT                   (4 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
-Pourquoi : vous l'avez demandé. Le code accepte maintenant Kimi (Moonshot AI) et une liste des IA permises : les
-autres ne sont plus jamais appelées, même si leur clé reste dans Vercel.
-  1. Créer la clé Kimi : platform.moonshot.ai → se connecter → API Keys → Create → copier la clé (montrée une seule fois).
-     Ajouter du crédit (Recharge / Billing).
-  2. Vercel → projet office-manager-personal-pilot → Settings → Environment Variables → « Add » :
-       KIMI_API_KEY = la clé copiée                       (Production et Preview cochés)
-       OFFICE_MANAGER_AI_PROVIDERS = anthropic,openai,kimi (Production et Preview cochés)
-     Facultatif : KIMI_MODEL = kimi-k3 pour le modèle le plus récent (par défaut : kimi-k2.6).
-  3. Vérifier qu'ANTHROPIC_MODEL existe aussi dans Vercel (sans lui, Claude n'est jamais utilisé).
-  4. Deployments → la ligne la plus récente → ⋯ → Redeploy, puis ⋯ → Promote to Production (jamais Redeploy sur
-     la ligne « Current »).
-  5. Contrôle : https://office-manager-personal-pilot.vercel.app/api/health doit montrer "kimi": true et
-     "allowedAI": "anthropic,openai,kimi".
-Les autres clés (OpenRouter, xAI, Mistral, Groq, Hugging Face) peuvent rester ou être supprimées : elles ne servent plus.
+Pourquoi : votre décision (« on reste sur Claude et ChatGPT, avec le modèle le plus puissant »). Les autres IA ne sont
+plus jamais appelées, même si leur clé reste dans Vercel. Le code garde la place de réflexion de ces modèles et leur
+laisse jusqu'à 2 minutes sur les grosses lectures.
+  1. Anthropic : console.anthropic.com → Billing → recharger le crédit.
+  2. Vercel → projet office-manager-personal-pilot → Settings → Environment Variables (Production et Preview cochés) :
+       OFFICE_MANAGER_AI_PROVIDERS = anthropic,openai            (ajouter « ,eynowa-lab » pour garder la revue analytique)
+       ANTHROPIC_MODEL = claude-fable-5-1                         (le plus puissant ; plus économique : claude-opus-5-5)
+       ANTHROPIC_EFFORT = high                                    (facultatif ; xhigh ou max = plus profond, plus lent, plus cher)
+       OPENAI_MODEL = gpt-6-astra                                 (vérifier le nom exact sur platform.openai.com → Models)
+     Pour changer une variable existante : ⋯ → Edit → nouvelle valeur → Save.
+  3. Deployments → la ligne la plus récente → ⋯ → Redeploy, puis ⋯ → Promote to Production (jamais Redeploy sur la
+     ligne « Current »).
+  4. Contrôle : https://office-manager-personal-pilot.vercel.app/api/health doit montrer "allowedAI": "anthropic,openai".
+Les autres clés (OpenRouter, xAI, Mistral, Groq, Hugging Face, Kimi) peuvent rester ou être supprimées : elles ne servent plus.
+Coût : ces modèles coûtent plus cher par demande que les modèles courants ; le plafond OFFICE_MANAGER_AI_DAILY_LIMIT
+(par exemple 1000) évite qu'une boucle coûte cher.
 
 -----------------------------------------------------------------------------------------------------------------
 00000. [ ] PASSER SUR VOTRE PROPRE SERVEUR (VPS), SANS VERCEL NI SUPABASE                            (4 novembre 2026)
