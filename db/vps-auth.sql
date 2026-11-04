@@ -36,10 +36,16 @@ create table if not exists auth.om_links (
   token_hash text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   kind text not null check (kind in ('signup', 'magiclink')),
+  -- Sign-up: the password chosen is kept WITH its link, and becomes the account's password only when the owner of the address
+  -- opens that link (nobody can register an address and keep a password on it before its owner confirms).
+  password_hash text,
+  user_meta jsonb,
   expires_at timestamptz not null,
   used_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table auth.om_links add column if not exists password_hash text;
+alter table auth.om_links add column if not exists user_meta jsonb;
 
 revoke all on all tables in schema auth from public, anon, authenticated;
 grant usage on schema auth to service_role;

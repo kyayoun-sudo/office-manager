@@ -82,6 +82,36 @@ test('sign-up: the address is confirmed by the e-mail link, never on the person\
   assert.equal(mails.length, 1);
 });
 
+test('security: an address registered by someone else cannot keep their password (pre-hijacking), re-sign-up, logout', async () => {
+  const { call, mails, db } = await setup();
+  // Someone signs up with the address of another person and chooses a password; the address is not confirmed.
+  await call('signup', { body: { email: 'victime@cabinet.test', password: 'Intrus-mot-1' } });
+  // The real person later uses « Continuer avec Google »: Google proves the address.
+  const s = await sessionForEmail('victime@cabinet.test', 'Victime', call);
+  assert.ok(s.refresh_token);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'victime@cabinet.test', password: 'Intrus-mot-1' } })).status, 400, 'the intruder password does not open the account');
+  // The intruder's confirmation link, still in the person's mailbox, no longer does anything.
+  const intruderLink = new URL(mails.at(-1).link).searchParams.get('token');
+  assert.match(await verifyLinkRedirect({ token: intruderLink }, { db }), /otp_expired/);
+
+  // Two sign-ups on an unconfirmed address: only the newest link confirms, with ITS password.
+  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Premier-mot-1' } });
+  const first = new URL(mails.at(-1).link).searchParams.get('token');
+  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Second-mot-2' } });
+  const second = new URL(mails.at(-1).link).searchParams.get('token');
+  assert.match(await verifyLinkRedirect({ token: first }, { db }), /otp_expired/);
+  assert.match(await verifyLinkRedirect({ token: second }, { db }), /access_token=/);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Premier-mot-1' } })).status, 400);
+  const ok = await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Second-mot-2' } });
+  assert.equal(ok.status, 200);
+
+  // Logout ends the session on the server: the refresh token no longer works.
+  const { logout } = await import('../lib/accounts.js');
+  await logout({ refresh_token: ok.data.refresh_token }, { authCall: call, local: true });
+  assert.equal((await call('token?grant_type=refresh_token', { body: { refresh_token: ok.data.refresh_token } })).status, 400);
+  assert.equal(await userFromAccessToken(ok.data.access_token, db), null);
+});
+
 test('« Continuer avec Google »: lib/google-signin.js opens the session on the local accounts (user, single-use link, verify)', async () => {
   const { call } = await setup();
   const s = await sessionForEmail('google@cabinet.test', 'Personne Google', call);
