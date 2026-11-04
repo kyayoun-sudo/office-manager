@@ -29,10 +29,10 @@ function harness(replies) {
 
 test('repeated current context offset advances to next unseen window instead of looping', async () => {
   const h = harness([{ context_offset: 0 }]);
-  const result = await h.run({ text: 'x'.repeat(65000) });
+  const result = await h.run({ text: 'x'.repeat(250000) });
   assert.equal(result.pending, true);
   const job = h.view.work.walkthrough.find(x => x.kind === 'document-brain');
-  assert.equal(job.context_offset, 30000);
+  assert.equal(job.context_offset, 120000);
   assert.equal(job.no_progress, 0);
   assert.equal(job.feedback.at(-1).refused, 'CONTEXT_OFFSET_ALREADY_VISIBLE');
 });
