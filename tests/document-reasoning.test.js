@@ -117,14 +117,14 @@ test('a failed model call is retained without paying for it again on reopening',
 });
 
 test('oversized context remains available by offset; catalog entries are never silently pruned', async () => {
-  const f = await fixture(); f.state().card.long = 'X'.repeat(70000) + 'CLAUSE_FINALE';
-  f.answer(input => { assert.equal(input.catalog.length, 30); assert.equal(input.context.partial, true); return { context_offset: 60000 }; }); await f.run();
+  const f = await fixture(); f.state().card.long = 'X'.repeat(250000) + 'CLAUSE_FINALE';
+  f.answer(input => { assert.equal(input.catalog.length, 30); assert.equal(input.context.partial, true); return { context_offset: 240000 }; }); await f.run();
   f.answer(input => { assert.match(input.context.text, /CLAUSE_FINALE/); return { questions: ['Lecture en cours'] }; });
   await f.run(); assert.ok((await f.run()).result);
 });
 
 test('the next passage of the context asked as a piece (« file_id: context ») is read, not refused (D2_BUDGET, 2026-11-04)', async () => {
-  const f = await fixture(); f.state().card.long = 'X'.repeat(70000) + 'CLAUSE_FINALE';
+  const f = await fixture(); f.state().card.long = 'X'.repeat(250000) + 'CLAUSE_FINALE';
   let seen = 0;
   f.answer(input => {
     if (/CLAUSE_FINALE/.test(input.context.text || '')) { seen++; return { questions: ['Lu'] }; }
@@ -213,4 +213,22 @@ test('« Reprendre la recherche » after a stop on foreign pieces: the AI is tol
   f.answer(input => { assert.match(JSON.stringify(input.feedback), /s’est arrêtée parce que tu as cité des pièces absentes/); return { catalog_page: 1 }; });
   const r = await f.run({ retry_ai: true });
   assert.equal(r.ai_error, null); assert.equal(r.pending, true);
+});
+
+test('a long context is not an endless loop: a passage already read is refused, then the job stops; a turn cap (PRJ-01, 2026-11-04)', async () => {
+  const f = await fixture(); f.state().card.long = 'X'.repeat(400000) + 'FIN';
+  // The AI goes back and forth between two passages, as on PRJ-01 (304 turns for D1, no piece read).
+  let n = 0;
+  f.answer(input => (n++ % 2 === 0 ? { context_offset: 120000 } : { context_offset: 0 }));
+  let r;
+  for (let i = 0; i < 10 && !(r && r.ai_error); i++) r = await f.run();
+  assert.equal(r.ai_error, 'AI_NO_PROGRESS', 'stopped after coming back to a passage already read');
+  assert.ok(n <= 6, 'within a few turns, not hundreds (' + n + ')');
+  // An AI that keeps asking for new things without ever answering stops at the turn cap.
+  const g = await fixture(); g.state().card.long = 'Y'.repeat(300000);
+  let page = 0;
+  g.answer(() => ({ catalog_page: (page = page === 1 ? 2 : 1) }));
+  let s;
+  for (let i = 0; i < 60 && !(s && s.ai_error); i++) s = await g.run();
+  assert.ok(s.ai_error, 'the job stops with its reason said');
 });
