@@ -12,7 +12,7 @@ import { smartSearch } from '../lib/smart-search.js';
 import { listPendingActions, recordDecision } from '../lib/action-decisions.js';
 import { getMissionView, getMissionContacts } from '../lib/mission-view.js';
 import { getPersona, savePersona, draftInternalMessage } from '../lib/agent-persona.js';
-import { login, refreshSession, logout, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount, restartFirm, resetFirm } from '../lib/accounts.js';
+import { login, refreshSession, logout, confirmSignupLink, bootstrapOwner, listAccounts, manageAccount, signUp, claimOwner, oauthLogin, authStartUrl, setupState, closeOwnAccount, restartFirm, resetFirm } from '../lib/accounts.js';
 import { translateTexts } from '../lib/translate-ui.js';
 import { providersStatus } from '../lib/ai-plus.js';
 import { startCapabilityRefresh, capabilityStep, capabilityInsights, capabilityReport, capabilityContext } from '../lib/capabilities.js';
@@ -503,6 +503,8 @@ export const ROUTES = Object.freeze({
     return { url: authStartUrl(String(req.query?.provider || 'google'), proto + '://' + host + '/login.html') };
   }), unavailable: 'LOGIN_UNAVAILABLE' },
   'oauth-login': { POST: open((orgId, req) => oauthLogin(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
+  // The firm's own server: the confirmation link of the e-mail + the e-mail and password chosen at sign-up (lib/local-auth.js).
+  'confirm-signup': { POST: open((orgId, req) => confirmSignupLink(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
   tidy: {
     GET: (orgId, req) => req.query?.id ? getRequest(orgId, req.query.id) : listRequests(orgId),
     POST: (orgId, req) => tidyAction(orgId, req),

@@ -107,6 +107,7 @@
     'GOOGLE_REFUSED: access_denied': 'Connexion annulée dans Google.', AUTH_LINK_FAILED: 'Connexion impossible pour le moment (serveur de comptes).', AUTH_SESSION_FAILED: 'Connexion impossible pour le moment (serveur de comptes).', OAUTH_STATE_EXPIRED: 'La demande a expiré : cliquez à nouveau sur « Continuer avec Google ».',
     INVALID_EMAIL: 'Adresse e-mail invalide.',
     INVALID_CREDENTIALS: 'E-mail ou mot de passe incorrect.',
+    LINK_EXPIRED: 'Ce lien de confirmation a expiré ou a déjà servi. Inscrivez-vous de nouveau pour en recevoir un autre.',
     ACCOUNT_NOT_ALLOWED: 'Cette adresse n’a pas encore de compte ici. Cliquez sur « Continuer avec Google » : votre compte est créé en un clic.',
     TOO_MANY_ATTEMPTS: 'Trop de tentatives. Réessayez dans quelques minutes.',
     WEAK_PASSWORD: 'Mot de passe trop faible : 10 caractères minimum, avec des lettres et des chiffres.',
@@ -160,8 +161,18 @@
       .then(function (d) { if (!d.url) throw new Error(d.error || 'LOGIN_UNAVAILABLE'); location.assign(d.url); })
       .catch(function (err) { say('google-status', MESSAGES[err.message] || 'Connexion Google indisponible pour le moment.', true); });
   });
+  // The link of the confirmation e-mail (the firm's own server): the address is confirmed only with the e-mail and the password
+  // chosen at sign-up, typed in the form below (route confirm-signup).
+  var pendingConfirm = null;
   (function googleReturn() {
     var h = new URLSearchParams(location.hash.slice(1));
+    if (h.get('confirm_token')) {
+      pendingConfirm = h.get('confirm_token');
+      history.replaceState(null, '', location.pathname + location.search);
+      say('login-status', 'Pour confirmer votre adresse, entrez l’e-mail et le mot de passe choisis à l’inscription, puis « Se connecter ».');
+      $('email').focus();
+      return;
+    }
     if (!h.get('refresh_token') && !h.get('error')) return;
     history.replaceState(null, '', location.pathname + location.search);
     if (h.get('error')) { say('google-status', MESSAGES[h.get('error')] || ('Google : ' + (h.get('error_description') || h.get('error'))), true); return; }
@@ -183,7 +194,7 @@
     var email = $('email').value.trim(), password = $('password').value;
     if (!email || !password) { say('login-status', 'Renseignez votre e-mail et votre mot de passe.', true); return; }
     $('login-btn').disabled = true; say('login-status', 'Connexion…');
-    post('login', { email: email, password: password }).then(enter)
+    (pendingConfirm ? post('confirm-signup', { token: pendingConfirm, email: email, password: password }) : post('login', { email: email, password: password })).then(enter)
       .catch(function (err) { if (err.message === 'FIRM_CLOSED') { offerRestart({ email: email, password: password }); say('login-status', MESSAGES.FIRM_CLOSED, true); return; } say('login-status', MESSAGES[err.message] || 'Connexion impossible pour le moment.', true); $('password').value = ''; $('password').focus(); })
       .then(function () { $('login-btn').disabled = false; });
   });

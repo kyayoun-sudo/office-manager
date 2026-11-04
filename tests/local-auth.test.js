@@ -5,12 +5,14 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { localAuthCall, userFromAccessToken, verifyLinkRedirect, checkPasswordHash } from '../lib/local-auth.js';
 import { createSqlRest } from '../lib/sql-rest.js';
-import { login, refreshSession, signUp } from '../lib/accounts.js';
+import { login, refreshSession, signUp, confirmSignupLink } from '../lib/accounts.js';
 import { sessionForEmail } from '../lib/google-signin.js';
 
 const ROOT = new URL('../', import.meta.url);
 const ORG = '6c2fe1e2-3daf-4795-9d09-3fdb95e52942';
 let shared;
+// Confirmation succeeded: either a session, or « waiting for a role from the owner » (a firm that already has accounts).
+const confirmed = p => p.then(x => x, e => { if (e.message === 'ACCOUNT_PENDING') return { pending: true }; throw e; });
 async function setup() {
   if (shared) return shared;
   const pg = new PGlite();
@@ -63,53 +65,63 @@ test('accounts.login / refreshSession run unchanged on the local accounts and th
   await assert.rejects(refreshSession(ORG, { refresh_token: s.refresh_token }, { authCall: call, fetchRows: rest }), /SESSION_EXPIRED/);
 });
 
-test('sign-up: the address is confirmed by the e-mail link, never on the person\'s behalf', async () => {
-  const { call, mails, rest } = await setup();
+test('sign-up: the e-mail link + the password chosen at sign-up confirm the address, never the link alone', async () => {
+  const { call, mails, rest, db } = await setup();
   const out = await signUp(ORG, { email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3', display_name: 'Nouveau' },
     { authCall: call, fetchRows: rest, env: { OFFICE_MANAGER_MULTI_CABINET: 'on' } });
   assert.equal(out.confirmation_required, true);
   assert.equal(mails.length, 1);
-  assert.match(mails[0].link, /^https:\/\/office\.cabinet\.test\/auth\/v1\/verify\?type=signup&token=om_lk_/);
+  assert.ok(mails[0].link.startsWith('https://office.cabinet.test/auth/v1/verify?type=signup&token=om_lk_'));
   assert.equal((await call('token?grant_type=password', { body: { email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3' } })).status, 400, 'not confirmed yet');
-  const { db } = await setup();
   const token = new URL(mails[0].link).searchParams.get('token');
-  const back = await verifyLinkRedirect({ token }, { db });
-  assert.match(back, /^\/login\.html#access_token=om_at_.+&refresh_token=om_rt_/);
-  assert.match(await verifyLinkRedirect({ token }, { db }), /otp_expired/, 'a link serves once');
+  // Opening the link only leads to the login page, nothing is confirmed.
+  assert.equal(await verifyLinkRedirect({ token }, { db }), '/login.html#confirm_token=' + token);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3' } })).status, 400, 'still not confirmed');
+  await assert.rejects(confirmSignupLink(ORG, { token, email: 'nouveau@cabinet.test', password: 'faux' }, { authCall: call, fetchRows: rest }), /INVALID_CREDENTIALS/);
+  const session = await confirmed(confirmSignupLink(ORG, { token, email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3' }, { authCall: call, fetchRows: rest }));
+  assert.ok(session.refresh_token || session.pending);
+  await assert.rejects(confirmSignupLink(ORG, { token, email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3' }, { authCall: call, fetchRows: rest }), /LINK_EXPIRED/, 'a link serves once');
   assert.equal((await call('token?grant_type=password', { body: { email: 'nouveau@cabinet.test', password: 'Mot-de-passe-3' } })).status, 200);
   // Signing up again with a confirmed address says nothing about it and sends nothing.
   assert.equal((await call('signup', { body: { email: 'nouveau@cabinet.test', password: 'Autre-mot-9' } })).status, 200);
   assert.equal(mails.length, 1);
 });
 
-test('security: an address registered by someone else cannot keep their password (pre-hijacking), re-sign-up, logout', async () => {
-  const { call, mails, db } = await setup();
-  // Someone signs up with the address of another person and chooses a password; the address is not confirmed.
+test('security: an intruder who registers someone else’s address never gets in (before or after the owner), logout, too many tries', async () => {
+  const { call, mails, db, rest } = await setup();
+  const link = () => new URL(mails.at(-1).link).searchParams.get('token');
+  // 1. The intruder registers the address first, then the real person confirms it with Google: the intruder's password is gone.
   await call('signup', { body: { email: 'victime@cabinet.test', password: 'Intrus-mot-1' } });
-  // The real person later uses « Continuer avec Google »: Google proves the address.
+  const intruderLink = link();
   const s = await sessionForEmail('victime@cabinet.test', 'Victime', call);
   assert.ok(s.refresh_token);
-  assert.equal((await call('token?grant_type=password', { body: { email: 'victime@cabinet.test', password: 'Intrus-mot-1' } })).status, 400, 'the intruder password does not open the account');
-  // The intruder's confirmation link, still in the person's mailbox, no longer does anything.
-  const intruderLink = new URL(mails.at(-1).link).searchParams.get('token');
-  assert.match(await verifyLinkRedirect({ token: intruderLink }, { db }), /otp_expired/);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'victime@cabinet.test', password: 'Intrus-mot-1' } })).status, 400);
+  assert.match(await verifyLinkRedirect({ token: intruderLink }, { db }), /otp_expired/, 'the intruder’s link is void');
 
-  // Two sign-ups on an unconfirmed address: only the newest link confirms, with ITS password.
-  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Premier-mot-1' } });
-  const first = new URL(mails.at(-1).link).searchParams.get('token');
-  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Second-mot-2' } });
-  const second = new URL(mails.at(-1).link).searchParams.get('token');
-  assert.match(await verifyLinkRedirect({ token: first }, { db }), /otp_expired/);
-  assert.match(await verifyLinkRedirect({ token: second }, { db }), /access_token=/);
-  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Premier-mot-1' } })).status, 400);
-  const ok = await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Second-mot-2' } });
+  // 2. The real person signs up, THEN the intruder signs up the same address: both links reach the real person's mailbox.
+  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' } });
+  const ownerLink = link();
+  await call('signup', { body: { email: 'deux@cabinet.test', password: 'Intrus-mot-2' } });
+  const lateIntruderLink = link();
+  // The person opens the intruder's (newest) e-mail by mistake: with THEIR password it confirms nothing.
+  await assert.rejects(confirmSignupLink(ORG, { token: lateIntruderLink, email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, { authCall: call, fetchRows: rest }), /INVALID_CREDENTIALS/);
+  // Their own link still works, and voids the intruder's.
+  await confirmed(confirmSignupLink(ORG, { token: ownerLink, email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, { authCall: call, fetchRows: rest }));
+  await assert.rejects(confirmSignupLink(ORG, { token: lateIntruderLink, email: 'deux@cabinet.test', password: 'Intrus-mot-2' }, { authCall: call, fetchRows: rest }), /LINK_EXPIRED/);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Intrus-mot-2' } })).status, 400);
+  const ok = await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' } });
   assert.equal(ok.status, 200);
 
-  // Logout ends the session on the server: the refresh token no longer works.
+  // 3. Logout ends the session on the server.
   const { logout } = await import('../lib/accounts.js');
   await logout({ refresh_token: ok.data.refresh_token }, { authCall: call, local: true });
   assert.equal((await call('token?grant_type=refresh_token', { body: { refresh_token: ok.data.refresh_token } })).status, 400);
   assert.equal(await userFromAccessToken(ok.data.access_token, db), null);
+
+  // 4. Ten wrong passwords in a row: the address is blocked for a while (as Supabase did), even with the right one.
+  for (let i = 0; i < 10; i++) assert.ok([400, 429].includes((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'faux-' + i } })).status));
+  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' } })).status, 429);
+  await assert.rejects(login(ORG, { email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, { authCall: call, fetchRows: rest }), /TOO_MANY_ATTEMPTS/);
 });
 
 test('« Continuer avec Google »: lib/google-signin.js opens the session on the local accounts (user, single-use link, verify)', async () => {
