@@ -60,6 +60,9 @@ test('a large import receipt is stored in the mission Drive: the row stays small
   // Changed or missing file: said, never trusted.
   drive.files.get('R1').bytes = gzipSync(Buffer.from(JSON.stringify({ plan_id: 'plan-1', cells: [] })));
   await assert.rejects(receiptCells(stored, 'plan-1', { drive }), /RECEIPT_CELLS_FILE_CHANGED/);
+  // A file blown up far beyond its cells (decompression bomb) is refused before it is trusted.
+  drive.files.get('R1').bytes = gzipSync(Buffer.alloc(stored.cells_ref.count * 4096 + 200000, 32));
+  await assert.rejects(receiptCells(stored, 'plan-1', { drive }), /RECEIPT_CELLS_FILE_UNREADABLE/);
   drive.files.delete('R1');
   await assert.rejects(receiptCells(stored, 'plan-1', { drive }), /RECEIPT_CELLS_FILE_MISSING/);
 });
