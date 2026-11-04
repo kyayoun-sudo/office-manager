@@ -14,7 +14,7 @@ Pourquoi : vous avez demandé de tout faire depuis votre serveur. Le code est pr
 la base PostgreSQL, l'application, le HTTPS et les sauvegardes tournent sur un seul serveur ; les comptes sont repris
 avec leurs mots de passe. L'installation actuelle (Vercel + Supabase) n'est pas touchée et reste utilisable jusqu'à la
 bascule. Rien de tout cela n'a encore été essayé sur un vrai serveur.
-Guide complet, pas à pas : docs/INSTALLER_SUR_UN_VPS.md. En bref :
+Guide simple et détaillé, à suivre dans l'ordre : docs/GUIDE_SIMPLE_PASSAGE_VPS.md (version technique : docs/INSTALLER_SUR_UN_VPS.md). En bref :
   1. Louer un VPS Ubuntu 24.04, 4 Go de mémoire (Hetzner, OVHcloud, Scaleway…) ; noter son adresse IP.
   2. Chez le fournisseur de votre nom de domaine : un enregistrement A « office » → l'IP du serveur.
   3. Prévoir un compte d'envoi d'e-mails (SMTP) pour les confirmations d'inscription (fournisseur du cabinet, Brevo…).

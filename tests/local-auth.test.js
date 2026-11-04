@@ -154,10 +154,12 @@ test('wrong-password limits: a right password never refills the address counter;
     if (i % 5 === 0) await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip });
   }
   assert.ok(refused >= 10, 'the address is stopped although it logs in to its own account between tries (' + refused + ')');
-  // One account tried from many addresses: stopped at the account cap (100), whatever the address.
+  // One account tried from many addresses: over the account cap (100) it is not locked but paced (one try every 5 s).
   _resetFailures();
   let stopped = 0;
   for (let i = 0; i < 110; i++) if ((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'faux' }, ip: '198.51.100.' + (i % 250) })).status === 429) stopped++;
-  assert.equal(stopped, 10);
+  assert.equal(stopped, 9, 'after 100 wrong tries, one try per 5 s for this account');
+  await new Promise(r => setTimeout(r, 5100));
+  assert.equal((await call('token?grant_type=password', { body: { email: 'stuff@cabinet.test', password: 'Mon-compte-1' }, ip: '203.0.113.99' })).status, 200, 'the real person still gets in');
   _resetFailures();
 });
