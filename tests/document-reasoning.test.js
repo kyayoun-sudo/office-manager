@@ -123,6 +123,21 @@ test('oversized context remains available by offset; catalog entries are never s
   await f.run(); assert.ok((await f.run()).result);
 });
 
+test('the next passage of the context asked as a piece (« file_id: context ») is read, not refused (D2_BUDGET, 2026-11-04)', async () => {
+  const f = await fixture(); f.state().card.long = 'X'.repeat(70000) + 'CLAUSE_FINALE';
+  let seen = 0;
+  f.answer(input => {
+    if (/CLAUSE_FINALE/.test(input.context.text || '')) { seen++; return { questions: ['Lu'] }; }
+    assert.ok(!(input.feedback || []).some(x => x.refused === 'PIECE_NOT_IN_MISSION'), 'never refused as a piece outside the mission');
+    return { inspect: { file_id: 'context', offset: input.context.next_offset } };
+  });
+  let r;
+  for (let i = 0; i < 6 && !r?.result; i++) r = await f.run();
+  assert.equal(seen, 1);
+  assert.ok(r.result);
+  assert.equal(f.counts().opened, 0, 'no piece is opened for a context passage');
+});
+
 test('bytes select the Excel parser even with a PDF name and wrong MIME; later rows are accessible', async () => {
   const wb = new ExcelJS.Workbook(), sheet = wb.addWorksheet('Comptes');
   for (let i = 1; i <= 80; i++) sheet.addRow([i, 'Écriture ' + i, i * 10]);

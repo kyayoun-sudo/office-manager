@@ -35,6 +35,15 @@ test('switch on: the firm is accepted only for a member, or for a call signed by
   await assert.rejects(resolveRequestOrg(forged, { env, currentAccount: member }), /NOT_IN_THIS_CABINET/);
 });
 
+test('a service that does not answer is never told as « not in this firm » (database restart, 2026-11-04)', async () => {
+  const req = () => ({ headers: { 'x-office-manager-org': OTHER } });
+  for (const message of ['AUTH_CHECK_FAILED', 'SUPABASE_521: <html>', 'fetch failed']) {
+    const down = async () => { throw new Error(message); };
+    await assert.rejects(resolveRequestOrg(req(), { env, currentAccount: down }), e => e.message === 'SERVICE_TEMPORARILY_UNAVAILABLE' && e.statusCode === 503);
+  }
+  await assert.rejects(resolveRequestOrg(req(), { env, currentAccount: async () => { throw new Error('ACCOUNT_NOT_ALLOWED'); } }), /NOT_IN_THIS_CABINET/);
+});
+
 test('two firms in the same process never see each other\'s Drive', async () => {
   await withEnv(env, async () => {
     const rows = { [PILOT]: 'drive-pilot', [OTHER]: 'folder:drive-other' };
