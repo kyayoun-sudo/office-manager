@@ -483,7 +483,7 @@ export const ROUTES = Object.freeze({
     POST: (orgId, req) => draftInternalMessage(orgId, req.body || {}),
     unavailable: 'AGENT_MESSAGE_UNAVAILABLE'
   },
-  login: { POST: open((orgId, req) => login(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
+  login: { POST: open(async (orgId, req) => login(orgId, req.body || {}, { ip: (await import('../lib/attempts.js')).callerAddress(req) })), unavailable: 'LOGIN_UNAVAILABLE' },
   session: { POST: open((orgId, req) => refreshSession(orgId, req.body || {})), unavailable: 'SESSION_UNAVAILABLE' },
   logout: { POST: open((orgId, req) => logout(req.body || {})), unavailable: 'LOGOUT_UNAVAILABLE' },
   'bootstrap-owner': { POST: open((orgId, req) => bootstrapOwner(orgId, req)), unavailable: 'BOOTSTRAP_UNAVAILABLE' },
@@ -504,7 +504,7 @@ export const ROUTES = Object.freeze({
   }), unavailable: 'LOGIN_UNAVAILABLE' },
   'oauth-login': { POST: open((orgId, req) => oauthLogin(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
   // The firm's own server: the confirmation link of the e-mail + the e-mail and password chosen at sign-up (lib/local-auth.js).
-  'confirm-signup': { POST: open((orgId, req) => confirmSignupLink(orgId, req.body || {})), unavailable: 'LOGIN_UNAVAILABLE' },
+  'confirm-signup': { POST: open(async (orgId, req) => confirmSignupLink(orgId, req.body || {}, { ip: (await import('../lib/attempts.js')).callerAddress(req) })), unavailable: 'LOGIN_UNAVAILABLE' },
   tidy: {
     GET: (orgId, req) => req.query?.id ? getRequest(orgId, req.query.id) : listRequests(orgId),
     POST: (orgId, req) => tidyAction(orgId, req),

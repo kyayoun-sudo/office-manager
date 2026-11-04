@@ -118,10 +118,15 @@ test('security: an intruder who registers someone else’s address never gets in
   assert.equal((await call('token?grant_type=refresh_token', { body: { refresh_token: ok.data.refresh_token } })).status, 400);
   assert.equal(await userFromAccessToken(ok.data.access_token, db), null);
 
-  // 4. Ten wrong passwords in a row: the address is blocked for a while (as Supabase did), even with the right one.
-  for (let i = 0; i < 10; i++) assert.ok([400, 429].includes((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'faux-' + i } })).status));
-  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' } })).status, 429);
-  await assert.rejects(login(ORG, { email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, { authCall: call, fetchRows: rest }), /TOO_MANY_ATTEMPTS/);
+  // 4. Wrong passwords (security review 2026-11-04): counted per caller address + account, reserved BEFORE the check.
+  const attacker = '198.51.100.7', owner = '203.0.113.20';
+  // Ten tries sent at the same time from the attacker's address: never more than 10 reach the password check.
+  const burst = await Promise.all(Array.from({ length: 15 }, (_, i) => call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'faux-' + i }, ip: attacker })));
+  assert.equal(burst.filter(r => r.status === 429).length, 5);
+  assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, ip: attacker })).status, 429, 'blocked from the attacker address');
+  await assert.rejects(login(ORG, { email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, { authCall: call, fetchRows: rest, ip: attacker }), /TOO_MANY_ATTEMPTS/);
+  // The real person, from their own address, is not locked out by the stranger.
+  for (let i = 0; i < 12; i++) assert.equal((await call('token?grant_type=password', { body: { email: 'deux@cabinet.test', password: 'Vrai-mot-1' }, ip: owner })).status, 200, 'a right password gives its try back');
 });
 
 test('« Continuer avec Google »: lib/google-signin.js opens the session on the local accounts (user, single-use link, verify)', async () => {
