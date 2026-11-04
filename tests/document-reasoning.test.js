@@ -232,3 +232,20 @@ test('a long context is not an endless loop: a passage already read is refused, 
   for (let i = 0; i < 60 && !(s && s.ai_error); i++) s = await g.run();
   assert.ok(s.ai_error, 'the job stops with its reason said');
 });
+
+test("pages of the catalogue already seen stay visible; « Relancer l'IA » starts the stuck counter again (D4 of PRJ-01, 2026-11-04)", async () => {
+  const f = await fixture();
+  // The AI walks through pages 1 and 2, then wants page 0 back: it no longer has to — its pieces are in catalog_already_seen.
+  f.answer({ catalog_page: 1 }); await f.run();
+  f.answer(input => { assert.deepEqual(input.catalog_already_seen.map(x => x.id).slice(0, 2), ['D0', 'D1']); return { catalog_page: 2 }; }); await f.run();
+  f.answer(input => { assert.equal(input.catalog_already_seen.length, 60); assert.ok(input.catalog_already_seen.some(x => x.id === 'D35')); return { catalog_page: 0 }; });
+  let r = await f.run(); assert.equal(r.ai_error, null);
+  f.answer(input => { assert.match(input.feedback.at(-1).instruction, /catalog_already_seen/); return { inspect: { file_id: 'D3', page: 1 } }; });
+  r = await f.run(); r = await f.run(); assert.equal(f.counts().opened, 1, 'a seen piece is read instead of the page asked again');
+  // Stuck as D4 was: the retry must give the AI a real new turn, not stop at once on the old counter.
+  f.answer({ catalog_page: 0 }); r = await f.run(); r = await f.run();
+  assert.equal(r.ai_error, 'AI_NO_PROGRESS');
+  f.answer({ inspect: { file_id: 'D5', page: 1 } });
+  r = await f.run({ retry_ai: true });
+  assert.equal(r.ai_error, null); assert.equal(r.pending, true);
+});
