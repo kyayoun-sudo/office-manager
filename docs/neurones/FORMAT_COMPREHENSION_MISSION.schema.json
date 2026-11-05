@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "office-manager/neurone/comprehension-mission/v1",
+  "title": "Compréhension d'une mission d'audit",
+  "description": "Ce que l'IA doit rendre après avoir lu une mission, quel que soit le cabinet et le working file. Le fichier d'origine change ; cette structure ne change jamais. Chaque élément garde l'endroit où il a été trouvé (localisation), pour que la personne puisse vérifier. Ce qui n'est pas trouvé vaut null et apparaît dans maillons_casses : l'IA n'invente jamais.",
+  "type": "object",
+  "required": ["version", "mission", "risques", "procedures", "anomalies", "limitations", "conclusions_cycle", "synthese", "opinion", "maillons_casses", "carte"],
+  "properties": {
+    "version": { "const": "1" },
+
+    "mission": {
+      "type": "object",
+      "required": ["entite", "referentiel", "mandat", "periode", "materialite"],
+      "properties": {
+        "entite": {
+          "type": "object",
+          "required": ["designation", "type"],
+          "properties": {
+            "designation": { "type": "string", "description": "Nom ou désignation anonymisée (« Société A », « Projet B »)." },
+            "type": { "enum": ["societe", "association_ong", "projet_bailleur", "entite_publique", "autre"] },
+            "activite": { "type": ["string", "null"] },
+            "pays": { "type": ["string", "null"] },
+            "sources_financement": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "referentiel": { "type": ["string", "null"], "description": "SYSCOHADA, SYCEBNL, IPSAS, accord de financement…" },
+        "mandat": {
+          "type": "object",
+          "required": ["type", "exigences"],
+          "properties": {
+            "type": { "enum": ["commissariat_aux_comptes", "audit_contractuel", "audit_projet_bailleur", "audit_acquisitions", "examen_limite", "procedures_convenues", "due_diligence", "autre"] },
+            "exigences": {
+              "type": "array",
+              "description": "Ce que le mandat (lettre de mission, TDR) exige. Chaque exigence doit être couverte par une procédure, sinon c'est un maillon cassé.",
+              "items": { "$ref": "#/$defs/exigence" }
+            }
+          }
+        },
+        "periode": { "type": "object", "properties": { "debut": { "type": ["string", "null"] }, "fin": { "type": ["string", "null"] } } },
+        "materialite": {
+          "type": ["object", "null"],
+          "description": "null si elle n'est fixée nulle part. Sans elle, aucune conclusion ni opinion ne peut être proposée.",
+          "properties": {
+            "globale": { "type": ["number", "null"] },
+            "travail": { "type": ["number", "null"] },
+            "negligeable": { "type": ["number", "null"] },
+            "base": { "type": ["string", "null"] },
+            "localisation": { "$ref": "#/$defs/localisation" }
+          }
+        }
+      }
+    },
+
+    "risques": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "cycle", "assertions", "explicite"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "cycle": { "$ref": "#/$defs/cycle" },
+          "assertions": { "type": "array", "items": { "$ref": "#/$defs/assertion" } },
+          "niveau": { "enum": ["faible", "moyen", "eleve", "significatif", null] },
+          "fraude": { "type": "boolean", "default": false },
+          "explicite": { "type": "boolean", "description": "true si le dossier l'écrit ; false si l'IA le déduit de l'objectif d'une procédure." },
+          "localisation": { "$ref": "#/$defs/localisation" }
+        }
+      }
+    },
+
+    "procedures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "cycle", "intitule", "nature", "risques", "assertions", "statut", "constats"],
+        "properties": {
+          "id": { "type": "string", "description": "Code du dossier s'il existe (ACH-03, « D-2 »), sinon généré." },
+          "cycle": { "$ref": "#/$defs/cycle" },
+          "intitule": { "type": "string" },
+          "nature": { "enum": ["comprehension", "walkthrough", "test_controle", "analytique", "test_detail", "confirmation", "inventaire", "recalcul", "rapprochement", "cut_off", "entretien", "lecture_documents", "autre"] },
+          "risques": { "type": "array", "items": { "type": "string" }, "description": "id des risques auxquels elle répond." },
+          "assertions": { "type": "array", "items": { "$ref": "#/$defs/assertion" } },
+          "exigences": { "type": "array", "items": { "type": "string" }, "description": "id des exigences du mandat qu'elle couvre." },
+          "population": {
+            "type": ["object", "null"],
+            "properties": {
+              "description": { "type": "string" },
+              "nombre": { "type": ["number", "null"] },
+              "total": { "type": ["number", "null"] },
+              "rapprochee": { "enum": ["oui", "non", "inconnu"] },
+              "source_rapprochement": { "type": ["string", "null"] }
+            }
+          },
+          "echantillon": {
+            "type": ["object", "null"],
+            "properties": {
+              "methode": { "enum": ["exhaustif", "aleatoire", "jugement", "seuil", "mixte", "inconnu"] },
+              "critere": { "type": ["string", "null"] },
+              "taille": { "type": ["number", "null"] },
+              "couverture": { "type": ["number", "null"], "description": "Part du montant de la population testée (0 à 1)." }
+            }
+          },
+          "preuves": { "type": "array", "items": { "$ref": "#/$defs/preuve" } },
+          "statut": { "enum": ["faite", "partielle", "en_attente_client", "non_faite", "non_applicable_justifiee", "non_applicable_non_justifiee"] },
+          "constats": { "type": "array", "items": { "$ref": "#/$defs/constat" } },
+          "conclusion_dossier": { "type": ["string", "null"], "description": "La conclusion telle qu'écrite dans le dossier, mot pour mot." },
+          "localisation": { "$ref": "#/$defs/localisation" }
+        }
+      }
+    },
+
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "procedure", "description", "montant", "nature", "corrigee"],
+        "properties": {
+          "id": { "type": "string" },
+          "procedure": { "type": "string" },
+          "description": { "type": "string" },
+          "montant": { "type": ["number", "null"] },
+          "nature": { "enum": ["certaine", "extrapolee", "jugement"] },
+          "sens": { "enum": ["surevaluation", "sous_evaluation", "classement", "inconnu"] },
+          "ecriture": { "type": ["object", "null"], "properties": { "debit": { "type": "string" }, "credit": { "type": "string" } } },
+          "corrigee": { "enum": ["oui", "non", "inconnu"] },
+          "dans_synthese": { "enum": ["oui", "non", "montant_different"] }
+        }
+      }
+    },
+
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "procedure", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "procedure": { "type": "string" },
+          "description": { "type": "string" },
+          "montant": { "type": ["number", "null"], "description": "Montant qui n'a pas pu être vérifié." },
+          "procedure_alternative": { "enum": ["faite", "possible_non_faite", "impossible", "inconnu"] },
+          "dans_synthese": { "enum": ["oui", "non", "montant_different"] }
+        }
+      }
+    },
+
+    "conclusions_cycle": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["cycle", "conclusion_dossier", "conclusion_logique", "coherente"],
+        "properties": {
+          "cycle": { "$ref": "#/$defs/cycle" },
+          "conclusion_dossier": { "type": ["string", "null"] },
+          "conclusion_logique": { "enum": ["assurance", "anomalie", "limitation", "incomplet", "impossible_sans_materialite"], "description": "Ce que la règle « le plus mauvais constat décide » donne." },
+          "coherente": { "type": "boolean" },
+          "raison": { "type": "string" }
+        }
+      }
+    },
+
+    "synthese": {
+      "type": "object",
+      "properties": {
+        "anomalies_non_corrigees_total": { "type": ["number", "null"] },
+        "limitations_total": { "type": ["number", "null"] },
+        "au_dessus_materialite": { "enum": ["oui", "non", "inconnu"] },
+        "generalise": { "enum": ["oui", "non", "a_juger"], "description": "Toujours « a_juger » si la décision revient à l'Associé." },
+        "points_qualitatifs": { "type": "array", "items": { "type": "string" } },
+        "observations": { "type": "array", "items": { "type": "string" }, "description": "Continuité, point important à souligner (paragraphe d'observation)." },
+        "controle_interne": { "type": "array", "items": { "type": "string" }, "description": "Faiblesses pour la lettre à la direction." }
+      }
+    },
+
+    "opinion": {
+      "type": "object",
+      "required": ["dans_dossier", "proposable", "proposee", "raisonnement", "manque"],
+      "properties": {
+        "dans_dossier": { "enum": ["sans_reserve", "avec_reserve", "defavorable", "impossibilite", "absente"] },
+        "proposable": { "type": "boolean", "description": "false tant que la matérialité manque, ou qu'une procédure CORE n'est pas conclue." },
+        "proposee": { "enum": ["sans_reserve", "avec_reserve_limitation", "avec_reserve_desaccord", "defavorable", "impossibilite", "aucune"] },
+        "raisonnement": { "type": "array", "items": { "type": "string" }, "description": "Le chemin dans l'arbre ISA 705 : Q1, Q2, Q3, avec les montants." },
+        "manque": { "type": "array", "items": { "type": "string" }, "description": "Ce qu'il faut obtenir pour pouvoir proposer." },
+        "decision": { "const": "Associé", "description": "Rappel : l'IA propose, l'Associé décide." }
+      }
+    },
+
+    "maillons_casses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["regle", "description", "consequence"],
+        "properties": {
+          "regle": { "$ref": "#/$defs/regle" },
+          "description": { "type": "string" },
+          "consequence": { "type": "string" },
+          "localisation": { "$ref": "#/$defs/localisation" }
+        }
+      }
+    },
+
+    "carte": {
+      "type": "array",
+      "description": "L'adaptateur : où chaque notion se trouve dans CE dossier. Validé une fois par un Manager pour un modèle de working file, puis réutilisé.",
+      "items": {
+        "type": "object",
+        "required": ["notion", "trouvee"],
+        "properties": {
+          "notion": { "enum": ["mandat", "materialite", "risque", "procedure", "population", "echantillon", "preuve", "constat", "anomalie", "limitation", "conclusion", "synthese", "opinion"] },
+          "trouvee": { "type": "boolean" },
+          "ou": { "type": ["string", "null"], "description": "Ex. « Word du cycle, tableau Travaux à effectuer / Commentaires » ou « feuille 02_PROGRAMME, ligne par code »." }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "cycle": { "enum": ["planification", "capitaux_propres_fonds", "immobilisations", "stocks", "achats_fournisseurs", "ventes_clients", "ressources_financements", "personnel", "tresorerie", "impots", "autres_creances_dettes", "emprunts", "provisions", "parties_liees", "projet_bailleur", "acquisitions_marches", "cloture", "autre"] },
+    "assertion": { "enum": ["existence", "exhaustivite", "exactitude", "evaluation", "droits_obligations", "separation_exercices", "classement", "presentation", "conformite", "regularite"] },
+    "localisation": {
+      "type": ["object", "null"],
+      "properties": { "fichier": { "type": "string" }, "endroit": { "type": ["string", "null"] }, "extrait": { "type": ["string", "null"] } }
+    },
+    "exigence": {
+      "type": "object",
+      "required": ["id", "texte"],
+      "properties": { "id": { "type": "string" }, "texte": { "type": "string" }, "source": { "type": ["string", "null"] } }
+    },
+    "preuve": {
+      "type": "object",
+      "required": ["id", "description", "appartient_mission"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "nature": { "enum": ["externe", "interne", "observation", "recalcul", "entretien", "inconnu"] },
+        "appartient_mission": { "enum": ["oui", "non", "inconnu"], "description": "Lu dans le contenu (client, projet, période), jamais dans le nom du fichier." },
+        "raison": { "type": ["string", "null"] },
+        "localisation": { "$ref": "#/$defs/localisation" }
+      }
+    },
+    "constat": {
+      "type": "object",
+      "required": ["resultat", "description"],
+      "properties": {
+        "resultat": { "enum": ["conforme", "exception", "limitation", "en_attente", "non_fait"] },
+        "description": { "type": "string" },
+        "montant": { "type": ["number", "null"] },
+        "preuves": { "type": "array", "items": { "type": "string" } },
+        "suite": { "enum": ["anomalie", "limitation", "controle_interne", "aucune", null] }
+      }
+    },
+    "regle": {
+      "enum": [
+        "R01_conclusion_contraire_aux_constats",
+        "R02_preuve_hors_mission",
+        "R03_travail_recopie_annee_precedente",
+        "R04_synthese_differente_du_travail",
+        "R05_ecriture_manuelle_significative_non_expliquee",
+        "R06_date_hors_periode",
+        "R07_confirmation_sans_reponse_sans_alternative",
+        "R08_identite_client_incoherente",
+        "R09_exigence_du_mandat_non_couverte",
+        "R10_materialite_absente",
+        "R11_population_non_rapprochee",
+        "R12_risque_significatif_sans_procedure",
+        "R13_anomalie_absente_de_la_synthese",
+        "R14_rapport_incoherent_avec_la_synthese",
+        "R15_autre"
+      ]
+    }
+  }
+}
