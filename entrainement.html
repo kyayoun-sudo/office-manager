@@ -515,6 +515,15 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
           if ((o.missing || []).length) op.appendChild(el('p', 'Il manque : ' + o.missing.join(' ; '), 'small'));
           box.appendChild(op);
         }
+        // Neurone 6 (2026-11-05): the comprehension sheet of the mission, to download (JSON, firm-independent format).
+        if (q.understanding) {
+          var u = q.understanding, found = (u.carte || []).filter(function (c) { return c.trouvee; }).length;
+          box.appendChild(el('p', 'Fiche de compréhension : ' + (u.procedures || []).length + ' procédure(s), ' + (u.anomalies || []).length + ' anomalie(s), ' + (u.limitations || []).length + ' limitation(s), ' + (u.maillons_casses || []).length + ' maillon(s) cassé(s) ; ' + found + ' notion(s) sur ' + (u.carte || []).length + ' trouvée(s) dans le dossier.', 'small'));
+          box.appendChild(btn('Télécharger la fiche de compréhension (JSON)', 'btn', function () {
+            var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(u, null, 2)], { type: 'application/json' }));
+            a.download = 'FICHE_COMPREHENSION_' + String(q.mission_name || q.mission_id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) + '.json'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+          }));
+        }
         if (!q.findings.length) box.appendChild(el('p', 'Aucun point relevé sur les documents lus.', 'small'));
         q.findings.forEach(function (f) {
           var p = el('div', null, 'stack');
