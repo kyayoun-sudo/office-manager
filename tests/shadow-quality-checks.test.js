@@ -121,7 +121,7 @@ test('the pass reads the mission’s documents, says what it could not read, kee
   assert.equal(lab.quality.length, 1); assert.equal(lab.quality[0].mission_id, mission.id);
   assert.equal(audits[0].action_type, 'SHADOW_QUALITY_CHECKED');
   await assert.rejects(missionQualityPass('org', 'pas-un-id', 'Paul', {}), /MISSION_ID_REQUIRED/);
-  assert.equal(Object.keys(CHECKS).length, 8);
+  assert.equal(Object.keys(CHECKS).length, 12, 'C1–C8 + the audit chain C9–C12 (lib/audit-chain.js)');
 });
 
 test('the study’s lessons enter Shadow through the partners’ import, all « under review », never with a client name in the text', async () => {
