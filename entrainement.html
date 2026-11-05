@@ -496,7 +496,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       data.problems.forEach(function (p) { b.appendChild(item(NAME(p.agent) + ' — ' + (p.category || '') + ' : ' + p.problem, 'Cause probable : ' + (p.cause || '?') + ' · preuves : ' + (p.evidence || []).join(', ') + ' · ' + UI.dateTime(p.at))); }); }
     // Quality checks of a mission (2026-11-03): Shadow reads the working papers and deliverables and reports, nothing is changed.
     if (panel === 'quality') {
-      b.appendChild(el('p', 'Shadow lit les feuilles de test, les fiches, la note de synthèse, le rapport et les pièces d’une mission, puis signale : feuille d’un autre client ou d’un autre exercice, feuille sans conclusion, fiche qui contredit la note, rapport sans réserve malgré des points bloquants, redressement fiscal non repris, capitaux propres sous la moitié du capital non repris, chiffre introuvable ou de signe inverse, fiche recopiée d’un autre exercice, nom du projet ou bailleur différent des TDR. Il ne corrige rien : vous décidez.', 'small'));
+      b.appendChild(el('p', 'Shadow lit les feuilles de test, les fiches, la note de synthèse, le rapport et les pièces d’une mission, puis signale : feuille d’un autre client ou d’un autre exercice, feuille sans conclusion, fiche qui contredit la note, rapport sans réserve malgré des points bloquants, redressement fiscal non repris, capitaux propres sous la moitié du capital non repris, chiffre introuvable ou de signe inverse, fiche recopiée d’un autre exercice, nom du projet ou bailleur différent des TDR, matérialité absente, éléments testés hors de l’exercice, confirmation sans réponse ni procédure alternative, conclusion « sans exception » malgré des exceptions. Il propose enfin l’opinion que le dossier soutient (ISA 705, 706, 570), avec son raisonnement et ce qui manque. Il ne corrige rien : l’associé décide.', 'small'));
       var qr = el('div', null, 'btn-row'), qs = document.createElement('select'); qs.setAttribute('aria-label', 'Mission à contrôler'); qs.appendChild(new Option('Chargement des missions…', ''));
       OM.api('/api/missions').then(function (r) { qs.textContent = ''; (r.missions || []).forEach(function (m) { qs.appendChild(new Option((m.mission_code ? m.mission_code + ' — ' : '') + m.name, m.id)); }); if (!(r.missions || []).length) qs.appendChild(new Option('Aucune mission ouverte', '')); }).catch(function () { qs.textContent = ''; qs.appendChild(new Option('Missions indisponibles', '')); });
       qr.appendChild(qs); qr.appendChild(btn('Contrôler cette mission', 'btn', function () { if (!qs.value) return; act({ action: 'quality-check', mission_id: qs.value }, 'Contrôle terminé : résultats ci-dessous.'); }));
@@ -505,6 +505,16 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       (data.quality || []).forEach(function (q) {
         var box = el('div', null, 'stack');
         box.appendChild(el('p', 'Documents lus : ' + q.coverage.read + ' sur ' + q.coverage.documents + (q.coverage.unread.length ? ' — non lus : ' + q.coverage.unread.slice(0, 8).map(function (u) { return u.name + ' (' + u.why + ')'; }).join(', ') : ''), 'small'));
+        // Neurone 5 (2026-11-05): the opinion the file supports, proposed with its reasoning; the partner decides.
+        if (q.opinion) {
+          var o = q.opinion, op = el('div', null, 'stack');
+          op.appendChild(el('strong', 'Opinion que le dossier soutient : ' + (o.proposed ? o.proposed.label + (o.proposed.going_concern_section ? ' + section continuité d’exploitation' : '') : 'pas encore proposable') + ' — décision de l’associé'));
+          if (o.in_file) op.appendChild(el('p', 'Rapport du dossier : ' + o.in_file.label + (o.coherent_with_file === false ? ' (ne correspond pas aux points du dossier)' : ''), 'small'));
+          (o.reasoning || []).forEach(function (r) { op.appendChild(el('p', '• ' + r, 'small')); });
+          (o.points || []).slice(0, 6).forEach(function (p) { op.appendChild(el('p', '[' + (p.type === 'limitation' ? 'limitation' : p.type === 'desaccord' ? 'désaccord' : 'limitation ou désaccord') + (p.significant === true ? ', significatif' : p.significant === false ? ', sous le seuil' : '') + '] « ' + p.text + ' »' + (p.doc ? ' — ' + p.doc : ''), 'small')); });
+          if ((o.missing || []).length) op.appendChild(el('p', 'Il manque : ' + o.missing.join(' ; '), 'small'));
+          box.appendChild(op);
+        }
         if (!q.findings.length) box.appendChild(el('p', 'Aucun point relevé sur les documents lus.', 'small'));
         q.findings.forEach(function (f) {
           var p = el('div', null, 'stack');
