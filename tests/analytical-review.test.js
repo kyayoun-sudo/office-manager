@@ -120,3 +120,24 @@ test('an unreadable uploaded review remains a working file instead of becoming s
  d.fileForAI=async()=>{throw Error('UNREADABLE_FILE');};await assert.rejects(importAnalyticalReview('org',M,'review',account,d),/UNREADABLE_FILE/);
  assert.equal(docs[1].deposit,'analytical_review_template');let payload;d.startAuditorReview=async(o,r,b)=>{payload=b;};await startAnalyticalReview('org',{},M,account,d);assert.deepEqual(payload.evidence_files,['client']);
 });
+test('the trial balance is read by code before the AI review; the AI receives the figures to check (2026-11-14)',async()=>{
+  const {d}=world();let payload;
+  d.startAuditorReview=async(o,r,b)=>{payload=b;return {started:true};};
+  d.readTable=async id=>({meta:{name:'Balance N.xlsx'},rows:[['Balance au 31/12/2024'],['Compte','Intitulé','Solde N','Solde N-1'],['411000','Clients',-50,10],['521000','Banque',150,90],['101000','Capital',-100,-100]]});
+  await startAnalyticalReview('org',{},M,account,d);
+  assert.match(payload.focus,/CHIFFRES CALCULÉS PAR LE CODE/);
+  assert.match(payload.focus,/client au crédit/);
+  assert.match(payload.focus,/à CONTRÔLER/);
+  assert.deepEqual(payload.evidence_files,['client'],'the AI still has the sources to check the figures');
+  const ctx=await analyticalReviewContext('org',M,account,d);
+  assert.equal(ctx.code_figures.status,'computed');
+  assert.equal(ctx.code_figures.comparison.cycles.CASH.variation,60);
+});
+test('a balance the code cannot read never blocks the review',async()=>{
+  const {d}=world();let payload;
+  d.startAuditorReview=async(o,r,b)=>{payload=b;return {started:true};};
+  d.readTable=async()=>{throw Error('UNREADABLE');};
+  await startAnalyticalReview('org',{},M,account,d);
+  assert.equal(payload.analytical_review,true);
+  assert.doesNotMatch(payload.focus,/CHIFFRES CALCULÉS PAR LE CODE/);
+});
