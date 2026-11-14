@@ -271,13 +271,30 @@
       $('say').textContent = 'Brouillon enregistré (version ' + r.programme.version + ').'; showGaps(r.gaps); $('savebar').hidden = true; load(true);
     }).catch(function (e) { $('say').textContent = 'Impossible : ' + msg(e); $('savebar-msg').textContent = 'Non enregistré : ' + msg(e); }).then(function () { b.disabled = false; });
   });
-  $('validate').addEventListener('click', function () {
-    var b = this; b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
-    post(Object.assign(body(), { action: 'save' })).then(function (saved) { return post({ action: 'validate', mission_id: missionId, expected_programme_id:saved.programme.id,expected_updated_at:saved.programme.updated_at }); }).then(function (r) {
-      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). '+(r.document && r.document.status==='verified'?'Document sauvegardé et vérifié dans le Drive. ':'Document Drive en attente : '+(r.document && r.document.error || 'réessayez l’export')+'. ')+'Préparation des Working Papers…'; showGaps([]);
+  // The analytical review comes first (2026-11-14): without it, validating asks for the validator's reason, which is traced.
+  function analyticalGateBox(retry) {
+    var old = document.getElementById('analytical-gate'); if (old) old.remove();
+    var box = el('div', null, 'note'); box.id = 'analytical-gate';
+    box.appendChild(el('p', 'La revue analytique de cette mission n’est pas terminée. Elle vient avant le programme de travail.'));
+    var a = el('a', 'Faire la revue analytique'); a.href = '/revue-analytique.html?mission_id=' + encodeURIComponent(missionId); box.appendChild(a);
+    box.appendChild(el('p', 'Ou valider quand même : écrivez pourquoi (gardé dans le journal de la mission).', 'meta'));
+    var t = document.createElement('textarea'); t.rows = 2; t.style.width = '100%'; t.setAttribute('aria-label', 'Raison de valider sans revue analytique'); box.appendChild(t);
+    var go = el('button', 'Valider sans revue analytique', 'btn ghost'); go.type = 'button';
+    go.addEventListener('click', function () { var r = t.value.trim(); if (r.length < 10) { $('say').textContent = 'Écrivez une raison d’au moins 10 caractères.'; return; } box.remove(); retry(r); });
+    box.appendChild(go);
+    $('validate').parentNode.parentNode.insertBefore(box, $('validate').parentNode.nextSibling);
+  }
+  function validateNow(reason) {
+    var b = $('validate'); b.disabled = true; $('say').textContent = 'Enregistrement puis validation…';
+    post(Object.assign(body(), { action: 'save' })).then(function (saved) { return post(Object.assign({ action: 'validate', mission_id: missionId, expected_programme_id:saved.programme.id,expected_updated_at:saved.programme.updated_at }, reason ? { skip_analytical_reason: reason } : {})); }).then(function (r) {
+      $('say').textContent = 'Programme validé (version ' + r.programme.version + '). '+(r.analytical_review_skipped ? 'Sans revue analytique (raison gardée). ' : '')+(r.document && r.document.status==='verified'?'Document sauvegardé et vérifié dans le Drive. ':'Document Drive en attente : '+(r.document && r.document.error || 'réessayez l’export')+'. ')+'Préparation des Working Papers…'; showGaps([]);
       return makeWps();
-    }).catch(function (e) { $('say').textContent = msg(e); showGaps(e.data && e.data.gaps); }).then(function () { b.disabled = false; });
-  });
+    }).catch(function (e) {
+      if (e && e.code === 'ANALYTICAL_REVIEW_REQUIRED') { $('say').textContent = 'Revue analytique à faire d’abord.'; analyticalGateBox(validateNow); return; }
+      $('say').textContent = msg(e); showGaps(e.data && e.data.gaps);
+    }).then(function () { b.disabled = false; });
+  }
+  $('validate').addEventListener('click', function () { validateNow(null); });
   var WP_ERR = { WORKPAPERS_FOLDER_NOT_FOUND: 'Je ne trouve pas le dossier des Working Papers sous la mission : collez son lien dans « Matérialité », enregistrez, puis « Créer les Working Papers ».',
     MISSION_FOLDER_NOT_KNOWN: 'Le dossier Drive de la mission n’est pas connu : collez le lien du dossier des Working Papers dans « Matérialité ».', NO_VALIDATED_PROGRAMME: 'Validez d’abord le programme.' };
   var WP_STATUS = { CREATED: 'créé et vérifié dans le Drive (fichier de base)', CREATED_NOT_VERIFIED: 'créé, pas encore vérifié', ALREADY_EXISTS: 'existait déjà : gardé tel quel', FAILED: 'échec',

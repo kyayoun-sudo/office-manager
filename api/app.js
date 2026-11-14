@@ -251,7 +251,7 @@ export const ROUTES = Object.freeze({
     POST: users(MANAGERS, async (orgId, req) => {
       const w = await import('../lib/work-programme.js'); const b = req.body || {}; const id = String(b.mission_id || '');
       if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
-      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account, Object.hasOwn(b,'expected_programme_id') ? {expected:{id:b.expected_programme_id,updated_at:b.expected_updated_at}} : {});
+      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account, { ...(Object.hasOwn(b,'expected_programme_id') ? {expected:{id:b.expected_programme_id,updated_at:b.expected_updated_at}} : {}), ...(b.skip_analytical_reason ? { skipAnalyticalReason: String(b.skip_analytical_reason) } : {}) });
       if (b.action === 'analyse') return w.planProgramme(orgId, id, b, req.account);
       if (b.action === 'publish') return w.publishProgramme(orgId, id, req.account);
       if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);

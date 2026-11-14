@@ -30,7 +30,7 @@ function db() {
   return { t, fetchRows };
 }
 const mia = { role: 'manager', email: 'mia@c.ci' };
-const deps = (x, extra = {}) => ({ fetchRows: x.fetchRows, methodology: async () => LIB, audit: async () => ({}), emit: async () => ({}), ...extra });
+const deps = (x, extra = {}) => ({ fetchRows: x.fetchRows, methodology: async () => LIB, audit: async () => ({}), emit: async () => ({}), auditorState: async () => ({ status: 'done', focus: '[REVUE_ANALYTIQUE_PRELIMINAIRE]' }), ...extra });
 
 test('a new programme version inherits server-recorded workpaper IDs, never browser bindings', async () => {
   const x = db(), cycles = [proposeCycle(LIB.sops[0])];
@@ -100,4 +100,18 @@ test('import: the codes written in the Manager’s file are recognised by code, 
   assert.equal(x.t.programmes.length, 0, 'nothing saved by the import itself');
   const none = { readText: async () => ({ text: 'Tester les achats.' }) };
   await assert.rejects(importProgramme('org', M, { file: 'PROGRAMMEXXXXXXXXXXXXXXXX' }, mia, deps(x, { drive: none })), /NO_PROCEDURE_CODE_IN_FILE/);
+});
+
+test('gate (2026-11-14): no analytical review → validation refused; a reason from the validator lets it pass, traced', async () => {
+  const x = db(); const audits = [];
+  const body = { materiality: { overall: '12000000', performance: '9000000', trivial: '600000', file: 'https://docs.google.com/spreadsheets/d/MATERIALITEXXXXXXXXXXXXX/edit' }, reviews: { manager: true },
+    cycles: [{ sop_file_id: 'sopA', preparer: 'ali@c.ci', procedures: [{ code: 'ACH-03', active: true, sample_size: 25 }] }] };
+  await saveProgramme('org', M, body, mia, deps(x));
+  const none = { auditorState: async () => ({ status: 'running', focus: '[REVUE_ANALYTIQUE_PRELIMINAIRE]' }), audit: async (o, e) => { audits.push(e); } };
+  await assert.rejects(validateProgramme('org', M, mia, deps(x, none)), e => e.message === 'ANALYTICAL_REVIEW_REQUIRED' && e.reason_required === true);
+  await assert.rejects(validateProgramme('org', M, mia, deps(x, { ...none, skipAnalyticalReason: 'non' })), /ANALYTICAL_REVIEW_REQUIRED/);
+  const v = await validateProgramme('org', M, mia, deps(x, { ...none, skipAnalyticalReason: 'Revue faite hors application, dossier papier du Manager' }));
+  assert.equal(v.programme.status, 'validated');
+  assert.match(v.analytical_review_skipped, /hors application/);
+  assert.ok(audits.some(a => a.action_type === 'ANALYTICAL_REVIEW_SKIPPED' && /hors application/.test(a.decision)));
 });
