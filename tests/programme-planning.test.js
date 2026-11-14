@@ -116,6 +116,7 @@ function fixture() {
     fetchRows,
     methodology: async () => lib,
     permissions: async () => ({ granted: true }),
+    auditorState: async () => ({ status: 'done', focus: '[REVUE_ANALYTIQUE_PRELIMINAIRE]' }),
     audit: async () => ({}),
     emit: async () => ({}),
     analyse: async (args) => {

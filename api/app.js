@@ -251,7 +251,8 @@ export const ROUTES = Object.freeze({
     POST: users(MANAGERS, async (orgId, req) => {
       const w = await import('../lib/work-programme.js'); const b = req.body || {}; const id = String(b.mission_id || '');
       if (b.action === 'save') return w.saveProgramme(orgId, id, b, req.account);
-      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account, Object.hasOwn(b,'expected_programme_id') ? {expected:{id:b.expected_programme_id,updated_at:b.expected_updated_at}} : {});
+      if (b.action === 'propose-preparers') return w.preparerProposal(orgId, id, b.cycles, req.account);
+      if (b.action === 'validate') return w.validateProgramme(orgId, id, req.account, { ...(Object.hasOwn(b,'expected_programme_id') ? {expected:{id:b.expected_programme_id,updated_at:b.expected_updated_at}} : {}), ...(b.skip_analytical_reason ? { skipAnalyticalReason: String(b.skip_analytical_reason) } : {}) });
       if (b.action === 'analyse') return w.planProgramme(orgId, id, b, req.account);
       if (b.action === 'publish') return w.publishProgramme(orgId, id, req.account);
       if (b.action === 'import') return w.importProgramme(orgId, id, b, req.account);
@@ -418,6 +419,7 @@ export const ROUTES = Object.freeze({
       if (action === 'stage-files') return a.stageAnalyticalFiles(orgId, missionId, Array.isArray(body.file_ids) ? body.file_ids : [], account);
       if (action === 'delete-file') return a.deleteAnalyticalFile(orgId, missionId, String(body.file_id || ''), account);
       if (action === 'refresh-lab') return a.refreshEynowaKnowledge(orgId, missionId, account);
+      if (action === 'figures') return a.refreshCodeFigures(orgId, missionId, account);
       if (action === 'start') return a.startAnalyticalReview(orgId, req, missionId, account);
       if (action === 'finalize') return a.finalizeAnalyticalReview(orgId, missionId, account);
       throw fail('UNKNOWN_ACTION', 400);

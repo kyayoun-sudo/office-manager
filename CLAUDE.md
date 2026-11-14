@@ -615,6 +615,16 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `revue-analytique.html`, grand livre (règles de test des écritures sur 100 %), états financiers PDF, répartition des tests par niveau
   enregistrée dans le programme. Non essayé avec une vraie balance ni la vraie IA. Tests : `tests/financial-statements.test.js`,
   `tests/analytical-review.test.js`.
+- **Suite (Paul, 2026-11-14 : « ok on fait les prochaines PR »)** : 1) PORTE — `validateProgramme` refuse sans revue analytique terminée
+  (`analyticalReviewDone` : état de l'Enhanced Auditor `done` + `[REVUE_ANALYTIQUE_PRELIMINAIRE]`, revue Excel importée comprise) →
+  `ANALYTICAL_REVIEW_REQUIRED` ; la personne qui valide peut passer outre avec une raison (≥ 10 caractères, `skip_analytical_reason`), tracée
+  `ANALYTICAL_REVIEW_SKIPPED` ; `programme.html` montre le lien vers la revue et le champ de la raison ; « Mes tests » d'une mission directe passe
+  avec une raison écrite par le code (tracée). 2) `revue-analytique.html` : carte « Chiffres de la balance », « Lire la balance » = action
+  `figures` (`refreshCodeFigures`, sans IA, équipe de la mission). 3) `proposePreparers` / action `propose-preparers` (bouton « Répartir les tests
+  selon le niveau du SOP ») : niveau du SOP (Junior / Senior / Manager) → personne de la mission de ce niveau (fonction sur la mission, sinon
+  grade), charge répartie, test déjà confié jamais changé, aucun du niveau = dit ; proposition, enregistrée seulement par « Enregistrer ».
+  L'IA ne répartit pas encore elle-même (sa proposition reste dans le texte de la revue). Tests : `tests/work-programme.test.js`,
+  `tests/analytical-review.test.js`. Écrans non essayés dans un navigateur.
 - **Leçons de l'étude → Shadow** : `scripts/shadow-lessons-import.mjs` fait un fichier d'import au format de la sauvegarde
   (`lab-import`), toutes les leçons « à revoir » (un associé décide), texte générique refusé s'il contient un nom de client (les exemples
   vont dans `evidence`, jamais envoyée à l'IA) ou touche une zone protégée.

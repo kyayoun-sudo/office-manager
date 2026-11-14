@@ -30,7 +30,7 @@ function db() {
   return { t, fetchRows };
 }
 const mia = { role: 'manager', email: 'mia@c.ci' };
-const deps = (x, extra = {}) => ({ fetchRows: x.fetchRows, methodology: async () => LIB, audit: async () => ({}), emit: async () => ({}), ...extra });
+const deps = (x, extra = {}) => ({ fetchRows: x.fetchRows, methodology: async () => LIB, audit: async () => ({}), emit: async () => ({}), auditorState: async () => ({ status: 'done', focus: '[REVUE_ANALYTIQUE_PRELIMINAIRE]' }), ...extra });
 
 test('a new programme version inherits server-recorded workpaper IDs, never browser bindings', async () => {
   const x = db(), cycles = [proposeCycle(LIB.sops[0])];
@@ -100,4 +100,36 @@ test('import: the codes written in the Manager’s file are recognised by code, 
   assert.equal(x.t.programmes.length, 0, 'nothing saved by the import itself');
   const none = { readText: async () => ({ text: 'Tester les achats.' }) };
   await assert.rejects(importProgramme('org', M, { file: 'PROGRAMMEXXXXXXXXXXXXXXXX' }, mia, deps(x, { drive: none })), /NO_PROCEDURE_CODE_IN_FILE/);
+});
+
+test('gate (2026-11-14): no analytical review → validation refused; a reason from the validator lets it pass, traced', async () => {
+  const x = db(); const audits = [];
+  const body = { materiality: { overall: '12000000', performance: '9000000', trivial: '600000', file: 'https://docs.google.com/spreadsheets/d/MATERIALITEXXXXXXXXXXXXX/edit' }, reviews: { manager: true },
+    cycles: [{ sop_file_id: 'sopA', preparer: 'ali@c.ci', procedures: [{ code: 'ACH-03', active: true, sample_size: 25 }] }] };
+  await saveProgramme('org', M, body, mia, deps(x));
+  const none = { auditorState: async () => ({ status: 'running', focus: '[REVUE_ANALYTIQUE_PRELIMINAIRE]' }), audit: async (o, e) => { audits.push(e); } };
+  await assert.rejects(validateProgramme('org', M, mia, deps(x, none)), e => e.message === 'ANALYTICAL_REVIEW_REQUIRED' && e.reason_required === true);
+  await assert.rejects(validateProgramme('org', M, mia, deps(x, { ...none, skipAnalyticalReason: 'non' })), /ANALYTICAL_REVIEW_REQUIRED/);
+  const v = await validateProgramme('org', M, mia, deps(x, { ...none, skipAnalyticalReason: 'Revue faite hors application, dossier papier du Manager' }));
+  assert.equal(v.programme.status, 'validated');
+  assert.match(v.analytical_review_skipped, /hors application/);
+  assert.ok(audits.some(a => a.action_type === 'ANALYTICAL_REVIEW_SKIPPED' && /hors application/.test(a.decision)));
+});
+
+test('tests are spread by the SOP level among the mission team; given tests kept; missing level said (2026-11-14)', async () => {
+  const { proposePreparers } = await import('../lib/work-programme.js');
+  const team = [{ name: 'Ali', email: 'ali@c.ci', mission_function: 'auditor' }, { name: 'Awa', email: 'awa@c.ci', mission_function: 'auditor' },
+    { name: 'Sam', email: 'sam@c.ci', mission_function: 'senior' }, { name: 'Mia', email: 'mia@c.ci', mission_function: 'manager' }];
+  const cycles = [{ cycle_code: 'ACH', procedures: [
+    { code: 'ACH-01', active: true, level: 'Junior' }, { code: 'ACH-02', active: true, level: 'Junior' }, { code: 'ACH-03', active: true, level: 'Senior' },
+    { code: 'ACH-04', active: true, level: 'Manager' }, { code: 'ACH-05', active: true, level: 'Junior', preparer: 'sam@c.ci' },
+    { code: 'ACH-06', active: false, level: 'Junior' }, { code: 'ACH-07', active: true, level: null }] }];
+  const r = proposePreparers(cycles, team);
+  const by = Object.fromEntries(r.proposals.map(p => [p.code, p.preparer]));
+  assert.deepEqual(new Set([by['ACH-01'], by['ACH-02']]), new Set(['ali@c.ci', 'awa@c.ci']), 'juniors share the load');
+  assert.equal(by['ACH-03'], 'sam@c.ci'); assert.equal(by['ACH-04'], 'mia@c.ci');
+  assert.ok(!('ACH-05' in by) && !('ACH-06' in by), 'given or inactive tests untouched');
+  assert.ok(r.missing.some(m => m.code === 'ACH-07'));
+  const noSenior = proposePreparers([{ cycle_code: 'X', procedures: [{ code: 'X-1', active: true, level: 'Senior' }] }], team.filter(p => p.mission_function !== 'senior'));
+  assert.match(noSenior.missing[0].why, /aucun senior/);
 });
