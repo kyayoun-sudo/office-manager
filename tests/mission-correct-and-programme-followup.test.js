@@ -30,7 +30,8 @@ test('someone else on the mission who is not a manager cannot; a same-name missi
   await assert.rejects(setMissionDetails('org', { mission_id: ID, name: 'Y' }, { email: 'b@x', role: 'auditor' }, { fetchRows: db(m).fetchRows, audit: async () => {} }), /ROLE_NOT_ALLOWED/);
   const { fetchRows } = db(m, [{ id: 'other', name: 'Audit 2025', status: 'fieldwork' }]);
   await assert.rejects(setMissionDetails('org', { mission_id: ID, name: 'audit 2025' }, { email: 'm@x', role: 'manager' }, { fetchRows, audit: async () => {} }), /POSSIBLE_DUPLICATE/);
-  const r = await setMissionDetails('org', { mission_id: ID, name: 'audit 2025', confirm_duplicate: true }, { email: 'm@x', role: 'manager' }, { fetchRows, audit: async () => {} });
+  await assert.rejects(setMissionDetails('org', { mission_id: ID, name: 'audit 2025', confirm_duplicate: true }, { email: 'm@x', role: 'manager' }, { fetchRows, audit: async () => {} }), /POSSIBLE_DUPLICATE/);
+  const r = await setMissionDetails('org', { mission_id: ID, name: 'audit 2025', duplicate_reason: 'Deux missions distinctes, contrats séparés' }, { email: 'p@x', role: 'partner' }, { fetchRows, audit: async () => {} });
   assert.deepEqual(r.changed, ['name']);
 });
 
