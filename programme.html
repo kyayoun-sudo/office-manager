@@ -81,6 +81,7 @@
       <h2 id="h-cyc">Cycles et contrôles</h2>
       <div class="row" id="add-row"><label for="add-sop" class="meta">Ajouter un cycle</label><select id="add-sop"></select><button class="btn ghost" id="add" type="button">Ajouter</button></div>
       <p class="meta" id="no-lib" hidden>Aucun SOP lu pour l’instant : un manager les fait lire dans <a href="/methodologie.html">Méthodologie du cabinet</a>.</p>
+      <div class="row" id="spread-row"><button class="btn ghost" id="spread" type="button">Répartir les tests selon le niveau du SOP</button><span class="status" id="spread-say" role="status" aria-live="polite"></span></div>
       <div class="stack" id="cycles"></div>
     </section>
 
@@ -295,6 +296,16 @@
     }).then(function () { b.disabled = false; });
   }
   $('validate').addEventListener('click', function () { validateNow(null); });
+  // Proposal only (2026-11-14): tests without a preparer get a person of the SOP's level on this mission; nothing saved until « Enregistrer ».
+  $('spread').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('spread-say').textContent = 'Répartition…';
+    post({ action: 'propose-preparers', mission_id: missionId, cycles: cycles }).then(function (r) {
+      var n = 0; (r.proposals || []).forEach(function (x) { cycles.forEach(function (c) { if (c.cycle_code !== x.cycle) return; (c.procedures || []).forEach(function (p) { if (p.code === x.code && p.active && !p.preparer) { p.preparer = x.preparer; n++; } }); }); });
+      paintCycles(); if (n) dirty();
+      var miss = (r.missing || []).map(function (m) { return m.code + ' (' + m.why + ')'; });
+      $('spread-say').textContent = n + ' test(s) répartis, à enregistrer.' + (miss.length ? ' Non répartis : ' + miss.slice(0, 8).join(', ') + (miss.length > 8 ? '…' : '') + '.' : '');
+    }).catch(function (e) { $('spread-say').textContent = 'Impossible : ' + msg(e); }).then(function () { b.disabled = false; });
+  });
   var WP_ERR = { WORKPAPERS_FOLDER_NOT_FOUND: 'Je ne trouve pas le dossier des Working Papers sous la mission : collez son lien dans « Matérialité », enregistrez, puis « Créer les Working Papers ».',
     MISSION_FOLDER_NOT_KNOWN: 'Le dossier Drive de la mission n’est pas connu : collez le lien du dossier des Working Papers dans « Matérialité ».', NO_VALIDATED_PROGRAMME: 'Validez d’abord le programme.' };
   var WP_STATUS = { CREATED: 'créé et vérifié dans le Drive (fichier de base)', CREATED_NOT_VERIFIED: 'créé, pas encore vérifié', ALREADY_EXISTS: 'existait déjà : gardé tel quel', FAILED: 'échec',
@@ -354,7 +365,7 @@
     REVIEWS.forEach(function (r) { var l = el('label'), c = el('input'); c.type = 'checkbox'; c.id = 'r-' + r[0]; c.checked = !!(p && p.reviews && p.reviews[r[0]]); l.appendChild(c); l.appendChild(document.createTextNode(r[1])); rv.appendChild(l); });
     cycles = JSON.parse(JSON.stringify((p && p.cycles) || []));
     $('savebar').hidden = true; paintCycles(); paintAdd();
-    $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('import-card').hidden = !editable;
+    $('validate').hidden = !data.may_validate; $('save').hidden = !editable; $('spread-row').hidden = !editable; $('import-card').hidden = !editable;
     var fp = $('found-progs'); fp.textContent = '';
     if ((data.found_programmes || []).length) {
       fp.appendChild(el('p', 'Programme(s) de travail trouvé(s) parmi les documents de la mission :', 'meta'));

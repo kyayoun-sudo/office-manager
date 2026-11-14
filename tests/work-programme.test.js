@@ -115,3 +115,21 @@ test('gate (2026-11-14): no analytical review → validation refused; a reason f
   assert.match(v.analytical_review_skipped, /hors application/);
   assert.ok(audits.some(a => a.action_type === 'ANALYTICAL_REVIEW_SKIPPED' && /hors application/.test(a.decision)));
 });
+
+test('tests are spread by the SOP level among the mission team; given tests kept; missing level said (2026-11-14)', async () => {
+  const { proposePreparers } = await import('../lib/work-programme.js');
+  const team = [{ name: 'Ali', email: 'ali@c.ci', mission_function: 'auditor' }, { name: 'Awa', email: 'awa@c.ci', mission_function: 'auditor' },
+    { name: 'Sam', email: 'sam@c.ci', mission_function: 'senior' }, { name: 'Mia', email: 'mia@c.ci', mission_function: 'manager' }];
+  const cycles = [{ cycle_code: 'ACH', procedures: [
+    { code: 'ACH-01', active: true, level: 'Junior' }, { code: 'ACH-02', active: true, level: 'Junior' }, { code: 'ACH-03', active: true, level: 'Senior' },
+    { code: 'ACH-04', active: true, level: 'Manager' }, { code: 'ACH-05', active: true, level: 'Junior', preparer: 'sam@c.ci' },
+    { code: 'ACH-06', active: false, level: 'Junior' }, { code: 'ACH-07', active: true, level: null }] }];
+  const r = proposePreparers(cycles, team);
+  const by = Object.fromEntries(r.proposals.map(p => [p.code, p.preparer]));
+  assert.deepEqual(new Set([by['ACH-01'], by['ACH-02']]), new Set(['ali@c.ci', 'awa@c.ci']), 'juniors share the load');
+  assert.equal(by['ACH-03'], 'sam@c.ci'); assert.equal(by['ACH-04'], 'mia@c.ci');
+  assert.ok(!('ACH-05' in by) && !('ACH-06' in by), 'given or inactive tests untouched');
+  assert.ok(r.missing.some(m => m.code === 'ACH-07'));
+  const noSenior = proposePreparers([{ cycle_code: 'X', procedures: [{ code: 'X-1', active: true, level: 'Senior' }] }], team.filter(p => p.mission_function !== 'senior'));
+  assert.match(noSenior.missing[0].why, /aucun senior/);
+});
