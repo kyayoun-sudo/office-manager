@@ -418,6 +418,7 @@ export const ROUTES = Object.freeze({
       if (action === 'stage-files') return a.stageAnalyticalFiles(orgId, missionId, Array.isArray(body.file_ids) ? body.file_ids : [], account);
       if (action === 'delete-file') return a.deleteAnalyticalFile(orgId, missionId, String(body.file_id || ''), account);
       if (action === 'refresh-lab') return a.refreshEynowaKnowledge(orgId, missionId, account);
+      if (action === 'figures') return a.refreshCodeFigures(orgId, missionId, account);
       if (action === 'start') return a.startAnalyticalReview(orgId, req, missionId, account);
       if (action === 'finalize') return a.finalizeAnalyticalReview(orgId, missionId, account);
       throw fail('UNKNOWN_ACTION', 400);

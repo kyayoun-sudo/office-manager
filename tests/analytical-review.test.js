@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startAnalyticalReview, importAnalyticalReview, analyticalReviewContext, finalizeAnalyticalReview, refreshEynowaKnowledge, deleteAnalyticalFile } from '../lib/analytical-review.js';
+import { startAnalyticalReview, importAnalyticalReview, analyticalReviewContext, finalizeAnalyticalReview, refreshEynowaKnowledge, deleteAnalyticalFile, refreshCodeFigures } from '../lib/analytical-review.js';
 import { auditorStep } from '../lib/enhanced-auditor.js';
 const M = '11111111-1111-1111-1111-111111111111', account = { role:'owner', email:'owner@example.com' };
 function world(manager = true) {
@@ -140,4 +140,13 @@ test('a balance the code cannot read never blocks the review',async()=>{
   await startAnalyticalReview('org',{},M,account,d);
   assert.equal(payload.analytical_review,true);
   assert.doesNotMatch(payload.focus,/CHIFFRES CALCULÉS PAR LE CODE/);
+});
+test('« Lire la balance » computes the figures without AI and keeps them for the screen',async()=>{
+  const {d}=world();
+  d.readTable=async()=>({meta:{name:'Balance.xlsx'},rows:[['Compte','Intitulé','Solde N','Solde N-1'],['521000','Banque',150,90],['101000','Capital',-150,-90]]});
+  d.callModel=async()=>{throw Error('no AI here');};d.multiModel=async()=>{throw Error('no AI here');};
+  const r=await refreshCodeFigures('org',M,account,d);
+  assert.equal(r.code_figures.status,'computed');
+  assert.equal((await analyticalReviewContext('org',M,account,d)).code_figures.comparison.cycles.CASH.variation,60);
+  await assert.rejects(refreshCodeFigures('org',M,{role:'auditor',email:'stranger@x.ci'},d),/NOT_ON_THIS_MISSION/);
 });
