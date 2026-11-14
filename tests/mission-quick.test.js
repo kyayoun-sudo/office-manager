@@ -64,13 +64,45 @@ test('a double click never creates two missions', async () => {
   assert.equal(db.missions.length, 1);
 });
 
-test('same client and same name: possible duplicate shown, created only when the person confirms', async () => {
+test('same mission: blocked; « confirm » no longer passes; only an owner / partner with a written reason (2026-11-14)', async () => {
   const db = fakeDb({ missions: [{ id: '44444444-4444-4444-8444-444444444444', name: 'Audit BLE Transit 2025', client_name: 'BLE TRANSIT', status: 'closed' }] });
   await assert.rejects(createMissionQuick(ORG, { name: 'Audit BLE TRANSIT 2025', client: 'Ble Transit' }, auditor, deps(db)),
-    e => e.message === 'POSSIBLE_DUPLICATE' && e.statusCode === 409 && e.duplicates[0].status === 'closed');
-  const r = await createMissionQuick(ORG, { name: 'Audit BLE TRANSIT 2025', client: 'Ble Transit', confirm_duplicate: true }, auditor, deps(db));
+    e => e.message === 'POSSIBLE_DUPLICATE' && e.statusCode === 409 && e.duplicates[0].status === 'closed' && e.override_allowed === false);
+  await assert.rejects(createMissionQuick(ORG, { name: 'Audit BLE TRANSIT 2025', client: 'Ble Transit', confirm_duplicate: true, duplicate_reason: 'je le veux vraiment' }, auditor, deps(db)), /POSSIBLE_DUPLICATE/);
+  const partner = { ...auditor, role: 'partner' };
+  await assert.rejects(createMissionQuick(ORG, { name: 'Audit BLE TRANSIT 2025', client: 'Ble Transit' }, partner, deps(db)), e => e.override_allowed === true && e.reason_required === true);
+  const r = await createMissionQuick(ORG, { name: 'Audit BLE TRANSIT 2025', client: 'Ble Transit', duplicate_reason: 'Deuxième lot du même audit, contrat séparé' }, partner, deps(db));
   assert.equal(r.created, true);
   assert.equal(db.missions.length, 2);
+});
+
+test('other names, same client + exercise + type = the same mission; another type or year is not; a cancelled one never counts', async () => {
+  const db = fakeDb({ missions: [{ id: '55555555-5555-4555-8555-555555555555', name: 'CAC 2024', client_name: 'Alpha SA', status: 'fieldwork', engagement_type: 'statutory', period_label: '2024' },
+    { id: '66666666-6666-4666-8666-666666666666', name: 'Revue Beta 2024', client_name: 'Beta', status: 'cancelled' }] });
+  await assert.rejects(createMissionQuick(ORG, { name: 'Commissariat aux comptes exercice', client: 'ALPHA SA', engagement_type: 'statutory', period: '2024' }, auditor, deps(db)),
+    e => e.message === 'POSSIBLE_DUPLICATE' && /même exercice/.test(e.duplicates[0].why));
+  const other = await createMissionQuick(ORG, { name: 'Commissariat aux comptes exercice', client: 'ALPHA SA', engagement_type: 'statutory', period: '2025' }, auditor, deps(db));
+  assert.equal(other.created, true);
+  const again = await createMissionQuick(ORG, { name: 'Revue Beta 2024', client: 'Beta' }, auditor, deps(db));
+  assert.equal(again.created, true, 'a cancelled mission is not a duplicate');
+});
+
+test('missions unreadable → nothing created (never a silent pass)', async () => {
+  const db = fakeDb(); const base = db.fetchRows;
+  db.fetchRows = async (url, o = {}) => { if (url.startsWith('office_missions') && /order=created_at/.test(url)) throw new Error('down'); return base(url, o); };
+  await assert.rejects(createMissionQuick(ORG, { name: 'X', client: 'Y' }, auditor, deps(db)), /DUPLICATE_CHECK_UNAVAILABLE/);
+  assert.equal(db.missions.length, 0);
+});
+
+test('two identical missions created at the same instant: the oldest stays, the newer is cancelled', async () => {
+  const { settleRace } = await import('../lib/mission-identity.js');
+  const rows = [{ id: 'a', name: 'Audit Gamma 2025', client_name: 'Gamma', status: 'fieldwork', created_at: '2026-11-14T10:00:00Z' },
+    { id: 'b', name: 'Audit Gamma 2025', client_name: 'Gamma', status: 'fieldwork', created_at: '2026-11-14T10:00:01Z' }];
+  const fetchRows = async (url, o = {}) => { if (o.method === 'PATCH') { rows.find(r => url.includes('id=eq.' + r.id)).status = JSON.parse(o.body).status; return []; } return rows; };
+  const kept = await settleRace('org', rows[1], { name: 'Audit Gamma 2025', client: 'Gamma' }, { fetchRows, audit: async () => {} });
+  assert.equal(kept.id, 'a'); assert.equal(rows[1].status, 'cancelled'); assert.equal(rows[0].status, 'fieldwork');
+  const same = await settleRace('org', rows[0], { name: 'Audit Gamma 2025', client: 'Gamma' }, { fetchRows, audit: async () => {} });
+  assert.equal(same.id, 'a', 'the oldest keeps itself');
 });
 
 test('name and client are the only required fields', async () => {

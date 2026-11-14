@@ -625,6 +625,18 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   grade), charge répartie, test déjà confié jamais changé, aucun du niveau = dit ; proposition, enregistrée seulement par « Enregistrer ».
   L'IA ne répartit pas encore elle-même (sa proposition reste dans le texte de la revue). Tests : `tests/work-programme.test.js`,
   `tests/analytical-review.test.js`. Écrans non essayés dans un navigateur.
+- **Deux missions identiques impossibles (Paul, 2026-11-14 : « on peut créer 2 missions identiques »)** — causes prouvées : la création directe
+  ne comparait que le nom exact, « Créer quand même » passait pour tout le monde, une lecture en panne des missions laissait tout passer
+  (`.catch(() => [])`), la correction comparait le nom exact, la mission née d'une opportunité n'était comparée à rien, et deux créations au
+  même instant passaient toutes les deux. Désormais UNE règle (`lib/mission-identity.js`) : même mission = même client (ou client absent d'un
+  côté) ET (même nom par ses mots, `findSameMission`, années différentes exclues, OU même exercice + même type de mission) ; une mission
+  annulée ne compte jamais, une archivée oui. Seul un propriétaire / associé passe outre, avec une raison écrite (`duplicate_reason`,
+  ≥ 10 caractères, audit `MISSION_DUPLICATE_OVERRIDDEN`) ; `confirm_duplicate` ne suffit plus. Lecture impossible = rien créé
+  (`DUPLICATE_CHECK_UNAVAILABLE`). Course : après l'insertion, `settleRace` garde la plus ancienne et annule la nouvelle (statut `cancelled`,
+  rien supprimé, audit `MISSION_DUPLICATE_CANCELLED`, la personne est envoyée vers celle gardée). Branché : `createMissionQuick`,
+  `setMissionDetails`, création de la mission d'une opportunité (`lib/opportunities.js`, passage outre de l'associé). Écran `mission.html` :
+  missions trouvées + pourquoi + champ de raison pour un associé. Pas de nouveau SQL. Limite : l'écran Opportunités affiche l'erreur sans
+  champ de raison. Tests : `tests/mission-quick.test.js`, `tests/mission-correct-and-programme-followup.test.js`.
 - **Leçons de l'étude → Shadow** : `scripts/shadow-lessons-import.mjs` fait un fichier d'import au format de la sauvegarde
   (`lab-import`), toutes les leçons « à revoir » (un associé décide), texte générique refusé s'il contient un nom de client (les exemples
   vont dans `evidence`, jamais envoyée à l'IA) ou touche une zone protégée.

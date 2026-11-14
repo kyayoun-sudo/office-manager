@@ -718,10 +718,18 @@
     $('new-mission').hidden = !show; $('new-open').setAttribute('aria-expanded', String(show));
     if (show) { pendingId = pendingId || newId(); $('n-name').focus(); }
   }
-  function createMission(confirmDup) {
+  // Same mission already there (2026-11-14): only an owner / partner may still go on, with a written reason (kept in the journal).
+  function overrideBox(parent, data, go) {
+    if (!data || !data.override_allowed) { parent.appendChild(el('p', 'Seul un associé peut créer une mission identique à une mission existante.', 'meta')); return; }
+    parent.appendChild(el('p', 'Associé : si c’est bien une autre mission, écrivez pourquoi (gardé dans le journal).', 'meta'));
+    var t = document.createElement('textarea'); t.rows = 2; t.style.width = '100%'; t.setAttribute('aria-label', 'Pourquoi ce n’est pas la même mission'); parent.appendChild(t);
+    var b = el('button', 'Ce n’est pas la même mission : continuer', 'btn ghost'); b.type = 'button';
+    b.addEventListener('click', function () { var r = t.value.trim(); if (r.length < 10) { t.focus(); return; } go(r); }); parent.appendChild(b);
+  }
+  function createMission(reason) {
     var body = { action: 'create', request_id: pendingId || (pendingId = newId()), name: $('n-name').value.trim(), client: $('n-client').value.trim(),
       period: $('n-period').value.trim(), engagement_type: $('n-type').value, origin: $('n-origin').value,
-      planned_start: $('n-start').value || null, planned_end: $('n-end').value || null, folder: $('n-folder').value.trim(), confirm_duplicate: confirmDup === true };
+      planned_start: $('n-start').value || null, planned_end: $('n-end').value || null, folder: $('n-folder').value.trim(), duplicate_reason: typeof reason === 'string' ? reason : undefined };
     if (!body.name || !body.client) { $('n-status').textContent = 'Indiquez au moins le nom de la mission et le client.'; return; }
     var b = $('n-create'); b.disabled = true; $('n-status').textContent = 'Création…'; $('n-dups').hidden = true;
     OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
@@ -735,14 +743,13 @@
       b.disabled = false;
       var dups = e.data && e.data.duplicates;
       if (e.code === 'POSSIBLE_DUPLICATE' && dups && dups.length) {
-        $('n-status').textContent = 'Une mission du même nom existe déjà pour ce client. Ouvrez-la, ou créez quand même une nouvelle mission.';
+        $('n-status').textContent = 'Cette mission existe déjà. Ouvrez-la plutôt que d’en créer une deuxième.';
         var box = $('n-dups'); box.textContent = ''; box.hidden = false;
-        dups.forEach(function (m) { var a = el('a', null, 'item link-item'); a.href = '/mission.html?id=' + encodeURIComponent(m.id); a.appendChild(el('span', m.name)); a.appendChild(el('span', LABELS[canon(m.status)] || m.status, 'tag neutral')); box.appendChild(a); });
-        var again = el('button', 'Créer quand même une nouvelle mission', 'btn ghost'); again.type = 'button';
-        again.addEventListener('click', function () { createMission(true); }); box.appendChild(again);
+        dups.forEach(function (m) { var a = el('a', null, 'item link-item'); a.href = '/mission.html?id=' + encodeURIComponent(m.id); a.appendChild(el('span', m.name + (m.client ? ' — ' + m.client : ''))); if (m.why) a.appendChild(el('span', m.why, 'meta')); a.appendChild(el('span', LABELS[canon(m.status)] || m.status, 'tag neutral')); box.appendChild(a); });
+        overrideBox(box, e.data, function (r) { createMission(r); });
         return;
       }
-      $('n-status').textContent = 'Impossible : ' + e.message;
+      $('n-status').textContent = e.code === 'DUPLICATE_CHECK_UNAVAILABLE' ? 'Impossible de vérifier qu’elle n’existe pas déjà : réessayez dans un instant. Rien n’a été créé.' : 'Impossible : ' + e.message;
     });
   }
   // ---- Correct the mission (name, client, type, period) ----
@@ -754,13 +761,13 @@
     $('e-name').value = m.name || ''; $('e-client').value = (current && current.client) || m.client_name || '';
     $('e-type').value = f.engagement_type || ''; $('e-period').value = f.period || '';
   }
-  function saveEdit(force) {
+  function saveEdit(reason) {
     $('e-status').textContent = 'Enregistrement…';
     OM.api('/api/app?route=mission-quick', { method: 'POST', body: JSON.stringify({ action: 'details', mission_id: missionId, name: $('e-name').value.trim(), client: $('e-client').value.trim(),
-      engagement_type: $('e-type').value, period: $('e-period').value.trim(), confirm_duplicate: force === true }) })
+      engagement_type: $('e-type').value, period: $('e-period').value.trim(), duplicate_reason: typeof reason === 'string' ? reason : undefined }) })
       .then(function (r) { $('e-status').textContent = r.changed.length ? 'Mission corrigée.' : 'Rien à changer.'; openEdit(false); reload(); loadFollowups(); })
       .catch(function (e) {
-        if (e.code === 'POSSIBLE_DUPLICATE') { $('e-status').textContent = 'Une autre mission de ce client porte déjà ce nom. '; var b = el('button', 'Enregistrer quand même', 'btn ghost'); b.type = 'button'; b.addEventListener('click', function () { saveEdit(true); }); $('e-status').appendChild(b); return; }
+        if (e.code === 'POSSIBLE_DUPLICATE') { var st = $('e-status'); st.textContent = 'Avec ces changements, cette mission serait identique à : ' + ((e.data && e.data.duplicates) || []).map(function (m) { return m.name + (m.why ? ' (' + m.why + ')' : ''); }).join(', ') + '. '; overrideBox(st, e.data, function (r) { saveEdit(r); }); return; }
         $('e-status').textContent = e.code === 'ROLE_NOT_ALLOWED' ? 'Seuls un manager, un associé ou la personne qui a créé la mission peuvent la corriger.' : 'Impossible : ' + e.message;
       });
   }
