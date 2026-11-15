@@ -30,9 +30,22 @@ docker compose up -d db                 # au premier démarrage : les tables de 
 SUPABASE_DB_URL='…' bash scripts/vps-migrate.sh
 ```
 `SUPABASE_DB_URL` : Supabase → bouton **Connect** → **Session pooler** (remplacer `[YOUR-PASSWORD]` par le mot de passe de la base).
-Le script arrête tout s'il manque une colonne, copie les données en une fois (tout ou rien), puis les **comptes avec leurs mots de
+Le script crée d'abord sur le serveur ce qui n'existe que chez Supabase (anciennes tables, colonnes ajoutées à la main :
+seulement des ajouts, essai à blanc puis une transaction ; les vues sont ignorées), copie les données en une fois (tout ou rien), puis les **comptes avec leurs mots de
 passe** (chacun se reconnecte avec son mot de passe actuel), et affiche le nombre de lignes de chaque table des deux côtés.
 Rien n'est effacé chez Supabase.
+Une colonne obligatoire sur le serveur mais vide chez Supabase reçoit la valeur par défaut du serveur (nommée à l'écran ;
+le journal des missions note ce remplissage). Pour recommencer le déménagement, il faut une base neuve (les lignes déjà copiées
+seraient en double) : `docker compose down` puis `docker volume rm office-manager_pgdata`, et reprendre à l'étape 4.
+
+**Serveur qui a déjà nginx sur les ports 80/443** (autre site ; cas du VPS IONOS, 2026-11-15) : ne pas lancer Caddy. Un fichier
+`docker-compose.override.yml` ouvre l'application à la machine seule (`127.0.0.1:3000:3000`) et met `caddy` dans un profil ;
+nginx reçoit un bloc `server_name <domaine>` qui renvoie vers `http://127.0.0.1:3000` (délais de 900 s comme Caddy), et le
+certificat vient de l'outil déjà installé (`lego`, défi HTTP par le dossier que le port 80 sert déjà), avec son minuteur de
+renouvellement. Tester `nginx -t` avant `systemctl reload nginx` ; vérifier ensuite que l'autre site répond toujours.
+
+**Pendant l'essai, agents arrêtés** : `OFFICE_MANAGER_SCHEDULER=off` dans `.env` tant que Vercel tourne (sinon deux installations
+travaillent sur le même Drive et la même boîte mail). L'enlever à la bascule, puis `docker compose up -d app`.
 
 ## 5. Démarrer tout (≈ 5 min)
 ```bash
