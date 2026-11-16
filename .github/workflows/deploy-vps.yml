@@ -34,6 +34,8 @@ jobs:
 
   deploy:
     needs: tests
+    # Only the « production » branch is ever deployed, even when started by hand from another branch.
+    if: github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production

@@ -41,3 +41,10 @@ On peut aussi relancer un déploiement à la main : **Actions → Déploiement�
   ```
   ssh ionos-office "cat > /usr/local/bin/office-manager-deploy" < scripts/vps-deploy-receive.sh
   ```
+
+## Protection supplémentaire (facultative, à faire par le propriétaire du dépôt)
+
+Le travail GitHub ne déploie que la branche `production`, même lancé à la main depuis une autre branche.
+Pour verrouiller aussi côté GitHub (il faut les droits d'administrateur du dépôt, que Claude n'a pas) :
+**Settings → Environments → production → Deployment branches and tags → Selected branches → Add rule `production`**.
+Vous pouvez aussi cocher **Required reviewers** : chaque mise en ligne attendra alors votre clic « Approve ».
