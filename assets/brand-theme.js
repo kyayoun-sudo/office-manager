@@ -85,7 +85,8 @@
         MAIL_DELEGATION_MISSING: 'Google refuse l’envoi : le super administrateur Google Workspace doit autoriser l’envoi au nom de l’agent.',
         MAIL_AUTH_FAILED: 'Google refuse la connexion de la boîte de l’agent : reconnectez Google.',
         ROLE_NOT_ALLOWED: 'Action réservée à un autre rôle (propriétaire, associé ou manager).',
-        INVALID_BODY: 'Message vide ou trop long.'
+        INVALID_BODY: 'Message vide ou trop long.',
+        SERVER_RESTARTING_RETRY: 'Le serveur redémarre (mise à jour) : réessayez dans quelques secondes. Rien n’a été perdu.'
       };
       if (E[c]) return E[c];
       if (/^GMAIL_SEND_\d+_API_DISABLED/.test(c)) return 'Gmail refuse l’envoi : l’API Gmail n’est pas activée dans le projet Google Cloud du cabinet (console.cloud.google.com → API et services → Gmail API → Activer).';
@@ -136,7 +137,8 @@
       }).then(function (r) {
         return r.text().then(function (raw) {
           var data = null;
-          try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = { error: 'INVALID_RESPONSE' }; }
+          // A page instead of JSON: 502/503/504 = the server is restarting (deployment) or unreachable — said as such, not « INVALID_RESPONSE ».
+          try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = { error: r.status >= 502 && r.status <= 504 ? 'SERVER_RESTARTING_RETRY' : 'INVALID_RESPONSE' }; }
           if (!r.ok) {
             var code = (data && data.error) || ('HTTP_' + r.status);
             // Expired personal token: refresh once, then retry.
