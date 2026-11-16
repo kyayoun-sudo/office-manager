@@ -55,6 +55,7 @@
     state.box = box || null;
     state.items = [];
     state.draft = null;
+    state.lastPoll = 0;
     state.tab = 'inbox';
     paint();
     if (box) return loadMessages(true);
