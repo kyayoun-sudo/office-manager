@@ -201,3 +201,24 @@ test('Gmail personal send uses the connected person only and requires atomic dra
   await assert.rejects(sendPersonalDraft(ORG_A, ACTOR_A, BOX_A, DRAFT_A, true, { db, env, fetchImpl }), /PERSONAL_DRAFT_NOT_SENDABLE/);
   assert.equal(providerRequests.length, 1);
 });
+
+
+test('an auditor cannot bypass firm approval by emailing a registered mission client from a personal mailbox', async () => {
+  const privateBox = { ...boxB, org_id: ORG_A, user_id: USER_B, status: 'connected' };
+  let transmissions = 0;
+  const db = async (path, opts = {}) => {
+    if (path.startsWith('office_email_accounts?') && path.includes('user_id=eq.' + USER_B)) return [privateBox];
+    if (path.startsWith('office_personal_mail_drafts?') && path.includes('select=')) return [{
+      id: DRAFT_A, recipient: 'client@example.test', subject: 'Documents', body: 'Voici le GL', status: 'draft'
+    }];
+    if (path.startsWith('office_missions?')) {
+      assert.match(path, new RegExp('org_id=eq.' + ORG_A));
+      assert.match(decodeURIComponent(path), /client_contact_emails=cs.\{client@example.test\}/);
+      return [{ id: 'client-mission' }];
+    }
+    if (opts.method === 'PATCH') transmissions++;
+    throw Error('Unexpected query ' + path);
+  };
+  await assert.rejects(sendPersonalDraft(ORG_A, ACTOR_B, BOX_B, DRAFT_A, true, { db, env }), /PERSONAL_MAIL_CLIENT_REQUIRES_FIRM_APPROVAL/);
+  assert.equal(transmissions, 0, 'client communication cannot even claim an outbound draft');
+});
