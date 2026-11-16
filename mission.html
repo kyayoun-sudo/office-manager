@@ -511,7 +511,7 @@
     fillList('pbc', d.pbc, function (a) { return row(a.summary, a.due_at ? 'attendue le ' + UI.date(a.due_at) : '', a.status, a.status === 'executed' || a.status === 'verified' ? 'tag' : 'tag warn'); }, 'Aucune pièce PBC suivie pour cette mission.');
     fillList('docs', d.documents || [], function (doc) {
       var item = el('div', null, 'item'); var t = el('div', null, 't');
-      t.appendChild(doc.web_url ? UI.safeLink(doc.web_url, doc.name || 'Sans nom') : el('span', doc.name || 'Sans nom'));
+      t.appendChild(UI.pieceLink(doc, doc.name || 'Sans nom'));
       t.appendChild(el('span', [doc.document_type, doc.deposited ? 'déposé' + (doc.deposited_by ? ' par ' + doc.deposited_by : '') + (doc.deposited_at ? ' le ' + UI.date(doc.deposited_at) : '') : ''].filter(Boolean).join(' · '), 'meta'));
       if (doc.summary) t.appendChild(el('span', doc.summary, 'meta'));
       item.appendChild(t);
@@ -916,7 +916,7 @@
         return;
       }
       $('pc-status').textContent = 'Dépôt de « ' + list[i].name + ' » (' + (i + 1) + '/' + list.length + ')…';
-      sendOne(list[i]).then(function (r) { done.push(r); box.appendChild(el('div', '« ' + list[i].name + ' » → ' + (r.name || list[i].name), 'item')); })
+      sendOne(list[i]).then(function (r) { done.push(r); var item = el('div', null, 'item'); item.appendChild(document.createTextNode('« ' + list[i].name + ' » → ')); item.appendChild(UI.pieceLink(r, r.name || list[i].name)); box.appendChild(item); })
         .catch(function (e) { box.appendChild(el('div', '« ' + list[i].name + ' » : non déposé (' + e.message + ')', 'item')); })
         .then(function () { next(i + 1); });
     };
@@ -1066,6 +1066,7 @@
           b.disabled = true; pbcPost(Object.assign({ action: 'decide', id: r.id }, body), function () { return 'Enregistré.'; }); }); acts.appendChild(b); }
         var VERDICT = { conforme: 'conforme', partiel: 'incomplète', mauvaise_periode: 'mauvaise période', autre_document: 'autre document', a_verifier: 'à vérifier', illisible: 'non lue par l’application' };
         if (r.control && r.control.proposed && r.status === 'to_confirm') t.appendChild(el('span', 'Contrôle proposé (' + (r.control.by === 'code+ia' ? 'code et IA' : 'code') + ') : ' + (VERDICT[r.control.proposed] || r.control.proposed), r.control.proposed === 'conforme' ? 'tag' : 'tag warn'));
+        (r.pieces || []).forEach(function (piece) { t.appendChild(UI.pieceLink(piece)); });
         if (r.status === 'to_confirm' && (r.pieces || []).length) {
           var b0 = el('button', 'Confirmer la pièce', 'btn'); b0.type = 'button';
           b0.addEventListener('click', function () { var body = { action: 'decide', id: r.id, decision: 'accept' };

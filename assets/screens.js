@@ -105,6 +105,64 @@
       if (/^https:\/\//.test(href || '')) { a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
       return a;
     },
+    pieceLink: function (piece, label) {
+      var name = label || piece.name || 'Pièce';
+      var href = piece.url || piece.web_url;
+      var fileId = /^[a-zA-Z0-9_-]+$/.test(piece.file_id || '') ? piece.file_id : '';
+      var source = null;
+      try { source = new URL(href); } catch (_) {}
+      if (!source || source.protocol !== 'https:') {
+        if (!fileId) return UI.el('span', name);
+        source = new URL('https://drive.google.com/file/d/' + fileId + '/view');
+      }
+      if (source.origin === 'https://drive.google.com' || source.origin === 'https://docs.google.com') {
+        var match = /^\/(?:file|document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)(?:\/|$)/.exec(source.pathname);
+        var openId = source.origin === 'https://drive.google.com' && source.pathname === '/open' ? source.searchParams.get('id') : '';
+        fileId = match ? match[1] : /^[a-zA-Z0-9_-]+$/.test(openId || '') ? openId : '';
+      } else {
+        fileId = '';
+      }
+      var link = UI.safeLink(source.href, name);
+      link.setAttribute('aria-label', 'Voir ' + name + ' (nouvelle fenêtre ou nouvel onglet)');
+      if (!fileId || typeof HTMLDialogElement === 'undefined' || !HTMLDialogElement.prototype.showModal) return link;
+
+      var preview = new URL('https://drive.google.com/file/d/' + fileId + '/preview');
+      var resourceKey = source.searchParams.get('resourcekey');
+      if (resourceKey) preview.searchParams.set('resourcekey', resourceKey);
+      link.setAttribute('aria-label', 'Aperçu : ' + name);
+      link.setAttribute('aria-haspopup', 'dialog');
+      link.addEventListener('click', function (event) {
+        if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+
+        var dialog = UI.el('dialog', null, 'om-dialog om-piece-preview');
+        var title = UI.el('h2', name);
+        title.id = 'om-piece-preview-title';
+        dialog.setAttribute('aria-labelledby', title.id);
+        var header = UI.el('header', null, 'om-piece-preview-head');
+        var actions = UI.el('div', null, 'om-piece-preview-actions');
+        var close = UI.el('button', 'Fermer', 'btn ghost');
+        close.type = 'button';
+        close.addEventListener('click', function () { dialog.close(); });
+        var original = UI.safeLink(source.href, 'Ouvrir dans Drive');
+        original.className = 'btn ghost';
+        actions.append(original, close);
+        header.append(title, actions);
+        var frame = document.createElement('iframe');
+        frame.src = preview.href;
+        frame.title = 'Aperçu : ' + name;
+        frame.referrerPolicy = 'no-referrer';
+        dialog.append(header, frame);
+        dialog.addEventListener('close', function () {
+          dialog.remove();
+          link.focus();
+        }, { once: true });
+        document.body.appendChild(dialog);
+        dialog.showModal();
+        close.focus();
+      });
+      return link;
+    },
     renderSearch: function (box, data) {
       box.textContent = '';
       var labels = { documents: 'Documents', missions: 'Missions', people: 'Personnes' };
