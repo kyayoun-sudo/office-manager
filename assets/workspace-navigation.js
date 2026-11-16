@@ -10,7 +10,7 @@
   var en = OM.getLang && OM.getLang() === 'en';
   function tr(fr, english) { return en ? english : fr; }
   var role = OM.getRole() || 'guest';
-  var storageKey = 'om:rail-compact:' + role;
+  var storageKey = 'om:rail-compact:' + role + ':' + (OM.getUserName && OM.getUserName() || 'user');
   var compact = false;
   try { compact = window.localStorage.getItem(storageKey) === '1'; } catch (_) {}
   var bar = document.createElement('div');
