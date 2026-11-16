@@ -15,6 +15,7 @@ const cut = (s, n) => String(s ?? '').slice(0, n);
 const sha = o => crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex');
 
 export function buildImport(proposals, { by = null, now = new Date().toISOString(), clientNames = [] } = {}) {
+  if (proposals?.schema === EXPORT_SCHEMA) throw new Error('SHADOW_EXPORT_NOT_PROPOSALS: importer la sauvegarde complète depuis Entraînement → Garder ce que Shadow a appris → Importer ; consulter scripts/shadow-export-audit.mjs pour vérifier le fichier.');
   const lessons = [], refused = [];
   const names = clientNames.map(n => String(n).trim()).filter(n => n.length >= 3);
   for (const p of proposals.lessons || []) {
