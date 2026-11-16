@@ -51,6 +51,8 @@
     advanced.appendChild(intro);
     advanced.appendChild(link('/mise-en-service.html', 'État des connexions et diagnostic'));
     advanced.appendChild(link('/entrainement.html', 'Ouvrir le laboratoire IA'));
+    var registry = document.querySelector('main.main > header a[href="/specialists.html"]');
+    if (registry) { registry.textContent = 'Registre des spécialistes IA'; advanced.appendChild(registry); }
   }
   staticContent();
   var topSections = {
@@ -77,6 +79,7 @@
   });
   if (documents) sections.push({ el: documents, group: 'methods' });
   var preview = area.querySelector(':scope > .side');
+  var saveRow = document.getElementById('save') && document.getElementById('save').parentElement;
   var storage = 'om:settings-group:' + role;
   function hashGroup() {
     var h = decodeURIComponent(location.hash.replace(/^#/, ''));
@@ -99,6 +102,7 @@
     nestedGroups.forEach(function (x) { x.el.classList.toggle('om-settings-out', x.group !== group); });
     area.classList.toggle('om-settings-out', !nestedGroups.some(function (x) { return x.group === group; }));
     if (preview) preview.classList.toggle('om-settings-out', group !== 'identity');
+    if (saveRow) saveRow.classList.toggle('om-settings-out', !['identity', 'connections', 'agents'].includes(group));
     personal.hidden = group !== 'personal';
     advanced.hidden = group !== 'advanced';
     if (save) {
