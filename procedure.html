@@ -308,7 +308,7 @@
       c.appendChild(el('h3', it.sample_id + ' · ' + [it.ref, it.date, it.party].filter(Boolean).join(' · ') + ' · ' + fmt(it.amount)));
       if (it.reasons) c.appendChild(el('p', 'Choisi parce que : ' + it.reasons.join(', '), 'meta'));
       var ev = el('p', null, 'meta'); ev.appendChild(document.createTextNode('Pièces : '));
-      (it.evidence || []).forEach(function (e, i) { if (i) ev.appendChild(document.createTextNode(' ; ')); ev.appendChild(e.url ? UI.safeLink(e.url, e.name) : document.createTextNode(e.name || e.file_id)); });
+      (it.evidence || []).forEach(function (e, i) { if (i) ev.appendChild(document.createTextNode(' ; ')); ev.appendChild(UI.pieceLink(e, e.name || e.file_id)); });
       if (!(it.evidence || []).length) ev.appendChild(document.createTextNode('aucune'));
       c.appendChild(ev);
       if (!locked) {
@@ -328,7 +328,7 @@
       if (it.ai) {
         var a = el('div', null, 'ai'); a.appendChild(el('p', null)).appendChild(el('strong', 'Proposition de l’Enhanced Auditor : ' + it.ai.proposed_result));
         (it.ai.evidence_candidates || []).forEach(function (e) {
-          a.appendChild(el('p', 'Pièce proposée : ' + (e.name || e.file_id)));
+          var piece = el('p', 'Pièce proposée : '); piece.appendChild(UI.pieceLink(e, e.name || e.file_id)); a.appendChild(piece);
           if (!locked && !(it.evidence || []).some(function (known) { return known.file_id === e.file_id; })) {
             var confirm = el('button', 'Confirmer cette pièce pour le test', 'btn ghost'); confirm.type = 'button';
             confirm.addEventListener('click', function () { act(confirm, { action: 'evidence', sample_id: it.sample_id, file: e.file_id }, say); }); a.appendChild(confirm);
@@ -471,7 +471,7 @@
     var editable = data && data.editable !== false;
     needs.items.forEach(function (it) {
       var row = el('div', null, 'item'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)';
-      var t = el('div'); t.appendChild(el('strong', it.document)); t.appendChild(el('div', (it.label || it.status) + (it.period ? ' · ' + it.period : '') + ((it.pieces || []).length ? ' · ' + it.pieces.map(function (p) { return p.name; }).join(', ') : ''), 'meta')); row.appendChild(t);
+      var t = el('div'); t.appendChild(el('strong', it.document)); t.appendChild(el('div', (it.label || it.status) + (it.period ? ' · ' + it.period : '') + ((it.pieces || []).length ? ' · ' + it.pieces.map(function (p) { return p.name; }).join(', ') : ''), 'meta')); (it.pieces || []).forEach(function (piece) { t.appendChild(UI.pieceLink(piece)); }); row.appendChild(t);
       var tools = el('div', null, 'row');
       if (editable && ['accepted', 'not_applicable'].indexOf(it.status) < 0) {
         var f = document.createElement('input'); f.type = 'file'; f.setAttribute('aria-label', 'Déposer : ' + it.document);
