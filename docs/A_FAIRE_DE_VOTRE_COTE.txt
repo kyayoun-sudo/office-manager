@@ -8,6 +8,29 @@ Dernière mise à jour : 14 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+00007. [x] BASCULE FAITE : TOUT LE CABINET SUR https://office.eynowa.com                          (16 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Fait par Claude le 16 novembre (vous lui aviez donné la main) :
+  1. Ce qui avait été fait sur Vercel depuis le déménagement du 15 novembre a été comparé ligne par ligne : seul
+     l'historique (8 entrées du journal d'audit, 14 connexions) manquait sur le serveur ; il y a été ajouté. Le travail
+     de PRJ-01 et les réglages étaient plus récents sur le serveur (gardés). Les 99 pièces déposées sont dans le Drive
+     (commun aux deux) : rien à déplacer.
+  2. Agents arrêtés côté Vercel : les 3 tâches planifiées de Supabase (grand-controleur-mission-lifecycle,
+     office-manager-central-control, office-manager-unified-scheduler) sont désactivées (pas supprimées).
+  3. Agents allumés sur le serveur (passages automatiques toutes les 5 minutes ; horaires du cabinet inchangés).
+  4. L'ancienne adresse https://office-manager-personal-pilot.vercel.app renvoie chaque page vers la même page de
+     https://office.eynowa.com (redirection temporaire « Bascule vers le serveur du cabinet », Vercel → projet →
+     Bulk Redirects). Les favoris de l'équipe continuent donc de marcher.
+Annoncer à l'équipe (texte prêt à envoyer) :
+  « Office Manager a déménagé sur notre propre serveur : https://office.eynowa.com. Mêmes adresses e-mail, mêmes mots
+    de passe. L'ancienne adresse vous y renvoie automatiquement. Sur l'accueil, « Ma messagerie » vous permet de relier
+    votre propre boîte e-mail. »
+Pour revenir en arrière (si un problème grave) : dans Supabase → SQL : select cron.alter_job(job_id := N, active := true)
+pour N = 2, 3, 4 ; dans Vercel → Bulk Redirects → restaurer la version précédente ; sur le serveur, remettre
+OFFICE_MANAGER_SCHEDULER=off dans .env. Les données saisies sur le serveur depuis ne seraient pas sur Vercel.
+Plus tard : quand tout va bien depuis quelques semaines, on pourra fermer le projet Vercel et Supabase (abonnements).
+
+-----------------------------------------------------------------------------------------------------------------
 00006. [ ] CHACUN RELIE SA BOÎTE E-MAIL (« Ma messagerie » sur l'accueil)                           (16 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 En ligne sur https://office.eynowa.com depuis le 16 novembre (détails techniques : docs/PERSONAL_MAIL.md).
@@ -49,7 +72,7 @@ revient tout seul à la version précédente si l'application ne répond pas. Ex
 Rien à faire de plus : la clé de déploiement et les secrets GitHub sont déjà en place.
 
 -----------------------------------------------------------------------------------------------------------------
-00003. [ ] REMPLIR LE .env DU VPS IONOS PUIS DÉMÉNAGER LES DONNÉES DE SUPABASE                    (14 novembre 2026)
+00003. [x] REMPLIR LE .env DU VPS IONOS PUIS DÉMÉNAGER LES DONNÉES DE SUPABASE                    (14 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Tout est expliqué pas à pas dans : docs/REMPLIR_LE_ENV_DU_SERVEUR.txt
 En bref : 5 informations à coller dans /opt/office-manager/.env (clé Claude, clé ChatGPT, ID et code secret du client
@@ -94,7 +117,7 @@ Coût : ces modèles coûtent plus cher par demande que les modèles courants ; 
 (par exemple 1000) évite qu'une boucle coûte cher.
 
 -----------------------------------------------------------------------------------------------------------------
-00000. [ ] PASSER SUR VOTRE PROPRE SERVEUR (VPS), SANS VERCEL NI SUPABASE                            (4 novembre 2026)
+00000. [x] PASSER SUR VOTRE PROPRE SERVEUR (VPS), SANS VERCEL NI SUPABASE                            (4 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Pourquoi : vous avez demandé de tout faire depuis votre serveur. Le code est prêt (branche feature/white-label-desktop) :
 la base PostgreSQL, l'application, le HTTPS et les sauvegardes tournent sur un seul serveur ; les comptes sont repris
