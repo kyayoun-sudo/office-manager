@@ -59,6 +59,15 @@
     try { window.localStorage.setItem(storageKey, compact ? '1' : '0'); } catch (_) {}
     nav.querySelectorAll('a[href]').forEach(function (a) {
       if (!a.title) a.title = a.getAttribute('aria-label') || a.textContent.trim();
+      // Legacy/additive links (e.g. Mes dossiers) may have no SVG icon.
+      // Give them a readable compact marker instead of hiding the link.
+      if (!a.querySelector('svg, .om-rail-fallback')) {
+        var marker = document.createElement('span');
+        marker.className = 'om-rail-fallback';
+        marker.textContent = (a.textContent.trim().charAt(0) || '•').toLocaleUpperCase();
+        marker.setAttribute('aria-hidden', 'true');
+        a.insertBefore(marker, a.firstChild);
+      }
     });
   }
   setCompact(compact);
