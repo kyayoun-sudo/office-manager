@@ -106,7 +106,7 @@ test("persistent steps run actual supplied model, isolate tools, retain correcti
   const owner = { role: "owner", email: "owner@example.com" };
   await assert.rejects(
     sandboxAction("org", { role: "auditor" }, { action: "sandbox-create" }, d),
-    /PARTNERS_ONLY/,
+    /TRAINING_ADMIN_ONLY/,
   );
   await sandboxAction("org", owner, { action: "sandbox-create" }, d);
   const result = await sandboxAction(
@@ -183,7 +183,7 @@ test("model sees no answer key; completed WP retains proposals and campaign does
       };
     },
   };
-  const account = { role: "partner", email: "p@example.com" };
+  const account = { role: "it_admin", email: "it@example.com" };
   await sandboxAction("firm-a", account, { action: "sandbox-create" }, d);
   const r = await sandboxAction(
     "firm-a",

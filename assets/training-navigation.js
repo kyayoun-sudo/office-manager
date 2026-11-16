@@ -1,5 +1,7 @@
 (function () {
   'use strict';
+  var OM = window.OfficeManager;
+  if (!OM || ['owner', 'it_admin'].indexOf(OM.getRole()) < 0) return;
   var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-training-view]'));
   var views = ['cabinet', 'specialized', 'shadow'];
   function show(view) {
