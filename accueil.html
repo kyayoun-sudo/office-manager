@@ -8,8 +8,11 @@
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
 <link rel="stylesheet" href="/assets/workspace.css">
-<link rel="stylesheet" href="/assets/personal-mail.css"></head>
-<body>
+<link rel="stylesheet" href="/assets/personal-mail.css">
+<link rel="stylesheet" href="/assets/ui.css">
+<script defer src="/assets/ui-workspace.js"></script>
+</head>
+<body class="om-design">
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
@@ -254,6 +257,17 @@
         var b = UI.el('button', null, 'kpi kpi-tile tone-' + (k.tone || 'neutral'));
         b.type = 'button';
         b.appendChild(UI.el('span', k.label));
+        var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '2');
+        icon.setAttribute('stroke-linecap', 'round');
+        icon.setAttribute('aria-hidden', 'true');
+        var lines = document.createElementNS(icon.namespaceURI, 'path');
+        lines.setAttribute('d', 'M3 3v18h18M8 16v-3m5 3V8m5 8v-5');
+        icon.appendChild(lines);
+        b.appendChild(icon);
         b.appendChild(UI.el('strong', String(k.value)));
         if (k.detail) b.appendChild(UI.el('small', k.detail));
         b.setAttribute('aria-label', k.label + ' : ' + k.value + (k.detail ? ' (' + k.detail + ')' : '') + '. Voir le détail');
