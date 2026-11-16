@@ -14,3 +14,6 @@ work-*.mjs
 # Données réelles de cabinets / clients : jamais dans le dépôt (public)
 entrainement/
 Enqu*te*Finance Audit Conseil*
+
+# Modèle de design d'un autre projet (NalaCare) : source d'inspiration locale, jamais dans le dépôt (2026-11-16)
+template/
