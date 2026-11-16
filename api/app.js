@@ -195,16 +195,16 @@ export const ROUTES = Object.freeze({
   // « rangement automatique » switch.
   // One question about a real situation, for the Management Cards (managers answer).
   // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
-  // Shadow is seen by the partners and the IT administrator (Paul, 2026-10-11); the partners decide on
-  // lessons and experiments; code proposals may also be asked by the IT administrator.
+  // The owner and IT administrator both control the private AI laboratory.
+  // A mission quality check remains an owner-only operation on real client documents.
   shadow: {
     GET: users([...SHADOW_VIEWERS], async (orgId, req) => req.query?.firm === '1' ? (await import('../lib/firm-simulation-service.js')).firmView(orgId, { mode: req.query?.mode }) : req.query?.sandbox === '1' ? (await import('../lib/audit-sandbox.js')).sandboxView(orgId) : (await import('../lib/shadow.js')).labView()),
     POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
-      if (!['code', 'code-close'].includes(b.action) && !PARTNERS.includes(req.account?.role)) throw fail('PARTNERS_ONLY', 403);
+      if (b.action === 'quality-check' && req.account?.role !== 'owner') throw fail('CLIENT_MISSION_RESTRICTED', 403);
       if (String(b.action).startsWith('firm-')) return (await import('../lib/firm-simulation-service.js')).firmAction(orgId, req.account, b);
       if (String(b.action).startsWith('sandbox-')) return (await import('../lib/audit-sandbox.js')).sandboxAction(orgId, req.account, b);
-      // Keep what Shadow learnt when the firm is erased (2026-10-18): partners export / import its lessons and tests.
+      // Keep what Shadow learnt when the firm is erased: both training administrators can export/import.
       if (b.action === 'lab-export') return (await import('../lib/shadow-transfer.js')).exportLab(who(req) || 'associé');
       if (b.action === 'lab-import') return (await import('../lib/shadow-transfer.js')).importLab(orgId, b.file, who(req) || 'associé');
       if (b.action === 'run') return s.shadowPass(orgId, { force: true, req });
@@ -401,8 +401,8 @@ export const ROUTES = Object.freeze({
       if (a === 'tdr') return t.markTdr(orgId, b, req.account);
       if (a === 'submitted') return t.recordSubmission(orgId, b, req.account);
       if (a === 'result') return t.recordResult(orgId, req, b, req.account);
-      if (a === 'review-decide') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.decideLossReview(orgId, b, req.account); }
-      if (a === 'review-run') { if (!SHADOW_VIEWERS.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.reviewLoss(orgId, String(b.id || '')); }
+      if (a === 'review-decide') { if (!FIRM_LEAD.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.decideLossReview(orgId, b, req.account); }
+      if (a === 'review-run') { if (!FIRM_LEAD.includes(req.account?.role)) throw fail('ROLE_NOT_ALLOWED', 403); return t.reviewLoss(orgId, String(b.id || '')); }
       if (a === 'settings') return t.saveWatchSettings(orgId, b, req.account);
       throw fail('UNKNOWN_ACTION', 400);
     }),
@@ -565,11 +565,11 @@ export const ROUTES = Object.freeze({
     unavailable: 'COMPLETED_LEARNING_UNAVAILABLE'
   },
   training: {
-    GET: users(ALL_ROLES, (orgId, req) => getTraining(orgId, req)),
-    POST: owner((orgId, req) => trainingAction(orgId, req)),
+    GET: users([...SHADOW_VIEWERS], (orgId, req) => getTraining(orgId, req)),
+    POST: users([...SHADOW_VIEWERS], (orgId, req) => trainingAction(orgId, req)),
     unavailable: 'TRAINING_UNAVAILABLE'
   },
-  'training-confirm': { POST: users(ALL_ROLES, (orgId, req) => confirmCase(orgId, req)), unavailable: 'TRAINING_UNAVAILABLE' },
+  'training-confirm': { POST: users([...SHADOW_VIEWERS], (orgId, req) => confirmCase(orgId, req)), unavailable: 'TRAINING_UNAVAILABLE' },
   'training-step': { POST: (orgId, req) => trainingStep(orgId, req), unavailable: 'TRAINING_UNAVAILABLE' },
   messages: {
     GET: users(MANAGERS, (orgId) => listMessages(orgId)),
