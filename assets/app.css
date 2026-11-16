@@ -252,10 +252,10 @@ table tbody tr:is(:focus-within,:has(input:checked),[aria-selected="true"]) > :f
 .om-nav-compact .nav{padding:16px 7px}
 .om-nav-compact .nav .brand{justify-content:center;padding:4px 0 15px}
 .om-nav-compact .nav .brand>div:not(.logo){display:none}
-.om-nav-compact .nav a[href]{font-size:0;justify-content:center;gap:0;padding:11px 3px;min-height:40px}
-.om-nav-compact .nav a[href] svg{width:21px;height:21px;flex:none}
+.om-nav-compact .nav > a[href]{font-size:0;justify-content:center;gap:0;padding:11px 3px;min-height:40px}
+.om-nav-compact .nav > a[href] svg{width:21px;height:21px;flex:none}
 .om-nav-compact .nav .badge{font-size:10px;position:absolute;right:2px;top:2px}
-.om-nav-compact .nav a[href]{position:relative}
+.om-nav-compact .nav > a[href]{position:relative}
 .om-nav-compact .nav .who{padding:12px 0 4px}
 .om-nav-compact .nav .who .me{justify-content:center;gap:0}
 .om-nav-compact .nav .who .me [data-user-name],.om-nav-compact .nav .who .avatar{display:none}
@@ -265,7 +265,7 @@ table tbody tr:is(:focus-within,:has(input:checked),[aria-selected="true"]) > :f
   .om-nav-compact .nav{padding:10px 12px}
   .om-nav-compact .nav .brand{justify-content:flex-start;padding:0}
   .om-nav-compact .nav .brand>div:not(.logo){display:block}
-  .om-nav-compact .nav.open a[href]{font-size:14px;justify-content:flex-start;gap:11px;padding:9px 10px}
+  .om-nav-compact .nav.open > a[href]{font-size:14px;justify-content:flex-start;gap:11px;padding:9px 10px}
   .om-nav-compact .nav .who{padding:12px 8px 4px}
   .om-nav-compact .nav .who .me [data-user-name],.om-nav-compact .nav .who .avatar{display:flex}
   .om-nav-compact .gear-menu{position:static;width:100%}
