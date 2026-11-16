@@ -94,7 +94,7 @@ test('sync uses mailbox-specific credentials and persists only scoped messages',
   const db = async (path, opts = {}) => {
     if (path.startsWith('office_email_accounts?') && path.includes('select=*')) return [mailbox];
     if (path.startsWith('office_personal_mail_items?') && !opts.method) return [];
-    if (path === 'office_personal_mail_items') { recorded.push(...JSON.parse(opts.body)); return []; }
+    if (path.startsWith('office_personal_mail_items?on_conflict=')) { recorded.push(...JSON.parse(opts.body)); return []; }
     if (opts.method === 'PATCH') return [];
     throw new Error('Unexpected DB path: ' + path);
   };
