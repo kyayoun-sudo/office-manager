@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 // base.sql first (the firm, missions, people, « À valider », inventory: 2026-10-11, any firm can start from an empty
 // Supabase); then the parts that extend it. purge.sql last (it lists every table of the firm).
-export const INSTALL_PARTS = ['base.sql', 'org-branding.sql', 'action-decisions.sql', 'agent-persona.sql', 'app-users.sql',
+export const INSTALL_PARTS = ['base.sql', 'org-branding.sql', 'action-decisions.sql', 'agent-persona.sql', 'app-users.sql', 'personal-mail.sql',
   'tidy.sql', 'agent-schedule.sql', 'access-log.sql', 'training.sql', 'agent-messages.sql', 'agent-messages-client.sql', 'test-run.sql', 'google-connection.sql', 'roles.sql', 'personal-ai.sql',
   'memory.sql', 'live-collaboration.sql', 'inspection-reader-leases.sql', 'mission-plans.sql', 'workfiles.sql', 'people-intelligence.sql', 'work-programme.sql', 'procedure-work.sql', 'mission-quick.sql', 'mission-functions.sql', 'firm-workflow.sql', 'pbc-requests.sql', 'mission-shared-memory.sql', 'cabinet-onboarding.sql', 'ai-usage.sql', 'purge.sql'];
 

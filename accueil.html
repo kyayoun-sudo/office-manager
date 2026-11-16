@@ -7,7 +7,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
-<link rel="stylesheet" href="/assets/workspace.css"></head>
+<link rel="stylesheet" href="/assets/workspace.css">
+<link rel="stylesheet" href="/assets/personal-mail.css"></head>
 <body>
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
@@ -75,6 +76,11 @@
       <div id="mywork-actions" class="stack"><p class="empty">Chargement…</p></div>
     </section>
 
+    <section class="card" id="personal-mail-card" aria-label="Ma messagerie privée" hidden>
+      <h2>Ma messagerie</h2>
+      <p class="meta">Connectez votre propre boîte mail pour consulter vos messages.</p>
+    </section>
+
     <a class="callout" id="setup" href="/mise-en-service.html" hidden>
       <span class="callout-label">Mise en service</span>
       <span class="callout-num" id="setup-num"></span>
@@ -101,7 +107,7 @@
     </section>
 
     <section class="card" id="mails" aria-labelledby="h-mails" hidden>
-      <div class="card-head"><h2 id="h-mails">E-mails qui demandent une action</h2><button class="btn ghost" id="mails-refresh" type="button">Relire la boîte</button></div>
+      <div class="card-head"><h2 id="h-mails">Boîte partagée du cabinet — e-mails qui demandent une action</h2><button class="btn ghost" id="mails-refresh" type="button">Relire la boîte</button></div>
       <p class="status" id="mails-status" role="status" aria-live="polite"></p>
       <div id="mails-list" class="stack"></div>
     </section>
@@ -515,5 +521,6 @@
   UI.requireLogin(start);
 })();
 </script>
-<script src="/assets/role-workspace.js"></script></body>
+<script src="/assets/role-workspace.js"></script>
+<script src="/assets/personal-mail.js"></script></body>
 </html>
