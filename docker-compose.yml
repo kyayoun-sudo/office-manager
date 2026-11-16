@@ -37,6 +37,26 @@ services:
       db:
         condition: service_healthy
 
+  # ---- Local tools, optional (profile « outils-locaux », 2026-11-16) ------------------------------------------------
+  # Started only with COMPOSE_PROFILES=outils-locaux in .env. Reached by app on the internal Docker network, never
+  # published on the Internet. The application uses them only with EYNOWA_TOOL_GATEWAY_ENABLED=true and their address
+  # given explicitly (OLLAMA_BASE_URL=http://ollama:11434, DOCTR_BASE_URL=http://doctr:8080) — see .env.example.
+  ollama:
+    # Open-source AI on the server: support for short text tasks only (never files, never audit judgement).
+    image: ollama/ollama:0.40.13
+    restart: unless-stopped
+    profiles: ["outils-locaux"]
+    environment:
+      OLLAMA_KEEP_ALIVE: "24h"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  doctr:
+    # OCR of scanned PDF pages on the server (lib/docker-document-ocr.js); an uncertain page goes back to the AI.
+    build: ./docker/doctr
+    restart: unless-stopped
+    profiles: ["outils-locaux"]
+
   caddy:
     image: caddy:2
     restart: unless-stopped
@@ -75,6 +95,7 @@ services:
         condition: service_healthy
 
 volumes:
+  ollama_models:
   pgdata:
   caddy_data:
   caddy_config:

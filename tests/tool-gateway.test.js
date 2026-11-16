@@ -10,7 +10,7 @@ afterEach(() => {
 });
 function setup() {
   for (const key of Object.keys(process.env)) {
-    if (/^(CHROMA_|MEILISEARCH_|N8N_|VERCEL$|EYNOWA_TOOL_GATEWAY_ENABLED$)/.test(key)) delete process.env[key];
+    if (/^(CHROMA_|MEILISEARCH_|N8N_|VERCEL$|DATABASE_URL$|EYNOWA_TOOL_GATEWAY_ENABLED$)/.test(key)) delete process.env[key];
   }
   process.env.EYNOWA_TOOL_GATEWAY_ENABLED = 'true';
   const calls = [];
@@ -81,6 +81,18 @@ test('Vercel requires explicit URLs for new services', async () => {
   process.env.N8N_BASE_URL = 'https://remote.example';
   await gateway.workflowRun({ webhookPath: 'a' });
   assert.equal(calls.length, 1);
+});
+test('the firm own server (DATABASE_URL) never guesses localhost: port 3000 is Office Manager itself', async () => {
+  const calls = setup();
+  process.env.DATABASE_URL = 'postgres://office_manager@db:5432/office_manager';
+  const config = gateway.toolGatewayConfig();
+  for (const name of ['ollama', 'doctr', 'gotenberg', 'chroma', 'meilisearch', 'n8n']) assert.equal(config[name], null, name);
+  await assert.rejects(gateway.convertOfficeToPdf({ bytes: Buffer.from('x'), filename: 'a.docx' }), { code: 'EYNOWA_TOOL_NOT_CONFIGURED' });
+  assert.equal(calls.length, 0);
+  process.env.DOCTR_BASE_URL = 'http://doctr:8080/';
+  process.env.OLLAMA_BASE_URL = 'http://ollama:11434';
+  assert.equal(gateway.toolGatewayConfig().doctr, 'http://doctr:8080');
+  assert.equal(gateway.toolGatewayConfig().ollama, 'http://ollama:11434');
 });
 test('validation rejects invalid vectors, records and unsafe webhook paths', async () => {
   const calls = setup();
