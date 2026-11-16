@@ -290,6 +290,8 @@
     if (!OM.isManager()) return;
     $('mails').hidden = false;
     OM.api('/api/app?route=mail-triage').then(function (d) {
+      // The connected mailbox belongs to one person: everybody else reads their own in « Ma messagerie ».
+      if (d.private) { $('mails').hidden = true; return; }
       var box = $('mails-list'); box.textContent = '';
       $('mails-status').textContent = d.updated_at ? 'Boîte lue le ' + UI.dateTime(d.updated_at) + ' · ' + d.total + ' e-mail(s) à traiter.' : 'La boîte n\'a pas encore été lue. Cliquez sur « Relire la boîte » (la boîte Gmail du cabinet doit être autorisée dans Paramètres).';
       (d.items || []).forEach(function (m) { box.appendChild(mailCard(m)); });

@@ -59,7 +59,7 @@ import { workState, eveningPoint, eveningStep, startWpReview, wpStep, updateRevi
 import { managementCard, refreshCard, addObservation, recommendTeam, lastRecommendation, retainPerson } from '../lib/people-cards.js';
 import { addContacts, decideContact, addFact } from '../lib/mission-data.js';
 import { suggest as writeSuggest, draft as writeDraft, submit as writeSubmit } from '../lib/mission-write.js';
-import { triageInbox, importantMails, draftReply, sendReply, markMailDone } from '../lib/mail-triage.js';
+import { triageInbox, importantMails, draftReply, sendReply, markMailDone, ownsFirmMailbox } from '../lib/mail-triage.js';
 
 // Single endpoint for the new screens, to stay within Vercel's function limit.
 //   GET  /api/app?route=branding                   firm name, colour, logo (everyone)
@@ -861,7 +861,8 @@ export const ROUTES = Object.freeze({
   // Home cockpit (2026-10-08): the system's KPI, each with what / how / sources / elements.
   cockpit: {
     GET: users(ALL_ROLES, async (orgId, req) => {
-      const c = await cockpit(orgId);
+      // The connected mailbox's messages only for the person whose mailbox it is (2026-11-16, ownsFirmMailbox).
+      const c = await cockpit(orgId, { includeMails: ownsFirmMailbox(req.account) });
       // Collaborators: the firm's work, not the people indicators nor the firm's mailbox.
       if (!MANAGERS.includes(req.account?.role)) c.kpis = c.kpis.filter(k => !['capacity', 'conflicts', 'quality', 'mails', 'ethics', 'training'].includes(k.key));
       return c;
@@ -1065,9 +1066,11 @@ export const ROUTES = Object.freeze({
     unavailable: 'PBC_UNAVAILABLE'
   },
   // Important e-mails of the firm's authorised mailbox: list, refresh, AI reply, send / propose.
+  // Private to the owner of the connected mailbox (2026-11-16): another manager or partner gets nothing of it.
   'mail-triage': {
-    GET: users(MANAGERS, () => importantMails()),
+    GET: users(MANAGERS, (orgId, req) => ownsFirmMailbox(req.account) ? importantMails() : { items: [], total: 0, private: true }),
     POST: users(MANAGERS, (orgId, req) => {
+      if (!ownsFirmMailbox(req.account)) throw fail('MAILBOX_PRIVATE', 403);
       const b = req.body || {};
       if (b.action === 'refresh') return triageInbox(orgId);
       if (b.action === 'draft') return draftReply(orgId, String(b.id || ''), String(b.instruction || ''), req.account);
