@@ -182,22 +182,45 @@
   function renderList() {
     var list = document.getElementById('personal-mail-list'); if (!list) return;
     list.textContent = '';
-    if (!state.items.length) { list.appendChild(el('p', 'Aucun message à afficher. Synchronisez votre boîte si nécessaire.', 'empty')); return; }
-    state.items.forEach(function (m) {
-      var item = el('div', null, 'item pm-item');
-      var info = el('div', null, 't');
-      info.appendChild(el('strong', m.subject || '(sans objet)'));
-      info.appendChild(el('span', [m.sender, UI.dateTime(m.received_at), m.unread ? 'Non lu' : ''].filter(Boolean).join(' · '), 'meta'));
-      info.appendChild(el('p', m.summary || m.snippet || '', 'pm-snippet'));
-      if (m.suggested_action) info.appendChild(el('p', 'Proposition IA : ' + m.suggested_action, 'meta'));
-      item.appendChild(info);
-      var row = el('div', null, 'pm-toolbar');
-      row.appendChild(button('Ouvrir', function () { return openMessage(m); }, true));
-      if (state.tab === 'suggestions') row.appendChild(button('Traité', function () {
-        return api('done', { mailbox_id: state.box.id, message_id: m.id }).then(function () { return loadMessages(false); });
-      }, true));
-      item.appendChild(row); list.appendChild(item);
-    });
+    var tools = el('div', null, 'pm-toolbar');
+    var search = document.createElement('input'); search.type = 'search';
+    search.placeholder = 'Rechercher un expéditeur ou un objet';
+    search.setAttribute('aria-label', 'Rechercher dans les messages synchronisés');
+    search.style.minWidth = '210px';
+    tools.appendChild(search);
+    var unreadLabel = el('label', 'Non lus uniquement', 'pm-switch');
+    var unread = document.createElement('input'); unread.type = 'checkbox';
+    unreadLabel.insertBefore(unread, unreadLabel.firstChild);
+    tools.appendChild(unreadLabel);
+    list.appendChild(tools);
+    var results = el('div', null, 'pm-list'); list.appendChild(results);
+    function fill() {
+      results.textContent = '';
+      var needle = search.value.trim().toLowerCase();
+      var messages = state.items.filter(function (m) {
+        if (unread.checked && !m.unread) return false;
+        return !needle || [m.subject, m.sender, m.recipient, m.snippet, m.summary].join(' ').toLowerCase().includes(needle);
+      });
+      if (!messages.length) { results.appendChild(el('p', 'Aucun message correspondant parmi les messages synchronisés.', 'empty')); return; }
+      messages.forEach(function (m) {
+        var item = el('div', null, 'item pm-item');
+        var info = el('div', null, 't');
+        info.appendChild(el('strong', m.subject || '(sans objet)'));
+        info.appendChild(el('span', [m.sender, UI.dateTime(m.received_at), m.unread ? 'Non lu' : ''].filter(Boolean).join(' · '), 'meta'));
+        info.appendChild(el('p', m.summary || m.snippet || '', 'pm-snippet'));
+        if (m.suggested_action) info.appendChild(el('p', 'Proposition IA : ' + m.suggested_action, 'meta'));
+        item.appendChild(info);
+        var row = el('div', null, 'pm-toolbar');
+        row.appendChild(button('Ouvrir', function () { return openMessage(m); }, true));
+        if (state.tab === 'suggestions') row.appendChild(button('Traité', function () {
+          return api('done', { mailbox_id: state.box.id, message_id: m.id }).then(function () { return loadMessages(false); });
+        }, true));
+        item.appendChild(row); results.appendChild(item);
+      });
+    }
+    search.addEventListener('input', fill);
+    unread.addEventListener('change', fill);
+    fill();
   }
   function downloadAttachment(messageId, att) {
     return api('attachment', { mailbox_id: state.box.id, id: messageId, attachment_id: att.id }, true).then(function (r) {
