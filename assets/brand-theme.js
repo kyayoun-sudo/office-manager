@@ -270,11 +270,17 @@
   // ---- Settings wheel at the bottom of the menu (Paul, 2026-10-07: « une roue en bas où il y a
   // Se déconnecter, Paramètres avec les rubriques »): the setup and settings sections (owner), the
   // language, closing one's own account, logging out. ----
+  // A small settings wheel: full organisation is on the dedicated settings hub.
   var SETTINGS = [
-    ['Mise en service', '/mise-en-service.html', [['h-sum', 'État'], ['h-steps', 'Les étapes'], ['h-map', 'Cartographie du Drive'], ['h-know', 'Ce que l’Orpailleur a compris']]],
-    ['Paramètres', '/parametres.html', [['h-google', 'Accès Google (Drive et Gmail)'], ['h-id', 'Identité'], ['h-logo', 'Logo'], ['h-col', 'Couleur principale'], ['h-mail', 'E-mail de l’agent'],
-      ['h-tone', 'Ton avec les collègues'], ['h-people', 'Gestion des personnes'], ['h-sched', 'Horaires des agents'], ['h-users', 'Comptes du cabinet'], ['h-try', 'Essayer']],
-    ['Panneau Excel', '/excel/install.html', []]]
+    ['Paramètres du cabinet', '/parametres.html', [
+      ['settings-team', 'Équipe et accès'],
+      ['settings-identity', 'Identité du cabinet'],
+      ['settings-connections', 'Connexions'],
+      ['settings-agents', 'Agents et automatisations'],
+      ['settings-advanced', 'Administration avancée']
+    ]],
+    ['Mise en service', '/mise-en-service.html', []],
+    ['Panneau Excel', '/excel/install.html', []]
   ];
   function svgIcon(d) {
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -723,7 +729,7 @@
     '/preparation.html': ['owner', 'partner', 'manager', 'supervisor'],
     '/auditeur.html': ['owner', 'partner', 'quality_reviewer', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'collaborator'],
     '/pilotage.html': ['owner', 'partner', 'quality_reviewer'],
-    '/entrainement.html': ['owner', 'partner', 'it_admin'],
+    '/entrainement.html': ['owner', 'it_admin'],
     '/veille.html': ['owner', 'partner', 'bdm'],
     '/mise-en-service.html': ['owner', 'partner', 'it_admin'], '/parametres.html': ['owner', 'partner', 'it_admin']
   };
@@ -781,7 +787,7 @@
   // A page with many sections shows them as tabs instead of one long scroll.
   function autoTabs() {
     var main = document.querySelector('.main');
-    if (!main || main.dataset.tabs || main.hasAttribute('data-no-tabs')) return;
+    if (!main || main.dataset.tabs || main.hasAttribute('data-no-tabs') || location.pathname === '/parametres.html') return;
     var groups = new Map();
     main.querySelectorAll('section.card').forEach(function (sec) {
       if (sec.id === 'login' || !sec.querySelector('h2')) return;
@@ -902,7 +908,10 @@
   if (!onLoginPage() && !inExcel()) {
     if (!readSession()) { OM.forget(true); return; }
     if (readSession().needs_cabinet) { location.replace(CABINETS_PAGE); return; }
-    var ready = function () { decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession(); };
+    var ready = function () {
+      decorateShell(); autoTabs(); addLogout(); OM.paintUser(); OM.checkSession();
+      var ui = document.createElement('script'); ui.src = '/assets/workspace-navigation.js'; document.head.appendChild(ui);
+    };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
   }
   function startIndependenceReview() { if (onLoginPage() || inExcel() || !OM.hasPersonalSession()) return; var script = document.createElement('script'); script.src = '/assets/independence-review.js'; document.head.appendChild(script); }
