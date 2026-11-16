@@ -1,9 +1,10 @@
 {
   "name": "office-manager-desktop",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "icons": "tauri icon ./logo-cabinet.png",
+    "tauri": "tauri",
+    "icons": "tauri icon ./app-icon.svg -o src-tauri/icons",
     "dev": "tauri dev",
     "build": "tauri build"
   },

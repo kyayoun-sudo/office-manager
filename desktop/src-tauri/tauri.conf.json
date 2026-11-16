@@ -1,21 +1,24 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Office Manager",
-  "version": "0.1.0",
-  "identifier": "ai.officemanager.desktop",
+  "version": "1.0.0",
+  "identifier": "com.eynowa.officemanager",
   "build": {
-    "frontendDist": "https://REMPLACER-PAR-L-ADRESSE-VERCEL.vercel.app"
+    "frontendDist": "../offline"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Office Manager",
-        "url": "/accueil.html",
-        "width": 1280,
-        "height": 840,
+        "url": "index.html",
+        "width": 1366,
+        "height": 860,
         "minWidth": 900,
         "minHeight": 600,
-        "resizable": true
+        "resizable": true,
+        "center": true,
+        "create": false
       }
     ],
     "security": {
@@ -24,13 +27,43 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "dmg",
+      "app"
+    ],
+    "createUpdaterArtifacts": true,
+    "publisher": "EYNOWA",
+    "copyright": "© EYNOWA",
+    "category": "Business",
+    "shortDescription": "Office Manager — le bureau du cabinet",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "French",
+          "English"
+        ],
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5QzU2QTAxOUM1QUZEMTAKUldRUS9WcWNBV3JGV2NCVTZGeExxMm9KejJiSURINzcxYWhuaDBqWTh2QVBJWWZJMmlwcTBuZnQK",
+      "endpoints": [
+        "https://github.com/kyayoun-sudo/office-manager/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

@@ -1,0 +1,94 @@
+name: Application de bureau (Windows et Mac)
+
+# Builds the installers of the desktop app and publishes them as a GitHub release, with latest.json for the
+# automatic updates (each installed app checks it at start). Started by a tag « desktop-v1.2.3 » or by hand.
+#   git tag desktop-v1.0.0 && git push origin desktop-v1.0.0
+# The version in desktop/src-tauri/tauri.conf.json is set from the tag. Secrets: TAURI_SIGNING_PRIVATE_KEY
+# (signs the updates). Optional, later: WINDOWS_CERTIFICATE… / APPLE_… for the publisher's code signature.
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (ex. 1.0.1)'
+        required: true
+      server_url:
+        description: 'Adresse du serveur du cabinet'
+        required: false
+        default: 'https://office.eynowa.com'
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: '--bundles nsis'
+          - platform: macos-latest
+            args: '--target universal-apple-darwin --bundles app,dmg'
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version and server address
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_SERVER: ${{ inputs.server_url }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#desktop-v}}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version invalide : $VERSION"; exit 1; }
+          SERVER="${INPUT_SERVER:-https://office.eynowa.com}"
+          [[ "$SERVER" =~ ^https://[a-z0-9.-]+$ ]] || { echo "Adresse invalide : $SERVER"; exit 1; }
+          node -e 'const f="desktop/src-tauri/tauri.conf.json",fs=require("fs");const c=JSON.parse(fs.readFileSync(f,"utf8"));c.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(c,null,2))' "$VERSION"
+          sed -i.bak "s|var SERVER = 'https://office.eynowa.com';|var SERVER = '$SERVER';|" desktop/offline/index.html
+          grep -q "var SERVER = '$SERVER';" desktop/offline/index.html
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # The only host the app window shows itself (desktop/src-tauri/src/main.rs, read when compiling).
+          echo "OM_SERVER_HOST=${SERVER#https://}" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable, 2026-11-16
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Tauri command-line tool
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: desktop
+          tagName: desktop-v${{ env.VERSION }}
+          releaseName: 'Office Manager ${{ env.VERSION }} (application de bureau)'
+          releaseBody: |
+            Application de bureau d'Office Manager.
+            - Windows : téléchargez le fichier se terminant par « _x64-setup.exe », puis ouvrez-le.
+            - Mac : téléchargez le fichier « .dmg », ouvrez-le et glissez Office Manager dans Applications.
+            Une application déjà installée se met à jour toute seule au démarrage.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
