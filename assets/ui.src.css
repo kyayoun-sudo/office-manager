@@ -206,3 +206,27 @@
   --brand-ink: var(--om-brand-link, var(--foreground));
   color-scheme: inherit;
 }
+
+.om-design .om-piece-preview {
+  width: min(72rem, calc(100% - 2rem));
+  max-width: none;
+  height: min(52rem, calc(100dvh - 2rem));
+  max-height: none;
+  padding: 1rem;
+}
+.om-design .om-piece-preview-head,
+.om-design .om-piece-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.om-design .om-piece-preview-head { justify-content: space-between; }
+.om-design .om-piece-preview-head h2 { overflow-wrap: anywhere; }
+.om-design .om-piece-preview iframe {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
