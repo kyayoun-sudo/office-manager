@@ -292,3 +292,54 @@ table tbody tr:is(:focus-within,:has(input:checked),[aria-selected="true"]) > :f
 @media(max-width:860px){.om-settings-groups{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.om-settings-hub{padding:12px}.om-settings-group{padding:9px 11px}}
 
 .nav .om-rail-fallback{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:6px;background:var(--surface-2);color:var(--brand-ink);font-size:12px;font-weight:800;flex:none}
+
+/* UI consistency (Windows / Edge / Chrome): typographic baseline and safe form widths.
+   Do not globally change button display: charts, tabs and specialist editors use
+   different button layouts. Rich audit text preserves its own line-height. */
+html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body {
+  font-family:"Schibsted Grotesk",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.5;
+}
+button,input,select,textarea { font-family:inherit; }
+:is(p,li,dt,dd,label,.hint,.small,.status,.callout-text) { line-height:1.5; }
+h1 { line-height:1.2; }
+h2,h3 { line-height:1.3; }
+.nav > a[href] { min-height:40px; line-height:1.35; align-items:center; }
+.nav .brand,.nav .who .me { align-items:center; }
+.nav .brand :is(span,small),.nav .who [data-user-name] { line-height:1.35; }
+:is(.btn,.chip,.tabs button,.om-toolbar-btn,.om-settings-group,.nav-toggle,.notification-tools .bell) {
+  line-height:1.35;
+}
+:is(input[type="text"],input[type="password"],input[type="search"],input[type="email"],
+    input[type="time"],input[type="number"],input[type="url"],select,textarea) {
+  min-width:0;
+  max-width:100%;
+  line-height:1.4;
+  vertical-align:middle;
+}
+textarea { line-height:1.5; }
+/* Flex children otherwise keep their intrinsic minimum width and push text/forms
+   beyond the right edge, especially after the new full-width workspace layout. */
+.main,.main > *,.main .card,.main .card > *,.main .field,.main form {
+  min-width:0;
+}
+.main .card :is(p,a,.hint,.small,label) { overflow-wrap:anywhere; }
+/* This legacy form contains direct labels + select + input + submit button.
+   Without an explicit layout its width:100% controls become inline overflows. */
+#workflow-reference-form {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:8px;
+  width:100%;
+  max-width:100%;
+  align-items:start;
+}
+#workflow-reference-form :is(input,select) {
+  display:block;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+}
+#workflow-reference-form button { justify-self:start; }
