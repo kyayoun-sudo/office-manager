@@ -100,8 +100,15 @@
       <div id="cockpit" class="kpis cockpit-grid"><p class="empty">Chargement…</p></div>
     </section>
 
+    <section class="card" id="mes-mails" aria-labelledby="h-my-mails" hidden>
+      <div class="card-head"><h2 id="h-my-mails">Mes e-mails</h2><span class="meta" id="my-mails-at"></span></div>
+      <p class="status" id="my-mails-status" role="status" aria-live="polite"></p>
+      <div id="my-mails-tools" class="row"></div>
+      <div id="my-mails-list" class="stack"></div>
+    </section>
+
     <section class="card" id="mails" aria-labelledby="h-mails" hidden>
-      <div class="card-head"><h2 id="h-mails">E-mails qui demandent une action</h2><button class="btn ghost" id="mails-refresh" type="button">Relire la boîte</button></div>
+      <div class="card-head"><h2 id="h-mails">E-mails du cabinet qui demandent une action</h2><button class="btn ghost" id="mails-refresh" type="button">Relire la boîte</button></div>
       <p class="status" id="mails-status" role="status" aria-live="polite"></p>
       <div id="mails-list" class="stack"></div>
     </section>
@@ -515,5 +522,6 @@
   UI.requireLogin(start);
 })();
 </script>
+<script src="/assets/my-mail.js"></script>
 <script src="/assets/role-workspace.js"></script></body>
 </html>

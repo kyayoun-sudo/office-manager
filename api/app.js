@@ -762,6 +762,21 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'MY_AI_UNAVAILABLE'
   },
+  // Each person's OWN mailbox (2026-11-16, lib/personal-mail.js): every role, only the signed-in person's mailbox.
+  'my-mail': {
+    GET: users([...ALL_ROLES], async (orgId, req) => (await import('../lib/personal-mail.js')).myMailView(orgId, req.account)),
+    POST: users([...ALL_ROLES], async (orgId, req) => {
+      const p = await import('../lib/personal-mail.js'); const b = req.body || {};
+      if (b.action === 'connect') return p.connectMailbox(orgId, req);
+      if (b.action === 'refresh') return p.refreshMyMail(orgId, req.account);
+      if (b.action === 'draft') return p.draftMyReply(orgId, req.account, String(b.id || ''), String(b.instruction || ''));
+      if (b.action === 'send') return p.sendMyReply(orgId, req.account, { id: b.id, subject: b.subject, body: b.body });
+      if (b.action === 'done') return p.markMyMailDone(orgId, req.account, String(b.id || ''), b.how || 'traité');
+      if (b.action === 'unlink') return p.unlinkMailbox(orgId, req.account);
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'MY_MAIL_UNAVAILABLE'
+  },
   'personal-ai': {
     GET: users(PARTNERS, async (orgId) => (await import('../lib/personal-ai.js')).personalAIOverview(orgId)),
     POST: users(PARTNERS, async (orgId, req) => (await import('../lib/personal-ai.js')).setPersonalAIAllowed(orgId, Boolean(req.body?.allowed), who(req))),

@@ -8,6 +8,23 @@ Dernière mise à jour : 14 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+00006. [ ] CHACUN RELIE SA BOÎTE E-MAIL (« Mes e-mails » sur l'accueil)                              (16 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Chaque personne du cabinet, quel que soit son rôle, voit maintenant sur l'accueil une carte « Mes e-mails » :
+  1. « Relier ma boîte e-mail » → Google demande de choisir SA propre adresse (la même que pour se connecter à
+     Office Manager) et d'autoriser la lecture et l'envoi d'e-mails → Autoriser.
+  2. Ses e-mails des 7 derniers jours qui demandent une action s'affichent (résumé, mission, action suggérée).
+  3. « Répondre » → quelques mots → l'IA rédige → on corrige → « Envoyer depuis ma boîte » : la réponse part de SA
+     propre adresse, dans la même conversation Gmail (visible dans « Messages envoyés »).
+  4. « Délier ma boîte » retire l'accès à tout moment.
+Personne ne voit la boîte d'un autre (ni les associés, ni le propriétaire). La carte « E-mails du cabinet » (boîte
+reliée dans Paramètres) reste pour les responsables, comme avant.
+À vérifier une fois dans Google Cloud → Google Auth Platform → Audience :
+  - « Interne » : rien à faire (seules les adresses du domaine Google Workspace peuvent relier leur boîte).
+  - « Externe » et application non validée : Google affichera « Google n'a pas validé cette application » ; chacun
+    clique « Paramètres avancés → Accéder à … ». Limite de 100 personnes : suffisante pour le cabinet.
+
+-----------------------------------------------------------------------------------------------------------------
 00005. [ ] GOOGLE : AUTORISER LA NOUVELLE ADRESSE https://office.eynowa.com                        (16 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Le serveur répond sur https://office.eynowa.com (certificat HTTPS renouvelé tout seul). Pour que « Connecter Google » et
