@@ -380,6 +380,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       $('need-login').hidden = false;
       $('need-login').querySelector('.callout-text').textContent = 'Le laboratoire IA est réservé au propriétaire et au responsable informatique.';
       document.querySelector('.training-nav').hidden = true;
+      document.querySelector('a[href="/missions-terminees.html"]').hidden = true;
       document.querySelectorAll('.training-panel').forEach(function (p) { p.hidden = true; });
       return;
     }
@@ -399,6 +400,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
   // Shadow is fully administered by the owner and IT administrator.
   var itAdmin = OM && OM.getRole && OM.getRole() === 'it_admin';
   if (!OM || !['owner', 'it_admin'].includes(OM.getRole())) return;
+  if (itAdmin) document.querySelector('#sh-tabs [data-p="quality"]').hidden = true;
   $('shadow-card').hidden = false;
   var NAME = function (k) { return OM.agentName ? OM.agentName(k) : k; };
   var TYPE = { professional_rule: 'Règle professionnelle', firm_rule: 'Règle du cabinet', experience_lesson: 'Leçon d’expérience', hypothesis: 'Hypothèse' };
