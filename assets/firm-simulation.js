@@ -2,7 +2,7 @@
   'use strict';
   var OM = window.OfficeManager;
   var host = document.getElementById('firm-simulation-host');
-  if (!host || !OM || !OM.isOwner()) return;
+  if (!host || !OM || !['owner', 'it_admin'].includes(OM.getRole())) return;
   host.textContent = '';
   function el(tag, text, className) {
     var n = document.createElement(tag);
