@@ -57,7 +57,7 @@
     toggle.title = label;
     toggle.setAttribute('aria-label', label);
     try { window.localStorage.setItem(storageKey, compact ? '1' : '0'); } catch (_) {}
-    nav.querySelectorAll('a[href]').forEach(function (a) {
+    nav.querySelectorAll(':scope > a[href]').forEach(function (a) {
       if (!a.title) a.title = a.getAttribute('aria-label') || a.textContent.trim();
       // Legacy/additive links (e.g. Mes dossiers) may have no SVG icon.
       // Give them a readable compact marker instead of hiding the link.
