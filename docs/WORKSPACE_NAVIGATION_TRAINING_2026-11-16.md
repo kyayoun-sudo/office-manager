@@ -1,7 +1,7 @@
 # Navigation, paramètres et accès du laboratoire — 16 novembre 2026
 
 ## Objectif
-Conserver toutes les fonctions métier existantes, simplifier leur accès et réserver le laboratoire IA au propriétaire du cabinet et à son responsable informatique. Office Manager est un produit indépendant et multi-cabinet : ne jamais insérer de secrets ou de données client dans les fichiers du dépôt.
+Conserver toutes les fonctions métier existantes, simplifier leur accès et réserver le laboratoire IA au propriétaire, aux associés (décision de Paul, 16 novembre 2026) et au responsable informatique. Office Manager est un produit indépendant et multi-cabinet : ne jamais insérer de secrets ou de données client dans les fichiers du dépôt.
 
 ## Comportement de l’interface
 - Barre commune **Précédent / Actualiser / Suivant**, affichée sur les espaces authentifiés.
@@ -27,7 +27,7 @@ Conserver toutes les fonctions métier existantes, simplifier leur accès et ré
 
 **Important** : les autorisations de laboratoire ne donnent pas accès aux données de missions clients. Le rapport d'entraînement reste exploitable côté IT ; pour les cas réels, le contenu, les réponses, les justificatifs et les leçons détaillées ne sont pas retournés à ce rôle. Les anciens résultats du contrôle qualité de missions réelles sont masqués dans la vue Shadow de l'administrateur informatique.
 
-La route de veille commerciale continue d'utiliser les rôles des associés : le retrait des associés du laboratoire ne modifie pas leurs décisions commerciales.
+La route de veille commerciale continue d'utiliser les rôles des associés : les associés gardent l'accès au laboratoire et y décident des leçons.
 
 ## Actualisation et effets de bord
 La lecture de la campagne d'entraînement (`GET training`) est devenue purement consultative : elle ne déclenche plus de passage d'agent. L'avancement est exécuté au démarrage ou par `training-step`/le planificateur. Si la campagne n'avance plus, vérifier ces exécutions au lieu de mettre le rattrapage sur la route de lecture.
@@ -46,7 +46,7 @@ Examiner notamment `tests/workspace-ux-access.test.js`, `tests/training.test.js`
 2. Ouvrir Mission, Documents et Auditeur ; réduire le menu, utiliser Précédent/Actualiser/Suivant, vérifier la largeur et les icônes.
 3. Tester un formulaire modifié avant Actualiser : aucune saisie ne doit être perdue sans confirmation.
 4. Se connecter comme responsable informatique : créer un cabinet virtuel, contrôler une campagne fictive, importer/exporter un lab et approuver une leçon. Vérifier que les documents clients et les contrôles de mission réelle sont inaccessibles.
-5. Se connecter comme associé, manager puis auditeur : le laboratoire ne doit ni figurer dans le menu ni être accessible par URL/API ; l'apprentissage personnel demeure disponible.
+5. Se connecter comme manager puis auditeur : le laboratoire ne doit ni figurer dans le menu ni être accessible par URL/API ; l'apprentissage personnel demeure disponible.
 6. Vérifier les anciens liens directs `/parametres.html#h-google`, `#h-users`, `#h-tone` ainsi que les liens du menu de paramètres.
 7. Tester sur téléphone et sur un écran de largeur réduite, et sur une installation multitenant avec deux cabinets isolés.
 

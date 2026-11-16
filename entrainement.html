@@ -220,7 +220,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
   function render(d) {
     $('area').hidden = false;
     var c = d.campaign, r = d.report;
-    var owner = ['owner', 'it_admin'].indexOf(OM.getRole()) >= 0;
+    var owner = ['owner', 'partner', 'it_admin'].indexOf(OM.getRole()) >= 0;
     $('owner-card').hidden = !owner;
     var active = c && c.status === 'active';
     $('start-box').hidden = Boolean(active);
@@ -376,7 +376,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
   function start() {
     OM.loadBranding().catch(function () {});
     if (!OM.hasPersonalSession()) { $('need-login').hidden = false; return; }
-    if (['owner', 'it_admin'].indexOf(OM.getRole()) < 0) {
+    if (['owner', 'partner', 'it_admin'].indexOf(OM.getRole()) < 0) {
       $('need-login').hidden = false;
       $('need-login').querySelector('.callout-text').textContent = 'Le laboratoire IA est réservé au propriétaire et au responsable informatique.';
       document.querySelector('.training-nav').hidden = true;
@@ -397,9 +397,9 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 (function () {
   var OM = window.OfficeManager, UI = window.OMScreens, el = UI.el;
   var $ = function (id) { return document.getElementById(id); };
-  // Shadow is fully administered by the owner and IT administrator.
+  // Shadow is fully administered by the owner, the partners and the IT administrator (Paul, 2026-11-16).
   var itAdmin = OM && OM.getRole && OM.getRole() === 'it_admin';
-  if (!OM || !['owner', 'it_admin'].includes(OM.getRole())) return;
+  if (!OM || !['owner', 'partner', 'it_admin'].includes(OM.getRole())) return;
   if (itAdmin) document.querySelector('#sh-tabs [data-p="quality"]').hidden = true;
   $('shadow-card').hidden = false;
   var NAME = function (k) { return OM.agentName ? OM.agentName(k) : k; };

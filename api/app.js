@@ -196,12 +196,12 @@ export const ROUTES = Object.freeze({
   // One question about a real situation, for the Management Cards (managers answer).
   // Shadow, the learning lab (owner only), and its short questionnaire (everyone).
   // The owner and IT administrator both control the private AI laboratory.
-  // A mission quality check remains an owner-only operation on real client documents.
+  // A mission quality check (real client documents) stays with the owner and the partners, never IT.
   shadow: {
     GET: users([...SHADOW_VIEWERS], async (orgId, req) => req.query?.firm === '1' ? (await import('../lib/firm-simulation-service.js')).firmView(orgId, { mode: req.query?.mode }) : req.query?.sandbox === '1' ? (await import('../lib/audit-sandbox.js')).sandboxView(orgId) : (await import('../lib/shadow.js')).labView({ role: req.account?.role })),
     POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
-      if (b.action === 'quality-check' && req.account?.role !== 'owner') throw fail('CLIENT_MISSION_RESTRICTED', 403);
+      if (b.action === 'quality-check' && !PARTNERS.includes(req.account?.role)) throw fail('CLIENT_MISSION_RESTRICTED', 403);
       if (String(b.action).startsWith('firm-')) return (await import('../lib/firm-simulation-service.js')).firmAction(orgId, req.account, b);
       if (String(b.action).startsWith('sandbox-')) return (await import('../lib/audit-sandbox.js')).sandboxAction(orgId, req.account, b);
       // Keep what Shadow learnt when the firm is erased: both training administrators can export/import.

@@ -251,10 +251,10 @@ test('without the firm’s direct Google access, missions wait (no attempt burnt
   assert.ok(w.tables.office_training_cases.every(c => c.status === 'graded'), JSON.stringify(w.tables.office_training_cases.map(c => [c.status, c.error])));
 });
 
-test('routes and page: owner and IT pilot training; collaborators cannot read or confirm private lessons', () => {
-  assert.deepEqual(ROUTES.training.POST.userRoles, ['owner', 'it_admin']);
-  assert.deepEqual(ROUTES.training.GET.userRoles, ['owner', 'it_admin']);
-  assert.deepEqual(ROUTES['training-confirm'].POST.userRoles, ['owner', 'it_admin']);
+test('routes and page: owner, partners and IT pilot training (partners confirmed by Paul 2026-11-16); collaborators cannot read or confirm private lessons', () => {
+  assert.deepEqual(ROUTES.training.POST.userRoles, ['owner', 'partner', 'it_admin']);
+  assert.deepEqual(ROUTES.training.GET.userRoles, ['owner', 'partner', 'it_admin']);
+  assert.deepEqual(ROUTES['training-confirm'].POST.userRoles, ['owner', 'partner', 'it_admin']);
   assert.ok(!ROUTES['training-step'].POST.public, 'the background step still needs the access code');
   const html = readFileSync(new URL('../entrainement.html', import.meta.url), 'utf8');
   assert.ok(!/innerHTML/.test(html), 'no HTML injection');

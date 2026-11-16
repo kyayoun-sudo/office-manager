@@ -14,7 +14,7 @@ test('reference results persist per organisation and cannot contaminate AI campa
  await assert.rejects(firmAction('A',{role:'junior'},{action:'firm-create'},d),/TRAINING_ADMIN_ONLY/);
  const it = harness(); await firmAction('IT',{role:'it_admin',email:'it@simulation.invalid'},{action:'firm-create'},it);
  assert.ok((await firmView('IT',it)).campaign, 'IT can create a sandbox campaign');
- await assert.rejects(firmAction('IT',{role:'partner'},{action:'firm-start'},it),/TRAINING_ADMIN_ONLY/);
+ await assert.rejects(firmAction('IT',{role:'senior'},{action:'firm-start'},it),/TRAINING_ADMIN_ONLY/);
 });
 test('AI adapter gets existing root instructions, persists results, enforces separate call budget',async()=>{
  const d=harness();await firmAction('A',owner,{action:'firm-create',max_calls:1},d);await firmAction('A',owner,{action:'firm-start'},d);

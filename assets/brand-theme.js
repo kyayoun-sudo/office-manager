@@ -729,7 +729,7 @@
     '/preparation.html': ['owner', 'partner', 'manager', 'supervisor'],
     '/auditeur.html': ['owner', 'partner', 'quality_reviewer', 'bdm', 'manager', 'supervisor', 'senior', 'auditor', 'collaborator'],
     '/pilotage.html': ['owner', 'partner', 'quality_reviewer'],
-    '/entrainement.html': ['owner', 'it_admin'],
+    '/entrainement.html': ['owner', 'partner', 'it_admin'],
     '/veille.html': ['owner', 'partner', 'bdm'],
     '/mise-en-service.html': ['owner', 'partner', 'it_admin'], '/parametres.html': ['owner', 'partner', 'it_admin']
   };
