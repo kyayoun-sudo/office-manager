@@ -1195,7 +1195,7 @@ export const ROUTES = Object.freeze({
         const result = await runInFirm(state.org, () => m.completePersonalMail(req));
         return { __redirect: result.redirect };
       } catch (e) {
-        return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(String(e.message || 'PERSONAL_MAIL_OAUTH_FAILED').slice(0, 75)) };
+        return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(/^[A-Z][A-Z0-9_]{2,75}$/.test(String(e.message)) ? e.message : 'PERSONAL_MAIL_OAUTH_FAILED') };
       }
     }),
     unavailable: 'PERSONAL_MAIL_OAUTH_UNAVAILABLE'
@@ -1214,7 +1214,7 @@ export const ROUTES = Object.freeze({
           const result = await runInFirm(state.org, () => personal.completePersonalMail(req));
           return { __redirect: result.redirect };
         } catch (e) {
-          return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(String(e.message || 'PERSONAL_MAIL_OAUTH_FAILED').slice(0, 75)) };
+          return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(/^[A-Z][A-Z0-9_]{2,75}$/.test(String(e.message)) ? e.message : 'PERSONAL_MAIL_OAUTH_FAILED') };
         }
       }
       try { const to = (await import('../lib/google-connection.js')).relayTarget(req); if (to) return { __relay: to }; } catch (e) { console.error('[google-callback] relay refused:', String(e.message || e).slice(0, 80)); }
