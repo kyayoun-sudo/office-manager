@@ -131,3 +131,73 @@ test('reply draft cannot be redirected to an arbitrary external recipient', asyn
     { recipient: 'attacker@example.test', subject: 'Re', body: 'Hello', reply_to_id: MSG_A }, { db }),
   /PERSONAL_MAIL_REPLY_RECIPIENT_MISMATCH/);
 });
+
+
+test('AI consent applied after first sync classifies previously cached private messages', async () => {
+  const row = { ...mailbox, ai_enabled: true };
+  const patched = [];
+  let aiCalls = 0;
+  const db = async (path, opts = {}) => {
+    if (path.startsWith('office_email_accounts?') && path.includes('select=*')) return [row];
+    if (path.startsWith('office_personal_mail_items?') && !opts.method) return [
+      { id: MSG_A, provider_message_id: 'mail-A', folder: 'inbox', needs_action: null, unread: false, has_attachments: false }
+    ];
+    if (opts.method === 'PATCH') { patched.push({ path, data: JSON.parse(opts.body) }); return []; }
+    throw Error('unhandled DB ' + path);
+  };
+  const fetchImpl = async url => {
+    const u = String(url);
+    if (u.includes('oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: 'private-A' }));
+    if (u.includes('/messages?')) return new Response(JSON.stringify(u.includes('in%3Asent') ? { messages: [] } : { messages: [{ id: 'mail-A' }] }));
+    if (u.includes('/messages/mail-A')) return new Response(JSON.stringify({
+      id: 'mail-A', threadId: 'thread-A', internalDate: String(Date.now()), labelIds: ['INBOX','UNREAD'],
+      snippet: 'Le grand livre est demandé', payload: { headers: [
+        { name: 'From', value: 'Client <client@example.test>' }, { name: 'Subject', value: 'GL' }
+      ] }
+    }));
+    throw Error('unexpected provider ' + u);
+  };
+  const ai = async () => {
+    aiCalls++;
+    return { text: JSON.stringify({ items: [{ id: 'mail-A', needs_action: true, importance: 'haute', category: 'document',
+      summary: 'Grand livre demandé', suggested_action: 'Préparer le grand livre', deadline: '' }] }) };
+  };
+  const result = await syncPersonalMail(ORG_A, ACTOR_A, BOX_A, { db, env, fetchImpl, ai });
+  assert.equal(result.added, 0);
+  assert.equal(aiCalls, 1);
+  assert.ok(patched.some(p => p.path.includes('office_personal_mail_items?') && p.data.needs_action === true));
+  assert.ok(patched.every(p => p.path.includes('user_id=eq.' + USER_A)));
+});
+
+test('Gmail personal send uses the connected person only and requires atomic draft ownership', async () => {
+  const draft = { id: DRAFT_A, user_id: USER_A, mailbox_id: BOX_A, recipient: 'client@example.test', subject: 'Bonjour',
+    body: 'Voici mon message', reply_to_provider_id: null, status: 'draft' };
+  let draftStatus = 'draft';
+  const providerRequests = [];
+  const db = async (path, opts = {}) => {
+    if (path.startsWith('office_email_accounts?') && path.includes('select=*')) return [mailbox];
+    if (path.startsWith('office_personal_mail_drafts?') && !opts.method) return draftStatus === 'draft' ? [draft] : [];
+    if (path.startsWith('office_personal_mail_drafts?') && opts.method === 'PATCH') {
+      const next = JSON.parse(opts.body);
+      if (next.status === 'sending' && draftStatus === 'draft') { draftStatus = 'sending'; return [{ ...draft, status: 'sending' }]; }
+      if (next.status === 'sent') draftStatus = 'sent';
+      return [];
+    }
+    throw Error('unexpected ' + path);
+  };
+  const fetchImpl = async (url, options) => {
+    const u = String(url);
+    if (u.includes('oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: 'private-A' }));
+    if (u.includes('/messages/send')) { providerRequests.push(options); return new Response(JSON.stringify({ id: 'sent-A' })); }
+    throw Error('unexpected provider ' + u);
+  };
+  assert.deepEqual(await sendPersonalDraft(ORG_A, ACTOR_A, BOX_A, DRAFT_A, true, { db, env, fetchImpl }),
+    { sent: true, accepted_by_provider: true });
+  assert.equal(draftStatus, 'sent');
+  assert.equal(providerRequests.length, 1);
+  const raw = Buffer.from(JSON.parse(providerRequests[0].body).raw, 'base64url').toString();
+  assert.match(raw, /From: a@example.test/);
+  assert.match(raw, /To: client@example.test/);
+  await assert.rejects(sendPersonalDraft(ORG_A, ACTOR_A, BOX_A, DRAFT_A, true, { db, env, fetchImpl }), /PERSONAL_DRAFT_NOT_SENDABLE/);
+  assert.equal(providerRequests.length, 1);
+});
