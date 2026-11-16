@@ -305,7 +305,8 @@
     root.hidden = false;
     paint();
     if (qs('personal_mail') === 'connected') setStatus('Messagerie connectée. Votre compte est distinct de celui du cabinet.');
-    if (qs('personal_mail') === 'error') setStatus('Connexion impossible : ' + (qs('code') || 'autorisation refusée'), true);
+    var WHY = { PERSONAL_MAIL_NOT_YOURS: 'la boîte choisie chez Google ou Microsoft n’est pas votre adresse de connexion à Office Manager. Choisissez votre propre boîte.', PERSONAL_MAIL_CONSENT_REFUSED: 'vous avez refusé l’autorisation.', PERSONAL_MAIL_SCOPE_MISSING: 'il faut autoriser la lecture ET l’envoi d’e-mails.' };
+    if (qs('personal_mail') === 'error') setStatus('Connexion impossible : ' + (WHY[qs('code')] || qs('code') || 'autorisation refusée'), true);
     loadAccounts();
     setInterval(function () {
       if (!document.hidden && state.box && Date.now() - state.lastPoll > 10 * 60 * 1000) {

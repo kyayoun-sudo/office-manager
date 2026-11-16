@@ -59,7 +59,7 @@ test('OAuth callback verifies the still-active account and stores token encrypte
   const state = new URL(request.url).searchParams.get('state');
   const writes = [];
   const db = async (path, options = {}) => {
-    if (path.startsWith('office_app_users?')) return [{ auth_user_id: USER_A }];
+    if (path.startsWith('office_app_users?')) return [{ auth_user_id: USER_A, email: 'A@example.test' }];
     if (path.startsWith('office_email_accounts?on_conflict')) { writes.push(JSON.parse(options.body)[0]); return []; }
     throw new Error('unexpected ' + path);
   };
@@ -78,6 +78,17 @@ test('OAuth callback verifies the still-active account and stores token encrypte
   assert.equal(writes[0].user_id, USER_A);
   assert.ok(writes[0].refresh_token_enc.startsWith('pm1.'));
   assert.ok(!writes[0].refresh_token_enc.includes('UNSAFE'));
+  // Security review 2026-11-16: a consent link prepared by A and opened by a colleague must never attach the colleague's
+  // mailbox to A's account.
+  const other = personalMailStart(ORG_A, ACTOR_A, 'google', {}, { env });
+  const otherState = new URL(other.url).searchParams.get('state');
+  const colleague = async u => {
+    if (String(u).includes('userinfo')) return response({ email: 'colleague@example.test', email_verified: true });
+    if (String(u).includes('/profile')) return response({ emailAddress: 'colleague@example.test' });
+    return fetchImpl(u);
+  };
+  await assert.rejects(completePersonalMail({ query: { state: otherState, code: 'authorization-code' } }, { env, db, fetchImpl: colleague }), /PERSONAL_MAIL_NOT_YOURS/);
+  assert.equal(writes.length, 1, 'nothing stored for the colleague mailbox');
 });
 
 test('revoked refresh token requires reconnect, never falls back to owner access', async () => {
