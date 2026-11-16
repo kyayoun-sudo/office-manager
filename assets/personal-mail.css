@@ -1,0 +1,17 @@
+/* Additive styling for each user's private mailbox on Accueil. */
+.pm-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.pm-toolbar .btn { min-height:36px; padding:7px 12px; }
+.pm-select { display:flex; align-items:center; gap:8px; font-size:0.94rem; }
+.pm-select select { max-width:340px; width:100%; border:1px solid var(--line); border-radius:9px; padding:8px; color:var(--text); background:var(--surface); }
+.pm-consent { background:var(--surface-2,var(--surface)); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+.pm-switch { display:flex; align-items:center; gap:10px; font-weight:600; }
+.pm-switch input { width:18px; height:18px; }
+.pm-consent p { margin:7px 0 0; }
+.pm-list { display:grid; gap:8px; }
+.pm-item { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.pm-item .t { flex:1 1 260px; min-width:0; }
+.pm-item strong, .pm-snippet { overflow-wrap:anywhere; }
+.pm-body { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; max-height:350px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:12px; background:var(--surface); }
+.pm-field { display:grid; gap:5px; font-weight:600; margin:10px 0; }
+.pm-field input, .pm-field textarea { width:100%; font:inherit; border:1px solid var(--line); border-radius:9px; padding:10px; color:var(--text); background:var(--surface); }
+@media(max-width:600px) { .pm-item { display:block; } .pm-select { width:100%; } .pm-select select { flex:1; min-width:0; } }
