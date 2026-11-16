@@ -290,3 +290,5 @@ table tbody tr:is(:focus-within,:has(input:checked),[aria-selected="true"]) > :f
 .om-settings-hub>.card>.btn{margin-right:8px;margin-bottom:8px;align-self:flex-start}
 .om-settings-results{font-size:14px;color:var(--muted)}
 @media(max-width:860px){.om-settings-groups{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.om-settings-hub{padding:12px}.om-settings-group{padding:9px 11px}}
+
+.nav .om-rail-fallback{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:6px;background:var(--surface-2);color:var(--brand-ink);font-size:12px;font-weight:800;flex:none}
