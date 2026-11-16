@@ -538,6 +538,7 @@ create table if not exists public.office_email_accounts (
   last_error text,
   updated_at timestamptz not null default now(),
   unique (org_id,user_id,provider,email),
+  unique (org_id,user_id,id),
   foreign key (org_id,user_id) references public.office_app_users(org_id,auth_user_id) on delete cascade
 );
 create index if not exists office_email_accounts_owner_idx on public.office_email_accounts(org_id,user_id);
@@ -545,7 +546,8 @@ create table if not exists public.office_personal_mail_items (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null,
   user_id uuid not null,
-  mailbox_id uuid not null references public.office_email_accounts(id) on delete cascade,
+  mailbox_id uuid not null,
+  foreign key (org_id,user_id,mailbox_id) references public.office_email_accounts(org_id,user_id,id) on delete cascade,
   provider_message_id text not null,
   thread_id text,
   folder text not null check (folder in ('inbox','sent')),
@@ -573,7 +575,8 @@ create table if not exists public.office_personal_mail_drafts (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null,
   user_id uuid not null,
-  mailbox_id uuid not null references public.office_email_accounts(id) on delete cascade,
+  mailbox_id uuid not null,
+  foreign key (org_id,user_id,mailbox_id) references public.office_email_accounts(org_id,user_id,id) on delete cascade,
   reply_to_provider_id text,
   recipient text not null,
   subject text not null,
