@@ -34,7 +34,10 @@ Plus tard : quand tout va bien depuis quelques semaines, on pourra fermer le pro
 00006. [ ] CHACUN RELIE SA BOÎTE E-MAIL (« Ma messagerie » sur l'accueil)                           (16 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 En ligne sur https://office.eynowa.com depuis le 16 novembre (détails techniques : docs/PERSONAL_MAIL.md).
-Chaque personne, quel que soit son rôle, sur l'accueil → « Ma messagerie » :
+DEPUIS LE 16 NOVEMBRE AU SOIR : un seul clic. « Continuer avec Google » à la connexion demande aussi la lecture et l'envoi
+d'e-mails : la boîte de la personne est reliée en même temps. Si Google ne le donne pas du premier coup, l'accueil le
+redemande une fois tout seul. Avec le mot de passe, le bouton « Connecter Gmail » reste dans « Ma messagerie ».
+Sinon, à la main, sur l'accueil → « Ma messagerie » :
   1. Relier sa boîte Gmail (Google demande d'autoriser lecture et envoi). Outlook : voir point 4.
   2. Activer, si elle le veut, l'aide de l'IA (accord séparé : sans lui, l'IA ne lit rien).
   3. Voir ses e-mails, ses suggestions d'actions, rédiger avec l'IA, corriger, puis envoyer depuis SA propre adresse.
