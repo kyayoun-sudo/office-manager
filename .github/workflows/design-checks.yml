@@ -1,0 +1,24 @@
+name: Office Manager design checks
+
+on:
+  pull_request:
+    branches: [feature/white-label-desktop]
+  push:
+    branches: [feature/design-shadcn]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:sql
+      - run: npm run check

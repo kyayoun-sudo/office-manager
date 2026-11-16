@@ -9,7 +9,9 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:sql": "node tests/verify-sql.mjs",
-    "check": "node scripts/check-syntax.mjs"
+    "check": "node scripts/check-syntax.mjs",
+    "build:css": "tailwindcss -i assets/ui.src.css -o assets/ui.css --minify",
+    "build:css:watch": "tailwindcss -i assets/ui.src.css -o assets/ui.css --minify --watch"
   },
   "dependencies": {
     "@openai/agents": "0.18.0",
@@ -28,6 +30,9 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.3.14"
+    "@electric-sql/pglite": "0.3.14",
+    "@tailwindcss/cli": "4.3.5",
+    "basecoat-css": "1.1.0",
+    "tailwindcss": "4.3.5"
   }
 }

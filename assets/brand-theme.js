@@ -295,7 +295,19 @@
     var nameEl = who.querySelector('[data-user-name]');
     var me = node('div', null, 'me');
     var av = node('span', (OM.getUserName() || 'U').trim().charAt(0).toUpperCase(), 'avatar'); av.setAttribute('aria-hidden', 'true');
-    me.appendChild(av); if (nameEl) me.appendChild(nameEl);
+    me.appendChild(av);
+    if (document.body.classList.contains('om-design')) {
+      var identity = node('div', null, 'om-account-identity');
+      var account = readSession();
+      var email = account && account.user && account.user.email;
+      var initials = (OM.getUserName() || 'U').trim().split(/\s+/).slice(0, 2);
+      av.textContent = initials.map(function (part) { return part.charAt(0).toUpperCase(); }).join('') || 'U';
+      if (nameEl) identity.appendChild(nameEl);
+      if (email) identity.appendChild(node('small', email, 'om-account-email'));
+      me.appendChild(identity);
+    } else if (nameEl) {
+      me.appendChild(nameEl);
+    }
     var b = node('button', null, 'gear'); b.type = 'button'; b.id = 'gear-btn';
     b.setAttribute('aria-label', 'Réglages'); b.setAttribute('aria-haspopup', 'true'); b.setAttribute('aria-expanded', 'false');
     b.appendChild(svgIcon(ICONS['/parametres.html']));

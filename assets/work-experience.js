@@ -72,7 +72,7 @@
       );
       rail.appendChild(text);
       var h = main.querySelector(".page-head");
-      main.insertBefore(rail, h || main.firstChild);
+      if (h) h.before(rail); else main.prepend(rail);
       // Replace the older generic banner with the contextual return, keeping its destination.
       main
         .querySelectorAll(':scope > a[href^="/dossiers.html?"]')
