@@ -153,3 +153,16 @@ test('the signed state of a mailbox link carries the person and comes back to th
   assert.equal(body.m, 'mailbox'); assert.equal(body.by, 'ana@cabinet.test'); assert.equal(body.ret, '/accueil.html');
   assert.ok(encryptToken('x', env).startsWith('v1.'));
 });
+
+test('an e-mail is linked only to a mission the person may open; the AI never hears of the others', async () => {
+  _resetPersonalMailCache();
+  const A = '22222222-2222-4222-8222-222222222222', B = '33333333-3333-4333-8333-333333333333';
+  const base = db({ office_missions: [{ org_id: ORG, id: A, name: 'Mission A', mission_code: 'A', status: 'fieldwork' }, { org_id: ORG, id: B, name: 'Mission secrète', mission_code: 'B', status: 'fieldwork' }] }), log = [];
+  let seen = '';
+  const d = { fetchRows: base.fetchRows, fetchImpl: googleFetch(log), env, ...noAudit, accessibleMissionIds: async () => new Set([A]),
+    ai: async (_o, req) => { seen = req.input; return { text: JSON.stringify({ items: [{ id: 'm1', needs_action: true, mission_id: B, summary: 's' }] }) }; } };
+  await linkAna(d);
+  await refreshMyMail(ORG, ana, d);
+  assert.ok(seen.includes('Mission A') && !seen.includes('secrète'), 'only the missions Ana may open are given to the AI');
+  assert.equal(base.t.office_user_mail_items.find(i => i.id === 'm1').mission_id, null, 'a mission she cannot open is never linked');
+});
