@@ -198,7 +198,7 @@ export const ROUTES = Object.freeze({
   // The owner and IT administrator both control the private AI laboratory.
   // A mission quality check remains an owner-only operation on real client documents.
   shadow: {
-    GET: users([...SHADOW_VIEWERS], async (orgId, req) => req.query?.firm === '1' ? (await import('../lib/firm-simulation-service.js')).firmView(orgId, { mode: req.query?.mode }) : req.query?.sandbox === '1' ? (await import('../lib/audit-sandbox.js')).sandboxView(orgId) : (await import('../lib/shadow.js')).labView()),
+    GET: users([...SHADOW_VIEWERS], async (orgId, req) => req.query?.firm === '1' ? (await import('../lib/firm-simulation-service.js')).firmView(orgId, { mode: req.query?.mode }) : req.query?.sandbox === '1' ? (await import('../lib/audit-sandbox.js')).sandboxView(orgId) : (await import('../lib/shadow.js')).labView({ role: req.account?.role })),
     POST: users([...SHADOW_VIEWERS], async (orgId, req) => {
       const s = await import('../lib/shadow.js'); const b = req.body || {};
       if (b.action === 'quality-check' && req.account?.role !== 'owner') throw fail('CLIENT_MISSION_RESTRICTED', 403);
