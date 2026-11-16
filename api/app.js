@@ -1155,10 +1155,68 @@ export const ROUTES = Object.freeze({
     }),
     unavailable: 'AGENT_INTRO_UNAVAILABLE'
   },
+  // Personal mail: the logged-in user's own mailbox; NO cabinet-owner fallback.
+  'personal-mail': {
+    GET: users([...EVERYONE], async (orgId, req) => {
+      const oauth = await import('../lib/personal-mail-oauth.js');
+      const inbox = await import('../lib/personal-mail-inbox.js');
+      const b = req.query || {};
+      if (!b.action || b.action === 'accounts') return oauth.personalAccounts(orgId, req.account);
+      if (b.action === 'list') return inbox.listPersonalMail(orgId, req.account, b.mailbox_id, b.folder);
+      if (b.action === 'message') return inbox.getPersonalMessage(orgId, req.account, b.mailbox_id, b.id);
+      if (b.action === 'attachment') return inbox.personalAttachment(orgId, req.account, b.mailbox_id, b.id, b.attachment_id);
+      if (b.action === 'drafts') return inbox.personalDrafts(orgId, req.account, b.mailbox_id);
+      throw fail('PERSONAL_MAIL_ACTION_UNKNOWN', 400);
+    }),
+    POST: users([...EVERYONE], async (orgId, req) => {
+      const oauth = await import('../lib/personal-mail-oauth.js');
+      const inbox = await import('../lib/personal-mail-inbox.js');
+      const b = req.body || {};
+      if (b.action === 'connect') return oauth.personalMailStart(orgId, req.account, b.provider, req);
+      if (b.action === 'disconnect') return oauth.personalDisconnect(orgId, req.account, b.mailbox_id);
+      if (b.action === 'ai-consent') return oauth.personalSettings(orgId, req.account, b.mailbox_id, b.enabled);
+      if (b.action === 'sync') return inbox.syncPersonalMail(orgId, req.account, b.mailbox_id);
+      if (b.action === 'draft') return inbox.savePersonalDraft(orgId, req.account, b.mailbox_id, b);
+      if (b.action === 'drafts') return inbox.personalDrafts(orgId, req.account, b.mailbox_id);
+      if (b.action === 'ai-draft') return inbox.personalAiDraft(orgId, req.account, b.mailbox_id, b.message_id, b.instruction);
+      if (b.action === 'send') return inbox.sendPersonalDraft(orgId, req.account, b.mailbox_id, b.draft_id, b.confirm === true);
+      if (b.action === 'done') return inbox.markPersonalDone(orgId, req.account, b.mailbox_id, b.message_id);
+      throw fail('PERSONAL_MAIL_ACTION_UNKNOWN', 400);
+    }),
+    unavailable: 'PERSONAL_MAIL_UNAVAILABLE'
+  },
+  // Microsoft delegated OAuth callback; the encrypted state identifies the user and cabinet.
+  'personal-mail-callback': {
+    GET: open(async (orgId, req) => {
+      try {
+        const m = await import('../lib/personal-mail-oauth.js');
+        const state = m.readPersonalState(req.query?.state);
+        if (state.provider !== 'microsoft') throw fail('PERSONAL_MAIL_PROVIDER_MISMATCH', 400);
+        const result = await runInFirm(state.org, () => m.completePersonalMail(req));
+        return { __redirect: result.redirect };
+      } catch (e) {
+        return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(String(e.message || 'PERSONAL_MAIL_OAUTH_FAILED').slice(0, 75)) };
+      }
+    }),
+    unavailable: 'PERSONAL_MAIL_OAUTH_UNAVAILABLE'
+  },
   'google-callback': {
     GET: open(async (orgId, req) => {
       // Started on a preview: Google always comes back to the ONE registered address (production); the browser is sent back to the
       // preview with Google's answer, and the preview finishes (lib/google-connection.js, relayTarget).
+      // New personal Gmail connection returns on the ALREADY registered Google callback.
+      // Its encrypted state is unrelated to the existing firm-wide OAuth state.
+      const personal = await import('../lib/personal-mail-oauth.js');
+      if (personal.isPersonalState(req.query?.state)) {
+        try {
+          const state = personal.readPersonalState(req.query?.state);
+          if (state.provider !== 'google') throw fail('PERSONAL_MAIL_PROVIDER_MISMATCH', 400);
+          const result = await runInFirm(state.org, () => personal.completePersonalMail(req));
+          return { __redirect: result.redirect };
+        } catch (e) {
+          return { __redirect: '/accueil.html?personal_mail=error&code=' + encodeURIComponent(String(e.message || 'PERSONAL_MAIL_OAUTH_FAILED').slice(0, 75)) };
+        }
+      }
       try { const to = (await import('../lib/google-connection.js')).relayTarget(req); if (to) return { __relay: to }; } catch (e) { console.error('[google-callback] relay refused:', String(e.message || e).slice(0, 80)); }
       try {
         // Several firms: Google comes back without the firm header; the firm is the one in the state the server signed.
