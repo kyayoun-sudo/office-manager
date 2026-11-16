@@ -20,11 +20,15 @@ commit;
 begin;
 create table if not exists public.office_firm_drive (
   org_id uuid primary key,
-  drive_id text not null check (length(drive_id) between 10 and 100),
+  drive_id text not null check (length(drive_id) between 10 and 300),
   drive_name text check (drive_name is null or length(drive_name) <= 200),
   set_by text check (set_by is null or length(set_by) <= 120),
   set_at timestamptz not null default now()
 );
+-- 2026-11-16: the Drive is stored with its agents' memory and home folders ("folder:<id>|m:<memory>|h:<home>", 112 characters
+-- for the pilot firm); 100 refused the update (office_firm_drive_drive_id_check). Replayable.
+alter table public.office_firm_drive drop constraint if exists office_firm_drive_drive_id_check;
+alter table public.office_firm_drive add constraint office_firm_drive_drive_id_check check (length(drive_id) between 10 and 300);
 alter table public.office_firm_drive enable row level security;
 revoke all on public.office_firm_drive from public, anon, authenticated;
 commit;
