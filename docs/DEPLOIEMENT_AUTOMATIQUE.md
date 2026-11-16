@@ -39,7 +39,7 @@ On peut aussi relancer un déploiement à la main : **Actions → Déploiement�
 - **Un SQL qui modifie ou supprime** des données existantes. Le déploiement ne rejoue que `db/INSTALL_TOUT.sql`, qui ajoute seulement des tables, colonnes et fonctions. S'il échoue sur la copie d'essai, le déploiement s'arrête avant de toucher la base.
 - **Le script du serveur lui-même.** Après une modification de `scripts/vps-deploy-receive.sh`, il faut le réinstaller :
   ```
-  ssh ionos-office "cat > /usr/local/bin/office-manager-deploy" < scripts/vps-deploy-receive.sh
+  tr -d '\r' < scripts/vps-deploy-receive.sh | ssh ionos-office "cat > /usr/local/bin/office-manager-deploy"
   ```
 
 ## Protection supplémentaire (facultative, à faire par le propriétaire du dépôt)
