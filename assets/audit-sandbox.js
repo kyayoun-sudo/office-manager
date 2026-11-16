@@ -1,6 +1,6 @@
 (function () {
   var OM = window.OfficeManager;
-  if (!OM || !OM.isOwner()) return;
+  if (!OM || !['owner', 'it_admin'].includes(OM.getRole())) return;
   var section = document.createElement("section");
   section.className = "card";
   section.id = "audit-sandbox";
