@@ -8,6 +8,26 @@ Dernière mise à jour : 14 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+00006. [ ] CHACUN RELIE SA BOÎTE E-MAIL (« Ma messagerie » sur l'accueil)                           (16 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+En ligne sur https://office.eynowa.com depuis le 16 novembre (détails techniques : docs/PERSONAL_MAIL.md).
+Chaque personne, quel que soit son rôle, sur l'accueil → « Ma messagerie » :
+  1. Relier sa boîte Gmail (Google demande d'autoriser lecture et envoi). Outlook : voir point 4.
+  2. Activer, si elle le veut, l'aide de l'IA (accord séparé : sans lui, l'IA ne lit rien).
+  3. Voir ses e-mails, ses suggestions d'actions, rédiger avec l'IA, corriger, puis envoyer depuis SA propre adresse.
+     Une réponse à un contact client enregistré sur une mission passe par la validation du cabinet (sauf associé,
+     manager, propriétaire).
+  4. Déconnecter à tout moment : l'accès, les résumés et les brouillons sont effacés.
+Personne ne voit la boîte d'un autre, ni les associés ni le propriétaire.
+À faire de votre côté :
+  - Google Cloud → Google Auth Platform → Audience : si « Externe » et non validée, Google affichera « Google n'a pas
+    validé cette application » → chacun clique « Paramètres avancés → Accéder à … » (100 personnes au plus).
+  - Pour Outlook / Microsoft 365 (facultatif) : créer l'application dans Microsoft Entra ID (docs/PERSONAL_MAIL.md,
+    point 4), puis donner à Claude l'identifiant ; il règle MICROSOFT_CLIENT_ID / _SECRET sur le serveur.
+  - Recharger le crédit de l'IA (Anthropic ou OpenAI) pour les résumés et les brouillons.
+  - Faire l'essai avec deux personnes : chacune ne voit que sa boîte, et une réponse part bien de sa propre adresse.
+
+-----------------------------------------------------------------------------------------------------------------
 00005. [ ] GOOGLE : AUTORISER LA NOUVELLE ADRESSE https://office.eynowa.com                        (16 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Le serveur répond sur https://office.eynowa.com (certificat HTTPS renouvelé tout seul). Pour que « Connecter Google » et
