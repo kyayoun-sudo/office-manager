@@ -22,7 +22,10 @@ fn stays_in_app(url: &tauri::Url) -> bool {
     match url.scheme() {
         // The local start page of the app (desktop/offline/index.html).
         "tauri" => true,
-        "http" | "https" => matches!(url.host_str(), Some(h) if h == SERVER_HOST || h == "tauri.localhost" || h == "accounts.google.com"),
+        // Windows serves the local start page from http(s)://tauri.localhost.
+        "http" | "https" if url.host_str() == Some("tauri.localhost") => true,
+        // The server and Google: https only, default port only.
+        "https" => url.port().is_none() && matches!(url.host_str(), Some(h) if h == SERVER_HOST || h == "accounts.google.com"),
         _ => false,
     }
 }
