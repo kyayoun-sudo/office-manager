@@ -5,10 +5,20 @@
 #   backup  a pg_dump every night, 14 days kept, in ./backups
 # Start:   docker compose up -d --build        Logs: docker compose logs -f app
 # The values come from .env (copy .env.example). Step-by-step guide: docs/INSTALLER_SUR_UN_VPS.md
+# Logs of app, db and backup go to the system journal (journald, Paul 2026-11-16: « une partie qui écrit tous les logs
+# erreurs ») : they survive restarts and deployments, rotate by themselves and stay bounded (scripts/vps-journal-setup.sh).
+# Errors only, last 24 h:  om-erreurs        Everything of the app:  journalctl -t office-manager-app-1 -f
+# A host without journald (Docker Desktop…) sets OFFICE_MANAGER_LOG_DRIVER=json-file in .env.
+x-journal: &journal
+  driver: ${OFFICE_MANAGER_LOG_DRIVER:-journald}
+  options:
+    tag: "{{.Name}}"
+
 services:
   db:
     image: postgres:17
     restart: unless-stopped
+    logging: *journal
     environment:
       POSTGRES_DB: office_manager
       POSTGRES_USER: office_manager
@@ -29,6 +39,7 @@ services:
   app:
     build: .
     restart: unless-stopped
+    logging: *journal
     env_file: .env
     environment:
       DATABASE_URL: postgres://office_manager:${POSTGRES_PASSWORD}@db:5432/office_manager
@@ -75,6 +86,7 @@ services:
   backup:
     image: postgres:17
     restart: unless-stopped
+    logging: *journal
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:

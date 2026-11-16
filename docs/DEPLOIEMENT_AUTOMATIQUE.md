@@ -48,3 +48,19 @@ Le travail GitHub ne déploie que la branche `production`, même lancé à la ma
 Pour verrouiller aussi côté GitHub (il faut les droits d'administrateur du dépôt, que Claude n'a pas) :
 **Settings → Environments → production → Deployment branches and tags → Selected branches → Add rule `production`**.
 Vous pouvez aussi cocher **Required reviewers** : chaque mise en ligne attendra alors votre clic « Approve ».
+
+## Voir les erreurs du serveur
+
+Tout est gardé au même endroit, le journal du système : application, base, sauvegardes. Il survit aux redémarrages et
+aux déploiements, 30 jours et 1 Go au plus (`scripts/vps-journal-setup.sh`, déjà installé le 16 novembre 2026).
+
+```
+ssh ionos-office
+om-erreurs                 # erreurs des dernières 24 heures (application, base, sauvegardes, site web)
+om-erreurs "3 days ago"    # depuis 3 jours
+om-erreurs tout            # toutes les lignes de l'application, pas seulement les erreurs
+journalctl -t office-manager-app-1 -f    # suivre l'application en direct (Ctrl + C pour arrêter)
+```
+
+Les « robots refusés » (requêtes sur `/.env`, `/.git`…) sont des robots d'Internet qui cherchent des fichiers secrets.
+Le site les refuse : ils sont seulement comptés, sans danger.
