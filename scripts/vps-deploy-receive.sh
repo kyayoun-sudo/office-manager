@@ -8,7 +8,7 @@
 #   2. if the SQL of the application changed: night-style dump of the base, the new SQL tried first on a throwaway copy of
 #      the structure, then applied for real (it only adds: tables, columns, functions — INSTALL_TOUT.sql is replayable);
 #   3. copy of the current code kept in backups/, new code put in place (.env, backups, local overrides never touched);
-#   4. application rebuilt and restarted, /api/health must answer with the database within 90 s;
+#   4. application rebuilt; every service whose settings changed is restarted (docker compose up -d), /api/health must answer with the database within 90 s;
 #   5. otherwise the previous code is put back and restarted, and the job fails (the SQL additions stay: they only add).
 # The file in the repository is the reference; after changing it, reinstall it on the server (see docs/DEPLOIEMENT_AUTOMATIQUE.md).
 set -euo pipefail
@@ -74,7 +74,7 @@ healthy() {
 }
 
 echo "4/5 Construction et redémarrage de l'application…"
-if docker compose build app && docker compose up -d app && healthy; then
+if docker compose build app && docker compose up -d && healthy; then
   echo "5/5 En ligne : version ${SHA:0:7} (avant : ${OLD_VERSION:0:7})."
   ls -1t backups/code-avant-*.tgz 2>/dev/null | tail -n +11 | xargs -r rm -f   # keep the 10 latest code copies
   exit 0
@@ -86,6 +86,6 @@ tar -xzf "backups/code-avant-$STAMP.tgz" -C "$RESTORE"
 rsync -a --delete "${KEEP[@]}" "$RESTORE/" "$APP/"
 rm -rf "$RESTORE"
 echo "$OLD_VERSION" > VERSION_DEPLOYEE
-docker compose build app && docker compose up -d app && healthy && echo "Version précédente remise en ligne." || echo "ATTENTION : la version précédente ne répond pas non plus."
+docker compose build app && docker compose up -d && healthy && echo "Version précédente remise en ligne." || echo "ATTENTION : la version précédente ne répond pas non plus."
 docker compose logs app --tail 30 || true
 exit 7
