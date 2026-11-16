@@ -307,7 +307,11 @@
     if (qs('personal_mail') === 'connected') setStatus('Messagerie connectée. Votre compte est distinct de celui du cabinet.');
     var WHY = { PERSONAL_MAIL_NOT_YOURS: 'la boîte choisie chez Google ou Microsoft n’est pas votre adresse de connexion à Office Manager. Choisissez votre propre boîte.', PERSONAL_MAIL_CONSENT_REFUSED: 'vous avez refusé l’autorisation.', PERSONAL_MAIL_SCOPE_MISSING: 'il faut autoriser la lecture ET l’envoi d’e-mails.' };
     if (qs('personal_mail') === 'error') setStatus('Connexion impossible : ' + (WHY[qs('code')] || qs('code') || 'autorisation refusée'), true);
-    loadAccounts();
+    // One click (2026-11-16): just signed in with Google, but Google gave no lasting mailbox access — ask it once, by itself.
+    var askOnce = false; try { askOnce = sessionStorage.getItem('om_mailbox_consent') === '1'; sessionStorage.removeItem('om_mailbox_consent'); } catch (e) { askOnce = false; }
+    loadAccounts().then(function () {
+      if (askOnce && !state.accounts.some(function (x) { return x.provider === 'google' && x.status === 'connected'; })) connect('google');
+    });
     setInterval(function () {
       if (!document.hidden && state.box && Date.now() - state.lastPoll > 10 * 60 * 1000) {
         if (['inbox','suggestions','sent'].includes(state.tab)) loadMessages(true);

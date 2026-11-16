@@ -181,6 +181,8 @@
       // Back from "Démarrer": an owner continues the setup there (Google, then Drive).
       var after = null; try { after = sessionStorage.getItem('om_after_login'); sessionStorage.removeItem('om_after_login'); } catch (x) {}
       if (h.get('setup') === '1') after = '/demarrer.html'; // first owner: straight to the Drive address
+      // The mailbox was not linked by this sign-in (Google gave no lasting access): the home page asks Google once more.
+      if (h.get('mailbox') === 'consent') { try { sessionStorage.setItem('om_mailbox_consent', '1'); } catch (x) {} }
       if (after === '/demarrer.html' && session.user && session.user.role === 'owner') { OM.saveSession(session); location.replace('/demarrer.html'); return; }
       enter(session);
     })
