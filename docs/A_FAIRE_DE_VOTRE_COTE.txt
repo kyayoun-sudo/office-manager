@@ -4,8 +4,43 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 4 novembre 2026
+Dernière mise à jour : 14 novembre 2026
 Branche concernée : feature/white-label-desktop
+
+-----------------------------------------------------------------------------------------------------------------
+00004. [ ] METTRE UNE VERSION EN LIGNE SUR LE SERVEUR = POUSSER SUR LA BRANCHE « production »         (16 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Tout est automatique : GitHub lance les tests, puis envoie le code au serveur, qui sauvegarde, reconstruit, vérifie et
+revient tout seul à la version précédente si l'application ne répond pas. Explications : docs/DEPLOIEMENT_AUTOMATIQUE.md
+  Pour mettre en ligne :   git push origin feature/white-label-desktop:production
+  Ou sur GitHub : Pull requests → New → base « production », compare « feature/white-label-desktop » → Merge.
+  Suivre : GitHub → onglet Actions → « Déploiement sur le serveur du cabinet ».
+Rien à faire de plus : la clé de déploiement et les secrets GitHub sont déjà en place.
+
+-----------------------------------------------------------------------------------------------------------------
+00003. [ ] REMPLIR LE .env DU VPS IONOS PUIS DÉMÉNAGER LES DONNÉES DE SUPABASE                    (14 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Tout est expliqué pas à pas dans : docs/REMPLIR_LE_ENV_DU_SERVEUR.txt
+En bref : 5 informations à coller dans /opt/office-manager/.env (clé Claude, clé ChatGPT, ID et code secret du client
+Google, votre e-mail), puis le déménagement avec l'adresse « Session pooler » de Supabase. Les clés de Vercel sont
+« Sensitive » (illisibles) : on en crée de nouvelles, les anciennes continuent de servir à Vercel.
+
+-----------------------------------------------------------------------------------------------------------------
+00002. [x] METTRE LA CLÉ SSH SUR LE VPS IONOS (connexion sans mot de passe)                       (13 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Pourquoi : vous avez loué le VPS chez IONOS. Une clé a été créée sur cet ordinateur pour ce serveur seulement :
+   C:\Users\christian.aka\.ssh\id_ionos_office       (partie privée : ne jamais l'envoyer, ne jamais la copier ailleurs)
+   C:\Users\christian.aka\.ssh\id_ionos_office.pub   (partie publique : c'est elle qu'on donne au serveur)
+Partie publique (une seule ligne, à copier en entier) :
+   ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGC/wDv3KV8Wlc+6/qPge2sjysx4puLtVNIP+Vdk8qdk office-manager-vps-ionos
+Méthode A, depuis Windows (le serveur existe déjà) — dans PowerShell, remplacer ADRESSE_IP par celle du serveur :
+     type $env:USERPROFILE\.ssh\id_ionos_office.pub | ssh root@ADRESSE_IP "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+   Il demande une seule fois le mot de passe root (dans l'e-mail IONOS ou le Cloud Panel → Serveurs → le serveur →
+   « Mot de passe initial ») : c'est vous qui le tapez.
+Méthode B, dans IONOS : Cloud Panel → Serveurs et Cloud → Réseau / Accès → Clés SSH → Ajouter (coller la ligne).
+   Selon l'offre, IONOS n'applique la clé qu'à un serveur créé ou réinstallé après : la méthode A marche toujours.
+Contrôle : ssh -i $env:USERPROFILE\.ssh\id_ionos_office root@ADRESSE_IP  → entre sans demander de mot de passe.
+Ensuite, donnez l'adresse IP à Claude : il ajoute le raccourci « ssh ionos-office » sur cet ordinateur.
 
 -----------------------------------------------------------------------------------------------------------------
 00001. [ ] N'UTILISER QUE CLAUDE ET CHATGPT, AVEC LEUR MODÈLE LE PLUS PUISSANT                   (4 novembre 2026)
@@ -16,7 +51,7 @@ laisse jusqu'à 2 minutes sur les grosses lectures.
   1. Anthropic : console.anthropic.com → Billing → recharger le crédit.
   2. Vercel → projet office-manager-personal-pilot → Settings → Environment Variables (Production et Preview cochés) :
        OFFICE_MANAGER_AI_PROVIDERS = anthropic,openai            (ajouter « ,eynowa-lab » pour garder la revue analytique)
-       ANTHROPIC_MODEL = claude-fable-5-1                         (le plus puissant ; plus économique : claude-opus-5-5)
+       ANTHROPIC_MODEL = claude-fable-5-2                         (le plus puissant depuis le 9 nov. 2026 ; plus économique : claude-opus-5-5)
        ANTHROPIC_EFFORT = high                                    (facultatif ; xhigh ou max = plus profond, plus lent, plus cher)
        OPENAI_MODEL = gpt-6-astra                                 (vérifier le nom exact sur platform.openai.com → Models)
      Pour changer une variable existante : ⋯ → Edit → nouvelle valeur → Save.

@@ -1,0 +1,59 @@
+name: Déploiement sur le serveur du cabinet (VPS)
+
+# Every push on the « production » branch: full tests, then the code is sent to the server, which rebuilds and restarts
+# the application (scripts/vps-deploy-receive.sh). Can also be started by hand: Actions → this workflow → Run workflow.
+# Secrets (Settings → Secrets and variables → Actions): VPS_HOST, VPS_SSH_KEY (deploy-only key), VPS_KNOWN_HOSTS.
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Full repository test suite
+        run: npm test
+      - name: SQL/schema verification
+        run: npm run test:sql
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send the code to the server
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Only what Git holds for this commit (never entrainement/, never .env).
+          git archive --format=tar HEAD | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 "root@${VPS_HOST}" "deploy ${GITHUB_SHA}"
+      - name: Check the public address
+        env:
+          VPS_PUBLIC_URL: ${{ vars.VPS_PUBLIC_URL }}
+        if: ${{ vars.VPS_PUBLIC_URL != '' }}
+        run: curl -fsS -m 20 "$VPS_PUBLIC_URL/api/health" | grep -q '"database":true'

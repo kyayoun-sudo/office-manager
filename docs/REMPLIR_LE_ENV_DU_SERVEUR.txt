@@ -1,0 +1,158 @@
+REMPLIR LES RÉGLAGES DU SERVEUR (.env) ET DÉMÉNAGER LES DONNÉES DE SUPABASE
+==========================================================================
+Pour : le VPS IONOS 82.165.169.151 (AlmaLinux). Mis à jour le 14 novembre 2026.
+Durée : environ 45 minutes. Aucune connaissance informatique nécessaire : suivez les cases dans l'ordre.
+
+Ce qui est DÉJÀ FAIT par Claude sur le serveur (vous n'avez rien à faire pour ces lignes) :
+  - le code de l'application est dans /opt/office-manager ;
+  - la base de données tourne, toutes ses tables sont créées (elle est encore vide) ;
+  - le fichier .env existe, protégé (seul l'administrateur du serveur peut le lire) ;
+  - dedans, déjà rempli : le mot de passe de la base, l'identifiant du cabinet (DEFAULT_ORG_ID), le dossier mémoire,
+    les 8 codes secrets internes (créés au hasard, jamais affichés), Claude et ChatGPT seulement, avec leurs modèles
+    les plus puissants (claude-fable-5-1 et gpt-6-astra).
+
+Il vous reste 5 informations à mettre dans .env (partie A à D), puis le déménagement des données (partie F).
+Le domaine et l'envoi d'e-mails (partie E) viendront plus tard.
+
+
+POURQUOI VOUS NE POUVEZ PAS SIMPLEMENT RECOPIER VERCEL
+------------------------------------------------------
+Dans Vercel, les clés importantes sont marquées « Sensitive » : Vercel ne les montre plus jamais, à personne
+(Claude a vérifié la liste le 14 novembre : clé Claude, clé ChatGPT, secret Google, codes internes sont tous cachés).
+On en crée donc de NOUVELLES chez chaque fournisseur. Les anciennes continuent de marcher pour Vercel : rien ne casse.
+
+Conséquences, une seule fois, quand le serveur sera en route (c'est normal, rien n'est perdu) :
+  1. reconnecter Google : Paramètres → Google → « Connecter » (le Drive et Gmail reviennent tels quels) ;
+  2. chaque personne qui avait mis sa propre IA dans « Mon IA » doit recoller sa clé ;
+  3. revalider la cartographie du Drive : Mise en service → « Valider la cartographie » (même carte, nouvelle signature).
+
+
+AVANT DE COMMENCER : un endroit sûr pour noter
+----------------------------------------------
+Ouvrez le Bloc-notes de Windows. Vous y collerez provisoirement les clés au fur et à mesure.
+À LA FIN, FERMEZ-LE SANS ENREGISTRER : ces clés donnent accès à vos comptes, elles ne doivent pas rester dans un fichier.
+
+
+A. LA CLÉ DE CLAUDE (ANTHROPIC_API_KEY)
+--------------------------------------
+  1. Allez sur  https://console.anthropic.com  et connectez-vous.
+  2. Menu de gauche (ou en haut) : « API keys » (parfois sous « Settings »).
+  3. Bouton « Create Key ». Nom : office-manager-serveur. Validez.
+  4. Une clé s'affiche, elle commence par  sk-ant-  . Cliquez sur « Copy », collez-la dans le Bloc-notes.
+     Attention : elle n'est montrée qu'UNE fois. Si vous la perdez, recréez-en une.
+  5. Profitez-en : « Billing » → vérifiez qu'il reste du crédit (sinon Claude ne répond pas).
+
+
+B. LA CLÉ DE CHATGPT (OPENAI_API_KEY)
+------------------------------------
+  1. Allez sur  https://platform.openai.com  et connectez-vous.
+  2. En haut à droite, l'engrenage (Settings) → « API keys ».
+  3. Bouton « Create new secret key ». Nom : office-manager-serveur. Validez.
+  4. La clé commence par  sk-  . « Copy », collez-la dans le Bloc-notes (montrée une seule fois, elle aussi).
+  5. Dans « Limits » ou « Models », vérifiez que le modèle  gpt-6-astra  apparaît. S'il porte un autre nom, notez-le :
+     il faudra le mettre à la ligne OPENAI_MODEL (dites-le à Claude, il le fera).
+
+
+C. GOOGLE (GOOGLE_OAUTH_CLIENT_ID et GOOGLE_OAUTH_CLIENT_SECRET)
+---------------------------------------------------------------
+C'est ce qui permet à l'application de se connecter au Drive et à Gmail du cabinet.
+  1. Allez sur  https://console.cloud.google.com  et connectez-vous avec le compte qui gère l'application.
+  2. En haut, vérifiez que le bon projet est choisi (celui d'Office Manager).
+  3. Menu ☰ → « API et services » → « Identifiants »
+     (ou, selon l'écran : « Google Auth Platform » → « Clients »).
+  4. Dans « ID clients OAuth 2.0 », cliquez sur le client de l'application (type « Application Web »).
+  5. L'« ID client » est affiché (il finit par  .apps.googleusercontent.com ) : copiez-le dans le Bloc-notes.
+  6. Le « Code secret du client » n'est plus visible : cliquez sur « Ajouter un code secret » (« Add secret »).
+     Un nouveau code s'affiche (il commence souvent par  GOCSPX- ) : copiez-le dans le Bloc-notes.
+     NE DÉSACTIVEZ PAS l'ancien code : Vercel l'utilise encore.
+  7. Ne quittez pas encore cette page si vous avez déjà votre domaine : voir partie E, point 3.
+
+
+D. VOTRE ADRESSE E-MAIL (FIRST_OWNER_EMAILS)
+--------------------------------------------
+L'adresse e-mail avec laquelle VOUS vous connectez à Office Manager aujourd'hui (le propriétaire du cabinet).
+S'il y en a plusieurs (par exemple un associé), séparez-les par une virgule, sans espace :
+   paul@exemple.com,associe@exemple.com
+
+
+METTRE CES 5 INFORMATIONS DANS LE SERVEUR
+-----------------------------------------
+  1. Ouvrez PowerShell (touche Windows, tapez PowerShell, Entrée).
+  2. Tapez :   ssh ionos-office      puis Entrée. Vous êtes sur le serveur quand vous voyez  [root@localhost ~]#
+  3. Tapez :   nano /opt/office-manager/.env      puis Entrée. Le fichier s'ouvre.
+  4. Avec les flèches du clavier, allez sur chaque ligne ci-dessous, placez-vous JUSTE APRÈS le signe =,
+     puis faites un CLIC DROIT dans la fenêtre : cela colle ce que vous avez copié depuis le Bloc-notes.
+       FIRST_OWNER_EMAILS=            ← votre adresse (partie D)
+       GOOGLE_OAUTH_CLIENT_ID=        ← l'ID client (partie C, point 5)
+       GOOGLE_OAUTH_CLIENT_SECRET=    ← le code secret (partie C, point 6)
+       ANTHROPIC_API_KEY=             ← la clé sk-ant-… (partie A)
+       OPENAI_API_KEY=                ← la clé sk-… (partie B)
+     Règles : pas d'espace avant ni après le =, pas de guillemets, une seule ligne par réglage.
+     NE TOUCHEZ PAS aux autres lignes (surtout POSTGRES_PASSWORD et les codes secrets déjà remplis).
+  5. Enregistrer : appuyez sur Ctrl + O, puis Entrée. Fermer : Ctrl + X.
+  6. Tapez  exit  pour quitter le serveur. Dites à Claude « .env rempli » : il vérifiera que les lignes ne sont pas
+     vides, SANS lire les valeurs.
+
+
+E. PLUS TARD : LE DOMAINE ET LES E-MAILS
+----------------------------------------
+  1. Domaine : chez le fournisseur de votre nom de domaine → « Zone DNS » → ajouter un enregistrement
+       Type : A     Nom : office     Valeur : 82.165.169.151
+     Donnez ensuite l'adresse complète à Claude (par ex. office.mon-cabinet.com) : il remplit
+     OFFICE_MANAGER_DOMAIN et OFFICE_MANAGER_PUBLIC_URL.
+  2. E-mails (confirmation d'inscription des nouvelles personnes) : un compte gratuit sur  https://www.brevo.com
+     → Paramètres → « SMTP et API » → onglet SMTP : vous y trouvez le serveur (smtp-relay.brevo.com), le port (587),
+     l'identifiant et la clé SMTP. Elles vont dans SMTP_HOST, SMTP_USER, SMTP_PASSWORD (même méthode que ci-dessus).
+     Dans Brevo → « Expéditeurs », ajoutez l'adresse d'envoi (par ex. no-reply@mon-cabinet.com) ; mettez-la à SMTP_FROM.
+  3. Google (une fois le domaine connu) : sur la page du client OAuth (partie C), « URI de redirection autorisés »
+     → « Ajouter un URI » →  https://office.mon-cabinet.com/oauth/google/callback  → Enregistrer.
+     Gardez l'ancienne adresse Vercel dans la liste tant que vous n'avez pas basculé.
+
+
+F. DÉMÉNAGER LES DONNÉES DE SUPABASE VERS LE SERVEUR
+----------------------------------------------------
+Ce qui est copié : missions, procédures, réglages du cabinet, comptes des personnes (chacun garde son mot de passe).
+Ce qui n'est PAS touché : Supabase lui-même. Rien n'y est effacé, Vercel continue de marcher comme avant.
+
+F1. Le mot de passe de la base Supabase
+  1. Allez sur  https://supabase.com/dashboard  et ouvrez le projet de l'application
+     (son identifiant, visible dans l'adresse de la page, est  jdshiarbgpddhfhivmie ).
+  2. Si vous ne connaissez pas le mot de passe de la base (cas le plus fréquent) :
+     en bas à gauche « Project Settings » (roue dentée) → « Database » → « Reset database password »
+     → « Generate a password » → copiez-le dans le Bloc-notes → « Reset password ».
+     Cela ne gêne pas l'application actuelle : elle n'utilise pas ce mot de passe.
+     Important : le mot de passe doit contenir seulement des lettres et des chiffres (celui que Supabase génère convient).
+
+F2. L'adresse de la base
+  1. Toujours dans le projet, bouton « Connect » tout en haut de la page.
+  2. Choisissez « Session pooler » (dans la liste « Method » ou « Type », selon l'écran).
+  3. Copiez l'adresse affichée. Elle ressemble à :
+       postgresql://postgres.jdshiarbgpddhfhivmie:[YOUR-PASSWORD]@aws-0-eu-west-3.pooler.supabase.com:5432/postgres
+  4. Collez-la dans le Bloc-notes, puis remplacez  [YOUR-PASSWORD]  (crochets compris) par le mot de passe de F1.
+
+F3. Lancer le déménagement (faites-le avec Claude à côté, il lit les résultats avec vous)
+  1. PowerShell →  ssh ionos-office
+  2. Tapez :   cd /opt/office-manager
+  3. Dans le Bloc-notes, préparez cette ligne en remplaçant L-ADRESSE par l'adresse complète de F2
+     (gardez les deux apostrophes ' autour) :
+       SUPABASE_DB_URL='L-ADRESSE' bash scripts/vps-migrate.sh
+     Copiez toute la ligne, clic droit dans PowerShell pour la coller, puis Entrée.
+  4. Le programme affiche 4 étapes :
+       1/4 Comparaison des colonnes — s'il écrit « ARRÊT », rien n'a été copié : envoyez la liste affichée à Claude ;
+       2/4 Copie des données        — quelques minutes ;
+       3/4 Copie des comptes        — chacun garde son mot de passe ;
+       4/4 Vérification             — un tableau : nombre de lignes chez Supabase et sur le serveur, table par table.
+     C'est bon si aucune ligne n'indique « <-- DIFFÉRENT » et que la fin dit « Terminé ».
+  5. Effacez la ligne de l'historique du serveur (elle contient le mot de passe) : tapez   history -c   puis Entrée.
+  6. Tapez  exit . Fermez le Bloc-notes SANS ENREGISTRER.
+
+En cas d'erreur : copiez le message et envoyez-le à Claude. Ne lancez pas d'autre commande de vous-même.
+
+
+RÉCAPITULATIF : QUI FAIT QUOI
+-----------------------------
+  Vous   : clés Claude et ChatGPT (A, B), client Google (C), votre e-mail (D), les coller dans .env,
+           mot de passe et adresse Supabase (F1, F2), lancer la commande F3.
+  Claude : vérifier .env (sans lire les valeurs), lire les résultats du déménagement, démarrer l'application
+           quand le domaine sera prêt, vérifier que tout répond.
+  Plus tard : domaine et e-mails (E), puis essai complet et bascule (guide docs/GUIDE_SIMPLE_PASSAGE_VPS.md, étapes 10 à 12).
