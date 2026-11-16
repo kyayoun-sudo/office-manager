@@ -1,0 +1,5 @@
+export { default as StatsCard } from './StatsCard.vue'
+export { default as UserDistributionChart } from './UserDistributionChart.vue'
+export { default as StatsChart } from './StatsChart.vue'
+export { default as RecentUsersCard } from './RecentUsersCard.vue'
+export { default as UpcomingAppointmentsCard } from './UpcomingAppointmentsCard.vue'

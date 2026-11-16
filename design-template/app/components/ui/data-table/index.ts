@@ -1,0 +1,1 @@
+export { default as GenericDataTable } from './GenericDataTable.vue'

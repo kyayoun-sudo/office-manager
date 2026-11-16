@@ -35,7 +35,7 @@
       "permanent": false
     },
     {
-      "source": "/(lib|agents|db|scripts|supabase|connectors|desktop|tests|claude|server|backups|docker|\\.github|\\.claude)/(.*)",
+      "source": "/(lib|agents|db|scripts|supabase|connectors|desktop|design-template|tests|claude|server|backups|docker|\\.github|\\.claude)/(.*)",
       "destination": "/accueil.html",
       "permanent": false
     },

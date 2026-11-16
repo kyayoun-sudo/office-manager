@@ -6,8 +6,8 @@
 
 ## Mission
 
-Refais **l'apparence** d'Office Manager avec les composants **shadcn/ui en version HTML + Tailwind**, en t'inspirant du
-tableau de bord du dossier local `template/` (Nuxt 3 + shadcn-vue). **Aucune fonctionnalité ne doit changer, disparaître ou
+Refais **l'apparence** d'Office Manager avec les composants **shadcn/ui en version HTML + Tailwind**
+ **Aucune fonctionnalité ne doit changer, disparaître ou
 régresser.** Tu changes le look, jamais ce que fait l'application.
 
 ## Contexte du dépôt (à lire avant de toucher quoi que ce soit)
@@ -41,21 +41,22 @@ régresser.** Tu changes le look, jamais ce que fait l'application.
    **installe-la en dépendance de développement** : pas de CDN. Composants attendus : Button, Card, Badge, Input, Select, Textarea,
    Table, Tabs, Dialog, Dropdown, Tooltip, Alert, Sidebar, Breadcrumb, Avatar, Skeleton, Switch, Checkbox, Toast.
 2. **Base du modèle + couleur du cabinet.**
-   - Prends du modèle les tokens neutres de `template/app/assets/css/tailwind.css` : background, foreground, muted, border,
+   - Prends du modèle les tokens neutres de `design-template/app/assets/css/tailwind.css` : background, foreground, muted, border,
      card, `--radius: 0.625rem`, les tokens de sidebar et le mode sombre `.dark`.
    - La **couleur du cabinet** (`--brand`, réglée dans Paramètres) remplace `--primary`. Elle sert aux boutons principaux, à
      l'élément actif du menu, aux liens et au focus.
    - Le **logo du cabinet** va en haut du menu latéral.
    - Garde le contraste lisible en clair et en sombre : calcule une couleur de texte `--primary-foreground` lisible sur `--brand`.
-3. **S'inspirer seulement du template.** Le dossier `template/` est le produit « NalaCare Manager » d'un autre projet.
-   - Ne copie **aucun** fichier, composant `.vue`, image, logo, nom (« NalaCare ») ou texte de ce dossier.
-   - Reproduis seulement le style et la disposition, avec les composants shadcn libres.
-   - **Ne commite jamais le dossier `template/`** : ajoute-le à `.gitignore` dans ton premier commit.
+3. **Le modèle est une référence visuelle.** `design-template/` est une copie anonymisée d'un tableau de bord d'un autre
+   projet (nom, logo, icônes, adresses retirés). Rien n'y est exécuté ni déployé.
+   - Reproduis le style et la disposition avec les composants shadcn **HTML** libres. Les `.vue` ne servent qu'à comprendre la
+     structure (menu, en-tête, cartes, tableaux) : on ne les intègre pas, l'application reste en HTML.
+   - Ne remets aucun nom, logo ou adresse d'origine. Le dossier local `template/` (l'original) reste ignoré par Git : ne le commite jamais.
 4. **Pilote d'abord, puis le reste par lots.** Voir « Étapes » ci-dessous.
 
-## Ce que doit donner le nouveau design (référence : `template/app/assets/images/preview.png`)
+## Ce que doit donner le nouveau design (référence : `design-template/app/assets/images/preview.png`)
 
-- **Menu latéral** (comme `template/app/layouts/default.vue`, en HTML) :
+- **Menu latéral** (comme `design-template/app/layouts/default.vue`, en HTML) :
   - en haut : le logo et le nom du cabinet ;
   - des groupes titrés (Tableau de bord, Missions, Audit, Cabinet, Paramètres…), chaque entrée avec une icône Lucide en SVG
     inline (licence ISC, aucune police d'icônes externe) ;
@@ -111,7 +112,7 @@ Crée la branche `feature/design-shadcn` à partir de `feature/white-label-deskt
 poussent sur ce dépôt). Ouvre **chaque demande de fusion vers `feature/white-label-desktop`**, jamais vers `production` ni `main`.
 
 **Étape 1 — Socle + pilote** (une demande de fusion, puis attendre la validation de Paul) :
-1. Tailwind + bibliothèque shadcn-HTML, tokens, `assets/ui.css` compilé, `npm run build:css`, test « CSS à jour », `template/` dans `.gitignore`.
+1. Tailwind + bibliothèque shadcn-HTML, tokens, `assets/ui.css` compilé, `npm run build:css`, test « CSS à jour ».
 2. Le **cadre commun** (menu latéral, en-tête, fil d'Ariane, menu de compte, thème, tiroir mobile), branché sur `brand-theme.js`
    et `workspace-navigation.js` sans changer leur logique.
 3. Trois pages pilotes refaites entièrement :
