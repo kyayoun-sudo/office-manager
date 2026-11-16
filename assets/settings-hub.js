@@ -41,7 +41,7 @@
     p.textContent = 'Les réglages de ce compte ne changent pas les droits des autres collaborateurs.';
     personal.appendChild(p);
     personal.appendChild(link('/mon-ia.html', 'Configurer Mon IA'));
-    personal.appendChild(link('/messagerie.html', 'Ma messagerie'));
+    personal.appendChild(link('/accueil.html', 'Mon travail et mes e-mails personnels'));
     personal.appendChild(link('/apprentissage.html', 'Mon apprentissage'));
     advanced.textContent = '';
     var intro = document.createElement('p');
