@@ -21,6 +21,9 @@ test('personal mail tables are additive, private, idempotent and cascaded on dis
     org + "','" + user + "','" + id + "','provider-1','inbox','sample');");
   await db.exec("insert into office_personal_mail_drafts(org_id,user_id,mailbox_id,recipient,subject,body) values ('" +
     org + "','" + user + "','" + id + "','friend@example.test','subject','draft');");
+  await assert.rejects(db.exec("insert into office_personal_mail_items(org_id,user_id,mailbox_id,provider_message_id,folder) values ('" +
+    org + "','" + other + "','" + id + "','cross-owner','inbox');"), /foreign key/);
+  
   const policy = await db.query("select relrowsecurity from pg_class where relname='office_email_accounts'");
   assert.equal(policy.rows[0].relrowsecurity, true);
   const publicPrivileges = await db.query("select has_table_privilege('authenticated','office_email_accounts','SELECT') as allowed");
