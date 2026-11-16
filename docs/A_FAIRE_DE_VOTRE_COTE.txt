@@ -8,6 +8,17 @@ Dernière mise à jour : 14 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
+00005. [ ] GOOGLE : AUTORISER LA NOUVELLE ADRESSE https://office.eynowa.com                        (16 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Le serveur répond sur https://office.eynowa.com (certificat HTTPS renouvelé tout seul). Pour que « Connecter Google » et
+« Continuer avec Google » marchent à cette adresse :
+  1. console.cloud.google.com → le projet de l'application → API et services → Identifiants → le client OAuth (Web).
+  2. « URI de redirection autorisés » → Ajouter un URI →  https://office.eynowa.com/oauth/google/callback
+  3. « Origines JavaScript autorisées » (si la partie existe) → Ajouter →  https://office.eynowa.com
+  4. Enregistrer (attendre 5 minutes). Ne supprimez pas les anciennes adresses (Vercel, sslip.io) avant la bascule.
+Ensuite : se connecter sur https://office.eynowa.com, Paramètres → Google → « Connecter ».
+
+-----------------------------------------------------------------------------------------------------------------
 00004. [ ] METTRE UNE VERSION EN LIGNE SUR LE SERVEUR = POUSSER SUR LA BRANCHE « production »         (16 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Tout est automatique : GitHub lance les tests, puis envoie le code au serveur, qui sauvegarde, reconstruit, vérifie et
