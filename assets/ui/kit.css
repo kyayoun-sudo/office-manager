@@ -292,3 +292,51 @@
 }
 .om-design .main :is(.chat, .inbox) { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
 .om-design .main .empty-pane { margin: 1rem; }
+
+/* ---------- Pages denses : procédure, programme, revues ---------- */
+.om-design .main #back, .om-design .main .page-head .meta > a:first-child {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.om-design .main #back:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+.om-design .main details > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: calc(var(--radius) - 2px);
+}
+.om-design .main details > summary::-webkit-details-marker { display: none; }
+.om-design .main details > summary::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-right: 2px solid var(--muted-foreground);
+  border-bottom: 2px solid var(--muted-foreground);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.om-design .main details[open] > summary::before { transform: rotate(45deg); }
+.om-design .main details > summary h2 { margin: 0; font-size: 1.0625rem; }
+.om-design .main .step {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--om-muted-surface);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.om-design .main .step:is(.on, .active, .current, [aria-current]) { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+.om-design .main textarea { background-color: transparent; }
