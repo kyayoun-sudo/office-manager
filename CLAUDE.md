@@ -1205,11 +1205,11 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   `assets/ui-workspace.js` : thème clair / sombre (bouton + réglage cabinet), contraste `--brand`, groupes du menu, tiroir mobile.
 - **Déploiement par lot** (ne jamais casser les `id` / `name` / `data-*`) : sur chaque page → police IBM Plex Sans + Mono (Google
   Fonts, seule source externe autorisée par la CSP), `<link /assets/ui.css>`, `<script defer /assets/ui-workspace.js>`,
-  `<body class="om-design">`, et une empreinte de garde dans `tests/ui-pilot-hooks.test.js` (36 écrans y sont).
+  `<body class="om-design">`, et une empreinte de garde dans `tests/ui-pilot-hooks.test.js` (40 écrans y sont).
   Modèle visuel de référence : `design-template/` (Nuxt + shadcn-vue, copie anonymisée d'un autre projet — jamais exécuté ni commité
-  au-delà de la référence). Consignes complètes : `docs/PROMPT_CODEX_DESIGN_SHADCN.md`. Pages sans le socle (rapports/essais
-  statiques ou non référencés) : `cabinet-simulation-resultats.html`, `opportunites-corrige.html`, `diagnostic-ia.html`,
-  `test-cabinet.html` — à confirmer ou supprimer avec Paul.
+  au-delà de la référence). Consignes complètes : `docs/PROMPT_CODEX_DESIGN_SHADCN.md`. Les 40 pages HTML ont le socle
+  (`cabinet-simulation-resultats.html`, `diagnostic-ia.html`, `opportunites-corrige.html`, `test-cabinet.html` restent à confirmer
+  comme vrais écrans avec Paul — orphelines ou essais).
 - La couleur du cabinet (`--brand`, réglée dans Paramètres) remplace `--primary` pour les boutons, l'élément actif, les liens
   et le focus ; `--om-brand-text` / `--om-brand-link` sont calculés par `ui-workspace.js` pour le contraste AA.
 

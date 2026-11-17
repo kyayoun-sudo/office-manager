@@ -41,6 +41,10 @@ const baseline = {
   'presentation.html': 'd0fc3521e64512260a4f1cffe9b7d714ccdff92b376221b5bbf6e6ffb4454ef5',
   'questionnaire.html': '68904f87d60289c6dd6851f70bd65228c06c7b61da90c44b6f1df33bf72bb9ea',
   'index.html': '510b342a031c4b5be4c462898baadcd536f4abfa2a099df51e727f95fcc1d1b0',
+  'opportunites-corrige.html': 'f8de45c22f7fb89ae4c32db5af88f72bcdbe7ece219217eaeeaa178fa086f3a3',
+  'diagnostic-ia.html': '0aaf7974879afc9d9bcb53df400350d905e59b5bddc37f40ed1a229ed1e26332',
+  'test-cabinet.html': '68745167bb28e12a7f3b54c4dfceeba4bcc7d037f6061612fced4d8245f91b11',
+  'cabinet-simulation-resultats.html': '8e9d2714e40cc4cded695737f6ff83e5bce7d2e21ee13592b441e14800fe3bdf',
 };
 
 function hooks(html) {
