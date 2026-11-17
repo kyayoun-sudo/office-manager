@@ -40,6 +40,7 @@ const baseline = {
   'preparation.html': '94fd07a732baee5ad99109ec897ef3c645c353a6197552be3ea1fc6d2b2e45dd',
   'presentation.html': 'd0fc3521e64512260a4f1cffe9b7d714ccdff92b376221b5bbf6e6ffb4454ef5',
   'questionnaire.html': '68904f87d60289c6dd6851f70bd65228c06c7b61da90c44b6f1df33bf72bb9ea',
+  'index.html': '510b342a031c4b5be4c462898baadcd536f4abfa2a099df51e727f95fcc1d1b0',
 };
 
 function hooks(html) {
