@@ -5,6 +5,7 @@
 @source "../*.html";
 @source "./**/*.js";
 @source inline("badge{,-secondary,-destructive,-outline} btn{,-primary,-secondary,-outline,-ghost,-destructive}");
+@import "./ui/auth.css" layer(components);
 
 /* Neutral palette referenced from design-template/app/assets/css/tailwind.css.
    The legacy --muted token is a text color in Office Manager. */
