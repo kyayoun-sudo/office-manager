@@ -22,6 +22,13 @@ const baseline = {
   'cabinets.html': '8a5c378333fe273fd27afb5a92415264958c7969ae2a5cc446d2d2889f075c67',
   'equipe.html': '68a66efb94cd09574ffb4e4c19a34d51ed4ec39be40a06903b5d5b082975d65a',
   'specialists.html': '734aeb79ba2a8423cb3f3f553e14cca7c34df8c229aa858dad36ef171ec7665c',
+  'opportunites.html': 'ee406d61d7d4f410ee15a92a5a9e61a32f681137537e29b1006a4a553959e7fd',
+  'veille.html': '71b4987c47752f37d7d36908d8ace2dacedb68e60e15b7c3f6d5f3f5d249d9e8',
+  'secretariat.html': '0fa0aa1341c6a42f882fa967ea353abfe9bf5393f32353b5574126e077169b6e',
+  'validations.html': 'e791d88de28eae36a2457abe1da20bd9e19568fb4c9e4d6d879983e6040e6e30',
+  'messagerie.html': '3a7a031f53a3e098216a677f754c7086d2206b00b6aa6dd4d27f857bbd1c8d07',
+  'recherche.html': '8204a7e5a390e20dc2cceaccb437ec125b2c6afc34bea62b2d8551ca3558797e',
+  'rangement.html': 'a804fbab64dbedc2498f28ddf1427986460ca583ade8b286e3124f60f2dc64dd',
 };
 
 function hooks(html) {
