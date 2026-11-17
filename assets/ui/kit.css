@@ -340,3 +340,10 @@
 }
 .om-design .main .step:is(.on, .active, .current, [aria-current]) { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
 .om-design .main textarea { background-color: transparent; }
+
+/* Impasses : un message suivi d'un bouton clair pour continuer */
+.om-design .main :is(#state, #page-status) .btn { display: inline-flex; align-items: center; margin-inline-start: 0.5rem; text-decoration: none; }
+
+/* Onglets : toujours en rangée (certaines pages les empilaient) */
+.om-design .main .tabs[role="tablist"], .om-design .main .tabs { flex-direction: row; flex-wrap: wrap; width: fit-content; max-width: 100%; }
+.om-design .main .tabs button { width: auto; flex: 0 0 auto; }

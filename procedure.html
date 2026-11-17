@@ -618,7 +618,7 @@
   }
 
   function load() {
-    if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail.'; return; }
+    if (!missionId || !code) { $('state').textContent = 'Ouvrez la procédure depuis votre accueil ou le programme de travail. '; var go = document.createElement('a'); go.className = 'btn'; go.href = '/accueil.html'; go.textContent = 'Aller à mon travail'; $('state').appendChild(go); return; }
     OM.api('/api/app?route=procedure&mission_id=' + encodeURIComponent(missionId) + '&code=' + encodeURIComponent(code)).then(function (d) {
       data = d; paintCard(); paint(); loadReview(); loadNeeds(); loadSteps();
       window.dispatchEvent(new CustomEvent('procedure-ready', { detail: d }));

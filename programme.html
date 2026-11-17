@@ -389,7 +389,7 @@
     if (data.history.length > 1) h.appendChild(UI.table(['Version', 'État', 'Validé par', 'Le'], data.history.map(function (x) { return [x.version, { draft: 'brouillon', validated: 'validé', superseded: 'remplacé' }[x.status], x.validated_by || '', x.validated_at ? UI.dateTime(x.validated_at) : '']; })));
   }
   function load(keepSay) {
-    if (!missionId) { $('state').textContent = 'Ouvrez le programme depuis une mission.'; return; }
+    if (!missionId) { $('state').textContent = 'Ouvrez le programme depuis une mission. '; var go = document.createElement('a'); go.className = 'btn'; go.href = '/mission.html'; go.textContent = 'Choisir une mission'; $('state').appendChild(go); return; }
     OM.api('/api/app?route=work-programme&mission_id=' + encodeURIComponent(missionId)).then(function (d) { data = d; paint(); })
       .catch(function (e) { $('state').textContent = 'Impossible : ' + msg(e); });
   }
