@@ -1197,12 +1197,26 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   un au lieu d'en tirer un second) ; 4) écrans construits depuis la carte + pastilles ; 5) rattachement d'une pièce à la ligne du test ;
   6) agrandissement des tableaux (ExcelJS ne met pas à jour les formules des autres feuilles : réécriture contrôlée, recontrôle des totaux).
 
+## Design (thème shadcn, 2026-11-17)
+
+- **Socle** : `assets/ui.src.css` (Tailwind 4 + tokens shadcn : `--background/--foreground/--card/--border/--muted/--radius`, alias
+  legacy `--surface/--line/--ink/--surface-2/--nav`, mode sombre `.dark`) compilé en `assets/ui.css` minifié, commité.
+  `npm run build:css` à chaque changement ; le test `tests/ui-css-up-to-date.test.js` recompile et échoue si le fichier n'est pas à jour.
+  `assets/ui-workspace.js` : thème clair / sombre (bouton + réglage cabinet), contraste `--brand`, groupes du menu, tiroir mobile.
+- **Déploiement par lot** (ne jamais casser les `id` / `name` / `data-*`) : sur chaque page → police IBM Plex Sans + Mono (Google
+  Fonts, seule source externe autorisée par la CSP), `<link /assets/ui.css>`, `<script defer /assets/ui-workspace.js>`,
+  `<body class="om-design">`, et une empreinte de garde dans `tests/ui-pilot-hooks.test.js` (36 écrans y sont).
+  Modèle visuel de référence : `design-template/` (Nuxt + shadcn-vue, copie anonymisée d'un autre projet — jamais exécuté ni commité
+  au-delà de la référence). Consignes complètes : `docs/PROMPT_CODEX_DESIGN_SHADCN.md`. Pages sans le socle (rapports/essais
+  statiques ou non référencés) : `cabinet-simulation-resultats.html`, `opportunites-corrige.html`, `diagnostic-ia.html`,
+  `test-cabinet.html` — à confirmer ou supprimer avec Paul.
+- La couleur du cabinet (`--brand`, réglée dans Paramètres) remplace `--primary` pour les boutons, l'élément actif, les liens
+  et le focus ; `--om-brand-text` / `--om-brand-link` sont calculés par `ui-workspace.js` pour le contraste AA.
+
 ## Règles de travail
 
 - **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans
-  `docs/A_FAIRE_DE_VOTRE_COTE.txt`, avec le « comment faire » pas à pas (Paul, 2026-10-19) ; le tenir à jour à chaque modification.
-
-- Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
+  `docs/A_FAIRE_DE_VOTRE_COTE.txt`, avec le « comment faire » pas à pas (Paul, 2026-10-19) ; le tenir à jour à chaque modification.- Branche de travail de Claude : **`feature/white-label-desktop`** — tout le travail y est poussé (Paul, 2026-10-11 : « ta branche à
   toi »). `amelioration` a reçu le même travail le 2026-10-11 (rôles, droits, veille, Shadow) ; elle n'est plus la branche
   de construction. Ne pas toucher `main`, `fix/map-register-bridge-write` (environnement de test isolé) sans accord.
 - « EXTEND, DO NOT REBUILD » : ajouter sans casser ce qui est fait ; montrer le plan pour les gros changements.
