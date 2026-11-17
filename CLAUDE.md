@@ -1221,6 +1221,8 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
   Pour essayer une page en local : `npx serve .` (lire le port affiché : 4173 peut être pris par un serveur de prévisualisation qui injecte une
   fausse session de démonstration).
 
+- **Coquille et kit (2026-11-17)** : `assets/ui/shell.css` (menu latéral, barre du haut en icônes, cloche dans la barre, en-tête de page) et `assets/ui/kit.css` (boutons, champs, onglets, cartes, étiquettes, tableaux, états vides, dialogues, focus) restylent les classes existantes de toutes les pages sans toucher au HTML. Feuilles NON stratifiées (`app.css` ne l'est pas ; `auth.css` ne l'est plus non plus). Icônes du menu : `ICONS` + `addNavIcon` dans `brand-theme.js` (renommer un lien en réécrivant `textContent` efface son icône : la rappeler). Test : `tests/ui-shell.test.js`. Vérifié dans un navigateur (clair, sombre, 375 px) sur les pages de démonstration ; pas encore sur toutes les pages (procédure, programme, revues, Excel).
+
 ## Règles de travail
 
 - **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans
