@@ -16,6 +16,6 @@ test('assets/ui.css matches the minified Tailwind build', () => {
   ], { cwd: new URL('../', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const expected = readFileSync(new URL('../assets/ui.css', import.meta.url), 'utf8');
   // Windows checkouts may add a CR (core.autocrlf): line endings are not a difference in the CSS.
-  const norm = s => s.replace(//g, '').trimEnd();
+  const norm = s => s.replace(/\r/g, '').trimEnd();
   assert.ok(norm(actual) === norm(expected), 'Run npm run build:css and commit assets/ui.css');
 });
