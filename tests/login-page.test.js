@@ -81,3 +81,28 @@ test('decorative icons are hidden from assistive technology and no firm name is 
   assert.ok(!/<svg(?![^>]*aria-hidden)/.test(aside), 'every svg in the panel is decorative');
   assert.ok(!/(?:TATY|EYNOWA)/i.test(html.replace(/<script>[\s\S]*?<\/script>/, '')), 'no firm name in the markup: the firm name comes from data-firm-name');
 });
+
+test('the card keeps the login-card class where brand-theme.js mounts the language switch', () => {
+  const theme = read('assets/brand-theme.js');
+  assert.ok(theme.includes("document.querySelector('.login-card')"), 'brand-theme.js no longer looks for .login-card: update this test and the markup together');
+  assert.ok(/class="[^"]*\blogin-card\b[^"]*"/.test(login()), 'the card must keep the login-card class');
+});
+
+function luminance(hex) {
+  const c = hex.slice(1).match(/../g).map(x => parseInt(x, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+}
+const ratio = (a, b) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+
+test('error messages keep AA contrast (4.5:1) on the dark card too', () => {
+  const css = read('assets/ui/auth.css');
+  const light = css.match(/\.om-auth \.status\.error\s*{[^}]*color:\s*var\(--danger,\s*(#[0-9a-f]{6})\)/i);
+  const dark = css.match(/\.dark \.om-auth \.status\.error\s*{[^}]*color:\s*(#[0-9a-f]{6})/i);
+  assert.ok(dark, 'a lighter error colour is needed under .dark');
+  assert.ok(ratio(dark[1], '#0a0a0a') >= 4.5, 'dark error colour contrast ' + ratio(dark[1], '#0a0a0a').toFixed(2));
+  assert.ok(light && ratio(light[1], '#ffffff') >= 4.5, 'light fallback error colour contrast');
+});
+
+test('the French question mark never wraps alone on the sign-up line', () => {
+  assert.ok(login().includes('Pas encore de compte&nbsp;?'));
+});

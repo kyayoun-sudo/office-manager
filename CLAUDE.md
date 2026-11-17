@@ -1213,6 +1213,14 @@ Document de conception : « Office Manager AI — Postes, rôles et droits d'acc
 - La couleur du cabinet (`--brand`, réglée dans Paramètres) remplace `--primary` pour les boutons, l'élément actif, les liens
   et le focus ; `--om-brand-text` / `--om-brand-link` sont calculés par `ui-workspace.js` pour le contraste AA.
 
+- **Page de connexion (2026-11-17)** : `login.html` utilise la mise en page « auth » du template (formulaire d'abord dans le DOM, panneau de
+  marque dès 1024 px), style dans `assets/ui/auth.css` (importé par `assets/ui.src.css`, préfixe `om-auth-`). Le script inline est épinglé par
+  `tests/login-page.test.js` ; les éléments décoratifs n'ont jamais d'`id` / `name` / `data-*` (sinon l'empreinte de `tests/ui-pilot-hooks.test.js`
+  change). La carte garde la classe `login-card` : `assets/brand-theme.js` y monte le sélecteur de langue. Premier fichier du dossier
+  `assets/ui/` (un fichier CSS par famille de composants, spec `docs/superpowers/specs/2026-11-17-admin-panel-premium-design.md`).
+  Pour essayer une page en local : `npx serve .` (lire le port affiché : 4173 peut être pris par un serveur de prévisualisation qui injecte une
+  fausse session de démonstration).
+
 ## Règles de travail
 
 - **Tout ce que Paul doit faire lui-même** (SQL à exécuter, réglages Vercel / Supabase / Drive, vérifications, décisions) va dans

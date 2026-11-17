@@ -107,6 +107,7 @@
 .om-auth .status { min-height: 0; margin: 0; font-size: 0.875rem; line-height: 1.4; color: var(--muted-foreground); }
 .om-auth .status:empty { display: none; }
 .om-auth .status.error { color: var(--danger, #b42318); }
+.dark .om-auth .status.error { color: #ff8a80; }
 
 .om-auth .or { display: flex; align-items: center; gap: 0.625rem; font-size: 0.8125rem; color: var(--muted-foreground); }
 .om-auth .or::before,
@@ -211,10 +212,13 @@
   background-size: 22px 22px;
   mask-image: linear-gradient(to bottom right, transparent 20%, #000 90%);
 }
+.om-auth-aside > div { margin-block: auto; }
 .om-auth-pitch { margin: 0; max-width: 28rem; font-size: 2rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
 .om-auth-points { display: flex; flex-direction: column; gap: 0.875rem; margin: 1.75rem 0 0; padding: 0; list-style: none; max-width: 28rem; }
 .om-auth-points li { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.9375rem; line-height: 1.45; }
 .om-auth-points svg { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.1rem; }
+.om-auth .lang-switch { margin: 0; text-align: center; }
+.om-auth .link-btn, .om-auth .link-lang { color: var(--om-brand-link, var(--foreground)); }
 .om-auth-foot { margin: 0; font-size: 0.8125rem; opacity: 0.85; }
 /* end aside */
 
