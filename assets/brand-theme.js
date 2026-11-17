@@ -205,7 +205,7 @@
       // The server refuses what a role may not do; the menu only shows what it may.
       var role = OM.getRole();
       var taskLabels = { '/accueil.html': 'Mon travail', '/rangement.html': 'Documents', '/pilotage.html': 'Pilotage' };
-      document.querySelectorAll('.nav a[href]').forEach(function (a) { var label = taskLabels[a.getAttribute('href')]; if (label) { a.textContent = label; a.setAttribute('aria-label', label); } });
+      document.querySelectorAll('.nav a[href]').forEach(function (a) { var label = taskLabels[a.getAttribute('href')]; if (label) { a.textContent = label; addNavIcon(a); a.setAttribute('aria-label', label); } });
       if (role) document.querySelectorAll('.nav a[href]').forEach(function (a) {
         var allowed = NAV_ROLES[a.getAttribute('href')];
         if (allowed && allowed.indexOf(role) < 0) a.hidden = true;
@@ -761,8 +761,31 @@
     '/auditeur.html': 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17l-5-5M8 11l2 2 4-4',
     '/pilotage.html': 'M4 20V10M10 20V4M16 20v-7M22 20H2',
     '/mise-en-service.html': 'M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6l3 3M18 6l-3 3M9 15l-3 3',
+    '/dossiers.html': 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+    '/fichiers.html': 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+    '/missions-terminees.html': 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm-3.5 9l2.5 2.5 4.5-5',
+    '/programme.html': 'M9 6h12M9 12h12M9 18h12M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17',
+    '/secretariat.html': 'M3 6h18v12H3zM3 7l9 7 9-7',
+    '/specialists.html': 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6',
+    '/workflow.html': 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 6-12 3-12 6',
+    '/methodologie.html': 'M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z',
+    '/revue-analytique.html': 'M3 3v18h18M7 15l4-4 3 3 5-6',
+    '/mon-ia.html': 'M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z',
+    '/apprentissage.html': 'M2 9l10-5 10 5-10 5zM6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5',
+    '/carte.html': 'M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14',
+    '/cabinets.html': 'M4 21V5l8-2v18M20 21V9l-8-2M8 9h1M8 13h1M8 17h1M16 13h1M16 17h1',
     '/parametres.html': 'M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6l1.4 1.4m0-11.4l-1.4 1.4m-8.6 8.6l-1.4 1.4'
   };
+  // One icon per menu link (also called again after a link is renamed, because rewriting textContent removes the icon).
+  function addNavIcon(a) {
+    var d = ICONS[a.getAttribute('href')]; if (!d || a.querySelector('svg')) return;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path);
+    a.insertBefore(svg, a.firstChild);
+  }
+  OM.addNavIcon = addNavIcon;
   function decorateShell() {
     var nav = document.querySelector('.nav');
     if (!nav || nav.dataset.decorated) return;
@@ -781,14 +804,7 @@
       if (x[2]) link.setAttribute('data-partners-only', '');
       after.parentNode.insertBefore(link, after.nextSibling); after = link;
     });
-    nav.querySelectorAll('a[href]').forEach(function (a) {
-      var d = ICONS[a.getAttribute('href')]; if (!d || a.querySelector('svg')) return;
-      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
-      svg.setAttribute('stroke-width', '1.8'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
-      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', d); svg.appendChild(path);
-      a.insertBefore(svg, a.firstChild);
-    });
+    nav.querySelectorAll('a[href]').forEach(addNavIcon);
     var brand = nav.querySelector('.brand');
     if (brand && !nav.querySelector('.nav-toggle')) {
       var t = document.createElement('button'); t.type = 'button'; t.className = 'nav-toggle'; t.textContent = 'Menu'; t.setAttribute('aria-expanded', 'false');
@@ -940,7 +956,7 @@
     if (onLoginPage() || inExcel() || !readSession()) return;
     var nav = document.querySelector('.nav');
     if (nav && !nav.querySelector('a[href="/dossiers.html"]') && OM.getRole() !== 'it_admin') {
-      var a = node('a', 'Mes dossiers'); a.href = '/dossiers.html';
+      var a = node('a', 'Mes dossiers'); a.href = '/dossiers.html'; addNavIcon(a);
       var brand = nav.querySelector('.brand');
       nav.insertBefore(a, brand ? brand.nextSibling : nav.firstChild);
     }

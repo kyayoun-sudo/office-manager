@@ -61,6 +61,7 @@
       if (!a.title) a.title = a.getAttribute('aria-label') || a.textContent.trim();
       // Legacy/additive links (e.g. Mes dossiers) may have no SVG icon.
       // Give them a readable compact marker instead of hiding the link.
+      if (!a.querySelector('svg') && OM.addNavIcon) OM.addNavIcon(a);
       if (!a.querySelector('svg, .om-rail-fallback')) {
         var marker = document.createElement('span');
         marker.className = 'om-rail-fallback';

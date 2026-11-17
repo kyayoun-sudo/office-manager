@@ -1,0 +1,265 @@
+/* Kit de composants premium (équivalents shadcn des classes existantes).
+   Restyle .btn, .field, .tabs, .chip, .card, .tag, table, .empty, dialog… sans changer le HTML.
+   Feuille NON stratifiée ; couleur du cabinet = --primary ; clair et sombre. */
+
+.om-design {
+  --om-success: hsl(142 64% 24%);
+  --om-success-bg: hsl(142 70% 40% / 0.14);
+  --om-warning: hsl(32 90% 27%);
+  --om-warning-bg: hsl(38 92% 50% / 0.18);
+  --om-danger: hsl(0 70% 38%);
+  --om-danger-bg: hsl(0 84% 55% / 0.12);
+  --om-info: hsl(217 80% 33%);
+  --om-info-bg: hsl(217 90% 55% / 0.13);
+}
+.dark .om-design, .om-design.dark {
+  --om-success: hsl(142 70% 72%);
+  --om-success-bg: hsl(142 70% 45% / 0.2);
+  --om-warning: hsl(38 92% 72%);
+  --om-warning-bg: hsl(38 92% 50% / 0.2);
+  --om-danger: hsl(0 90% 78%);
+  --om-danger-bg: hsl(0 84% 60% / 0.2);
+  --om-info: hsl(217 90% 78%);
+  --om-info-bg: hsl(217 90% 60% / 0.2);
+}
+
+/* ---------- Focus : toujours visible ---------- */
+.om-design :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--om-brand-link, currentColor);
+  outline-offset: 2px;
+}
+
+/* ---------- Boutons ---------- */
+.om-design .btn {
+  min-height: 2.25rem;
+  padding: 0.4375rem 1rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: var(--om-shadow-xs);
+  transition: filter 0.15s, background-color 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.om-design .btn:hover { filter: brightness(1.08); }
+.om-design .btn:active { transform: translateY(1px); box-shadow: none; }
+.om-design .btn.ghost,
+.om-design .btn.secondary,
+.om-design .btn.outline {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.om-design .btn.ghost:hover,
+.om-design .btn.secondary:hover,
+.om-design .btn.outline:hover { background: var(--om-muted-surface); border-color: var(--border); filter: none; }
+.om-design .btn.danger { background: var(--danger, #b42318); color: #fff; border-color: transparent; }
+.om-design .btn:disabled, .om-design .btn[aria-disabled="true"] { opacity: 0.5; filter: none; box-shadow: none; }
+
+/* ---------- Champs ---------- */
+.om-design .main :is(input:not([type=checkbox],[type=radio],[type=range],[type=hidden],[type=file],[type=color]), select, textarea) {
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background-color: transparent;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.om-design .main textarea { min-height: 5rem; line-height: 1.5; }
+.om-design .main :is(input, select, textarea)::placeholder { color: var(--muted-foreground); opacity: 0.85; }
+.om-design .main :is(input:not([type=checkbox],[type=radio],[type=range],[type=file]), select, textarea):hover { border-color: color-mix(in oklab, var(--foreground) 28%, var(--border)); }
+.om-design .main :is(input:not([type=checkbox],[type=radio],[type=range],[type=file]), select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 26%, transparent);
+}
+.om-design .main select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 1rem;
+}
+.om-design .main :is(input[type=checkbox], input[type=radio]) { width: 1rem; height: 1rem; accent-color: var(--primary); }
+.om-design .main :is(input:disabled, select:disabled, textarea:disabled) { opacity: 0.55; cursor: not-allowed; }
+.om-design .field > label, .om-design .main label.field { font-size: 0.875rem; font-weight: 500; line-height: 1.3; }
+.om-design .hint, .om-design .field .hint { font-size: 0.8125rem; color: var(--muted-foreground); }
+.om-design .status { font-size: 0.875rem; }
+.om-design .status.error, .om-design .error { color: var(--om-danger); }
+
+/* ---------- Cartes ---------- */
+.om-design .card, .om-design .kpi, .om-design .item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--om-shadow-xs);
+}
+.om-design .item { background: var(--om-muted-surface); box-shadow: none; }
+.om-design .card h2 { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+.om-design .card-head { align-items: center; }
+.om-design .meta { font-size: 0.8125rem; color: var(--muted-foreground); }
+.om-design .callout { border-radius: var(--radius); background: var(--om-warning-bg); border-color: color-mix(in oklab, var(--om-warning) 30%, transparent); }
+.om-design .callout-label { color: var(--om-warning); }
+.om-design .links a, .om-design .opp-entry-card, .om-design .workspace-launcher, .om-design .workspace-agent {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  transition: transform 0.18s var(--om-ease), box-shadow 0.18s var(--om-ease), border-color 0.15s, background-color 0.15s;
+}
+.om-design .links a:hover, .om-design .opp-entry-card:hover, .om-design .workspace-launcher:hover, .om-design .workspace-agent:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--om-shadow-sm);
+  border-color: color-mix(in oklab, var(--primary) 55%, var(--border));
+}
+.om-design .workspace-launcher:first-child { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.om-design .workspace-launcher:first-child span { color: inherit; }
+.om-design .workspace-hero { border-radius: calc(var(--radius) + 0.25rem); border-color: var(--border); background: var(--card); box-shadow: var(--om-shadow-xs); }
+.om-design .workspace-avatar { background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--om-brand-link, var(--foreground)); }
+
+/* ---------- Onglets et puces (segmentés) ---------- */
+.om-design .main .tabs, .om-design .chips {
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--om-muted-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.om-design .main .tabs button, .om-design .chips .chip {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.om-design .main .tabs button:hover, .om-design .chips .chip:hover { color: var(--foreground); background: color-mix(in oklab, var(--card) 60%, transparent); }
+.om-design .main .tabs button[aria-selected="true"], .om-design .chips .chip[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--om-shadow-sm);
+}
+
+/* ---------- Étiquettes ---------- */
+.om-design .tag, .om-design .verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--om-brand-link, var(--foreground));
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.om-design .tag.neutral { background: var(--om-muted-surface); color: var(--muted-foreground); border-color: var(--border); }
+.om-design .tag.warn { background: var(--om-warning-bg); color: var(--om-warning); }
+.om-design .tag:is(.ok, .good, .success), .om-design .verdict.ok { background: var(--om-success-bg); color: var(--om-success); }
+.om-design .tag:is(.bad, .danger, .late) { background: var(--om-danger-bg); color: var(--om-danger); }
+.om-design .tag.info { background: var(--om-info-bg); color: var(--om-info); }
+.om-design .badge { border-radius: 999px; }
+
+/* ---------- Tableaux ---------- */
+.om-design .table-box, .om-design .rich-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  max-width: 100%;
+  overflow: auto;
+}
+.om-design .main table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+.om-design .main th {
+  padding: 0.625rem 0.75rem;
+  background: var(--om-muted-surface);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: start;
+  white-space: nowrap;
+}
+.om-design .main td { padding: 0.625rem 0.75rem; border-top: 1px solid var(--border); vertical-align: middle; }
+.om-design .main table tbody tr:nth-child(even) { background: transparent; }
+.om-design .main table tbody tr { transition: background-color 0.12s; }
+.om-design .main table tbody tr:hover { background: var(--om-muted-surface); }
+
+/* ---------- États vides ---------- */
+.om-design .empty, .om-design .empty-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--om-muted-surface) 55%, transparent);
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.om-design .empty::before, .om-design .empty-pane::before {
+  content: "";
+  width: 1.75rem;
+  height: 1.75rem;
+  background: currentColor;
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.om-design :is(.drop-zone, .opp-drop, .dropzone, .drop) {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--om-muted-surface) 55%, transparent);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.om-design :is(.drop-zone, .opp-drop, .dropzone, .drop):hover { border-color: var(--primary); background: var(--card); }
+
+/* ---------- Dialogues ---------- */
+.om-design .om-dialog, .om-design dialog {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 0.25rem);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--om-shadow-md);
+}
+.om-design .om-dialog::backdrop, .om-design dialog::backdrop { background: rgb(0 0 0 / 0.5); backdrop-filter: blur(2px); }
+.om-design .om-dialog h2 { font-size: 1.125rem; font-weight: 600; }
+.om-design .om-dialog p { color: var(--muted-foreground); }
+
+/* ---------- Chargement ---------- */
+.om-skeleton {
+  display: block;
+  min-height: 1rem;
+  border-radius: 0.375rem;
+  background: linear-gradient(90deg, var(--om-muted-surface) 25%, color-mix(in oklab, var(--om-muted-surface) 60%, var(--card)) 50%, var(--om-muted-surface) 75%);
+  background-size: 200% 100%;
+  animation: om-shimmer 1.4s linear infinite;
+}
+@keyframes om-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ---------- Mouvement discret (apparition des blocs de page) ---------- */
+@keyframes om-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.om-design .main > :is(.page-head, .card, .workspace-hero, .workspace-launchers, .kpis, .cockpit-grid) {
+  animation: om-rise 0.35s var(--om-ease) backwards;
+}
+.om-design .main > :nth-child(3) { animation-delay: 40ms; }
+.om-design .main > :nth-child(4) { animation-delay: 80ms; }
+.om-design .main > :nth-child(5) { animation-delay: 120ms; }
+.om-design .main > :nth-child(n+6) { animation-delay: 160ms; }
+
+/* ---------- Liens dans le texte : contraste AA en clair et en sombre ---------- */
+.om-design .main :is(p, .empty, .meta, .hint, .lead, li) a:not(.btn):not(.tag) {
+  color: var(--om-brand-link, var(--foreground));
+  text-underline-offset: 3px;
+}
