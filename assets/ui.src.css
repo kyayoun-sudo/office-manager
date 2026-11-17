@@ -230,3 +230,36 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+
+/* Lot 1 — Dossiers, Pilotage, Programme, Workflow, Revue Analytique, Méthodologie */
+.om-design .dossier-index-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.om-design .dossier-step { border-color: var(--border); padding-block: 1rem; }
+.om-design .dossier-work { border-radius: var(--radius); border: 1px solid var(--border); }
+.om-design .btn-row, .om-design .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.om-design .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; margin-block: 0.5rem 1rem; }
+.om-design .kpis > .kpi { padding: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); display: flex; flex-direction: column; gap: 0.25rem; }
+.om-design .kpis > .kpi > span { font-size: 0.8125rem; font-weight: 500; color: var(--muted-foreground); }
+.om-design .kpis > .kpi > strong { font-size: 1.5rem; font-weight: 700; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.om-design .prov { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.om-design .prov span { display: inline-flex; align-items: center; padding: 0.375rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.8125rem; background: var(--om-muted-surface); color: var(--muted-foreground); }
+.om-design .prov span.on { border-color: var(--primary); background: var(--card); color: var(--foreground); font-weight: 600; }
+.om-design .reply { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; background: var(--om-muted-surface); line-height: 1.6; }
+.om-design .cyc { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+.om-design .cyc h3 { font-size: 1.0625rem; font-weight: 600; color: var(--foreground); margin: 0; }
+.om-design .procs th { border-bottom: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.8125rem; font-weight: 600; }
+.om-design .procs td { border-bottom: 1px solid var(--border); padding: 0.5rem; vertical-align: middle; }
+.om-design .savebar { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+.om-design .wf-step { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+.om-design .wf-step summary { font-weight: 600; font-size: 0.9375rem; color: var(--foreground); cursor: pointer; }
+.om-design .wf-step summary:hover { color: var(--primary); }
+.om-design .tag.gate { background: hsl(0 84.2% 60.2% / 0.12); color: hsl(0 72% 51%); font-weight: 600; border: 1px solid hsl(0 84.2% 60.2% / 0.2); }
+.dark .om-design .tag.gate { background: hsl(0 62.8% 30.6% / 0.3); color: hsl(0 90% 75%); border-color: hsl(0 62.8% 30.6% / 0.5); }
+.om-design .choice { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 1.25rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+.om-design .choice h3 { font-size: 1.0625rem; font-weight: 600; margin-top: 0; color: var(--foreground); }
+.om-design .dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.75rem 1.5rem; text-align: center; cursor: pointer; background: var(--om-muted-surface); transition: border-color 0.2s, background-color 0.2s; }
+.om-design .dropzone:hover, .om-design .dropzone.over { border-color: var(--primary); background: var(--card); }
+.om-design .proc { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+.om-design .proc summary { font-weight: 600; font-size: 0.9375rem; color: var(--foreground); cursor: pointer; }
+.om-design .proc summary:hover { color: var(--primary); }
+.om-design .tag.risk { background: hsl(38 92% 50% / 0.15); color: hsl(38 80% 35%); font-weight: 600; }
+.dark .om-design .tag.risk { background: hsl(38 92% 50% / 0.2); color: hsl(38 92% 70%); }
