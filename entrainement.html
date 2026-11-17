@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Entraînement des agents</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
+<link rel="stylesheet" href="/assets/ui.css">
+<script defer src="/assets/ui-workspace.js"></script>
 <style>
 .bars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end;height:170px;padding-top:8px}
 .bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%}
@@ -29,7 +32,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 .training-nav{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 24px}.training-panel[hidden]{display:none!important}.training-exercise{margin:16px 0}.training-exercise>summary{cursor:pointer;padding:8px 0;line-height:1.6}.training-exercise>summary span{display:block;color:var(--muted);font-size:14px;margin-top:4px}.training-exercise[open]>summary{margin-bottom:18px}.training-steps{display:flex;gap:18px;flex-wrap:wrap;padding:14px 18px;background:var(--surface-2);border-radius:10px}.training-mode{font-weight:600;color:var(--brand-ink)}.training-table{overflow-x:auto}.training-table table{width:100%;border-collapse:collapse}.training-table td,.training-table th{text-align:left;padding:10px;border-bottom:1px solid var(--line)}.training-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}.training-settings{margin:14px 0}.training-settings label{display:block;margin:8px 0}.training-settings input,.training-settings select{font:inherit;min-height:42px;max-width:100%;padding:8px}.training-metrics{display:flex;flex-wrap:wrap;gap:12px}.training-metrics p{padding:12px 16px;background:var(--surface-2);border-radius:8px}.training-log{border-bottom:1px solid var(--line);padding:12px 0}
 </style>
 </head>
-<body>
+<body class="om-design">
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>

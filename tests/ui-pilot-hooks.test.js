@@ -29,6 +29,17 @@ const baseline = {
   'messagerie.html': '3a7a031f53a3e098216a677f754c7086d2206b00b6aa6dd4d27f857bbd1c8d07',
   'recherche.html': '8204a7e5a390e20dc2cceaccb437ec125b2c6afc34bea62b2d8551ca3558797e',
   'rangement.html': 'a804fbab64dbedc2498f28ddf1427986460ca583ade8b286e3124f60f2dc64dd',
+  'apprentissage.html': '50c5fa6149cf72d8ce8f609bb62c478ba2defe53a58cb0c623bc243a6a4d2898',
+  'assistant.html': '81568bdf56f981b699fcea87e1af11801ae3b9168d823f73f691e4189f8a45be',
+  'auditeur.html': 'f35c16f1edebaf4ed884f90f2299de8ceab772aced92ad54badc6f33e9e6a53f',
+  'carte.html': '517264de7878e11fa9e4c0ddbd52b1537bed1ee0a8614f286bbbda3d6255bf45',
+  'entrainement.html': '498594eedf82d79934500483f4e6674008f10ec26b7e77557a8bdb6ebd04a735',
+  'fichiers.html': '3754d85d85743a8676c7722fbdf334e8cbc11df0eab262f27246585d9d634b3d',
+  'missions-terminees.html': '3bc3550b6db8965b93c70910029a0bed4807dbd406f6ae3abf5696c1ef43dd80',
+  'mon-ia.html': '37df909cadf681eeea0794dad10714686e93046bfdb8d051017013181d542281',
+  'preparation.html': '94fd07a732baee5ad99109ec897ef3c645c353a6197552be3ea1fc6d2b2e45dd',
+  'presentation.html': 'd0fc3521e64512260a4f1cffe9b7d714ccdff92b376221b5bbf6e6ffb4454ef5',
+  'questionnaire.html': '68904f87d60289c6dd6851f70bd65228c06c7b61da90c44b6f1df33bf72bb9ea',
 };
 
 function hooks(html) {

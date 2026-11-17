@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
+<link rel="stylesheet" href="/assets/ui.css">
+<script defer src="/assets/ui-workspace.js"></script>
 <style>
 .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .agent-card{font:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;cursor:pointer;color:var(--ink);min-height:44px}
@@ -22,7 +24,7 @@ details.card[open] summary{margin-bottom:6px}
 .hint{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 </style>
 <link rel="stylesheet" href="/assets/workspace.css"></head>
-<body>
+<body class="om-design">
 <div class="shell">
   <nav class="nav" aria-label="Navigation principale">
     <div class="brand"><div class="logo" data-firm-logo>C</div><div><span data-firm-name>Office Manager</span><small>Office Manager</small></div></div>
