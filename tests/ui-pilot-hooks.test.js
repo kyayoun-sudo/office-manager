@@ -14,6 +14,14 @@ const baseline = {
   'workflow.html': '7eede4c1b0c03c6ca19e295d6ae06830b6929aac9860bc161a73ce6b950483ed',
   'revue-analytique.html': '3b7f098cf0d145841a1d58d3476ff09bc8ac27697ff0ea5bb7d37fa4c142f118',
   'methodologie.html': 'a5fc261e980e86d17b32c4919e583c61d40e367db51c4de7b7c70e918250cfb1',
+  'login.html': 'cbe22dfb73df6bee49f435c362e9163e4c2d57db00d08810a8641b221acbec61',
+  'bienvenue.html': '6ca2bdb186d28d2add5da590dd1d5189cefaa72b751a44979064efc1e6dd7c67',
+  'demarrer.html': '573f93df0b6e96301b5e772719541ceb4ad98fcc6cb05a5ceb267b04fa677019',
+  'mise-en-service.html': 'cf2e657eb373ebe0b02cfff6850effa1000575990de8dfecc11498e66e8bc876',
+  'parametres.html': '1f8d3ec68fbaedc0aa9e5ccbc6da4053ce51a3311a7a874fabcd459e074ec4d4',
+  'cabinets.html': '8a5c378333fe273fd27afb5a92415264958c7969ae2a5cc446d2d2889f075c67',
+  'equipe.html': '68a66efb94cd09574ffb4e4c19a34d51ed4ec39be40a06903b5d5b082975d65a',
+  'specialists.html': '734aeb79ba2a8423cb3f3f553e14cca7c34df8c229aa858dad36ef171ec7665c',
 };
 
 function hooks(html) {

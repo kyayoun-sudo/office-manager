@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Démarrer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/ui.css">
+<script defer src="/assets/ui-workspace.js"></script>
 <style>
-body{background:var(--bg,#F4F5F3)}
+body{background:var(--nav)}
 .wrap{max-width:620px;margin:0 auto;padding:32px 16px 64px;display:flex;flex-direction:column;gap:18px}
-.step{background:var(--surface);border:1px solid var(--line,#E3E7E5);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.step{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:12px}
 .step h2{margin:0;font-size:18px;display:flex;gap:10px;align-items:center}
-.num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--surface-2);font-size:14px;font-weight:600}
-.step.done .num{background:#0B4A43;color:#fff}
+.num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--om-muted-surface);font-size:14px;font-weight:600}
+.step.done .num{background:var(--primary);color:var(--primary-foreground)}
 .step.off{opacity:.55}
 .step.off button,.step.off input{pointer-events:none}
-.small{font-size:13px;color:var(--muted,#5B6670);margin:0;line-height:1.5}
+.small{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 .ok{color:var(--brand-ink);font-weight:500}
-.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--surface)!important;color:#1F2933!important;border:1px solid var(--line)!important}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--card)!important;color:var(--foreground)!important;border:1px solid var(--border)!important}
 </style>
 </head>
-<body>
+<body class="om-design">
 <div class="wrap">
   <header style="display:flex;flex-direction:column;gap:6px">
     <h1 style="margin:0">Démarrer Office Manager</h1>
