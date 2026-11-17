@@ -347,3 +347,12 @@
 /* Onglets : toujours en rangée (certaines pages les empilaient) */
 .om-design .main .tabs[role="tablist"], .om-design .main .tabs { flex-direction: row; flex-wrap: wrap; width: fit-content; max-width: 100%; }
 .om-design .main .tabs button { width: auto; flex: 0 0 auto; }
+
+/* ---------- Une décision claire : l'action principale se voit, le reste est discret ---------- */
+.om-design .card > :is(.btn, button.btn, a.btn) { align-self: flex-start; }
+.om-design .card > a.btn:not(.ghost):not(.danger) { background: var(--background); color: var(--foreground); border-color: var(--border); box-shadow: none; }
+.om-design .card > a.btn:not(.ghost):not(.danger):hover { background: var(--om-muted-surface); filter: none; }
+.om-design .card > .status:empty { display: none; }
+.om-design .card > .status { min-height: 0; }
+/* « À valider » : les propositions à décider d'abord, les messages aux collègues ensuite */
+.om-design .main > #mail-card { order: 10; }
