@@ -24,7 +24,7 @@ jobs:
       - name: Check syntax
         run: npm run check
       - name: Test mobile PWA
-        run: node --test tests/mobile-shell.test.js tests/mobile-pwa.test.js
+        run: node --test tests/mobile-shell.test.js tests/mobile-pwa.test.js tests/mobile-chat.test.js
       - name: Full regression
         run: npm test
       - name: SQL/schema tests
