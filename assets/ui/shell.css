@@ -142,7 +142,7 @@
 .om-design .om-workspace-crumb { margin-inline: 0.5rem 0; font-size: 0.8125rem; color: var(--muted-foreground); }
 
 /* ---------- Cloche : dans la barre du haut quand elle existe ---------- */
-.om-design .main > .om-workspace-toolbar + .notification-tools {
+.om-design .main > .om-workspace-toolbar ~ .notification-tools {
   position: sticky;
   top: var(--om-topbar);
   z-index: 36;
@@ -153,7 +153,7 @@
   pointer-events: none;
   overflow: visible;
 }
-.om-design .main > .om-workspace-toolbar + .notification-tools .bell {
+.om-design .main > .om-workspace-toolbar ~ .notification-tools .bell {
   position: absolute;
   top: calc(-1 * var(--om-topbar) + 0.625rem);
   right: calc(-1 * var(--om-px) + 1rem);
@@ -201,5 +201,10 @@
 @media (max-width: 860px) {
   .om-design .om-workspace-toolbar { flex-wrap: nowrap; }
   .om-design .om-workspace-crumb { display: none; }
-  .om-design .main > .om-workspace-toolbar + .notification-tools .bell { right: calc(-1 * var(--om-px) + 0.5rem); }
+  .om-design .main > .om-workspace-toolbar ~ .notification-tools .bell { right: calc(-1 * var(--om-px) + 0.5rem); }
 }
+
+/* Pages de mission : le lien « Voir le dossier » est inséré par script avant la cloche ; on remet la cloche juste sous la barre du haut. */
+.om-design .main:has(> a.btn[href^="/dossiers.html?"]) > .om-workspace-toolbar { order: -3; }
+.om-design .main:has(> a.btn[href^="/dossiers.html?"]) > .notification-tools { order: -2; }
+.om-design .main:has(> a.btn[href^="/dossiers.html?"]) > a.btn[href^="/dossiers.html?"] { order: -1; }

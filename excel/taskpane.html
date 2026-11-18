@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Office Manager</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/screens.css">
+<link rel="stylesheet" href="/assets/ui.css">
 <style>
 body{background:var(--ground)}
 .pane{padding:14px 14px 40px;display:flex;flex-direction:column;gap:12px}
@@ -26,7 +30,7 @@ body{background:var(--ground)}
 .muted{font-size:12.5px;color:var(--muted);margin:0;line-height:1.45}
 </style>
 </head>
-<body>
+<body class="om-design">
 <div class="pane">
   <header style="display:flex;align-items:center;gap:10px"><div class="logo" data-firm-logo style="width:30px;height:30px">C</div><div><h1 style="margin:0">Office Manager</h1><span class="muted" data-firm-name></span></div></header>
 

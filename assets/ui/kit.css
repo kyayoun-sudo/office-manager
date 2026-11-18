@@ -369,3 +369,34 @@
 /* Fiche mission : les boutons de l'en-tête gardent la taille de leur texte (pas de barre pleine largeur). */
 .om-design .page-head > :is(.btn, button, a.btn) { align-self: flex-start; width: auto; }
 .om-design .page-head > .btn.ghost { min-height: 2rem; padding-inline: 0.75rem; font-size: 0.8125rem; }
+
+/* Les « îlots sombres » de app.css rendaient tout tableau sombre, même en thème clair : on rend au tableau les couleurs du thème. */
+.om-design :is(.main:has(#items-card) > .card:not(#login), .ea-panel > .card, .table-box, .rich-table, table, .ask) {
+  --brand: inherit; --on-brand: inherit; --brand-ink: inherit;
+  --surface: inherit; --surface-2: inherit; --ground: inherit;
+  --ink: inherit; --muted: inherit; --line: inherit;
+  --soft: inherit; --brass: inherit; --brass-soft: inherit; --brass-ink: inherit;
+  --warn-bg: inherit; --warn-ink: inherit;
+  --danger: inherit; --danger-soft: inherit; --danger-ink: inherit;
+  --shadow: inherit;
+  color: inherit; background: transparent; color-scheme: normal;
+}
+.om-design .table-box, .om-design .rich-table { background: var(--card); }
+.om-design :is(.table-box, .rich-table, table, .ask) :is(input, select, textarea) { color: var(--foreground); background: var(--background); border-color: var(--border); accent-color: var(--primary); }
+.om-design :is(.table-box, .rich-table, table, .ask) :is(input, textarea)::placeholder { color: var(--muted-foreground); }
+.om-design table tbody tr:has(input:checked) { background: color-mix(in oklab, var(--primary) 8%, transparent); }
+
+/* Programme de travail : le tableau des procédures garde des colonnes lisibles et défile à l'intérieur de sa carte. */
+.om-design .procs { min-width: 64rem; }
+.om-design .procs td:nth-child(3) { min-width: 17rem; }
+.om-design .procs td select { min-width: 10rem; }
+.om-design .procs td input[type="text"] { min-width: 12rem; }
+.om-design .procs td:nth-child(2) { white-space: nowrap; }
+.om-design .wf-sop #card { max-height: min(34rem, 65vh); }
+.om-design .main .tabs button { white-space: normal; max-width: 100%; text-align: center; }
+
+/* Messagerie : l'archive et le bouton du son se rangent sur une ligne sans se chevaucher. */
+.om-design #chat-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
+
+/* Lien « Voir le dossier… » ajouté en tête des pages de mission : discret, à la taille de son texte. */
+.om-design .main > a.btn.ghost[href^="/dossiers.html?"] { align-self: flex-start; width: fit-content; min-height: 2rem; padding-inline: 0.75rem; font-size: 0.8125rem; }
