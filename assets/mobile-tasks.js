@@ -59,10 +59,16 @@
       var ask = make('button', 'Demander à l’IA');
       ask.type = 'button';
       ask.addEventListener('click', function () {
-        toAgent('Aide-moi avec cette tâche de mon Firm Manager : ' +
-          String(q.title || '').slice(0, 160) + ' — ' + String(q.question).slice(0, 650) +
-          (q.context ? ' (' + String(q.context).slice(0, 250) + ')' : '') +
-          '. Prépare les actions autorisées, indique ce que tu peux réellement effectuer et les validations restantes. Ne signe jamais à ma place.');
+        toAgent('Dans le Firm Manager existant, prends en charge cette tâche déjà créée (ne crée pas une nouvelle job note) : ' +
+          'identifiant ' + String(q.id || 'non fourni').slice(0, 160) +
+          ' ; mission ' + String(q.title || '').slice(0, 140) +
+          ' ; demande : ' + String(q.question).slice(0, 650) +
+          (q.context ? ' ; contexte : ' + String(q.context).slice(0, 240) : '') +
+          (q.href ? ' ; lien interne du dossier : ' + String(q.href).slice(0, 330) : '') +
+          '. Utilise les outils, job notes, pièces et workflows déjà présents dans Firm Manager. ' +
+          'Exécute uniquement les opérations permises pour mon rôle et vérifie le résultat réellement enregistré ; ' +
+          'sinon dis-moi précisément quelle approbation ou signature reste à faire. ' +
+          'N’attribue jamais une signature humaine à l’IA.');
       });
       actions.appendChild(ask);
       card.appendChild(actions);
