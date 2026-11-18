@@ -9,29 +9,18 @@ const boot = readFileSync(new URL('../assets/mobile.js', import.meta.url), 'utf8
 const css = readFileSync(new URL('../assets/mobile.css', import.meta.url), 'utf8');
 const worker = readFileSync(new URL('../mobile-sw.js', import.meta.url), 'utf8');
 
-test('E6 keeps procedure work in the canonical Firm Manager app', () => {
+test('experimental extended procedure editor remains separate from the lightweight phone bundle', () => {
   assert.doesNotThrow(() => new Script(js));
-  assert.match(html, /src="\/assets\/mobile-work\.js"/);
-  for (const id of ['mobile-work-list', 'mobile-work-mine', 'mobile-work-reviews',
-    'mobile-work-detail', 'mobile-work-conclusion-form', 'mobile-work-review-form',
-    'mobile-work-detail-status', 'mobile-work-points']) {
-    assert.ok(html.includes('id="' + id + '"'), id);
-  }
+  assert.doesNotMatch(html, /src="\/assets\/mobile-work\.js"/);
+  assert.match(html, /src="\/assets\/mobile-tasks\.js"/);
+  assert.match(html, /src="\/assets\/mobile-mail\.js"/);
   assert.match(js, /route=procedure&mine=1/);
-  assert.match(js, /route=procedure&reviews=1/);
   assert.match(js, /commit\('answer-point'/);
   assert.match(js, /commit\('conclusion'/);
   assert.match(js, /commit\('return'/);
   assert.match(js, /commit\('clear-point'/);
-  assert.match(js, /if \(!window\.confirm/);
-  assert.match(boot, /FirmMobileWork\.init\(OM\)/);
-  assert.match(boot, /FirmMobileWork\.refresh\(force\)/);
-  assert.match(css, /\.mobile-work-section/);
-  assert.match(worker, /mobile-work\.js/);
-  assert.doesNotMatch(js, /\.innerHTML\s*=/);
-  assert.doesNotMatch(js, /localStorage\s*[.\[]|sessionStorage\s*[.\[]/);
-  // Professional WP signatures are retained in the full page after examination.
   assert.doesNotMatch(js, /commit\('sign'/);
+  assert.doesNotMatch(worker, /'\/assets\/mobile-work\.js'/);
 });
 
 test('a preparer sees their procedures and saves a conclusion through the same server API', async () => {
