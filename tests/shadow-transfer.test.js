@@ -5,7 +5,7 @@ import { emptyLab } from '../lib/shadow.js';
 
 const L = (id, extra = {}) => ({ id, agent: 'orpailleur', lesson: 'Lire le contenu avant de nommer', rule: 'jamais depuis le nom', type: 'firm_rule', status: 'active', confidence: 'haute', occurrences: 3, evidence: ['decision:x'], history: [], ...extra });
 const T = (id) => ({ id, agent: 'orpailleur', kind: 'golden', name: 'n', scenario: 'scan 1 = relevé bancaire', expected: 'nom avec banque et période', results: [{ ok: true }] });
-function memoryLab(seed) { const lab = { ...emptyLab(), ...seed }; const writes = []; return { lab, d: { loadLab: async () => lab, updateJsonFile: async (name, fn) => { const next = fn(lab); Object.assign(lab, next || {}); writes.push(name); return lab; } }, writes }; }
+function memoryLab(seed) { const lab = { ...emptyLab(), ...seed }; const writes = []; return { lab, d: { loadLab: async () => lab, updateJsonFile: async (name, fn) => { const next = await fn(lab); Object.assign(lab, next || {}); writes.push(name); return lab; } }, writes }; }
 
 test('export keeps lessons and tests, not raw problems, surveys or usage', async () => {
   const m = memoryLab({ lessons: [L('L-1')], tests: [T('ORP_1')], problems: [{ secret: 'client X' }], surveys: [{ a: 'perso' }], usage: { '2026-10-01': {} } });
