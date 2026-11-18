@@ -1,53 +1,45 @@
-# Firm Manager Mobile — déploiement autonome, sans fusion de l'interface ordinateur
+# Firm Manager Mobile — interface légère du même Firm Manager
 
-## Décision produit
+> **Clarification du propriétaire (18 novembre 2026) :** ce document remplace la proposition précédente de « deuxième application autonome ». Il s'agit du **même Firm Manager**, auquel on ajoute un mode téléphone léger pour consulter et réaliser certaines activités. Ne pas créer un deuxième produit.
 
-Le propriétaire demande **deux interfaces distinctes** :
-- **Firm Manager ordinateur** : application complète, son cycle de livraison habituel intact.
-- **Firm Manager Mobile** : application web installable (PWA), légère, livrée et mise à jour séparément.
+## Un produit, deux interfaces adaptées
 
-Elles ne sont **pas deux bases de données**, ni deux moteurs d'agents et ne nécessitent pas deux comptes. Le mobile appelle les services existants de Firm Manager avec l'identité personnelle du collaborateur. Le serveur reste la source de vérité.
+- **Ordinateur** : cockpit complet, WP complexes, grande analyse, administration avancée.
+- **Téléphone** : les fonctions essentielles pour réellement travailler en version légère : suivi des missions, messagerie instantanée, discussions/instructions avec les agents IA, tâches courtes, réponses et commentaires, validations selon le rôle, photo et dépôt de pièces.
+- Les deux utilisent **exactement les mêmes** comptes et authentification, base de données, organisations, permissions, missions, chat, documents, mémoire et agents IA. Le serveur reste la source de vérité.
+- Une action effectuée sur mobile doit être retrouvée sur l'ordinateur, et inversement. Pas de duplication d'un workflow ni de nouvelle base mobile.
+- Le téléphone ne calcule pas les IA et ne charge pas les gros tableurs. Il contacte les services existants en ligne.
 
-La branche `feature/mobile-pwa` est autonome pour son **cycle de livraison**. Ne pas ouvrir une fusion vers `feature/white-label-desktop` par défaut ; ne pas déployer la version ordinateur en la remplaçant par la branche mobile. La manière de partager durablement le code commun (même dépôt avec packages séparés, ou dépôt frontend mobile ultérieur) est une décision d'architecture à prendre avec Christian ; l'autonomie de la livraison prime.
+## Architecture recommandée
 
-## Architecture de publication recommandée
+**Par défaut : même serveur et même origine web**, avec un point d'entrée `/mobile.html` déjà créé dans la branche `feature/mobile-pwa`, une PWA installable avec la même authentification que la version ordinateur. Cette solution évite CORS, les changements d'OAuth et une nouvelle gestion des comptes. Une adresse différente ou un hébergement séparé n'est **pas requis** ; ne le proposer que si un besoin réel l'exige après étude de Christian.
 
-Exemple d'adresse (à remplacer par le domaine réellement attribué) :
-- Bureau : `https://firm.example.com/`
-- Mobile : `https://mobile.firm.example.com/mobile.html`
+Le développement peut rester dans une **branche Git de travail** dédiée le temps des tests, mais cela ne signifie pas une application métier distincte ni un second déploiement obligatoire. La stratégie de publication de Christian doit mettre les fichiers mobiles à disposition du Firm Manager en service sans remplacer les pages ordinateur ; un PR ou une fusion Git éventuelle n'oblige jamais à fusionner les deux interfaces visuelles. Valider le plan avant tout changement serveur.
 
-Sur le **même VPS**, un vhost nginx distinct pourra :
-1. Servir **uniquement** les fichiers mobiles publics extraits d'une version approuvée de la branche mobile : `mobile.html`, `mobile-sw.js`, `assets/mobile.js`, `assets/mobile-chat.js`, `assets/mobile.css`, `assets/mobile-manifest.json`, `assets/firm-mobile-*.png`.
-2. Faire suivre vers le backend Firm Manager existant, via le réseau interne, les appels `/api/*`, la page `/login.html`, `/cabinets.html`, l'asset partagé `/assets/brand-theme.js` et les pages complètes liées depuis le mobile. L'URL et les en-têtes d'hôte/proxy doivent être validés sans casser OAuth, HTTPS ou les permissions multi-cabinets.
-3. Garder les sessions mobiles sur l'origine mobile, sans récupérer des secrets de la page bureau. Les mêmes comptes/personnes sont vérifiés par le même backend (sessions propres à chaque appareil).
-4. Enregistrer un certificat TLS valide pour le sous-domaine mobile. Les PWA/installations et service workers nécessitent HTTPS en production.
-5. **Ne pas** dupliquer les tâches programmées, la base SQL, ni les agents. Ne pas exécuter une deuxième instance de scheduler.
-6. Publier indépendamment les fichiers statiques mobiles, via un répertoire de versions et une bascule atomique, avec rollback vers la version précédente. Le backend desktop reste intact.
+## État réel du code
 
-Ce modèle garde un même domaine d'origine **à l'intérieur du mobile** pour `/api` et `/login.html`, en s'appuyant sur un reverse proxy ; il évite d'introduire un système CORS différent ou des jetons secrets navigateur. Alternative pour Christian : préfixe `/mobile/` sur le domaine principal, avec distribution autonome ; les chemins du manifeste et du worker devront alors être alignés au préfixe et au scope. **Ne pas appliquer les exemples DNS comme si les domaines existaient.**
+- E0 : inventaire GitHub initial, tests sur vrai serveur à compléter.
+- E1 : page `mobile.html`, assets mobiles et navigation à cinq onglets.
+- E2 : même session via `assets/brand-theme.js`, installation PWA, manifeste, worker et icônes ; essais d'installation iPhone et Android sur HTTPS encore nécessaires.
+- E3 : messagerie interne dans l'interface mobile, réutilisant `/api/app?route=chat` et les droits existants. Les tests automatisés ciblés ont été ajoutés ; recette réelle multi-utilisateurs encore nécessaire.
+- E4 : discussions/commandes IA directement dans l'écran téléphone, à réaliser avec les routes existantes.
+- E5 : caméra et pièces vers les dossiers de mission déjà existants, à réaliser.
+- E6 : activités courtes (job notes, checklists, commentaire WP, approbations selon rôle), à réaliser.
+- E7 : optimisation des performances, notifications push avec consentement, à finaliser.
+- E8 : tests multi-rôles, sécurité, synchronisation, réseau lent et déploiement après validation.
 
-Attention : une connexion Google native sur un sous-domaine mobile demande une vérification explicite des URL de redirection OAuth autorisées ; le login par e-mail/mot de passe réutilise déjà les endpoints existants. Même précaution pour le choix d'un cabinet et la redirection vers la bonne interface après login.
+## Points de recette impératifs
 
-## État des étapes
+1. Un même collaborateur se connecte au même Firm Manager depuis bureau et téléphone avec les **mêmes identifiants**.
+2. Une même mission et ses statuts sont retrouvés sur les deux interfaces ; droits par cabinet, utilisateur et mission identiques.
+3. Envoyer et recevoir des messages privés/groupes/missions depuis le téléphone, messages retrouvés au bureau ; aucun autre utilisateur ne lit les DM.
+4. Donner à un agent une demande sur téléphone, observer le statut d'exécution réelle côté serveur et le résultat au bureau, sans inventer de réussite.
+5. Prendre une photo et la déposer dans la mission, retrouver le même document dans le Drive autorisé.
+6. Répondre à une tâche ou effectuer une validation autorisée : le résultat est visible dans l'application bureau.
+7. Installer la PWA iOS/Android via HTTPS, tester réseau lent, appareils modestes, session expirée, caméra, rotation, retour et absence d'écran blanc.
+8. Ne jamais changer le comportement du bureau, du scheduler, des IA ou de l'authentification existants par inadvertance.
+9. Tester puis déployer avec sauvegarde et retour arrière, sans toucher à la production avant validation.
 
-- **E0** : inspection des fichiers et API existants, à compléter par la recette sur serveur réel.
-- **E1** : interface mobile à cinq onglets, consultation missions et tâches, PWA installable. Code sur branche, aucun déploiement.
-- **E2** : session de Firm Manager réutilisée, contrôles de structure ajoutés. Tests d'intégration multi-utilisateurs sur serveur réel et flux Google/cabinets toujours requis.
-- **E3** : messagerie mobile indépendante : conversation cabinet, DM entre collègues, groupes déjà existants, missions autorisées, affichage des archives, émission de messages, rechargement contrôlé. Aucun envoi d'e-mail externe, aucun second moteur de chat. Tests de code ajoutés, vérification réelle avec deux comptes requise.
-- **E4-E8** : agents IA dans l'interface mobile, caméra/docs, travail mobile, notifications push et recette/déploiement. Non terminés.
+## Instruction à Christian
 
-## Tests de recette impératifs
-
-1. Connexion mobile par e-mail/mot de passe ; déconnexion et reconnexion, session expirée, compte désactivé.
-2. Comptes de deux cabinets distincts, non-contamination des missions/messages.
-3. DM privé inaccessible à un autre collaborateur et au propriétaire sans participation.
-4. Groupe inaccessible aux non-membres ; mission inaccessible aux personnes hors staffing.
-5. Envoyer un message mobile, le recevoir dans la messagerie bureau et inversement ; actualisation à l'affichage.
-6. Perte du réseau pendant une écriture : afficher « non confirmé » et éviter une relance silencieuse (risque doublon).
-7. Vérifier l'installation iPhone/Android depuis l'adresse HTTPS effectivement publiée, les icônes et la reprise après mise à jour.
-8. Aucun plantage mobile ; aucun changement de la version bureau, agents, base ou scheduler.
-9. Vérifier les résultats CI et tester la version mobile dans un environnement de test avant de publier sur le VPS.
-
-## Consigne de livraison
-
-Christian valide le reverse proxy, le déploiement indépendant et la cohérence des URL de connexion. **Ne jamais fusionner la branche mobile avec l'interface ordinateur uniquement pour rendre le téléphone installable.** Les évolutions d'API partagées, si nécessaires, doivent être négociées et testées comme contrats compatibles des deux clients.
+**Ne pas construire une deuxième application Firm Manager.** Conserver le même backend et ajouter les écrans mobiles les plus utiles, réemployer les fonctions actuelles et masquer les opérations lourdes sur téléphone. La branche mobile protège le développement ; son cycle Git est distinct du fonctionnement métier. Éviter les doubles services et les nouvelles connexions inutiles.
