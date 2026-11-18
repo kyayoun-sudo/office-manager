@@ -1,4 +1,5 @@
 import test from 'node:test';
+process.env.OFFICE_MANAGER_MULTI_CABINET = 'on';
 import assert from 'node:assert/strict';
 import { runInFirm } from '../lib/firm-context.js';
 import { primeOrgKind, isSimulation, assertNoOutbound, simulationParent, assertSimulationDriveWrite, resetSimulationGuardCache } from '../lib/simulation-guard.js';
@@ -66,4 +67,37 @@ test('in a simulation, a Drive write inside the folder passes and outside is ref
     await assert.doesNotReject(assertWritableTarget('CHILD', { meta }));
     await assert.rejects(assertWritableTarget('OTHER', { meta }), /SIMULATION_WRITE_OUTSIDE_FOLDER/);
   });
+});
+
+import { assertNotSimulation } from '../lib/simulation-guard.js';
+import { disconnectGoogle, setFirmDrive } from '../lib/google-connection.js';
+
+test('review C1/C2: in a simulation, disconnecting Google and choosing a Drive are refused (they would hit the parent)', async () => {
+  resetSimulationGuardCache(); await primeOrgKind(SIM, { fetchRows });
+  await runInFirm(SIM, async () => {
+    assert.throws(assertNotSimulation, /SIMULATION_GOOGLE_IS_PARENTS/);
+    await assert.rejects(disconnectGoogle(SIM, { fetchRows: async () => { throw new Error('must not read'); } }), /SIMULATION_GOOGLE_IS_PARENTS/);
+    await assert.rejects(setFirmDrive(SIM, { body: { drive_id: 'PARENTDRIVE' } }, { fetchRows: async () => { throw new Error('must not read'); } }), /SIMULATION_GOOGLE_IS_PARENTS/);
+  });
+  resetSimulationGuardCache(); await primeOrgKind(REAL, { fetchRows });
+  runInFirm(REAL, () => assert.doesNotThrow(assertNotSimulation));
+});
+
+test('review C2: a stored drive id without the folder: prefix gives a simulation no confinement folder (writes refused)', async () => {
+  resetSimulationGuardCache();
+  const odd = async p => p.startsWith('office_firm_drive') ? [{ drive_id: 'PARENTDRIVE' }] : fetchRows(p);
+  await primeOrgKind(SIM, { fetchRows: odd });
+  await runInFirm(SIM, async () => await assert.rejects(assertWritableTarget('ANY', { meta: async () => ({ parents: ['PARENTDRIVE'] }) }), /SIMULATION_WRITE_OUTSIDE_FOLDER/));
+});
+
+test('review I1: a failed re-read keeps a known simulation, and an unreadable type never opens Drive writes', async () => {
+  resetSimulationGuardCache();
+  await primeOrgKind(SIM, { fetchRows });
+  const realNow = Date.now; Date.now = () => realNow() + 120000;
+  try { await primeOrgKind(SIM, { fetchRows: async () => { throw new Error('db down'); } }); } finally { Date.now = realNow; }
+  runInFirm(SIM, () => assert.equal(isSimulation(), true));
+  await runInFirm(SIM, async () => assert.equal((await import('../lib/simulation-guard.js')).simulationFolderId(), 'FOLDER1'));
+  resetSimulationGuardCache();
+  await primeOrgKind(REAL, { fetchRows: async () => { throw new Error('db down'); } });
+  await runInFirm(REAL, async () => await assert.rejects(assertWritableTarget('X', { meta: async () => ({ parents: [] }) }), /SIMULATION_WRITE_OUTSIDE_FOLDER/));
 });

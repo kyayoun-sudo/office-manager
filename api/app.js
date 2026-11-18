@@ -1,4 +1,5 @@
 import { withOperationActor } from '../lib/operation-context.js';
+import { assertNotSimulation } from '../lib/simulation-guard.js';
 import { asAgent, agentOfRoute } from '../lib/agent-context.js';
 import { resolveRequestOrg, runInFirm, pilotOrgId, multiCabinet, internalHeaders, isSignedInternal, internalBaseUrl } from '../lib/firm-context.js';
 import { collaboration } from '../lib/live-collaboration.js';
@@ -651,6 +652,7 @@ export const ROUTES = Object.freeze({
   google: {
     GET: owner((orgId, req) => googleStatus(orgId, { req })),
     POST: owner((orgId, req) => {
+      assertNotSimulation();
       if (req.body?.action === 'connect') return startConnect(orgId, req);
       if (req.body?.action === 'disconnect') return disconnectGoogle(orgId);
       if (req.body?.action === 'set-drive') return setFirmDrive(orgId, req).then(async (r) => {

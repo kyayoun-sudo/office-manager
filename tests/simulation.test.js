@@ -38,7 +38,7 @@ test('an unverified e-mail, an empty name and a missing Entraînements folder ar
 
 test('a second click on the same name returns the same firm and creates no second folder', async () => {
   const calls = [];
-  const d = { audit, fetchRows: async () => ({ org_id: SIM, created: false }), drive: { defaultParent: () => 'E', createFolder: async () => { calls.push(1); return { id: 'F' }; } } };
+  const d = { audit, fetchRows: async p => p.startsWith('office_firm_drive') ? [{ drive_id: 'folder:F' }] : ({ org_id: SIM, created: false }), drive: { defaultParent: () => 'E', createFolder: async () => { calls.push(1); return { id: 'F' }; } } };
   const out = await createSimulation(user, PARENT, { name: 'Même nom' }, d);
   assert.equal(out.created, false); assert.equal(calls.length, 0);
 });
@@ -83,4 +83,21 @@ test('archiving refuses a firm that is not a simulation of the current firm (a r
   await assert.rejects(archiveSimulation(user, PARENT, PARENT, { fetchRows: mk({ account_kind: null, parent_org_id: null }), audit }), /NOT_A_SIMULATION/);
   await assert.rejects(archiveSimulation(user, PARENT, SIM, { fetchRows: mk({ account_kind: 'simulation', parent_org_id: 'other-parent' }), audit }), /NOT_A_SIMULATION/);
   assert.deepEqual(patched, []);
+});
+
+test('review I2: the Entraînements parent is checked BEFORE the firm is created, and a retry repairs a firm left without folder', async () => {
+  const rpc = [];
+  const noParent = { audit, fetchRows: async p => { rpc.push(p); return { org_id: SIM, created: true }; }, drive: { defaultParent: () => null, createFolder: async () => ({ id: 'F' }) } };
+  await assert.rejects(createSimulation(user, PARENT, { name: 'X' }, noParent), /TRAINING_PARENT_REQUIRED/);
+  assert.deepEqual(rpc, []);
+  const made = []; const puts = [];
+  const retry = { audit, drive: { defaultParent: () => 'E', createFolder: async (p, n) => { made.push(n); return { id: 'F2' }; } },
+    fetchRows: async (path, o = {}) => {
+      if (path === 'rpc/office_create_simulation') return { org_id: SIM, created: false };
+      if (path.startsWith('office_firm_drive?org_id=eq.')) return [];
+      if (path.startsWith('office_firm_drive')) { puts.push(JSON.parse(o.body)[0].drive_id); return null; }
+      throw new Error('unexpected ' + path);
+    } };
+  const out = await createSimulation(user, PARENT, { name: 'Repris' }, retry);
+  assert.equal(out.folder_id, 'F2'); assert.deepEqual(puts, ['folder:F2']);
 });

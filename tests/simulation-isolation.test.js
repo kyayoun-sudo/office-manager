@@ -1,4 +1,5 @@
 import test from 'node:test';
+process.env.OFFICE_MANAGER_MULTI_CABINET = 'on';
 import assert from 'node:assert/strict';
 import { runInFirm } from '../lib/firm-context.js';
 import { primeOrgKind, resetSimulationGuardCache } from '../lib/simulation-guard.js';
