@@ -1,0 +1,67 @@
+/* Firm Manager mobile entry — E1. Intentionally separate from the desktop CSS bundle. */
+:root{--brand:#142d4e;--on-brand:#fff;--ink:#142d4e;--muted:#657185;--line:#dfe5ed;--soft:#f5f7fa;--paper:#fff;--accent:#edf2f8;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--soft);color-scheme:light}
+*,*:before,*:after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;min-width:280px}
+button,input,a{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+button:focus-visible,a:focus-visible{outline:3px solid #5e8fc7;outline-offset:3px}
+.mobile-skip{position:absolute;left:-9999px;top:0;z-index:50;background:#fff;padding:12px}
+.mobile-skip:focus{left:10px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.mobile-header{height:72px;max-width:680px;margin:auto;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;background:var(--paper);gap:8px;border-bottom:1px solid var(--line)}
+.mobile-brand{display:flex;gap:10px;align-items:center;text-decoration:none;min-width:0}
+.mobile-mark{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);font-weight:800;border-radius:13px;overflow:hidden}
+.mobile-mark img{height:100%;width:100%;object-fit:contain}
+.mobile-brand-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.mobile-brand-text strong{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mobile-brand-text small{font-size:11px;color:var(--muted)}
+.mobile-desktop{padding:9px 11px;font-size:12px;text-align:center;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:10px;text-decoration:none;white-space:nowrap}
+.mobile-main{max-width:680px;margin:0 auto;padding:18px 18px calc(110px + env(safe-area-inset-bottom))}
+.mobile-topline{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.mobile-eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.mobile-icon-button{height:36px;min-width:36px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--brand);font-size:22px}
+.mobile-network{background:#fff1db;color:#79500b;border:1px solid #f0d19a;padding:12px;border-radius:12px;font-size:13px}
+.mobile-panel h1{font-size:clamp(24px,7vw,30px);letter-spacing:-.04em;line-height:1.14;margin:10px 0 6px}
+.mobile-subtitle{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 18px}
+.mobile-hero{background:var(--brand);color:#fff;border-radius:18px;padding:18px;display:grid;grid-template-columns:42px 1fr;gap:12px;align-items:start}
+.mobile-hero-icon{background:#ffffff27;border:1px solid #ffffff32;border-radius:12px;width:42px;height:42px;display:grid;place-items:center;font-size:23px}
+.mobile-hero h2{margin:0 0 6px;font-size:18px}
+.mobile-hero p{margin:0;font-size:13px;line-height:1.5;color:#e1e9f4}
+.mobile-primary{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;background:#fff;color:var(--brand);border:0;border-radius:11px;padding:13px 14px;text-decoration:none;font-size:14px;font-weight:700;min-height:46px}
+.mobile-section-title{font-size:16px;margin:24px 0 12px}
+.mobile-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mobile-quick{background:var(--paper);border:1px solid var(--line);border-radius:15px;min-width:0;min-height:123px;text-align:left;padding:14px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-decoration:none;color:var(--ink)}
+.mobile-quick>span{font-size:22px;color:var(--brand);line-height:1}
+.mobile-quick strong{font-size:14px}
+.mobile-quick small{font-size:12px;color:var(--muted);line-height:1.35}
+.mobile-card,.mobile-list-card{border:1px solid var(--line);border-radius:16px;background:var(--paper);overflow:hidden}
+.mobile-card{margin-top:18px}
+.mobile-card-title{display:flex;align-items:center;justify-content:space-between;padding:14px 15px 0}
+.mobile-card-title h2{margin:0;font-size:16px}
+.mobile-card-title button{border:0;background:transparent;color:var(--brand);font-size:13px;font-weight:700;padding:8px}
+.mobile-list{min-width:0}
+.mobile-list-item{display:flex;gap:11px;align-items:center;text-decoration:none;padding:14px 15px;border-top:1px solid var(--line);min-height:68px;color:var(--ink);width:100%}
+.mobile-list-item:first-child{border-top:0}
+.mobile-list-item>span:nth-child(2){display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.mobile-list-item strong{font-size:14px;overflow-wrap:anywhere}
+.mobile-list-item small{font-size:12px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.mobile-list-item>span:last-child{color:var(--muted);font-size:24px}
+.mobile-list-icon{flex:0 0 38px;height:38px;background:var(--accent);border-radius:11px;display:grid;place-items:center;color:var(--brand);font-size:18px}
+.mobile-muted,.mobile-error,.mobile-explainer{padding:13px 15px;font-size:13px;line-height:1.5;color:var(--muted);margin:0}
+.mobile-error{color:#a03d2f}
+.mobile-explainer{padding:12px 0}
+.mobile-link-button{margin:16px 0 0;background:var(--brand);color:#fff}
+.mobile-actions{display:flex;flex-direction:column;gap:10px;margin-top:15px}
+.mobile-secondary{display:flex;align-items:center;min-height:46px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:12px 14px;text-decoration:none;font-weight:600;font-size:14px}
+.mobile-status{font-size:12px;color:var(--muted);min-height:15px}
+.mobile-tabs{position:fixed;z-index:20;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:7px max(8px,calc((100vw - 660px) / 2)) calc(7px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -3px 20px #142d4e0b}
+.mobile-tabs button{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-width:0;min-height:54px;border:0;background:transparent;color:var(--muted);border-radius:10px;padding:7px 2px}
+.mobile-tabs button>span{font-size:22px;line-height:1.1}
+.mobile-tabs button small{font-size:10px;font-weight:600}
+.mobile-tabs button[aria-current="page"]{color:var(--brand);background:var(--accent)}
+.mobile-lock{padding:70px 25px;text-align:center;color:var(--muted);max-width:440px;margin:0 auto;line-height:1.6}
+@media(min-width:680px){body{background:#eef2f6}.mobile-header{border-left:1px solid var(--line);border-right:1px solid var(--line)}.mobile-main{background:var(--soft);min-height:calc(100vh - 72px);border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+@media(max-width:350px){.mobile-brand-text strong{max-width:110px}.mobile-desktop{font-size:11px;padding:8px}.mobile-main{padding-left:12px;padding-right:12px}.mobile-tabs button small{font-size:9px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
