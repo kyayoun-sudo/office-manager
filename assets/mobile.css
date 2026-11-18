@@ -103,3 +103,19 @@ button:focus-visible,a:focus-visible{outline:3px solid #5e8fc7;outline-offset:3p
 .mobile-chat-send{min-height:46px;padding:10px 12px;background:var(--brand);color:#fff;border:0;border-radius:11px;font-weight:700;font-size:13px}
 .mobile-chat-send:disabled{opacity:.5;cursor:wait}
 .mobile-chat-status{font-size:12px;min-height:18px;color:var(--muted);line-height:1.4}
+
+/* E4 — agent request only when the IA tab is open; zero mobile-side AI runtime. */
+.mobile-ai-form{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:15px;display:flex;flex-direction:column;gap:8px}
+.mobile-ai-form .mobile-chat-picker{margin-bottom:5px}
+.mobile-ai-form textarea{font:inherit;font-size:15px;color:var(--ink);line-height:1.55;resize:vertical;min-height:110px;max-height:260px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper)}
+.mobile-ai-submit{margin-top:6px;min-height:46px;border:0;background:var(--brand);color:#fff;border-radius:11px;font:inherit;font-size:14px;font-weight:700}
+.mobile-ai-submit:disabled{opacity:.55;cursor:wait}
+.mobile-ai-status{font-size:12px;line-height:1.5;color:var(--muted);padding:11px 4px;min-height:24px}
+.mobile-ai-status[data-state="error"]{color:#a03d2f}
+.mobile-ai-status[data-state="success"]{color:#225741}
+.mobile-ai-answer-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:15px;margin-top:5px}
+.mobile-ai-answer-card h2{font-size:16px;margin:0 0 12px}
+.mobile-ai-answer{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;max-height:55vh;overflow-y:auto}
+.mobile-ai-proof{border-top:1px solid var(--line);padding-top:11px;color:var(--muted);font-size:12px;line-height:1.5}
+.mobile-ai-more{margin-top:12px}
+.mobile-ai-more summary{font-size:13px;color:var(--brand);font-weight:700;padding:10px 2px;cursor:pointer}
