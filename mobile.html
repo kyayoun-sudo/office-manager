@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#142d4e">
+<meta name="color-scheme" content="light">
+<title>Firm Manager · Mobile</title>
+<link rel="stylesheet" href="/assets/mobile.css">
+<script defer src="/assets/brand-theme.js"></script>
+<script defer src="/assets/mobile.js"></script>
+</head>
+<body>
+  <a href="#mobile-content" class="mobile-skip">Aller au contenu</a>
+  <header class="mobile-header">
+    <a class="mobile-brand" href="/mobile.html" aria-label="Firm Manager Mobile, accueil">
+      <span class="mobile-mark" data-firm-logo>F</span>
+      <span class="mobile-brand-text"><strong data-firm-name>Firm Manager</strong><small>Mobile</small></span>
+    </a>
+    <a class="mobile-desktop" href="/accueil.html" aria-label="Passer à la version complète">Version complète</a>
+  </header>
+
+  <div id="mobile-lock" class="mobile-lock" role="status" aria-live="polite">
+    Vérification de votre connexion…
+  </div>
+
+  <div id="mobile-app" hidden>
+    <main id="mobile-content" class="mobile-main" tabindex="-1">
+      <div class="mobile-topline">
+        <span id="mobile-role" class="mobile-eyebrow">Mon espace</span>
+        <button id="mobile-refresh" class="mobile-icon-button" type="button" aria-label="Actualiser la rubrique">↻ <span class="sr-only">Actualiser</span></button>
+      </div>
+      <p id="mobile-network" class="mobile-network" hidden>Connexion indisponible. Les données ne sont pas enregistrées hors ligne.</p>
+
+      <section class="mobile-panel" id="panel-accueil" data-panel="accueil" aria-labelledby="heading-accueil">
+        <h1 id="heading-accueil">Bonjour, <span data-user-name>collaborateur</span></h1>
+        <p class="mobile-subtitle">Vos échanges et vos missions, sans ouvrir le bureau.</p>
+        <div class="mobile-hero">
+          <div class="mobile-hero-icon" aria-hidden="true">✦</div>
+          <div><h2>Vos agents IA</h2><p>Poser une question ou donner une instruction dans Firm Manager.</p></div>
+          <button class="mobile-primary" type="button" data-open-tab="ia">Ouvrir l'assistant <span aria-hidden="true">→</span></button>
+        </div>
+        <h2 class="mobile-section-title">Accès rapide</h2>
+        <div class="mobile-quick-grid">
+          <button type="button" class="mobile-quick" data-open-tab="messages"><span aria-hidden="true">☏</span><strong>Messages</strong><small>Collègues et missions</small></button>
+          <button type="button" class="mobile-quick" data-open-tab="missions"><span aria-hidden="true">▣</span><strong>Missions</strong><small>Suivre vos dossiers</small></button>
+          <button type="button" class="mobile-quick" data-open-tab="travail"><span aria-hidden="true">✓</span><strong>Mon travail</strong><small>À traiter et valider</small></button>
+          <a class="mobile-quick" href="/rangement.html"><span aria-hidden="true">▤</span><strong>Documents</strong><small>Ouvrir dans Firm Manager</small></a>
+        </div>
+        <section class="mobile-card">
+          <div class="mobile-card-title"><h2>À traiter</h2><button type="button" data-open-tab="travail">Tout voir</button></div>
+          <div id="mobile-home-tasks" class="mobile-list" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+        </section>
+      </section>
+
+      <section class="mobile-panel" id="panel-messages" data-panel="messages" aria-labelledby="heading-messages" hidden>
+        <h1 id="heading-messages">Messages</h1>
+        <p class="mobile-subtitle">Les conversations auxquelles vous avez accès dans le cabinet.</p>
+        <div id="mobile-chats" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+        <a class="mobile-primary mobile-link-button" href="/messagerie.html">Ouvrir la messagerie pour répondre <span aria-hidden="true">→</span></a>
+        <p class="mobile-explainer">La lecture mobile est disponible ici. La réponse directement dans cet écran sera ajoutée à l'étape Messagerie (E3).</p>
+      </section>
+
+      <section class="mobile-panel" id="panel-ia" data-panel="ia" aria-labelledby="heading-ia" hidden>
+        <h1 id="heading-ia">Mes agents IA</h1>
+        <p class="mobile-subtitle">Accédez aux agents existants de Firm Manager. Leur interface mobile de dialogue arrivera à l'étape E4.</p>
+        <div class="mobile-list mobile-list-card">
+          <a class="mobile-list-item" href="/assistant.html?agent=auto"><span class="mobile-list-icon" aria-hidden="true">✦</span><span><strong>Assistant général</strong><small>Coordination et questions</small></span><span aria-hidden="true">›</span></a>
+          <a class="mobile-list-item" href="/assistant.html?agent=mission-controller"><span class="mobile-list-icon" aria-hidden="true">◉</span><span><strong>Mission Controller</strong><small>Suivi, planning, procédures</small></span><span aria-hidden="true">›</span></a>
+          <a class="mobile-list-item" href="/assistant.html?agent=orpailleur"><span class="mobile-list-icon" aria-hidden="true">▤</span><span><strong>Orpailleur</strong><small>Documents et classement</small></span><span aria-hidden="true">›</span></a>
+          <a class="mobile-list-item" href="/assistant.html?agent=enhanced-auditor"><span class="mobile-list-icon" aria-hidden="true">✓</span><span><strong>Enhanced Auditor</strong><small>Tests et preuves d'audit</small></span><span aria-hidden="true">›</span></a>
+          <a class="mobile-list-item" href="/assistant.html?agent=sika"><span class="mobile-list-icon" aria-hidden="true">◈</span><span><strong>SIKA</strong><small>Finance et honoraires</small></span><span aria-hidden="true">›</span></a>
+        </div>
+      </section>
+
+      <section class="mobile-panel" id="panel-missions" data-panel="missions" aria-labelledby="heading-missions" hidden>
+        <h1 id="heading-missions">Mes missions</h1>
+        <p class="mobile-subtitle">Uniquement les dossiers autorisés par Firm Manager.</p>
+        <div id="mobile-missions" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+      </section>
+
+      <section class="mobile-panel" id="panel-travail" data-panel="travail" aria-labelledby="heading-travail" hidden>
+        <h1 id="heading-travail">Mon travail</h1>
+        <p class="mobile-subtitle">Les notifications et demandes de votre périmètre.</p>
+        <div id="mobile-tasks" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+        <div class="mobile-actions">
+          <a href="/validations.html" class="mobile-secondary">Ouvrir les validations</a>
+          <a href="/accueil.html" class="mobile-secondary">Ouvrir mon espace complet</a>
+        </div>
+      </section>
+      <p id="mobile-status" class="mobile-status" role="status" aria-live="polite"></p>
+    </main>
+    <nav class="mobile-tabs" aria-label="Navigation mobile">
+      <button type="button" data-tab="accueil" aria-current="page"><span aria-hidden="true">⌂</span><small>Accueil</small></button>
+      <button type="button" data-tab="messages"><span aria-hidden="true">☏</span><small>Messages</small></button>
+      <button type="button" data-tab="ia"><span aria-hidden="true">✦</span><small>IA</small></button>
+      <button type="button" data-tab="missions"><span aria-hidden="true">▣</span><small>Missions</small></button>
+      <button type="button" data-tab="travail"><span aria-hidden="true">✓</span><small>Travail</small></button>
+    </nav>
+  </div>
+</body>
+</html>
