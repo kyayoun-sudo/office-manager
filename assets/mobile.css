@@ -164,3 +164,32 @@ button:focus-visible,a:focus-visible{outline:3px solid #5e8fc7;outline-offset:3p
 .mobile-work-clear{background:var(--soft);color:var(--brand);border:1px solid var(--line)}
 #mobile-work-detail>a{margin:12px 14px}
 .mobile-work-disclaimer{padding:2px 14px 13px;margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+
+/* Mobile Lite E6: compact task list, AI command and private e-mail reply. */
+.mobile-task-card{padding:13px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.mobile-task-card>strong{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.mobile-task-card p{margin:0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.mobile-task-card small{font-size:12px;color:var(--muted);line-height:1.4}
+.mobile-task-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:5px}
+.mobile-task-buttons>a,.mobile-task-buttons>button{flex:1;display:flex;justify-content:center;align-items:center;text-align:center;border-radius:10px;padding:9px 10px;min-height:42px;border:1px solid var(--line);font:inherit;font-size:12px;font-weight:700;background:var(--soft);color:var(--brand);text-decoration:none}
+.mobile-task-buttons>button{background:var(--brand);color:#fff;border-color:var(--brand)}
+.mobile-lite-command{padding:13px 14px;display:flex;flex-direction:column;gap:9px}
+.mobile-lite-command>label{font-size:12px;font-weight:700;color:var(--ink)}
+.mobile-lite-command textarea,.mobile-lite-command input{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);padding:11px 12px;font:inherit;font-size:14px;line-height:1.5}
+.mobile-lite-command input[readonly]{background:var(--soft)}
+.mobile-lite-command button{border:0;border-radius:10px;min-height:43px;background:var(--brand);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:10px}
+.mobile-lite-command .mobile-lite-cancel{background:var(--soft);border:1px solid var(--line);color:var(--brand)}
+.mobile-work-section>.mobile-work-disclaimer{padding:0 14px 13px;font-size:11px;line-height:1.5}
+.mobile-mail-disclaimer{font-size:12px;color:var(--muted);line-height:1.5;padding:0 14px 12px;margin:0}
+.mobile-mail-connect{padding:10px 14px 15px}
+.mobile-mail-connect p{margin:0 0 10px;font-size:13px;line-height:1.5}
+.mobile-mail-connect .mobile-capture-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+#mobile-mail-account-view{padding:0 14px 14px}
+#mobile-mail-list{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#mobile-mail-message h3{font-size:15px;line-height:1.4;overflow-wrap:anywhere;margin:13px 0 8px}
+#mobile-mail-back{margin-top:4px}
+.mobile-mail-meta{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.mobile-mail-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6;border-radius:10px;background:var(--soft);padding:12px;max-height:35vh;overflow-y:auto;margin:12px 0}
+#mobile-mail-composer{padding:12px 0}
+#mobile-mail-status[data-state="error"]{color:#a03d2f}
+@media(max-width:340px){.mobile-task-buttons{flex-direction:column}}
