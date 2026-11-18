@@ -81,6 +81,8 @@ Afficher les tâches autorisées par rôle : réponse à job note, commentaire d
 
 Critères : un junior accomplit une tâche courte, un senior commente, un manager valide ; les mêmes états s'affichent immédiatement sur bureau. Permissions respectées.
 
+**Avancement E6 (18 novembre 2026) :** nouvelle interface « Mon travail » ajoutée : liste des procédures attribuées et des revues issues des endpoints existants `procedure&mine=1` et `procedure&reviews=1`. L'utilisateur peut enregistrer une conclusion courte, répondre à un point de revue et, avec le bon rôle, retourner un point au préparateur ou confirmer la résolution d'un point répondu. Toutes les écritures passent par la même API `/api/app?route=procedure` avec vérification des droits serveur. La signature du Working Paper reste sur la version complète pour examen des preuves. **À terminer** : job notes élargies, checklists métier, validations simples réellement sûres sur mobile, recette réelle multi-rôles et tests des conflits/versionnage. Aucun second stockage des tâches.
+
 ## E7 — Notifications, performance et PWA installable
 
 Manifest, icônes, installation iOS/Android, service worker statique minimal ; puis push après consentement avec abonnements par appareil, expiration/révocation et respect des droits. Distinction entre notification informative et action urgente. Notifications actuelles en application : elles ne sont pas encore un push système. Performance sur réseau lent, chargement progressif, compression et reprise des uploads, tailles raisonnables, tests mémoire et batterie. Hors connexion : brouillons/indicateur réseau limités, pas de stockage local non chiffré des pièces ou messages sensibles.
