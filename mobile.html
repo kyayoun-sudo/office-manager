@@ -14,6 +14,7 @@
 <title>Firm Manager · Mobile</title>
 <link rel="stylesheet" href="/assets/mobile.css">
 <script defer src="/assets/brand-theme.js"></script>
+<script defer src="/assets/mobile-chat.js"></script>
 <script defer src="/assets/mobile.js"></script>
 </head>
 <body>
@@ -73,9 +74,28 @@
       <section class="mobile-panel" id="panel-messages" data-panel="messages" aria-labelledby="heading-messages" hidden>
         <h1 id="heading-messages">Messages</h1>
         <p class="mobile-subtitle">Les conversations auxquelles vous avez accès dans le cabinet.</p>
-        <div id="mobile-chats" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
-        <a class="mobile-primary mobile-link-button" href="/messagerie.html">Ouvrir la messagerie pour répondre <span aria-hidden="true">→</span></a>
-        <p class="mobile-explainer">La lecture mobile est disponible ici. La réponse directement dans cet écran sera ajoutée à l'étape Messagerie (E3).</p>
+        <div id="mobile-chat-list-view">
+          <label for="mobile-new-chat" class="mobile-chat-label">Nouvelle conversation</label>
+          <select id="mobile-new-chat" class="mobile-chat-picker" aria-label="Démarrer une conversation">
+            <option value="">Choisir une personne ou une mission…</option>
+          </select>
+          <div id="mobile-chats" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+        </div>
+        <section id="mobile-chat-thread-view" class="mobile-chat-thread-view" aria-label="Conversation" hidden>
+          <div class="mobile-thread-head">
+            <button type="button" id="mobile-chat-back" class="mobile-chat-back" aria-label="Retour aux conversations">‹</button>
+            <div><h2 id="mobile-chat-title">Conversation</h2><small>Messagerie du cabinet</small></div>
+            <button type="button" id="mobile-chat-archive" class="mobile-chat-archive">Archives</button>
+          </div>
+          <div id="mobile-chat-messages" class="mobile-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"><p class="mobile-muted">Chargement…</p></div>
+          <form id="mobile-chat-form" class="mobile-chat-form">
+            <label for="mobile-chat-text" class="sr-only">Votre message</label>
+            <textarea id="mobile-chat-text" maxlength="4000" rows="2" placeholder="Écrire un message…" required></textarea>
+            <button id="mobile-chat-send" class="mobile-chat-send" type="submit">Envoyer</button>
+          </form>
+        </section>
+        <p id="mobile-chat-status" class="mobile-chat-status" role="status" aria-live="polite"></p>
+        <p class="mobile-explainer">Messages internes uniquement. Les e-mails du cabinet et les demandes de validation suivent leurs propres règles.</p>
       </section>
 
       <section class="mobile-panel" id="panel-ia" data-panel="ia" aria-labelledby="heading-ia" hidden>
