@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/assets/mobile.css">
 <script defer src="/assets/brand-theme.js"></script>
 <script defer src="/assets/mobile-chat.js"></script>
+<script defer src="/assets/mobile-ai.js"></script>
 <script defer src="/assets/mobile.js"></script>
 </head>
 <body>
@@ -100,14 +101,36 @@
 
       <section class="mobile-panel" id="panel-ia" data-panel="ia" aria-labelledby="heading-ia" hidden>
         <h1 id="heading-ia">Mes agents IA</h1>
-        <p class="mobile-subtitle">Accédez aux agents existants de Firm Manager. Leur interface mobile de dialogue arrivera à l'étape E4.</p>
-        <div class="mobile-list mobile-list-card">
+        <p class="mobile-subtitle">Posez une question ou confiez une demande aux agents de votre Firm Manager. Le traitement se fait côté serveur.</p>
+        <form id="mobile-ai-form" class="mobile-ai-form">
+          <label class="mobile-chat-label" for="mobile-ai-agent">Choisir l'agent</label>
+          <select class="mobile-chat-picker" id="mobile-ai-agent" name="agent">
+            <option value="auto">Assistant général (choix automatique)</option>
+            <option value="mission-controller">Mission Controller</option>
+            <option value="orpailleur">Orpailleur</option>
+            <option value="enhanced-auditor">Enhanced Auditor</option>
+            <option value="sika">SIKA</option>
+          </select>
+          <label class="mobile-chat-label" for="mobile-ai-message">Votre demande</label>
+          <textarea id="mobile-ai-message" name="message" maxlength="4000" rows="4" required placeholder="Ex. : Quels points de contrôle dois-je revoir aujourd'hui ?"></textarea>
+          <button class="mobile-ai-submit" type="submit" id="mobile-ai-send">Envoyer à l'IA</button>
+        </form>
+        <div id="mobile-ai-status" class="mobile-ai-status" role="status" aria-live="polite">Aucune demande envoyée.</div>
+        <section id="mobile-ai-answer-card" class="mobile-ai-answer-card" aria-labelledby="mobile-ai-answer-title" hidden>
+          <h2 id="mobile-ai-answer-title">Réponse de l'agent</h2>
+          <div id="mobile-ai-answer" class="mobile-ai-answer"></div>
+          <p id="mobile-ai-proof" class="mobile-ai-proof"></p>
+        </section>
+        <p class="mobile-explainer">L'agent peut proposer une action ou en réaliser selon ses autorisations. Vérifiez les preuves et validations : une réponse ne confirme pas à elle seule qu'une opération a été effectuée.</p>
+        <details class="mobile-ai-more"><summary>Ouvrir la version complète des agents</summary>
+          <div class="mobile-list mobile-list-card">
           <a class="mobile-list-item" href="/assistant.html?agent=auto"><span class="mobile-list-icon" aria-hidden="true">✦</span><span><strong>Assistant général</strong><small>Coordination et questions</small></span><span aria-hidden="true">›</span></a>
           <a class="mobile-list-item" href="/assistant.html?agent=mission-controller"><span class="mobile-list-icon" aria-hidden="true">◉</span><span><strong>Mission Controller</strong><small>Suivi, planning, procédures</small></span><span aria-hidden="true">›</span></a>
           <a class="mobile-list-item" href="/assistant.html?agent=orpailleur"><span class="mobile-list-icon" aria-hidden="true">▤</span><span><strong>Orpailleur</strong><small>Documents et classement</small></span><span aria-hidden="true">›</span></a>
           <a class="mobile-list-item" href="/assistant.html?agent=enhanced-auditor"><span class="mobile-list-icon" aria-hidden="true">✓</span><span><strong>Enhanced Auditor</strong><small>Tests et preuves d'audit</small></span><span aria-hidden="true">›</span></a>
           <a class="mobile-list-item" href="/assistant.html?agent=sika"><span class="mobile-list-icon" aria-hidden="true">◈</span><span><strong>SIKA</strong><small>Finance et honoraires</small></span><span aria-hidden="true">›</span></a>
-        </div>
+          </div>
+        </details>
       </section>
 
       <section class="mobile-panel" id="panel-missions" data-panel="missions" aria-labelledby="heading-missions" hidden>
