@@ -23,7 +23,7 @@ Le développement peut rester dans une **branche Git de travail** dédiée le te
 - E2 : même session via `assets/brand-theme.js`, installation PWA, manifeste, worker et icônes ; essais d'installation iPhone et Android sur HTTPS encore nécessaires.
 - E3 : messagerie interne dans l'interface mobile, réutilisant `/api/app?route=chat` et les droits existants. Les tests automatisés ciblés ont été ajoutés ; recette réelle multi-utilisateurs encore nécessaire.
 - E4 : premier écran d'envoi direct à `/api/agent` et de résultat avec référence et statut ajouté à Lite ; tests automatisés et recette réelle en cours. Contexte de mission, preuve d'exécution et mémoire de conversation à améliorer.
-- E5 : caméra et pièces vers les dossiers de mission déjà existants, à réaliser.
+- E5 : premier dépôt photo/PDF dans les missions autorisées via le pipeline `mission-quick` déjà existant ajouté. Une vraie recette Drive/classification et des tests sur appareils physiques sont encore nécessaires ; aucune promesse de classement terminé.
 - E6 : activités courtes (job notes, checklists, commentaire WP, approbations selon rôle), à réaliser.
 - E7 : optimisation des performances, notifications push avec consentement, à finaliser.
 - E8 : tests multi-rôles, sécurité, synchronisation, réseau lent et déploiement après validation.
