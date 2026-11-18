@@ -116,6 +116,7 @@
           '/mission.html?id=' + encodeURIComponent(m.id), '▣'));
       });
       loaded.missions = true;
+      if (window.FirmMobileCapture) window.FirmMobileCapture.setMissions(list);
     }).catch(function (e) {
       if (serial.missions !== thisRun) return;
       placeholder('mobile-missions', errorText(e), true);
@@ -253,6 +254,7 @@
       installationBanner();
       if (window.FirmMobileChat) window.FirmMobileChat.init(OM);
       if (window.FirmMobileAI) window.FirmMobileAI.init(OM);
+      if (window.FirmMobileCapture) window.FirmMobileCapture.init(OM);
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
