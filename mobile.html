@@ -104,7 +104,10 @@
 
       <section class="mobile-panel" id="panel-ia" data-panel="ia" aria-labelledby="heading-ia" hidden>
         <h1 id="heading-ia">Mes agents IA</h1>
-        <p class="mobile-subtitle">Posez une question ou confiez une demande aux agents de votre Firm Manager. Le traitement se fait côté serveur.</p>
+        <p class="mobile-subtitle">Discutez avec les agents de votre Firm Manager. Ils utilisent les outils et job notes déjà existants, sans copier les dossiers sur votre téléphone.</p>
+        <div id="mobile-ai-conversation" class="mobile-ai-conversation" role="log" aria-label="Échanges avec les agents" aria-live="polite" aria-relevant="additions">
+          <p class="mobile-muted">Dites à l'agent ce qu'il doit faire dans Firm Manager. Les échanges affichés ici ne sont pas enregistrés sur ce téléphone.</p>
+        </div>
         <form id="mobile-ai-form" class="mobile-ai-form">
           <label class="mobile-chat-label" for="mobile-ai-agent">Choisir l'agent</label>
           <select class="mobile-chat-picker" id="mobile-ai-agent" name="agent">
@@ -114,9 +117,9 @@
             <option value="enhanced-auditor">Enhanced Auditor</option>
             <option value="sika">SIKA</option>
           </select>
-          <label class="mobile-chat-label" for="mobile-ai-message">Votre demande</label>
-          <textarea id="mobile-ai-message" name="message" maxlength="4000" rows="4" required placeholder="Ex. : Quels points de contrôle dois-je revoir aujourd'hui ?"></textarea>
-          <button class="mobile-ai-submit" type="submit" id="mobile-ai-send">Envoyer à l'IA</button>
+          <label class="mobile-chat-label" for="mobile-ai-message">Votre message à l'agent</label>
+          <textarea id="mobile-ai-message" name="message" maxlength="4000" rows="3" required placeholder="Ex. : Lia, ouvre ma job note de la mission, effectue les contrôles prévus et montre-moi le résultat."></textarea>
+          <button class="mobile-ai-submit" type="submit" id="mobile-ai-send">Envoyer l'instruction</button>
         </form>
         <div id="mobile-ai-status" class="mobile-ai-status" role="status" aria-live="polite">Aucune demande envoyée.</div>
         <section id="mobile-ai-answer-card" class="mobile-ai-answer-card" aria-labelledby="mobile-ai-answer-title" hidden>
