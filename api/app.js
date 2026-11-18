@@ -449,7 +449,7 @@ export const ROUTES = Object.freeze({
       const s = await import('../lib/simulation.js'), u = await import('../lib/user-auth.js');
       const b = req.body || {}, action = String(b.action || '');
       if (action === 'create') return s.createSimulation(await u.sessionUser(req), orgId, b);
-      if (action === 'archive') return s.archiveSimulation(await u.sessionUser(req), String(b.org_id || ''));
+      if (action === 'archive') return s.archiveSimulation(await u.sessionUser(req), orgId, String(b.org_id || ''));
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'SIMULATION_UNAVAILABLE'

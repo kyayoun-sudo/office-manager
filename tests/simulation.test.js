@@ -61,10 +61,26 @@ test('listing returns only the simulations the person belongs to', async () => {
 
 test('archiving deactivates the members of the simulation and touches nothing of the parent', async () => {
   const seen = [];
-  const fetchRows = async (path, o = {}) => { seen.push([path, o.method]); return !o.method && path.includes('auth_user_id=eq.u1') ? [{ role: 'owner' }] : []; };
-  const out = await archiveSimulation(user, SIM, { fetchRows, audit });
+  const fetchRows = async (path, o = {}) => {
+    seen.push([path, o.method]);
+    if (path.startsWith('office_organizations?id=eq.' + SIM)) return [{ account_kind: 'simulation', parent_org_id: PARENT }];
+    return !o.method && path.includes('auth_user_id=eq.u1') ? [{ role: 'owner' }] : [];
+  };
+  const out = await archiveSimulation(user, PARENT, SIM, { fetchRows, audit });
   assert.equal(out.archived, true);
   assert.ok(seen.some(([p, m]) => m === 'PATCH' && p.startsWith('office_app_users?org_id=eq.' + SIM)));
-  assert.ok(!seen.some(([p]) => p.includes(PARENT)));
-  await assert.rejects(archiveSimulation(user, SIM, { fetchRows: async () => [{ role: 'senior' }], audit }), /NOT_SIMULATION_OWNER/);
+  assert.ok(!seen.some(([p, m]) => m === 'PATCH' && p.includes(PARENT)));
+  await assert.rejects(archiveSimulation(user, PARENT, SIM, { fetchRows: async p => p.startsWith('office_organizations') ? [{ account_kind: 'simulation', parent_org_id: PARENT }] : [{ role: 'senior' }], audit }), /NOT_SIMULATION_OWNER/);
+});
+
+test('archiving refuses a firm that is not a simulation of the current firm (a real firm is never archived)', async () => {
+  const patched = [];
+  const mk = org => async (path, o = {}) => {
+    if (o.method === 'PATCH') patched.push(path);
+    if (path.startsWith('office_organizations?id=eq.')) return [org];
+    return [{ role: 'owner' }];
+  };
+  await assert.rejects(archiveSimulation(user, PARENT, PARENT, { fetchRows: mk({ account_kind: null, parent_org_id: null }), audit }), /NOT_A_SIMULATION/);
+  await assert.rejects(archiveSimulation(user, PARENT, SIM, { fetchRows: mk({ account_kind: 'simulation', parent_org_id: 'other-parent' }), audit }), /NOT_A_SIMULATION/);
+  assert.deepEqual(patched, []);
 });
