@@ -16,6 +16,7 @@
 <script defer src="/assets/brand-theme.js"></script>
 <script defer src="/assets/mobile-chat.js"></script>
 <script defer src="/assets/mobile-ai.js"></script>
+<script defer src="/assets/mobile-capture.js"></script>
 <script defer src="/assets/mobile.js"></script>
 </head>
 <body>
@@ -64,7 +65,7 @@
           <button type="button" class="mobile-quick" data-open-tab="messages"><span aria-hidden="true">☏</span><strong>Messages</strong><small>Collègues et missions</small></button>
           <button type="button" class="mobile-quick" data-open-tab="missions"><span aria-hidden="true">▣</span><strong>Missions</strong><small>Suivre vos dossiers</small></button>
           <button type="button" class="mobile-quick" data-open-tab="travail"><span aria-hidden="true">✓</span><strong>Mon travail</strong><small>À traiter et valider</small></button>
-          <a class="mobile-quick" href="/rangement.html"><span aria-hidden="true">▤</span><strong>Documents</strong><small>Ouvrir dans Firm Manager</small></a>
+          <button type="button" class="mobile-quick" data-open-tab="missions"><span aria-hidden="true">▤</span><strong>Photo ou pièce</strong><small>Déposer dans une mission</small></button>
         </div>
         <section class="mobile-card">
           <div class="mobile-card-title"><h2>À traiter</h2><button type="button" data-open-tab="travail">Tout voir</button></div>
@@ -137,6 +138,29 @@
         <h1 id="heading-missions">Mes missions</h1>
         <p class="mobile-subtitle">Uniquement les dossiers autorisés par Firm Manager.</p>
         <div id="mobile-missions" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+        <section class="mobile-capture-card" aria-labelledby="mobile-capture-title">
+          <h2 id="mobile-capture-title">Photographier ou déposer une pièce</h2>
+          <p>Envoyer une photo ou un PDF dans les pièces reçues d'une mission. Le serveur lancera ensuite le traitement documentaire existant.</p>
+          <form id="mobile-capture-form">
+            <label for="mobile-capture-mission">Mission</label>
+            <select id="mobile-capture-mission" required><option value="">Choisir une mission autorisée…</option></select>
+            <div class="mobile-capture-actions">
+              <button type="button" id="mobile-capture-camera">Prendre une photo</button>
+              <button type="button" id="mobile-capture-file">Choisir un fichier</button>
+            </div>
+            <input id="mobile-capture-camera-input" type="file" accept="image/*" capture="environment" hidden>
+            <input id="mobile-capture-file-input" type="file" accept="image/*,application/pdf,.pdf" hidden>
+            <div id="mobile-capture-selected" class="mobile-capture-selected" hidden>
+              <img id="mobile-capture-preview" alt="Aperçu de la pièce choisie" hidden>
+              <p id="mobile-capture-filename"></p>
+              <label for="mobile-capture-note">Consigne de classement (facultative)</label>
+              <textarea id="mobile-capture-note" maxlength="400" rows="2" placeholder="Ex. : facture à rapprocher du fournisseur…"></textarea>
+              <button id="mobile-capture-send" type="submit">Déposer dans la mission</button>
+            </div>
+          </form>
+          <p id="mobile-capture-status" class="mobile-capture-status" role="status" aria-live="polite"></p>
+          <p class="mobile-capture-hint">Ne renvoyez pas une pièce si l'envoi semble interrompu : vérifiez la mission pour éviter un doublon.</p>
+        </section>
       </section>
 
       <section class="mobile-panel" id="panel-travail" data-panel="travail" aria-labelledby="heading-travail" hidden>
