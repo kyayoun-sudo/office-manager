@@ -31,6 +31,31 @@
     var run = data && data.runId ? ' · Référence : ' + String(data.runId) : '';
     $('mobile-ai-proof').textContent = desc + evidence + run;
   }
+  function addToConversation(sender, body, trace) {
+    // The transcript is display-only in the current page. No second conversation store.
+    if (typeof document.createElement !== 'function') return;
+    var log = $('mobile-ai-conversation');
+    if (!log) return;
+    if (log.dataset.started !== 'yes') {
+      log.replaceChildren();
+      log.dataset.started = 'yes';
+    }
+    var item = document.createElement('div');
+    item.className = 'mobile-ai-turn' + (sender === 'Vous' ? ' own' : '');
+    var title = document.createElement('strong');
+    title.textContent = sender;
+    var text = document.createElement('p');
+    text.textContent = String(body || '');
+    item.append(title, text);
+    if (trace) {
+      var meta = document.createElement('small');
+      meta.textContent = trace;
+      item.appendChild(meta);
+    }
+    log.appendChild(item);
+    if (log.children.length > 16) log.removeChild(log.firstElementChild);
+    log.scrollTop = log.scrollHeight;
+  }
   function send(event) {
     event.preventDefault();
     if (submitting || !api) return;
@@ -47,14 +72,19 @@
     $('mobile-ai-send').disabled = true;
     $('mobile-ai-form').setAttribute('aria-busy', 'true');
     $('mobile-ai-answer-card').hidden = true;
-    state('Analyse en cours sur le serveur… N’envoyez pas une deuxième fois. La demande peut prendre quelques minutes.', 'working');
+    state('L’agent travaille dans Firm Manager. Ne renvoyez pas la même instruction pendant son traitement.', 'working');
+    addToConversation('Vous', message);
     api.api('/api/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: message, agent: agent, provider: 'auto', risk: 'normal' })
     }).then(function (data) {
       showResult(data);
-      state('Réponse reçue de ' + (data.agentName || 'l’agent') + '.', 'success');
+      addToConversation(data.agentName || 'Agent Firm Manager', data.answer || 'Réponse non fournie.',
+        'Exécution : ' + (data.kernelStatus || 'à vérifier') + (data.runId ? ' · Réf. ' + data.runId : ''));
+      // Clear the composer only after confirmation, never automatically retry commands.
+      $('mobile-ai-message').value = '';
+      state('Réponse reçue de ' + (data.agentName || 'l’agent') + '. La preuve d’exécution reste sur le serveur.', 'success');
     }).catch(function (error) {
       var code = error && (error.code || error.message);
       if (code === 'EXTERNAL_AI_APPROVAL_REQUIRED' || code === 'CONTENT_PROCESSING_APPROVAL_REQUIRED') {
@@ -67,6 +97,7 @@
         state('Réponse non confirmée (' + (error && error.message || 'réseau ou serveur') +
           '). Vérifiez le suivi des agents avant de renvoyer pour éviter une action en double.', 'error');
       }
+      addToConversation('Firm Manager', 'Réponse non confirmée. Vérifiez les exécutions avant de redonner l’ordre.', 'Aucun nouvel envoi automatique');
     }).finally(function () {
       submitting = false;
       $('mobile-ai-send').disabled = false;
