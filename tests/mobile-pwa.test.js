@@ -47,7 +47,7 @@ test('service worker never intercepts mission data, chats, API, HTML or document
 test('VPS serves mobile PWA files and keeps private code hidden', async () => {
   await withServer(async origin => {
     for (const url of ['/mobile.html', '/mobile-sw.js', '/assets/mobile.js',
-      '/assets/mobile.css', '/assets/mobile-chat.js', '/assets/mobile-ai.js', '/assets/mobile-capture.js', '/assets/mobile-work.js', '/assets/mobile-manifest.json',
+      '/assets/mobile.css', '/assets/mobile-chat.js', '/assets/mobile-ai.js', '/assets/mobile-capture.js', '/assets/mobile-tasks.js', '/assets/mobile-mail.js', '/assets/mobile-manifest.json',
       '/assets/firm-mobile-180.png', '/assets/firm-mobile-192.png',
       '/assets/firm-mobile-512.png']) {
       const r = await fetch(origin + url, { redirect: 'manual' });
