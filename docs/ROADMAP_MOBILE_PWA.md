@@ -47,6 +47,14 @@ Brancher `lib/chat.js` : messages individuels, cabinet, groupes et missions, ré
 
 Critères : deux téléphones et un ordinateur échangent, même historique et mêmes règles de visibilité ; aucun message du mauvais cabinet.
 
+## E3bis — Appels audio et réunions depuis la messagerie (nouvelle exigence)
+
+**Un seul Firm Manager.** Les appels et réunions sont accessibles dans la messagerie sur ordinateur et téléphone, avec les mêmes droits d'accès aux utilisateurs, groupes et missions. Parcours par lots : **appel audio 1:1 → vidéo 1:1 → réunions de groupe/mission → notifications d'appel**. Les médias passent par WebRTC/SFU, et le téléphone charge le SDK uniquement lorsqu'il en a besoin. Ne pas dupliquer l'authentification ni le stockage, ni enregistrer les réunions par défaut.
+
+**Point bloquant à traiter avant implémentation :** les en-têtes `Permissions-Policy` actuels bloquent caméra/microphone ; la CSP doit être alignée sur le fournisseur média sélectionné, sans désactiver globalement la sécurité. Les appels en arrière-plan sur PWA iOS/Android ne sont pas garantis comme dans une application native.
+
+**Spécification et tests :** [MOBILE_CALLS_MEETINGS.md](MOBILE_CALLS_MEETINGS.md). Christian valide choix LiveKit/Jitsi/Daily, capacité du VPS ou fournisseur géré, et les coûts avant l'intégration.
+
 ## E4 — Agent IA conversationnel qui agit
 
 Brancher les routes IA existantes (ne pas développer un second moteur IA). Dans le contexte de mission, permettre : question, instruction, affectation document, demande de résumé, correction, suivi du statut et résultat vérifiable. Afficher « demandé », « en cours », « terminé avec preuve », « bloqué », « échec ». Une réponse IA n'est jamais une preuve que la tâche est réalisée. Protéger les opérations externes ou destructives par les approbations existantes.
