@@ -33,7 +33,7 @@ const baseline = {
   'assistant.html': '81568bdf56f981b699fcea87e1af11801ae3b9168d823f73f691e4189f8a45be',
   'auditeur.html': 'f35c16f1edebaf4ed884f90f2299de8ceab772aced92ad54badc6f33e9e6a53f',
   'carte.html': '517264de7878e11fa9e4c0ddbd52b1537bed1ee0a8614f286bbbda3d6255bf45',
-  'entrainement.html': '498594eedf82d79934500483f4e6674008f10ec26b7e77557a8bdb6ebd04a735',
+  'entrainement.html': '0ab314be876b3d7d068b258ccebf797a25479632d4dee84fd44afed99a7b38c9',
   'fichiers.html': '3754d85d85743a8676c7722fbdf334e8cbc11df0eab262f27246585d9d634b3d',
   'missions-terminees.html': '3bc3550b6db8965b93c70910029a0bed4807dbd406f6ae3abf5696c1ef43dd80',
   'mon-ia.html': '37df909cadf681eeea0794dad10714686e93046bfdb8d051017013181d542281',

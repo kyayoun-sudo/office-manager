@@ -3,16 +3,16 @@
   var OM = window.OfficeManager;
   if (!OM || ['owner', 'partner', 'it_admin'].indexOf(OM.getRole()) < 0) return;
   var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-training-view]'));
-  var views = ['cabinet', 'specialized', 'shadow'];
+  var views = ['cabinet', 'specialized', 'shadow', 'simulation'];
   function show(view) {
     if (views.indexOf(view) < 0) view = 'cabinet';
     views.forEach(function (key) { document.getElementById('training-' + key).hidden = key !== view; });
     buttons.forEach(function (b) { var selected = b.dataset.trainingView === view; b.setAttribute('aria-pressed', String(selected)); b.className = selected ? 'btn' : 'btn ghost'; });
   }
-  function fromHash() { var value = location.hash.slice(1); show(value === 'tests-specialises' ? 'specialized' : value === 'lecons' || value === 'shadow-card' ? 'shadow' : 'cabinet'); }
+  function fromHash() { var value = location.hash.slice(1); show(value === 'tests-specialises' ? 'specialized' : value === 'lecons' || value === 'shadow-card' ? 'shadow' : value === 'simulation' ? 'simulation' : 'cabinet'); }
   buttons.forEach(function (b) { b.addEventListener('click', function () {
     var key = b.dataset.trainingView;
-    location.hash = key === 'cabinet' ? 'firm-simulation' : key === 'specialized' ? 'tests-specialises' : 'lecons';
+    location.hash = key === 'cabinet' ? 'firm-simulation' : key === 'specialized' ? 'tests-specialises' : key === 'simulation' ? 'simulation' : 'lecons';
     show(key);
   }); });
   window.addEventListener('hashchange', fromHash);

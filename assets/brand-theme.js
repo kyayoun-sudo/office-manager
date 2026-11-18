@@ -969,5 +969,22 @@
       main.insertBefore(link, main.firstChild);
     }
   }
+  // Simulation (2026-11-18): a permanent banner while the current firm is a training firm, and the way out.
+  function addSimulationBanner() {
+    var s = readSession(); if (!s || !s.org_id || !s.cabinets || document.getElementById('om-simulation-banner')) return;
+    var cur = s.cabinets.filter(function (c) { return c.org_id === s.org_id; })[0];
+    if (!cur || cur.account_kind !== 'simulation') return;
+    var bar = node('div', null, 'om-simulation-banner'); bar.id = 'om-simulation-banner'; bar.setAttribute('role', 'status');
+    bar.appendChild(node('strong', 'Mode Simulation'));
+    bar.appendChild(document.createTextNode(' — rien n’est réel : vos données et vos rôles ne touchent pas le vrai cabinet.'));
+    var leave = node('button', 'Quitter la simulation', 'btn ghost'); leave.type = 'button'; leave.id = 'om-simulation-leave';
+    leave.addEventListener('click', function () {
+      var real = s.cabinets.filter(function (c) { return c.account_kind !== 'simulation'; })[0];
+      if (real) OM.switchCabinet(real.org_id, '/entrainement.html#simulation');
+    });
+    bar.appendChild(leave);
+    var host = document.querySelector('main') || document.body; host.insertBefore(bar, host.firstChild);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addSimulationBanner); else addSimulationBanner();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addDossierNavigation); else addDossierNavigation();
 })();

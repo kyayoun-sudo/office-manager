@@ -74,6 +74,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       <button type="button" class="btn" data-training-view="cabinet" aria-controls="training-cabinet" aria-pressed="true">Cabinet virtuel</button>
       <button type="button" class="btn ghost" data-training-view="specialized" aria-controls="training-specialized" aria-pressed="false">Tests spécialisés</button>
       <button type="button" class="btn ghost" data-training-view="shadow" aria-controls="training-shadow" aria-pressed="false">Leçons et suivi</button>
+      <button type="button" class="btn ghost" data-training-view="simulation" aria-controls="training-simulation" aria-pressed="false">Simulation</button>
     </nav>
     <section id="training-cabinet" class="training-panel" aria-labelledby="training-cabinet-title">
       <h2 id="training-cabinet-title" class="sr">Cabinet virtuel</h2>
@@ -186,6 +187,18 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
       </section>
 
 
+    </section>
+    <section id="training-simulation" class="training-panel" aria-labelledby="training-simulation-title" hidden>
+      <h2 id="training-simulation-title">Simulation</h2>
+      <p class="small">Travaillez dans Firm Manager comme sur une vraie mission, dans un cabinet d’entraînement séparé : vos données, vos rôles et vos travaux n’ont aucun effet sur le vrai cabinet. Rien n’est envoyé à l’extérieur.</p>
+      <div id="simulation-list"></div>
+      <form id="simulation-form" class="card">
+        <div class="field"><label for="simulation-name">Nom de la simulation</label><input id="simulation-name" maxlength="120" required placeholder="ex. Entraînement — Société Atlas 2024"></div>
+        <div class="field"><label for="simulation-client">Ancienne mission (client)</label><input id="simulation-client" maxlength="120"></div>
+        <div class="field"><label for="simulation-period">Exercice</label><input id="simulation-period" maxlength="40" placeholder="2024"></div>
+        <button type="submit" class="btn" id="simulation-create">Créer la simulation</button>
+        <p class="small" id="simulation-say" role="status" aria-live="polite"></p>
+      </form>
     </section>
   </main>
 </div>
@@ -635,6 +648,7 @@ table.by-day td:first-child,table.by-day th:first-child{text-align:left}
 </html>
 
 <script src="/assets/training-navigation.js"></script>
+<script src="/assets/simulation.js" defer></script>
 <script src="/assets/audit-sandbox.js"></script>
 
 <script src="/assets/firm-simulation.js"></script>
