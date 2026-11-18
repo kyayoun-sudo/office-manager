@@ -1,12 +1,13 @@
 /* Firm Manager Mobile PWA: only static, public mobile assets can be cached.
    Never cache mission data, API responses, messages, tokens, uploaded documents or HTML. */
-const CACHE_NAME = 'firm-manager-mobile-static-v3';
+const CACHE_NAME = 'firm-manager-mobile-static-v4';
 const STATIC_ASSETS = [
   '/assets/mobile.css',
   '/assets/mobile.js',
   '/assets/mobile-chat.js',
   '/assets/mobile-ai.js',
   '/assets/mobile-capture.js',
+  '/assets/mobile-work.js',
   '/assets/mobile-manifest.json',
   '/assets/firm-mobile-180.png',
   '/assets/firm-mobile-192.png',
