@@ -151,7 +151,8 @@
     if (active === 'accueil') return notifications(force);
     if (active === 'travail') return Promise.all([
       notifications(force),
-      window.FirmMobileWork ? window.FirmMobileWork.refresh(force) : Promise.resolve()
+      window.FirmMobileTasks ? window.FirmMobileTasks.refresh(force) : Promise.resolve(),
+      window.FirmMobileMail ? window.FirmMobileMail.refresh(force) : Promise.resolve()
     ]);
     if (active === 'missions') return missions(force);
     if (active === 'messages') return messages(force);
@@ -259,7 +260,8 @@
       if (window.FirmMobileChat) window.FirmMobileChat.init(OM);
       if (window.FirmMobileAI) window.FirmMobileAI.init(OM);
       if (window.FirmMobileCapture) window.FirmMobileCapture.init(OM);
-      if (window.FirmMobileWork) window.FirmMobileWork.init(OM);
+      if (window.FirmMobileTasks) window.FirmMobileTasks.init(OM);
+      if (window.FirmMobileMail) window.FirmMobileMail.init(OM);
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
