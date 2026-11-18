@@ -11,7 +11,7 @@ Branche de référence : feature/white-label-desktop
 
 Le téléphone sert à discuter, agir et suivre. Les calculs d'IA, l'accès documentaire et les opérations métier lourdes sont exécutés par le serveur. Ne pas charger les classeurs complets ou le cockpit de bureau.
 
-**Règle de livraison :** développer dans la branche mobile, vérifier chaque lot, intégrer progressivement par PR contrôlées vers la branche de référence quand il est validé. Ne pas déployer ni fusionner sans recette. Une branche est un espace de développement, pas une seconde application autonome à maintenir indéfiniment.
+**Règle de livraison (clarification du propriétaire, 18 novembre 2026) :** ce n'est pas une application distincte : Firm Manager possède une interface ordinateur complète et une interface téléphone légère. Développer isolément les changements mobiles dans `feature/mobile-pwa` pour éviter les régressions ; conserver les mêmes API, authentification, organisations, permissions, missions, messages, agents IA, stockage et base. Aucune obligation de sous-domaine, de dépôt ou de serveur mobile distinct. Christian choisira le mécanisme d'intégration du code et de publication de l'interface mobile dans **le même Firm Manager**, après tests ; une fusion Git n'est pas une fusion fonctionnelle des interfaces. Ne pas fusionner ni déployer sans recette.
 
 ## E0 — Inventaire et garde-fous (audit initial : code inspecté, tests à exécuter)
 
