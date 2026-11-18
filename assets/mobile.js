@@ -122,6 +122,7 @@
     });
   }
   function messages(force) {
+    if (window.FirmMobileChat) return window.FirmMobileChat.refresh(force);
     if (loaded.messages && !force) return Promise.resolve();
     placeholder('mobile-chats', 'Chargement des conversations…', false);
     var thisRun = serial.messages = (serial.messages || 0) + 1;
@@ -250,6 +251,7 @@
         });
       }
       installationBanner();
+      if (window.FirmMobileChat) window.FirmMobileChat.init(OM);
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
