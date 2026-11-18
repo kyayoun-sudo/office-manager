@@ -73,5 +73,5 @@ test('joining or creating a firm needs a confirmed address', async () => {
 test('my firms: the active memberships of the person, with their names', async () => {
   const { d, users } = world();
   users.push({ org_id: ORG, auth_user_id: 'u1', role: 'manager', display_name: 'U' });
-  assert.deepEqual(await myCabinets({ id: 'u1' }, d), [{ org_id: ORG, name: 'Cabinet Alpha', role: 'manager' }]);
+  assert.deepEqual(await myCabinets({ id: 'u1' }, d), [{ org_id: ORG, name: 'Cabinet Alpha', role: 'manager', account_kind: null }]);
 });
