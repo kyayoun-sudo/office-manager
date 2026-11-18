@@ -244,6 +244,11 @@
       $('mobile-role').textContent = OM.roleLabel() || 'Mon espace';
       OM.loadBranding().catch(function () { /* The user still has a valid session. */ });
       updateNetwork();
+      if ('serviceWorker' in navigator && window.isSecureContext) {
+        navigator.serviceWorker.register('/mobile-sw.js', { scope: '/' }).catch(function () {
+          // A browser without service-worker support still loads the regular online app.
+        });
+      }
       installationBanner();
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
