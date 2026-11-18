@@ -437,6 +437,23 @@ export const ROUTES = Object.freeze({
   },
   // Several firms in one installation (2026-10-24): my firms, create one, join by invitation; administrators invite.
   // Signed-in identity only (a newcomer belongs to no firm yet); inviting needs an administrator of the firm.
+  // Simulation = a training firm, child of the real one (2026-11-18): list mine, create, archive. Personal session only.
+  simulation: {
+    GET: open(async (orgId, req) => {
+      if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
+      const s = await import('../lib/simulation.js'), u = await import('../lib/user-auth.js');
+      return { parent: orgId, simulations: await s.listSimulations(await u.sessionUser(req), orgId) };
+    }),
+    POST: open(async (orgId, req) => {
+      if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
+      const s = await import('../lib/simulation.js'), u = await import('../lib/user-auth.js');
+      const b = req.body || {}, action = String(b.action || '');
+      if (action === 'create') return s.createSimulation(await u.sessionUser(req), orgId, b);
+      if (action === 'archive') return s.archiveSimulation(await u.sessionUser(req), String(b.org_id || ''));
+      throw fail('UNKNOWN_ACTION', 400);
+    }),
+    unavailable: 'SIMULATION_UNAVAILABLE'
+  },
   cabinets: {
     GET: open(async (orgId, req) => {
       // The personal session only (a person without a firm never holds the shared pilot token).
@@ -524,7 +541,8 @@ export const ROUTES = Object.freeze({
   'scheduler-tick': { POST: open(async (orgId, req) => {
     if (!multiCabinet()) return tick(orgId, req);
     (await import('../lib/agent-passes.js')).requireSchedulerSecret(req);
-    const firms = await rest('office_organizations?select=id&order=created_at.asc&limit=1000') || [];
+    // Simulation firms never run automatic passes: their agents work only when a person asks (2026-11-18).
+    const firms = (await rest('office_organizations?select=id,account_kind&order=created_at.asc&limit=1000') || []).filter(f => f.account_kind !== 'simulation');
     const results = [];
     for (const f of firms) results.push(await runInFirm(f.id, async () => {
       await loadGoogleConnection(f.id).catch(() => null);
@@ -1317,6 +1335,8 @@ export async function handleApp(req) {
   // The firm of the request (lib/firm-context.js). Several firms per installation: the shared pilot token is no
   // longer enough, the person must belong to the firm (or the call is a signed internal one). Switch off: DEFAULT_ORG_ID.
   const orgId = await resolveRequestOrg(req, { requireMember: !run.public });
+  // The type of the firm (real / simulation) is read once, for the guards (no outbound, Drive confined): 2026-11-18.
+  if (orgId && multiCabinet()) await (await import('../lib/simulation-guard.js')).primeOrgKind(orgId).catch(() => null);
   // The owner code and FIRST_OWNER_EMAILS are the pilot firm's: never a way into another firm.
   if (PILOT_ONLY.has(String(req.query?.route || '')) && orgId !== pilotOrgId()) throw fail('PILOT_FIRM_ONLY', 403);
   // Owner-only routes (2026-10-11): the owner's or a partner's personal session is enough — no code to type,
