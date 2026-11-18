@@ -428,3 +428,9 @@
 /* Veille : les actions d'une offre (suivre, raison, ne pas suivre…) se rangent en ligne. */
 .om-design .td-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .om-design .td-actions :is(select, input:not([type="checkbox"])) { width: auto; min-width: 11rem; flex: 0 1 16rem; }
+
+/* Paramètres : l'aperçu de la barre du cabinet suit le thème (le menu est clair). */
+.om-design .preview-top { background: var(--om-muted-surface); color: var(--foreground); }
+
+/* Accueil : les deux liens sous « Mes agents » ne se collent plus. */
+.om-design .workspace-preview-link { display: block; width: fit-content; margin: 0.375rem 0; color: var(--om-brand-link); text-decoration: underline; }
