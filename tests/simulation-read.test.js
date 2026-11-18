@@ -88,3 +88,40 @@ test('the real firm keeps reading everything and keeps its Gmail', async () => {
     });
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('review: the parent LEGACY connection lends no Gmail either, and text scopes keep Drive', async () => {
+  const legacyRows = async (path, o) => {
+    if (path.startsWith('office_google_connections?org_id=eq.' + REAL)) return [];
+    if (path.startsWith('office_integration_connections?org_id=eq.' + REAL)) return [{ account_email: 'c@x.test', granted_scopes: [SCOPES.drive, SCOPES.gmailRead], status: 'connected' }];
+    if (path === 'rpc/office_get_google_drive_secret') return [{ client_id: 'a', client_secret: 'b', refresh_token: 'r' }];
+    return fetchRows(path, o);
+  };
+  await inSim(async () => {});
+  resetGoogleConnectionCache(); resetSimulationGuardCache();
+  await primeOrgKind(SIM, { fetchRows });
+  await loadGoogleConnection(SIM, { fetchRows: legacyRows });
+  await runInFirm(SIM, async () => { assert.equal(connectedHas(SCOPES.gmailRead), false); assert.equal(connectedHas(SCOPES.drive), true); });
+  const textRows = async (path, o) => path.startsWith('office_google_connections?org_id=eq.' + REAL)
+    ? [{ google_email: 'c@x.test', refresh_token_enc: encryptToken('r'), scopes: SCOPES.drive + ' ' + SCOPES.gmailRead, connected_by: 'p', connected_at: '2026-11-01' }] : fetchRows(path, o);
+  resetGoogleConnectionCache(); resetSimulationGuardCache();
+  await primeOrgKind(SIM, { fetchRows });
+  await loadGoogleConnection(SIM, { fetchRows: textRows });
+  await runInFirm(SIM, async () => { assert.equal(connectedHas(SCOPES.drive), true); assert.equal(connectedHas(SCOPES.gmailRead), false); });
+});
+
+test('review: copying a file of the real Drive into a simulation is refused (source checked)', async () => {
+  const { copyDriveFile } = await import('../lib/google-drive.js');
+  await inSim(async () => {
+    await assert.rejects(copyDriveFile('REALFILE', 'x', 'SIMFOLDER'), /SIMULATION_READ_OUTSIDE_FOLDER/);
+    assert.deepEqual(calls.filter(c => /\/copy/.test(c)), []);
+  });
+});
+
+test('review: a firm known as real stays real when the type read fails once', async () => {
+  resetSimulationGuardCache();
+  await primeOrgKind(REAL, { fetchRows });
+  const { isNotRealKnown } = await import('../lib/simulation-guard.js');
+  const { setTimeout: sleep } = await import('node:timers/promises');
+  await primeOrgKind(REAL, { fetchRows: async () => { throw new Error('db down'); }, now: () => Date.now() + 61000 });
+  await runInFirm(REAL, async () => assert.equal(isNotRealKnown(), false));
+});
