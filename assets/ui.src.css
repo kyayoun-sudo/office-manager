@@ -18,7 +18,7 @@
   --card: var(--background);
   --card-foreground: var(--foreground);
   --om-muted-surface: hsl(0 0% 96.1%);
-  --muted-foreground: hsl(0 0% 45.1%);
+  --muted-foreground: hsl(0 0% 41%);
   --muted: var(--muted-foreground);
   --border: hsl(0 0% 89.8%);
   --sidebar: hsl(0 0% 98%);

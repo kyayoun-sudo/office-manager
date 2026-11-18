@@ -434,3 +434,6 @@
 
 /* Accueil : les deux liens sous « Mes agents » ne se collent plus. */
 .om-design .workspace-preview-link { display: block; width: fit-content; margin: 0.375rem 0; color: var(--om-brand-link); text-decoration: underline; }
+
+/* Accessibilité : texte du bandeau « À valider » assez contrasté sur le fond ambre (4,14 → > 4,5). */
+.om-design .callout-text { color: var(--foreground); }
