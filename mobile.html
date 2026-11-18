@@ -17,7 +17,8 @@
 <script defer src="/assets/mobile-chat.js"></script>
 <script defer src="/assets/mobile-ai.js"></script>
 <script defer src="/assets/mobile-capture.js"></script>
-<script defer src="/assets/mobile-work.js"></script>
+<script defer src="/assets/mobile-tasks.js"></script>
+<script defer src="/assets/mobile-mail.js"></script>
 <script defer src="/assets/mobile.js"></script>
 </head>
 <body>
@@ -166,41 +167,75 @@
 
       <section class="mobile-panel" id="panel-travail" data-panel="travail" aria-labelledby="heading-travail" hidden>
         <h1 id="heading-travail">Mon travail</h1>
-        <p class="mobile-subtitle">Terminez les petits travaux et les réponses de revue, sans ouvrir de gros classeur.</p>
-        <div id="mobile-work-list">
-          <section class="mobile-work-section" aria-labelledby="mobile-work-mine-title">
-            <div class="mobile-card-title"><h2 id="mobile-work-mine-title">Mes procédures</h2><button id="mobile-work-refresh" type="button">Actualiser</button></div>
-            <div id="mobile-work-mine" class="mobile-work-items" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
-          </section>
-          <section class="mobile-work-section" aria-labelledby="mobile-work-reviews-title">
-            <div class="mobile-card-title"><h2 id="mobile-work-reviews-title">Mes revues</h2></div>
-            <div id="mobile-work-reviews" class="mobile-work-items" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
-          </section>
-        </div>
-        <section id="mobile-work-detail" class="mobile-work-section" hidden aria-label="Détail de la procédure">
-          <div class="mobile-thread-head"><button id="mobile-work-back" class="mobile-chat-back" type="button" aria-label="Retour à mes travaux">‹</button><div><h2 id="mobile-work-title">Procédure</h2><small id="mobile-work-subtitle">Travail</small></div></div>
-          <p id="mobile-work-detail-status" class="mobile-work-notice" role="status" aria-live="polite"></p>
-          <div id="mobile-work-points"></div>
-          <form id="mobile-work-conclusion-form" class="mobile-work-form" hidden>
-            <label for="mobile-work-conclusion">Conclusion de la procédure</label>
-            <textarea id="mobile-work-conclusion" rows="4" maxlength="3000" required></textarea>
-            <button type="submit">Enregistrer la conclusion</button>
-          </form>
-          <form id="mobile-work-review-form" class="mobile-work-form" hidden>
-            <label for="mobile-work-point">Point de revue à transmettre au préparateur</label>
-            <textarea id="mobile-work-point" rows="3" maxlength="1000" required></textarea>
-            <label for="mobile-work-severity">Importance</label>
-            <select id="mobile-work-severity"><option value="mineur">Mineur</option><option value="majeur">Majeur</option></select>
-            <button type="submit">Retourner avec ce point</button>
-          </form>
-          <a id="mobile-work-open-full" href="/procedure.html" class="mobile-secondary">Ouvrir la procédure complète et ses preuves</a>
-          <p class="mobile-work-disclaimer">Une revue ou une signature ne se valide pas sans contrôler les preuves et la version du Working Paper.</p>
+        <p class="mobile-subtitle">Voir l'essentiel, donner une instruction, répondre. Les grands travaux restent sur ordinateur.</p>
+
+        <section class="mobile-work-section" aria-labelledby="mobile-tasks-title">
+          <div class="mobile-card-title">
+            <h2 id="mobile-tasks-title">Mes tâches</h2>
+            <button id="mobile-tasks-refresh" type="button">Actualiser</button>
+          </div>
+          <div id="mobile-my-tasks" class="mobile-work-items" aria-live="polite">
+            <p class="mobile-muted">Chargement de vos tâches…</p>
+          </div>
         </section>
-        <h2 class="mobile-section-title">Notifications et validations</h2>
+
+        <section class="mobile-work-section" aria-labelledby="mobile-instruction-title">
+          <div class="mobile-card-title"><h2 id="mobile-instruction-title">Donner un ordre à l'IA</h2></div>
+          <form id="mobile-instruction-form" class="mobile-lite-command">
+            <label for="mobile-instruction-text">Que souhaitez-vous lui confier ?</label>
+            <textarea id="mobile-instruction-text" maxlength="1500" rows="3" required placeholder="Ex. : prépare ma réponse à cette job note et présente-la à ma validation."></textarea>
+            <button type="submit">Continuer avec l'IA</button>
+          </form>
+          <p class="mobile-work-disclaimer">L'IA peut préparer et réaliser les actions autorisées. Elle ne signe pas à votre place : toute signature personnelle ou professionnelle nécessite votre validation.</p>
+        </section>
+
+        <section class="mobile-work-section" id="mobile-mail-section" aria-labelledby="mobile-mail-title">
+          <div class="mobile-card-title">
+            <h2 id="mobile-mail-title">Mes e-mails personnels</h2>
+            <button id="mobile-mail-refresh" type="button">Actualiser</button>
+          </div>
+          <p class="mobile-mail-disclaimer">Uniquement votre boîte connectée. Séparée de la messagerie interne et des e-mails partagés du cabinet.</p>
+          <div id="mobile-mail-no-account" class="mobile-mail-connect" hidden>
+            <p>Aucune boîte personnelle connectée à ce compte.</p>
+            <div class="mobile-capture-actions">
+              <button id="mobile-mail-connect-google" type="button">Connecter Gmail</button>
+              <button id="mobile-mail-connect-microsoft" type="button">Connecter Outlook</button>
+            </div>
+          </div>
+          <div id="mobile-mail-account-view" hidden>
+            <label class="mobile-chat-label" for="mobile-mail-account">Ma boîte</label>
+            <select id="mobile-mail-account" class="mobile-chat-picker" aria-label="Choisir ma boîte personnelle"></select>
+            <div id="mobile-mail-list" class="mobile-work-items" aria-live="polite"></div>
+            <section id="mobile-mail-message" hidden>
+              <button id="mobile-mail-back" type="button" class="mobile-secondary">Retour aux e-mails</button>
+              <h3 id="mobile-mail-subject"></h3>
+              <p id="mobile-mail-from" class="mobile-mail-meta"></p>
+              <div id="mobile-mail-body" class="mobile-mail-body"></div>
+              <div class="mobile-capture-actions">
+                <button id="mobile-mail-reply" type="button">Répondre</button>
+                <button id="mobile-mail-ai-reply" type="button" hidden>Proposition IA</button>
+              </div>
+            </section>
+            <form id="mobile-mail-composer" class="mobile-lite-command" hidden>
+              <label for="mobile-mail-to">Destinataire</label>
+              <input id="mobile-mail-to" type="email" readonly required>
+              <label for="mobile-mail-reply-subject">Objet</label>
+              <input id="mobile-mail-reply-subject" maxlength="250" required>
+              <label for="mobile-mail-reply-body">Votre réponse</label>
+              <textarea id="mobile-mail-reply-body" maxlength="15000" rows="5" required></textarea>
+              <button id="mobile-mail-send" type="submit">Relire et envoyer</button>
+              <button id="mobile-mail-cancel" type="button" class="mobile-lite-cancel">Annuler</button>
+              <p class="mobile-work-disclaimer">L'envoi exige votre confirmation. Aucun e-mail n'est expédié automatiquement par l'IA.</p>
+            </form>
+          </div>
+          <p id="mobile-mail-status" class="mobile-work-notice" role="status" aria-live="polite"></p>
+        </section>
+
+        <h2 class="mobile-section-title">Notifications et suivis</h2>
         <div id="mobile-tasks" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
         <div class="mobile-actions">
-          <a href="/validations.html" class="mobile-secondary">Ouvrir les validations</a>
-          <a href="/accueil.html" class="mobile-secondary">Ouvrir mon espace complet</a>
+          <a href="/validations.html" class="mobile-secondary">Validations complètes</a>
+          <a href="/accueil.html" class="mobile-secondary">Version complète</a>
         </div>
       </section>
       <p id="mobile-status" class="mobile-status" role="status" aria-live="polite"></p>
