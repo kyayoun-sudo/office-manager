@@ -22,7 +22,7 @@ Le développement peut rester dans une **branche Git de travail** dédiée le te
 - E1 : page `mobile.html`, assets mobiles et navigation à cinq onglets.
 - E2 : même session via `assets/brand-theme.js`, installation PWA, manifeste, worker et icônes ; essais d'installation iPhone et Android sur HTTPS encore nécessaires.
 - E3 : messagerie interne dans l'interface mobile, réutilisant `/api/app?route=chat` et les droits existants. Les tests automatisés ciblés ont été ajoutés ; recette réelle multi-utilisateurs encore nécessaire.
-- E4 : discussions/commandes IA directement dans l'écran téléphone, à réaliser avec les routes existantes.
+- E4 : premier écran d'envoi direct à `/api/agent` et de résultat avec référence et statut ajouté à Lite ; tests automatisés et recette réelle en cours. Contexte de mission, preuve d'exécution et mémoire de conversation à améliorer.
 - E5 : caméra et pièces vers les dossiers de mission déjà existants, à réaliser.
 - E6 : activités courtes (job notes, checklists, commentaire WP, approbations selon rôle), à réaliser.
 - E7 : optimisation des performances, notifications push avec consentement, à finaliser.
@@ -39,6 +39,10 @@ Le développement peut rester dans une **branche Git de travail** dédiée le te
 7. Installer la PWA iOS/Android via HTTPS, tester réseau lent, appareils modestes, session expirée, caméra, rotation, retour et absence d'écran blanc.
 8. Ne jamais changer le comportement du bureau, du scheduler, des IA ou de l'authentification existants par inadvertance.
 9. Tester puis déployer avec sauvegarde et retour arrière, sans toucher à la production avant validation.
+
+## Demande à garder pour tout Firm Manager
+
+Agenda, réunions audio/vidéo, rendez-vous avec rappels et synchronisation facultative Google Agenda/Gmail : [GitHub #54](https://github.com/kyayoun-sudo/office-manager/issues/54). **Ne pas la limiter au mobile.**
 
 ## Instruction à Christian
 
