@@ -78,5 +78,11 @@
     api = officeManager;
     $('mobile-ai-form').addEventListener('submit', send);
   }
-  window.FirmMobileAI = { init: init };
+  function prefill(message, agent) {
+    var value = String(message || '').slice(0, 4000);
+    $('mobile-ai-message').value = value;
+    $('mobile-ai-agent').value = ALLOWED_AGENTS.includes(agent) ? agent : 'auto';
+    $('mobile-ai-message').focus();
+  }
+  window.FirmMobileAI = { init: init, prefill: prefill };
 })();
