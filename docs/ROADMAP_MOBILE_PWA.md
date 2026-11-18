@@ -47,6 +47,10 @@ Brancher `lib/chat.js` : messages individuels, cabinet, groupes et missions, ré
 
 Critères : deux téléphones et un ordinateur échangent, même historique et mêmes règles de visibilité ; aucun message du mauvais cabinet.
 
+## Fonctionnalité globale hors MVP mobile : réunions, agenda et Google Agenda
+
+**À ne pas oublier et à implémenter dans tout Firm Manager** (Web complet + Lite) : appels audio, réunions vidéo, calendrier personnel et par mission, invitations, rappels avant réunion et synchronisation facultative avec Google Agenda du compte Gmail connecté. Cahier des charges suivi dans [GitHub #54](https://github.com/kyayoun-sudo/office-manager/issues/54). Ce n'est pas une fonction uniquement téléphone ; **backlog, non implémentée**.
+
 ## E3bis — Appels audio et réunions depuis la messagerie (nouvelle exigence)
 
 **Un seul Firm Manager.** Les appels et réunions sont accessibles dans la messagerie sur ordinateur et téléphone, avec les mêmes droits d'accès aux utilisateurs, groupes et missions. Parcours par lots : **appel audio 1:1 → vidéo 1:1 → réunions de groupe/mission → notifications d'appel**. Les médias passent par WebRTC/SFU, et le téléphone charge le SDK uniquement lorsqu'il en a besoin. Ne pas dupliquer l'authentification ni le stockage, ni enregistrer les réunions par défaut.
@@ -60,6 +64,8 @@ Critères : deux téléphones et un ordinateur échangent, même historique et m
 Brancher les routes IA existantes (ne pas développer un second moteur IA). Dans le contexte de mission, permettre : question, instruction, affectation document, demande de résumé, correction, suivi du statut et résultat vérifiable. Afficher « demandé », « en cours », « terminé avec preuve », « bloqué », « échec ». Une réponse IA n'est jamais une preuve que la tâche est réalisée. Protéger les opérations externes ou destructives par les approbations existantes.
 
 Critères : commande depuis mobile, exécution serveur, dossier/état mis à jour, résultat visible sur bureau ; test d'erreur et de reconnexion.
+
+**Avancement E4 (18 novembre 2026) :** écran natif du téléphone ajouté sur la branche mobile ; formulaire agent + demande au backend existant `/api/agent`, réponse, référence de traitement et statut du moteur. Pas de second modèle IA, pas de stockage local des conversations. **Les tests CI et la recette sur vrai serveur doivent confirmer le fonctionnement** ; les commandes liées au contexte de mission et la continuité conversationnelle restent à compléter.
 
 ## E5 — Caméra, fichiers et dossiers de mission
 
