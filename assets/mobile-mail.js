@@ -162,6 +162,7 @@
         current = null;
         hideEditor();
         loaded = false;
+        busy = false;
         status('Envoi accepté par votre fournisseur de messagerie.');
         return refresh(false);
       }).catch(function (error) {
