@@ -17,6 +17,7 @@
 <script defer src="/assets/mobile-chat.js"></script>
 <script defer src="/assets/mobile-ai.js"></script>
 <script defer src="/assets/mobile-capture.js"></script>
+<script defer src="/assets/mobile-work.js"></script>
 <script defer src="/assets/mobile.js"></script>
 </head>
 <body>
@@ -165,7 +166,37 @@
 
       <section class="mobile-panel" id="panel-travail" data-panel="travail" aria-labelledby="heading-travail" hidden>
         <h1 id="heading-travail">Mon travail</h1>
-        <p class="mobile-subtitle">Les notifications et demandes de votre périmètre.</p>
+        <p class="mobile-subtitle">Terminez les petits travaux et les réponses de revue, sans ouvrir de gros classeur.</p>
+        <div id="mobile-work-list">
+          <section class="mobile-work-section" aria-labelledby="mobile-work-mine-title">
+            <div class="mobile-card-title"><h2 id="mobile-work-mine-title">Mes procédures</h2><button id="mobile-work-refresh" type="button">Actualiser</button></div>
+            <div id="mobile-work-mine" class="mobile-work-items" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+          </section>
+          <section class="mobile-work-section" aria-labelledby="mobile-work-reviews-title">
+            <div class="mobile-card-title"><h2 id="mobile-work-reviews-title">Mes revues</h2></div>
+            <div id="mobile-work-reviews" class="mobile-work-items" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
+          </section>
+        </div>
+        <section id="mobile-work-detail" class="mobile-work-section" hidden aria-label="Détail de la procédure">
+          <div class="mobile-thread-head"><button id="mobile-work-back" class="mobile-chat-back" type="button" aria-label="Retour à mes travaux">‹</button><div><h2 id="mobile-work-title">Procédure</h2><small id="mobile-work-subtitle">Travail</small></div></div>
+          <p id="mobile-work-detail-status" class="mobile-work-notice" role="status" aria-live="polite"></p>
+          <div id="mobile-work-points"></div>
+          <form id="mobile-work-conclusion-form" class="mobile-work-form" hidden>
+            <label for="mobile-work-conclusion">Conclusion de la procédure</label>
+            <textarea id="mobile-work-conclusion" rows="4" maxlength="3000" required></textarea>
+            <button type="submit">Enregistrer la conclusion</button>
+          </form>
+          <form id="mobile-work-review-form" class="mobile-work-form" hidden>
+            <label for="mobile-work-point">Point de revue à transmettre au préparateur</label>
+            <textarea id="mobile-work-point" rows="3" maxlength="1000" required></textarea>
+            <label for="mobile-work-severity">Importance</label>
+            <select id="mobile-work-severity"><option value="mineur">Mineur</option><option value="majeur">Majeur</option></select>
+            <button type="submit">Retourner avec ce point</button>
+          </form>
+          <a id="mobile-work-open-full" href="/procedure.html" class="mobile-secondary">Ouvrir la procédure complète et ses preuves</a>
+          <p class="mobile-work-disclaimer">Une revue ou une signature ne se valide pas sans contrôler les preuves et la version du Working Paper.</p>
+        </section>
+        <h2 class="mobile-section-title">Notifications et validations</h2>
         <div id="mobile-tasks" class="mobile-list mobile-list-card" aria-live="polite"><p class="mobile-muted">Chargement…</p></div>
         <div class="mobile-actions">
           <a href="/validations.html" class="mobile-secondary">Ouvrir les validations</a>
