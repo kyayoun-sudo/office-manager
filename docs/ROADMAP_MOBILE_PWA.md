@@ -73,6 +73,8 @@ Photo, galerie et fichier via sélecteur système. Prévisualisation locale, év
 
 Critères : pièce correctement attachée à la mission autorisée, provenance conservée, aucun mélange inter-cabinet ; voir le fichier sur ordinateur.
 
+**Avancement E5 (18 novembre 2026) :** le volet Missions possède maintenant la capture d'image (appareil photo), l'ajout de PDF, la sélection parmi les missions autorisées, et le dépôt via les actions `piece`/`piece-start` puis `pieces-done` du pipeline existant. L'image originale n'est pas compressée et aucun fichier n'est enregistré durablement sur le téléphone ; 20 Mo maximum pour limiter les risques de plantage. **Test réel sur serveur/Drive, gestion des dépôts interrompus et validation du classement Orpailleur restent à faire.** Aucune reprise automatique : risque de doublon.
+
 ## E6 — Mon travail et validations
 
 Afficher les tâches autorisées par rôle : réponse à job note, commentaire de WP, checklist courte, attribution, statut, points bloquants, revue/validation. Édition mobile limitée aux champs adaptés ; aucun grand tableur rendu en entier. Proposer les messages et e-mails via les systèmes existants ; envoi externe seulement si autorisé et validé conformément au workflow réel.
