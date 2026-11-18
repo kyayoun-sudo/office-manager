@@ -68,7 +68,9 @@ test('task list asks the same AI with an explicit user action, never auto-signs'
   delegate.click();
   assert.ok(switched);
   assert.match(instruction, /Répondre au point de revue/);
-  assert.match(instruction, /Ne signe jamais à ma place/);
+  assert.match(instruction, /N’attribue jamais une signature humaine à l’IA/);
+  assert.match(instruction, /job note/);
+  assert.match(instruction, /outils, job notes, pièces et workflows déjà présents/);
   assert.deepEqual(seen, ['/api/app?route=my-questions']);
   assert.doesNotMatch(tasks, /innerHTML\s*=/);
 });
