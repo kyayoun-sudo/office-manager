@@ -83,5 +83,5 @@ test('a selected photo uploads once and is registered to the same mission', asyn
 test('a mission not returned by the authorized API cannot be selected for upload', async () => {
   assert.ok(js.includes('authorized = new Set()'));
   assert.ok(js.includes('authorized.has(selectedMission)'));
-  assert.ok(js.includes('Ne renvoyez pas'));
+  assert.ok(js.includes('avant de renvoyer'));
 });
