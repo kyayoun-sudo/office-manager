@@ -94,6 +94,6 @@ test('E6 never sends a signature or bypasses permissions from the mobile app', (
   assert.ok(js.includes('review.me && review.me.may_review'));
   assert.ok(js.includes('detail.editable'));
   assert.ok(js.includes('server'));
-  assert.ok(js.includes('if (busy)'));
+  assert.ok(js.includes('if (!om || busy || !current)'));
   assert.ok(!js.includes("method: 'DELETE'"));
 });
