@@ -193,3 +193,11 @@ button:focus-visible,a:focus-visible{outline:3px solid #5e8fc7;outline-offset:3p
 #mobile-mail-composer{padding:12px 0}
 #mobile-mail-status[data-state="error"]{color:#a03d2f}
 @media(max-width:340px){.mobile-task-buttons{flex-direction:column}}
+
+/* Same Firm Manager AI presented as a lightweight, volatile conversation. */
+.mobile-ai-conversation{display:flex;flex-direction:column;gap:11px;border-radius:15px;border:1px solid var(--line);background:var(--soft);padding:12px;margin-bottom:12px;min-height:72px;max-height:38vh;overflow-y:auto;overscroll-behavior:contain}
+.mobile-ai-turn{display:flex;flex-direction:column;align-self:flex-start;gap:4px;max-width:94%;border-radius:13px 13px 13px 3px;background:var(--paper);border:1px solid var(--line);padding:10px 12px;overflow-wrap:anywhere}
+.mobile-ai-turn.own{align-self:flex-end;border-color:var(--brand);background:var(--brand);color:#fff;border-radius:13px 13px 3px 13px}
+.mobile-ai-turn strong{font-size:11px;font-weight:700}
+.mobile-ai-turn p{font-size:13px;white-space:pre-wrap;line-height:1.55;margin:0}
+.mobile-ai-turn small{font-size:10px;line-height:1.4;opacity:.8}
