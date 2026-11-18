@@ -201,6 +201,9 @@
 @media (max-width: 860px) {
   .om-design .om-workspace-toolbar { flex-wrap: nowrap; }
   .om-design .om-workspace-crumb { display: none; }
+  /* Sur mobile le menu reste collé en haut : la barre et la cloche défilent avec la page (sinon la cloche passe sur le bouton Menu). */
+  .om-design .om-workspace-toolbar { position: static; }
+  .om-design .main > .om-workspace-toolbar ~ .notification-tools { position: relative; top: auto; }
   .om-design .main > .om-workspace-toolbar ~ .notification-tools .bell { right: calc(-1 * var(--om-px) + 0.5rem); }
 }
 

@@ -400,3 +400,27 @@
 
 /* Lien « Voir le dossier… » ajouté en tête des pages de mission : discret, à la taille de son texte. */
 .om-design .main > a.btn.ghost[href^="/dossiers.html?"] { align-self: flex-start; width: fit-content; min-height: 2rem; padding-inline: 0.75rem; font-size: 0.8125rem; }
+
+/* Formulaires simples (sans classe) : de l'air entre deux champs et avant le bouton. */
+.om-design .card form:not([class]) > .field + .field,
+.om-design .card form:not([class]) > :is(p, .field) + :is(p, button, .btn) { margin-top: 0.875rem; }
+
+/* Page « Mes cabinets » : pas de .main ni de classes .btn / .field dans son HTML, on style donc ses éléments dans la carte. */
+.om-design .cab-card :is(input, select) {
+  width: 100%; box-sizing: border-box; height: 2.5rem; padding: 0 0.75rem;
+  font: inherit; font-size: 0.875rem; color: var(--foreground); background: var(--background);
+  border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
+}
+.om-design .cab-card :is(input, select):focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent); }
+.om-design .cab-card :is(button, a#home):not(.link-btn) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.5rem; padding: 0 1rem;
+  font: inherit; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer;
+  color: var(--primary-foreground); background: var(--primary); border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px); box-shadow: var(--om-shadow-xs);
+}
+.om-design .cab-card :is(button, a#home):not(.link-btn):hover { filter: brightness(1.08); }
+.om-design .cab-card :is(button, a#home):not(.link-btn):focus-visible { outline: 2px solid var(--om-brand-link, currentColor); outline-offset: 2px; }
+.om-design .cab-card :is(.cab-list button, #copy, a#home) { color: var(--foreground); background: var(--card); border-color: var(--border); box-shadow: none; }
+.om-design .cab-card :is(.cab-list button, #copy, a#home):hover { background: var(--om-muted-surface); filter: none; }
+.om-design .cab-card .link-btn { align-self: flex-start; min-height: 2.25rem; padding: 0.5rem 0; font: inherit; font-size: 0.8125rem; color: var(--om-brand-link, var(--foreground)); text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer; }
+.om-design .cab-card table { font-size: 0.8125rem; }
