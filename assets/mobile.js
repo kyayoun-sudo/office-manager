@@ -165,8 +165,60 @@
     window.addEventListener('offline', updateNetwork);
     window.addEventListener('pageshow', function (event) { if (event.persisted) refresh(true); });
   }
+  // Install only a browser-backed mobile shell. No second account or device-side AI.
+  var deferredInstall = null;
+  var dismissedInstall = false;
+  function installedMode() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  }
+  function installationBanner() {
+    var banner = $('mobile-install');
+    if (!banner) return;
+    var mobileAgent = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (installedMode() || dismissedInstall || (!mobileAgent && !deferredInstall)) {
+      banner.hidden = true;
+      return;
+    }
+    banner.hidden = false;
+    var ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    $('mobile-install-cta').hidden = !deferredInstall;
+    $('mobile-install-hint').textContent = deferredInstall
+      ? 'Installez Firm Manager comme une application depuis votre navigateur.'
+      : ios
+        ? 'Dans Safari : Partager → Ajouter à l’écran d’accueil → Ouvrir comme app.'
+        : 'Dans le menu du navigateur : Installer l’application ou Ajouter à l’écran d’accueil.';
+  }
+  window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    deferredInstall = event;
+    if (!$('mobile-app').hidden) installationBanner();
+  });
+  window.addEventListener('appinstalled', function () {
+    deferredInstall = null;
+    dismissedInstall = true;
+    installationBanner();
+  });
+  $('mobile-install-close').addEventListener('click', function () {
+    dismissedInstall = true;
+    installationBanner();
+  });
+  $('mobile-install-cta').addEventListener('click', function () {
+    if (!deferredInstall) return;
+    var event = deferredInstall;
+    deferredInstall = null;
+    var result = event.prompt();
+    Promise.resolve(result).then(function () {
+      return event.userChoice;
+    }).then(function (choice) {
+      if (choice && choice.outcome === 'accepted') dismissedInstall = true;
+    }).catch(function () {
+      detail('Installation non disponible : utilisez le menu de votre navigateur.');
+    }).finally(installationBanner);
+  });
+
   function login() {
-    location.replace('/login.html?next=' + encodeURIComponent('/mobile.html' + location.hash));
+    // login.html deliberately validates "next" without a # fragment.
+    location.replace('/login.html?next=' + encodeURIComponent('/mobile.html'));
   }
   function showRetry() {
     var lock = $('mobile-lock');
@@ -192,6 +244,7 @@
       $('mobile-role').textContent = OM.roleLabel() || 'Mon espace';
       OM.loadBranding().catch(function () { /* The user still has a valid session. */ });
       updateNetwork();
+      installationBanner();
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
