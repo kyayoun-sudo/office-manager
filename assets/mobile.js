@@ -252,6 +252,7 @@
       }
       installationBanner();
       if (window.FirmMobileChat) window.FirmMobileChat.init(OM);
+      if (window.FirmMobileAI) window.FirmMobileAI.init(OM);
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
