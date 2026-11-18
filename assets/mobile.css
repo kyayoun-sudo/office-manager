@@ -61,6 +61,13 @@ button:focus-visible,a:focus-visible{outline:3px solid #5e8fc7;outline-offset:3p
 .mobile-tabs button>span{font-size:22px;line-height:1.1}
 .mobile-tabs button small{font-size:10px;font-weight:600}
 .mobile-tabs button[aria-current="page"]{color:var(--brand);background:var(--accent)}
+.mobile-install{background:#e8f0fb;border:1px solid #bfd0e5;border-radius:14px;padding:14px 15px;margin:8px 0 18px;display:flex;flex-direction:column;gap:12px}
+.mobile-install h2{font-size:15px;margin:0 0 5px;color:var(--brand)}
+.mobile-install p{font-size:12px;line-height:1.5;margin:0;color:#42556d}
+.mobile-install-actions{display:flex;gap:8px;align-items:center}
+.mobile-install-primary,.mobile-install-secondary{font-weight:700;border-radius:9px;min-height:42px;padding:10px 15px;font-size:13px}
+.mobile-install-primary{background:var(--brand);color:#fff;border:1px solid var(--brand)}
+.mobile-install-secondary{background:transparent;color:var(--brand);border:1px solid #bacce2}
 .mobile-lock{padding:70px 25px;text-align:center;color:var(--muted);max-width:440px;margin:0 auto;line-height:1.6}
 @media(min-width:680px){body{background:#eef2f6}.mobile-header{border-left:1px solid var(--line);border-right:1px solid var(--line)}.mobile-main{background:var(--soft);min-height:calc(100vh - 72px);border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 @media(max-width:350px){.mobile-brand-text strong{max-width:110px}.mobile-desktop{font-size:11px;padding:8px}.mobile-main{padding-left:12px;padding-right:12px}.mobile-tabs button small{font-size:9px}}
