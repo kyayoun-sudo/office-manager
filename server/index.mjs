@@ -26,7 +26,7 @@ const HEADERS = (VERCEL.headers || []).map(h => ({ re: pattern(h.source), header
 
 // Only what the browser needs is served: the pages at the root, assets/, excel/ and the published simulation results.
 // Code, SQL, documents, secrets and anything else is never a file of the site.
-const PUBLIC = [/^\/[A-Za-z0-9_-]+\.html$/, /^\/assets\/[A-Za-z0-9_./-]+$/, /^\/excel\/[A-Za-z0-9_./-]+$/, /^\/docs\/FIRM_SIMULATION_DISK\.md$/, /^\/docs\/firm-simulation-results\/[A-Za-z0-9_./-]+$/];
+const PUBLIC = [/^\/mobile-sw\.js$/, /^\/[A-Za-z0-9_-]+\.html$/, /^\/assets\/[A-Za-z0-9_./-]+$/, /^\/excel\/[A-Za-z0-9_./-]+$/, /^\/docs\/FIRM_SIMULATION_DISK\.md$/, /^\/docs\/firm-simulation-results\/[A-Za-z0-9_./-]+$/];
 
 function securityHeaders(path, res) {
   for (const h of HEADERS) if (h.re.test(path)) for (const { key, value } of h.headers) res.setHeader(key, value);
@@ -78,7 +78,7 @@ async function serveStatic(path, req, res) {
   try { info = await stat(file); } catch { return false; }
   if (!info.isFile()) return false;
   res.setHeader('Content-Type', TYPES[extname(file).toLowerCase()] || 'application/octet-stream');
-  res.setHeader('Cache-Control', /\.html$/.test(file) ? 'no-cache' : 'public, max-age=300');
+  res.setHeader('Cache-Control', /(?:\.html$|mobile-sw\.js$)/.test(file) ? 'no-cache' : 'public, max-age=300');
   res.setHeader('Content-Length', info.size);
   if (req.method === 'HEAD') { res.end(); return true; }
   res.end(await readFile(file));
