@@ -148,7 +148,11 @@
   }
   function refresh(force) {
     detail('');
-    if (active === 'accueil' || active === 'travail') return notifications(force);
+    if (active === 'accueil') return notifications(force);
+    if (active === 'travail') return Promise.all([
+      notifications(force),
+      window.FirmMobileWork ? window.FirmMobileWork.refresh(force) : Promise.resolve()
+    ]);
     if (active === 'missions') return missions(force);
     if (active === 'messages') return messages(force);
     return Promise.resolve();
@@ -255,6 +259,7 @@
       if (window.FirmMobileChat) window.FirmMobileChat.init(OM);
       if (window.FirmMobileAI) window.FirmMobileAI.init(OM);
       if (window.FirmMobileCapture) window.FirmMobileCapture.init(OM);
+      if (window.FirmMobileWork) window.FirmMobileWork.init(OM);
       if (!boot.navReady) { connectNav(); boot.navReady = true; }
       syncUrl();
     }).catch(showRetry);
