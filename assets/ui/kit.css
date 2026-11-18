@@ -424,3 +424,7 @@
 .om-design .cab-card :is(.cab-list button, #copy, a#home):hover { background: var(--om-muted-surface); filter: none; }
 .om-design .cab-card .link-btn { align-self: flex-start; min-height: 2.25rem; padding: 0.5rem 0; font: inherit; font-size: 0.8125rem; color: var(--om-brand-link, var(--foreground)); text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer; }
 .om-design .cab-card table { font-size: 0.8125rem; }
+
+/* Veille : les actions d'une offre (suivre, raison, ne pas suivre…) se rangent en ligne. */
+.om-design .td-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.om-design .td-actions :is(select, input:not([type="checkbox"])) { width: auto; min-width: 11rem; flex: 0 1 16rem; }
