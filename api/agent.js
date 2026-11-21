@@ -287,6 +287,10 @@ export default async function handler(req, res) {
     const english = String(req.headers?.["x-om-lang"] || body.lang || "").toLowerCase() === "en";
     if (english) rootContext = { ...(rootContext || {}), reply_language: "English" };
 
+    // Simulation journal (2026-11-21): the person's instruction is kept before the agent works; nothing is written for a real firm.
+    const journalWho = { actor_id: personalAccount?.auth_user_id, actor_email: personalAccount?.email, agent: requestedAgent === ROOT_ROUTE ? ROOT_AGENT_KEY : requestedAgent, mission_id: body.mission_id, ref: run?.id || null };
+    const journal = await import('../lib/simulation-journal.js');
+    await journal.recordJournal(orgId, { ...journalWho, kind: 'consigne', body: message });
     const kernel = await runOfficeManagerKernel({
       message: english ? message + "\n\n(Answer in English. The firm's documents can be in French or English.)" : message,
       requestedAgent,
@@ -301,6 +305,7 @@ export default async function handler(req, res) {
     });
     const result = kernel.result;
     if (!result?.text) throw new Error('OFFICE_MANAGER_KERNEL_NO_RESULT');
+    await journal.recordJournal(orgId, { ...journalWho, kind: 'reponse', body: result.text });
 
     const topLevelTools = result.toolsUsed || [];
     const toolEvents = run?.id

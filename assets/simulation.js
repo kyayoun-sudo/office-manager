@@ -3,6 +3,7 @@
   if (!OM || !$('training-simulation')) return;
   var ERR = { CABINETS_NOT_ENABLED: 'Le mode plusieurs cabinets n’est pas encore activé sur ce serveur.', NOT_IN_PARENT: 'Vous n’êtes pas membre de ce cabinet.',
     PARENT_IS_SIMULATION: 'Quittez la simulation avant d’en créer une autre.', TRAINING_PARENT_REQUIRED: 'Le dossier « Entraînements » du Drive n’est pas connu : connectez le Drive du cabinet.',
+    JOURNAL_NOT_ALLOWED: 'Vous n’avez pas accès au journal de cette simulation.', NOT_A_SIMULATION: 'Cette simulation est introuvable.',
     EMAIL_NOT_VERIFIED: 'Confirmez votre adresse e-mail.', SIMULATION_NAME_REQUIRED: 'Donnez un nom à la simulation.' };
   var msg = function (e) { var m = (e && (e.code || e.message)) || String(e); return ERR[m] || m; };
   function el(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -21,8 +22,12 @@
     if (!list.length) { box.appendChild(el('p', 'Aucune simulation pour l’instant.', 'small')); return; }
     list.forEach(function (s) {
       var row = el('div', null, 'item');
-      var t = el('div', null, 't'); t.appendChild(el('span', s.name)); t.appendChild(el('span', s.archived ? ' — archivée' : ' — rôle : ' + s.role, 'small')); row.appendChild(t);
-      if (!s.archived) {
+      var t = el('div', null, 't'); t.appendChild(el('span', s.name)); t.appendChild(el('span', s.archived ? ' — archivée' : s.member === false ? ' — vous n’en êtes pas membre' : ' — rôle : ' + s.role, 'small')); row.appendChild(t);
+      var jr = el('button', 'Journal', 'btn ghost'); jr.type = 'button';
+      var jpanel = el('div', null, 'card'); jpanel.hidden = true;
+      jr.addEventListener('click', function () { jpanel.hidden = !jpanel.hidden; if (!jpanel.hidden) journal(s.org_id, jpanel); });
+      row.appendChild(jr); row.appendChild(jpanel);
+      if (!s.archived && s.member !== false) {
         var go = el('button', 'Entrer dans la simulation', 'btn'); go.type = 'button';
         go.addEventListener('click', function () { OM.switchCabinet(s.org_id, '/accueil.html'); });
         row.appendChild(go);
@@ -35,6 +40,23 @@
       }
       box.appendChild(row);
     });
+  }
+
+  var KIND_NAMES = { consigne: 'Consigne', reponse: 'Réponse de l’agent', correction: 'Correction' };
+  // Read-only journal of a simulation: instructions, answers and corrections (texts only through textContent).
+  function journal(simOrg, panel, before, list) {
+    if (!before) panel.textContent = 'Chargement…';
+    OM.api('/api/app?route=simulation&journal=' + encodeURIComponent(simOrg) + (before ? '&before=' + encodeURIComponent(before) : '')).then(function (d) {
+      var box = list || el('div'); if (!before) { panel.textContent = ''; panel.appendChild(el('p', d.scope === 'all' ? 'Tous les échanges de cette simulation.' : 'Vos échanges dans cette simulation.', 'small')); panel.appendChild(box); }
+      if (!before && !(d.entries || []).length) box.appendChild(el('p', 'Aucun échange pour l’instant.', 'small'));
+      (d.entries || []).forEach(function (e) {
+        var item = el('div', null, 'item');
+        item.appendChild(el('span', new Date(e.at).toLocaleString('fr-FR') + ' — ' + (KIND_NAMES[e.kind] || e.kind) + ' — ' + e.agent + (e.actor_email ? ' — ' + e.actor_email : ''), 'small'));
+        item.appendChild(el('p', e.body)); box.appendChild(item);
+      });
+      var more = panel.querySelector('[data-more]'); if (more) more.remove();
+      if (d.next) { var b = el('button', 'Voir plus ancien', 'btn ghost'); b.type = 'button'; b.setAttribute('data-more', '1'); b.addEventListener('click', function () { journal(simOrg, panel, d.next, box); }); panel.appendChild(b); }
+    }).catch(function (e) { panel.textContent = msg(e); });
   }
 
   var ROLE_NAMES = { owner: 'Propriétaire', partner: 'Associé', quality_reviewer: 'Revue qualité', bdm: 'BDM', manager: 'Manager', supervisor: 'Superviseur',

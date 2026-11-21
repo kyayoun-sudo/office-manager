@@ -443,6 +443,7 @@ export const ROUTES = Object.freeze({
     GET: open(async (orgId, req) => {
       if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
       const s = await import('../lib/simulation.js'), u = await import('../lib/user-auth.js');
+      if (req.query?.journal) return (await import('../lib/simulation-journal.js')).readJournal(await u.sessionUser(req), orgId, String(req.query.journal), req.query);
       if (req.query?.members) return s.simulationMembers(await u.sessionUser(req), orgId, String(req.query.members));
       return { parent: orgId, simulations: await s.listSimulations(await u.sessionUser(req), orgId) };
     }),
