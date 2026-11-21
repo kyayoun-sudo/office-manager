@@ -4,11 +4,25 @@ OFFICE MANAGER AI — CE QUI EST À FAIRE DE VOTRE CÔTÉ
 Ce fichier liste ce que Claude ne peut pas faire à votre place (accès à Supabase, au Drive réel, à la production,
 ou décisions qui vous reviennent). Il est tenu à jour à chaque modification. Une tâche faite peut être cochée [x].
 
-Dernière mise à jour : 18 novembre 2026
+Dernière mise à jour : 21 novembre 2026
 Branche concernée : feature/white-label-desktop
 
 -----------------------------------------------------------------------------------------------------------------
-00008. [ ] ACTIVER LA SIMULATION (cabinets multiples)                                              (18 novembre 2026)
+00009. [ ] EYNOWA LAB : CLÉ v1 EN PLACE, À NETTOYER ET À ESSAYER                                   (21 novembre 2026)
+-----------------------------------------------------------------------------------------------------------------
+Fait par Claude le 21 novembre (vous lui aviez donné la main) : clé d'application v1 d'Office Manager sur le Lab (empreinte
+SHA-256 dans le volume du Lab, clé en clair seulement dans le .env d'Office Manager : EYNOWA_LAB_V1_KEY), variables
+EYNOWA_LAB_CLIENTS_FILE et OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest dans le .env du Lab, deux routes ouvertes dans nginx
+(/v1/memory/remember, /v1/capabilities). Une leçon de simulation activée par un associé part dans la mémoire du Lab de son cabinet.
+À faire de votre côté :
+ 1. Essai réel : dans une simulation, faire proposer une leçon, l'activer (Entraînement → Leçons) et vérifier « EYNOWA Lab :
+    enregistrée ». Si « échec », le bouton « Envoyer au Lab » réessaie ; l'erreur est écrite sur la leçon.
+ 2. Supprimer, quand tout va bien, les sauvegardes qui contiennent des copies de .env :  rm -r /root/lab-v1-backup-20261121-*
+ 3. La clé v1 déclare 7 cabinets, dont deux cabinets d'essai du 16 novembre (« Test » et « Tes` ») : dire à Claude s'il faut les retirer.
+Retour arrière : remettre /root/lab-v1-backup-*/eynowa-lab.conf (nginx) et lab.env (Lab), puis recharger nginx et recréer le gateway.
+
+-----------------------------------------------------------------------------------------------------------------
+00008. [x] SIMULATION ACTIVÉE SUR LE SERVEUR (vérifié le 21 novembre 2026, reste l'essai avec un vrai compte)  (18 novembre 2026)
 -----------------------------------------------------------------------------------------------------------------
 Ce que c'est : Entraînement → onglet « Simulation » crée un cabinet d'entraînement séparé (données, rôles, travaux isolés ;
 aucun envoi réel ; écritures Drive limitées à son dossier). Rien ne change pour le cabinet actuel tant que vous n'activez pas.
