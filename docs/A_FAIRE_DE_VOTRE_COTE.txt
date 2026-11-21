@@ -17,6 +17,8 @@ Comment faire (sur le serveur) :
  1. ssh ionos-office, puis aller dans le dossier de l'application.
  2. Installer le SQL (une fois, sans danger si relancé) :
       docker compose exec -T db psql -U office_manager -d office_manager < db/simulation.sql
+    puis, pour le journal des échanges et corrections (21 novembre 2026, sans lui la simulation marche, sans journal) :
+      docker compose exec -T db psql -U office_manager -d office_manager < db/simulation-journal.sql
  3. Éditer le fichier .env et ajouter la ligne :   OFFICE_MANAGER_MULTI_CABINET=on
     (facultatif : OFFICE_MANAGER_SIMULATION_AI_DAILY_LIMIT=200 = plafond d'appels d'IA par simulation et par jour).
     Vérifier que DEFAULT_ORG_ID est déjà réglé (c'est le cabinet actuel). Le déploiement automatique ne touche jamais .env.
