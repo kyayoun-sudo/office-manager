@@ -13,6 +13,7 @@ import {
   searchQuery,
   workflowRun
 } from "./lib/tool-gateway.js";
+import { loadClients, identify, handleV1, CONTRACT_VERSION } from "./lib/lab-v1.js";
 
 const PORT = Number(process.env.PORT || 8787);
 const SECRET = process.env.EYNOWA_LAB_API_KEY || "";
@@ -30,6 +31,9 @@ function authorized(req) {
   const headerKey = req.headers["x-eynowa-api-key"];
   return equalSecret(bearer, SECRET) || equalSecret(headerKey, SECRET);
 }
+
+// Application keys (v1) are loaded once at start; a malformed file stops the start (no silent open access).
+const CLIENTS = loadClients();
 
 function send(res, status, data) {
   res.writeHead(status, {
@@ -54,6 +58,29 @@ function bytesFrom(data) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const path = String(req.url || "").split("?")[0];
+
+  // Liveness without secrets, for Docker healthchecks only (no component detail).
+  if (req.method === "GET" && path === "/livez") return send(res, 200, { ok: true, contract: CONTRACT_VERSION });
+
+  if (path.startsWith("/v1/")) {
+    const client = identify(req, CLIENTS, SECRET);
+    if (!client) return send(res, 401, { error: "UNAUTHORIZED" });
+    try {
+      const data = req.method === "POST" ? await jsonBody(req) : {};
+      return send(res, 200, await handleV1(req, path, client, data));
+    } catch (error) {
+      const status = Number(error?.status) || 500;
+      const safe = String(error?.code || error?.message || "INTERNAL_ERROR").split(":")[0];
+      return send(res, status, { error: safe, contract: CONTRACT_VERSION });
+    }
+  }
+
+  // Historical routes: unchanged, legacy key only (Office Manager compatibility).
+  // They give the legacy key access to any collection; switch them off once every consumer uses its own v1 key.
+  if (String(process.env.EYNOWA_LAB_LEGACY_ROUTES || "true").toLowerCase() === "false") {
+    return send(res, 410, { error: "LEGACY_ROUTES_DISABLED", contract: CONTRACT_VERSION });
+  }
   if (!authorized(req)) {
     return send(res, 401, { error: "UNAUTHORIZED" });
   }
