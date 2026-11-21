@@ -443,6 +443,7 @@ export const ROUTES = Object.freeze({
     GET: open(async (orgId, req) => {
       if (!multiCabinet()) throw fail('CABINETS_NOT_ENABLED', 503);
       const s = await import('../lib/simulation.js'), u = await import('../lib/user-auth.js');
+      if (req.query?.members) return s.simulationMembers(await u.sessionUser(req), orgId, String(req.query.members));
       return { parent: orgId, simulations: await s.listSimulations(await u.sessionUser(req), orgId) };
     }),
     POST: open(async (orgId, req) => {
@@ -451,6 +452,11 @@ export const ROUTES = Object.freeze({
       const b = req.body || {}, action = String(b.action || '');
       if (action === 'create') return s.createSimulation(await u.sessionUser(req), orgId, b);
       if (action === 'archive') return s.archiveSimulation(await u.sessionUser(req), orgId, String(b.org_id || ''));
+      const who = await u.sessionUser(req), sim = String(b.org_id || '');
+      if (action === 'invite') return s.inviteToSimulation(who, orgId, sim, b);
+      if (action === 'revoke') return s.revokeSimulationInvitation(who, orgId, sim, b.id);
+      if (action === 'set-role') return s.setSimulationRole(who, orgId, sim, b);
+      if (action === 'remove') return s.removeSimulationMember(who, orgId, sim, b);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'SIMULATION_UNAVAILABLE'
