@@ -222,6 +222,8 @@ export const ROUTES = Object.freeze({
       if (b.action === 'decide') return s.decide(orgId, b, who(req));
       if (b.action === 'rollback') return s.rollback(orgId, String(b.agent || ''), who(req));
       if (b.action === 'lesson') return s.setLessonStatus(orgId, b, who(req));
+      // Retry of the copy of an activated simulation lesson to the firm's memory in EYNOWA Lab (same key = no duplicate).
+      if (b.action === 'lab-transfer') return (await import('../lib/lesson-lab-transfer.js')).transferLesson(orgId, String(b.id || ''), who(req));
       if (b.action === 'tests') return s.generateTests(orgId, String(b.agent || ''));
       if (b.action === 'experiment') return s.runExperiment(orgId, String(b.agent || ''));
       if (b.action === 'source') { const m = String(b.link || '').match(/[-\w]{25,}/); return s.addSource(orgId, { file_id: m ? m[0] : b.link }, who(req)); }
