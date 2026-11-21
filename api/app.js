@@ -458,6 +458,8 @@ export const ROUTES = Object.freeze({
       if (action === 'revoke') return s.revokeSimulationInvitation(who, orgId, sim, b.id);
       if (action === 'set-role') return s.setSimulationRole(who, orgId, sim, b);
       if (action === 'remove') return s.removeSimulationMember(who, orgId, sim, b);
+      if (action === 'lessons-draft') return (await import('../lib/simulation-lessons.js')).draftLessons(who, orgId, sim);
+      if (action === 'lessons-send') return (await import('../lib/simulation-lessons.js')).sendLessons(who, orgId, sim, b);
       throw fail('UNKNOWN_ACTION', 400);
     }),
     unavailable: 'SIMULATION_UNAVAILABLE'

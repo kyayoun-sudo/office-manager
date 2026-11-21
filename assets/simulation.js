@@ -3,7 +3,7 @@
   if (!OM || !$('training-simulation')) return;
   var ERR = { CABINETS_NOT_ENABLED: 'Le mode plusieurs cabinets n’est pas encore activé sur ce serveur.', NOT_IN_PARENT: 'Vous n’êtes pas membre de ce cabinet.',
     PARENT_IS_SIMULATION: 'Quittez la simulation avant d’en créer une autre.', TRAINING_PARENT_REQUIRED: 'Le dossier « Entraînements » du Drive n’est pas connu : connectez le Drive du cabinet.',
-    JOURNAL_NOT_ALLOWED: 'Vous n’avez pas accès au journal de cette simulation.', NOT_A_SIMULATION: 'Cette simulation est introuvable.',
+    JOURNAL_NOT_ALLOWED: 'Vous n’avez pas accès au journal de cette simulation.', NOT_A_SIMULATION: 'Cette simulation est introuvable.', JOURNAL_TOO_SHORT: 'Le journal est trop court pour en tirer des leçons.', LESSON_AI_UNAVAILABLE: 'L’IA n’a pas répondu : réessayez plus tard.', LESSON_AI_UNREADABLE: 'L’IA a répondu de façon illisible : réessayez.', NO_LESSONS: 'Aucune leçon à envoyer.',
     EMAIL_NOT_VERIFIED: 'Confirmez votre adresse e-mail.', SIMULATION_NAME_REQUIRED: 'Donnez un nom à la simulation.' };
   var msg = function (e) { var m = (e && (e.code || e.message)) || String(e); return ERR[m] || m; };
   function el(tag, text, cls) { var n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -25,7 +25,7 @@
       var t = el('div', null, 't'); t.appendChild(el('span', s.name)); t.appendChild(el('span', s.archived ? ' — archivée' : s.member === false ? ' — vous n’en êtes pas membre' : ' — rôle : ' + s.role, 'small')); row.appendChild(t);
       var jr = el('button', 'Journal', 'btn ghost'); jr.type = 'button';
       var jpanel = el('div', null, 'card'); jpanel.hidden = true;
-      jr.addEventListener('click', function () { jpanel.hidden = !jpanel.hidden; if (!jpanel.hidden) journal(s.org_id, jpanel); });
+      jr.addEventListener('click', function () { jpanel.hidden = !jpanel.hidden; if (!jpanel.hidden) journal(s.org_id, jpanel, null, null, s.role === 'owner'); });
       row.appendChild(jr); row.appendChild(jpanel);
       if (!s.archived && s.member !== false) {
         var go = el('button', 'Entrer dans la simulation', 'btn'); go.type = 'button';
@@ -44,10 +44,11 @@
 
   var KIND_NAMES = { consigne: 'Consigne', reponse: 'Réponse de l’agent', correction: 'Correction' };
   // Read-only journal of a simulation: instructions, answers and corrections (texts only through textContent).
-  function journal(simOrg, panel, before, list) {
+  function journal(simOrg, panel, before, list, isOwner) {
     if (!before) panel.textContent = 'Chargement…';
     OM.api('/api/app?route=simulation&journal=' + encodeURIComponent(simOrg) + (before ? '&before=' + encodeURIComponent(before) : '')).then(function (d) {
-      var box = list || el('div'); if (!before) { panel.textContent = ''; panel.appendChild(el('p', d.scope === 'all' ? 'Tous les échanges de cette simulation.' : 'Vos échanges dans cette simulation.', 'small')); panel.appendChild(box); }
+      var box = list || el('div'); if (!before) { panel.textContent = ''; panel.appendChild(el('p', d.scope === 'all' ? 'Tous les échanges de cette simulation.' : 'Vos échanges dans cette simulation.', 'small')); panel.appendChild(box);
+        if (isOwner) { var ls = el('button', 'Proposer des leçons au cabinet', 'btn'); ls.type = 'button'; ls.addEventListener('click', function () { lessons(simOrg, panel); }); panel.insertBefore(ls, box); } }
       if (!before && !(d.entries || []).length) box.appendChild(el('p', 'Aucun échange pour l’instant.', 'small'));
       (d.entries || []).forEach(function (e) {
         var item = el('div', null, 'item');
@@ -56,6 +57,40 @@
       });
       var more = panel.querySelector('[data-more]'); if (more) more.remove();
       if (d.next) { var b = el('button', 'Voir plus ancien', 'btn ghost'); b.type = 'button'; b.setAttribute('data-more', '1'); b.addEventListener('click', function () { journal(simOrg, panel, d.next, box); }); panel.appendChild(b); }
+    }).catch(function (e) { panel.textContent = msg(e); });
+  }
+
+  // Lessons (step 4): the AI drafts from the journal, the owner corrects and keeps, then sends them to the parent firm's partners for validation.
+  function lessons(simOrg, panel) {
+    panel.textContent = 'L’IA relit le journal…';
+    post({ action: 'lessons-draft', org_id: simOrg }).then(function (d) {
+      panel.textContent = '';
+      panel.appendChild(el('p', 'Brouillons rédigés par l’IA d’après ce journal. Relisez chaque leçon : elle ne doit contenir aucun nom de client, de personne ni de société. Elles partent « en attente » : un associé les valide ou les refuse avant qu’un agent ne les applique.', 'small'));
+      var say = el('p', '', 'small'); say.setAttribute('role', 'status');
+      var rows = [];
+      if (!(d.drafts || []).length) panel.appendChild(el('p', 'Aucune leçon générale à proposer pour l’instant.', 'small'));
+      (d.drafts || []).forEach(function (x) {
+        var box = el('div', null, 'item'); var keep = el('input'); keep.type = 'checkbox'; keep.checked = true; keep.setAttribute('aria-label', 'Garder cette leçon');
+        var lesson = el('textarea'); lesson.value = x.lesson; lesson.rows = 2; lesson.maxLength = 400; lesson.setAttribute('aria-label', 'Leçon');
+        var rule = el('textarea'); rule.value = x.rule; rule.rows = 2; rule.maxLength = 300; rule.setAttribute('aria-label', 'Règle');
+        box.appendChild(keep); box.appendChild(el('span', ' Agent : ' + x.agent + ' — ' + x.category, 'small')); box.appendChild(lesson); box.appendChild(rule); panel.appendChild(box);
+        rows.push({ keep: keep, lesson: lesson, rule: rule, x: x });
+      });
+      (d.refused || []).forEach(function (x) { panel.appendChild(el('p', 'Écartée (' + x.problem + ') : ' + (x.lesson || x.rule), 'small')); });
+      if (rows.length) {
+        var send = el('button', 'Envoyer à l’associé', 'btn'); send.type = 'button';
+        send.addEventListener('click', function () {
+          var picked = rows.filter(function (r) { return r.keep.checked; }).map(function (r) { return { agent: r.x.agent, category: r.x.category, situation: r.x.situation, lesson: r.lesson.value, rule: r.rule.value, refs: r.x.refs }; });
+          if (!picked.length) { say.textContent = 'Cochez au moins une leçon.'; return; }
+          send.disabled = true;
+          post({ action: 'lessons-send', org_id: simOrg, lessons: picked }).then(function (r) {
+            panel.textContent = ''; panel.appendChild(el('p', (r.written || []).length + ' leçon(s) envoyée(s), ' + (r.merged || []).length + ' rapprochée(s) d’une leçon existante, ' + (r.refused || []).length + ' refusée(s).', 'small'));
+            (r.refused || []).forEach(function (x) { panel.appendChild(el('p', 'Refusée (' + x.why + ') : ' + x.lesson, 'small')); });
+          }).catch(function (e) { say.textContent = msg(e); send.disabled = false; });
+        });
+        panel.appendChild(send);
+      }
+      panel.appendChild(say);
     }).catch(function (e) { panel.textContent = msg(e); });
   }
 
